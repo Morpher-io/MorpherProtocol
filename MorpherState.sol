@@ -1,11 +1,12 @@
-pragma solidity 0.5.11;
+pragma solidity 0.5.16;
 
 //import "../node_modules/@openzeppelin/contracts/ownership/Ownable.sol";
 //import "../node_modules/@openzeppelin/contracts/math/SafeMath.sol";
 
 import "./Ownable.sol";
 import "./SafeMath.sol";
-import "./MorpherTokenInterface.sol";
+import "./IMorpherToken.sol";
+import "./IERC20.sol";
 
 // ----------------------------------------------------------------------------------
 // Data and token balance storage of the Morpher platform
@@ -13,7 +14,7 @@ import "./MorpherTokenInterface.sol";
 // by an elected platform administrator (see MorpherGovernance) to perform protocol updates.
 // ----------------------------------------------------------------------------------
 
-contract MorpherStateBeta is Ownable {
+contract MorpherState is Ownable {
     using SafeMath for uint256;
 
     uint256 public totalSupply;
@@ -23,7 +24,7 @@ contract MorpherStateBeta is Ownable {
     uint256 constant DECIMALS = 18;
     bool public paused = false;
 
-    address public morpherGovernanceContract;
+    address public morpherGovernance;
     address public morpherRewards;
     address public administrator;
     address public oracleContract;
@@ -40,7 +41,8 @@ contract MorpherStateBeta is Ownable {
     uint256 public mainChainWithdrawLimit24;
 
     mapping(address => bool) stateAccess;
-
+    mapping(address => bool) transferAllowed;
+    
     mapping(address => uint256) balances;
     mapping(address => mapping(address => uint256)) allowed;
 
@@ -88,35 +90,38 @@ contract MorpherStateBeta is Ownable {
 // ----------------------------------------------------------------------------
     event StateAccessGranted(address indexed whiteList, uint256 indexed blockNumber);
     event StateAccessDenied(address indexed blackList, uint256 indexed blockNumber);
+    
+    event TransfersEnabled(address indexed whiteList);
+    event TransfersDisabled(address indexed blackList);
 
-    event CreditAddress(address indexed recipient, uint256 indexed amount, uint256 totalCashSupply, uint256 indexed blockNumber);
-    event DebitAddress(address indexed payer, uint256 indexed amount, uint256 totalCashSupply, uint256 indexed blockNumber);
+    event CreditAddress(address indexed recipient, uint256 indexed amount, uint256 totalCashSupply);
+    event DebitAddress(address indexed payer, uint256 indexed amount, uint256 totalCashSupply);
 
     event Transfer(address indexed sender, address indexed recipient, uint256 amount, uint256 totalCashSupply);
     event Mint(address indexed recipient, uint256 amount, uint256 totalCashSupply);
     event Burn(address indexed recipient, uint256 amount, uint256 totalCashSupply);
 
-    event RewardsChange(address indexed rewardsAddress, uint256 indexed rewardsBasisPoints, uint256 blockNumber);
-    event LastRewardTime(uint256 indexed rewardsTime, uint256 indexed blockNumber);
-    event GovernanceChange(address indexed governanceAddress, uint256 indexed blockNumber);
+    event RewardsChange(address indexed rewardsAddress, uint256 indexed rewardsBasisPoints);
+    event LastRewardTime(uint256 indexed rewardsTime);
+    event GovernanceChange(address indexed governanceAddress);
     event TokenChange(address indexed tokenAddress);
-    event AdministratorChange(address indexed administratorAddress, uint256 indexed blockNumber);
-    event OracleChange(address indexed oracleContract, uint256 indexed blockNumber);
-    event MaxLeverageChange(uint256 maxLeverage, uint256 indexed blockNumber);
-    event MarketActivated(bytes32 indexed activateMarket, uint256 indexed blockNumber);
-    event MarketDeActivated(bytes32 indexed deActivateMarket, uint256 indexed blockNumber);
-    event NewBridge(address _bridgeAddress, uint256 indexed blockNumber);
-    event SideChainMerkleRootUpdate(bytes32 indexed sideChainMerkleRoot, uint256 updateTime, uint256 indexed blockNumber);
-    event NewSideChainOperator(address indexed sideChainOperator, uint256 indexed blockNumber);
-    event MainChainWithdrawLimitUpdate(uint256 indexed mainChainWithdrawLimit24, uint256 indexed blockNumber);
+    event AdministratorChange(address indexed administratorAddress);
+    event OracleChange(address indexed oracleContract);
+    event MaxLeverageChange(uint256 maxLeverage);
+    event MarketActivated(bytes32 indexed activateMarket);
+    event MarketDeActivated(bytes32 indexed deActivateMarket);
+    event NewBridge(address _bridgeAddress);
+    event SideChainMerkleRootUpdate(bytes32 indexed sideChainMerkleRoot, uint256 updateTime);
+    event NewSideChainOperator(address indexed sideChainOperator);
+    event MainChainWithdrawLimitUpdate(uint256 indexed mainChainWithdrawLimit24);
 
-    event NewTotalSupply(uint256 newTotalSupply, uint256 indexed blockNumber);
-    event NewTotalCashSupply(uint256 newTotalCashSupply, uint256 indexed blockNumber);
-    event StatePaused(address administrator, uint256 indexed blockNumber);
-    event StateUnPaused(address administrator, uint256 indexed blockNumber);
+    event NewTotalSupply(uint256 newTotalSupply);
+    event NewTotalCashSupply(uint256 newTotalCashSupply);
+    event StatePaused(address administrator);
+    event StateUnPaused(address administrator);
     
-    event SetAllowance(address indexed sender, address indexed spender, uint256 tokens, uint256 indexed blockNumber);
-    event SetPosition(bytes32 indexed positionHash, address indexed sender, bytes32 indexed marketId, uint256 timeStamp, uint256 longShares, uint256 shortShares, uint256 meanEntryPrice, uint256 meanEntrySpread, uint256 meanEntryLeverage, uint256 liquidationPrice, uint256 blockNumber);
+    event SetAllowance(address indexed sender, address indexed spender, uint256 tokens);
+    event SetPosition(bytes32 indexed positionHash, address indexed sender, bytes32 indexed marketId, uint256 timeStamp, uint256 longShares, uint256 shortShares, uint256 meanEntryPrice, uint256 meanEntrySpread, uint256 meanEntryLeverage, uint256 liquidationPrice);
     
     constructor() public {
         setRewardAddress(owner());
@@ -132,27 +137,32 @@ contract MorpherStateBeta is Ownable {
     }
 
     modifier notPaused {
-        require(paused == false, "Contract paused, aborting");
+        require(paused == false, "MorpherState: Contract paused, aborting");
         _;
     }
 
     modifier onlyPlatform {
-        require(stateAccess[msg.sender] == true, "Only Platform is allowed to execute operation.");
+        require(stateAccess[msg.sender] == true, "MorpherState: Only Platform is allowed to execute operation.");
         _;
     }
 
     modifier onlyGovernance {
-        require(msg.sender == getGovernanceContract(), "Calling contract not the Governance Contract. Aborting.");
+        require(msg.sender == getGovernance(), "MorpherState: Calling contract not the Governance Contract. Aborting.");
         _;
     }
 
     modifier onlyAdministrator {
-        require(msg.sender == getAdministrator(), "Caller is not the Administrator. Aborting.");
+        require(msg.sender == getAdministrator(), "MorpherState: Caller is not the Administrator. Aborting.");
+        _;
+    }
+
+    modifier canTransfer {
+        require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
         _;
     }
 
     modifier onlyBridge {
-        require(msg.sender == getMorpherBridge(), "Caller is not the Bridge. Aborting.");
+        require(msg.sender == getMorpherBridge(), "MorpherState: Caller is not the Bridge. Aborting.");
         _;
     }
 
@@ -172,67 +182,58 @@ contract MorpherStateBeta is Ownable {
         return exposureByMarket[_marketId].addy[_mappingIndex];
     }
 
-    function setMaxMappingIndex(bytes32 _marketId, uint256 _maxMappingIndex) public onlyPlatform returns(bool _success) {
+    function setMaxMappingIndex(bytes32 _marketId, uint256 _maxMappingIndex) public onlyPlatform {
         exposureByMarket[_marketId].maxMappingIndex = _maxMappingIndex;
-        return true;
     }
 
-    function setExposureMapping(bytes32 _marketId, address _address, uint256 _index) public onlyPlatform returns(bool _success) {
+    function setExposureMapping(bytes32 _marketId, address _address, uint256 _index) public onlyPlatform  {
         setExposureMappingIndex(_marketId, _address, _index);
         setExposureMappingAddress(_marketId, _address, _index);
-        return true;
     }
 
-    function setExposureMappingIndex(bytes32 _marketId, address _address, uint256 _index) public onlyPlatform returns(bool _success) {
+    function setExposureMappingIndex(bytes32 _marketId, address _address, uint256 _index) public onlyPlatform {
         exposureByMarket[_marketId].index[_address] = _index;
-        return true;
     }
 
-    function setExposureMappingAddress(bytes32 _marketId, address _address, uint256 _index) public onlyPlatform returns(bool _success) {
+    function setExposureMappingAddress(bytes32 _marketId, address _address, uint256 _index) public onlyPlatform {
         exposureByMarket[_marketId].addy[_index] = _address;
-        return true;
     }
 
 // ----------------------------------------------------------------------------
 // Setter/Getter functions for spam protection
 // ----------------------------------------------------------------------------
 
-    function setLastRequestBlock(address _address) public onlyPlatform returns(bool _success) {
+    function setLastRequestBlock(address _address) public onlyPlatform {
         lastRequestBlock[_address] = block.number;
-        return true;
     }
 
-    function getLastRequestBlock(address _address) public view returns(uint256 _success) {
+    function getLastRequestBlock(address _address) public view returns(uint256 _lastRequestBlock) {
         return lastRequestBlock[_address];
     }
 
-    function setNumberOfRequests(address _address, uint256 _numberOfRequests) public onlyPlatform returns(bool _success) {
+    function setNumberOfRequests(address _address, uint256 _numberOfRequests) public onlyPlatform {
         numberOfRequests[_address] = _numberOfRequests;
-        return true;
     }
 
-    function increaseNumberOfRequests(address _address) public onlyPlatform returns(bool _success) {
+    function increaseNumberOfRequests(address _address) public onlyPlatform{
         numberOfRequests[_address]++;
-        return true;
     }
 
     function getNumberOfRequests(address _address) public view returns(uint256 _numberOfRequests) {
         return numberOfRequests[_address];
     }
 
-    function setNumberOfRequestsLimit(uint256 _numberOfRequestsLimit) public onlyPlatform returns (bool _success) {
+    function setNumberOfRequestsLimit(uint256 _numberOfRequestsLimit) public onlyPlatform {
         numberOfRequestsLimit = _numberOfRequestsLimit;
-        return true;
     }
 
     function getNumberOfRequestsLimit() public view returns (uint256 _numberOfRequestsLimit) {
         return numberOfRequestsLimit;
     }
 
-    function setMainChainWithdrawLimit(uint256 _mainChainWithdrawLimit24) public onlyOwner returns (bool _success) {
+    function setMainChainWithdrawLimit(uint256 _mainChainWithdrawLimit24) public onlyOwner {
         mainChainWithdrawLimit24 = _mainChainWithdrawLimit24;
-        emit MainChainWithdrawLimitUpdate(_mainChainWithdrawLimit24, block.number);
-        return true;
+        emit MainChainWithdrawLimitUpdate(_mainChainWithdrawLimit24);
     }
 
     function getMainChainWithdrawLimit() public view returns (uint256 _mainChainWithdrawLimit24) {
@@ -243,90 +244,90 @@ contract MorpherStateBeta is Ownable {
 // Setter/Getter functions for state access
 // ----------------------------------------------------------------------------
 
-    function grantAccess(address _address) public onlyOwner returns (bool _success)  {
+    function grantAccess(address _address) public onlyOwner {
         stateAccess[_address] = true;
         emit StateAccessGranted(_address, block.number);
-        return true;
     }
 
-    function denyAccess(address _address) public onlyOwner returns (bool _success)  {
+    function denyAccess(address _address) public onlyOwner {
         stateAccess[_address] = false;
         emit StateAccessDenied(_address, block.number);
-        return true;
     }
     
     function getStateAccess(address _address) public view returns(bool _hasAccess) {
         return stateAccess[_address];
     }
 
+// ----------------------------------------------------------------------------
+// Setter/Getter functions for addresses that can transfer tokens (sidechain only)
+// ----------------------------------------------------------------------------
+
+    function enableTransfers(address _address) public onlyOwner {
+        transferAllowed[_address] = true;
+        emit TransfersEnabled(_address);
+    }
+
+    function disableTransfers(address _address) public onlyOwner {
+        transferAllowed[_address] = false;
+        emit TransfersDisabled(_address);
+    }
+    
+    function getCanTransfer(address _address) public view returns(bool _hasAccess) {
+        return transferAllowed[_address];
+    }
 
 // ----------------------------------------------------------------------------
 // Minting/burning/transfer of token
 // ----------------------------------------------------------------------------
 
-    function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused returns (bool _success) {
-        require(balances[_from] >= _token, "Not enough token.");
+    function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused {
+        require(balances[_from] >= _token, "MorpherState: Not enough token.");
         balances[_from] = balances[_from].sub(_token);
         balances[_to] = balances[_to].add(_token);
-        MorpherTokenInterface(morpherToken).emitTransfer(_from, _to, _token);
+        IMorpherToken(morpherToken).emitTransfer(_from, _to, _token);
         emit Transfer(_from, _to, _token, totalSupply);
-        return true;
     }
 
-    function mint(address _address, uint256 _token) public onlyPlatform notPaused returns (bool _success) {
+    function mint(address _address, uint256 _token) public onlyPlatform notPaused {
         balances[_address] = balances[_address].add(_token);
         totalSupply.add(_token);
-        MorpherTokenInterface(morpherToken).emitTransfer(address(0), _address, _token);
+        IMorpherToken(morpherToken).emitTransfer(address(0), _address, _token);
         emit Mint(_address, _token, totalCashSupply);
-        return true;
     }
 
-    function burn(address _address, uint256 _token) public onlyPlatform notPaused returns (bool _success) {
+    function burn(address _address, uint256 _token) public onlyPlatform notPaused {
         require(balances[_address] >= _token, "MorpherState: Not enough token.");
         balances[_address] = balances[_address].sub(_token);
         totalSupply.sub(_token);
-        MorpherTokenInterface(morpherToken).emitTransfer(_address, address(0), _token);
+        IMorpherToken(morpherToken).emitTransfer(_address, address(0), _token);
         emit Burn(_address, _token, totalCashSupply);
-        return true;
     }
 
 // ----------------------------------------------------------------------------
 // Setter/Getter functions for balance and token functions (ERC20)
 // ----------------------------------------------------------------------------
-    function getTotalSupply() public view returns (uint256 _totalSupply) {
-        return totalSupply;
-    }
-
-    function getTotalCashSupply() public view returns (uint256 _totalCashSupply) {
-        return totalCashSupply;
-    }
-
-    function setTotalSupply(uint256 _newTotalSupply) public onlyAdministrator returns (bool _success) {
+    function setTotalSupply(uint256 _newTotalSupply) public onlyAdministrator {
         totalSupply = _newTotalSupply;
-        emit NewTotalSupply(_newTotalSupply, block.number);
-        return true;
+        emit NewTotalSupply(_newTotalSupply);
      }
 
-    function updateTotalSupply(uint256 _newTotalSupply) private returns (bool _success) {
+    function updateTotalSupply(uint256 _newTotalSupply) private {
         totalSupply = _newTotalSupply;
-        emit NewTotalSupply(_newTotalSupply, block.number);
-        return true;
+        emit NewTotalSupply(_newTotalSupply);
      }
 
-    function setTotalCashSupply(uint256 _newTotalCashSupply) public onlyAdministrator returns (bool _success) {
+    function setTotalCashSupply(uint256 _newTotalCashSupply) public onlyAdministrator {
         totalCashSupply = _newTotalCashSupply;
-        emit NewTotalSupply(_newTotalCashSupply, block.number);
-        return true;
+        emit NewTotalSupply(_newTotalCashSupply);
      }
 
     function balanceOf(address _tokenOwner) public view returns (uint256 balance) {
         return balances[_tokenOwner];
     }
 
-    function setAllowance(address _from, address _spender, uint256 _tokens) public onlyPlatform returns (bool success) {
+    function setAllowance(address _from, address _spender, uint256 _tokens) public onlyPlatform {
         allowed[_from][_spender] = _tokens;
-        emit SetAllowance(_from, _spender, _tokens, block.number);
-        return true;
+        emit SetAllowance(_from, _spender, _tokens);
     }
 
     function getAllowance(address _tokenOwner, address spender) public view returns (uint256 remaining) {
@@ -337,20 +338,18 @@ contract MorpherStateBeta is Ownable {
 // Setter/Getter functions for platform roles
 // ----------------------------------------------------------------------------
 
-    function setGovernanceContract(address _newGovernanceContractAddress) public onlyOwner returns (bool _success) {
-        morpherGovernanceContract = _newGovernanceContractAddress;
-        emit GovernanceChange(_newGovernanceContractAddress, block.number);
-        return true;
+    function setGovernanceContract(address _newGovernanceContractAddress) public onlyOwner {
+        morpherGovernance = _newGovernanceContractAddress;
+        emit GovernanceChange(_newGovernanceContractAddress);
     }
 
-    function getGovernanceContract() public view returns (address _governanceContract) {
-        return morpherGovernanceContract;
+    function getGovernance() public view returns (address _governanceContract) {
+        return morpherGovernance;
     }
 
-    function setMorpherBridge(address _newBridge) public onlyOwner returns (bool _success) {
+    function setMorpherBridge(address _newBridge) public onlyOwner {
         morpherBridge = _newBridge;
-        emit NewBridge(_newBridge, block.number);
-        return true;
+        emit NewBridge(_newBridge);
     }
 
     function getMorpherBridge() public view returns (address _currentBridge) {
@@ -359,7 +358,7 @@ contract MorpherStateBeta is Ownable {
 
     function setOracleContract(address _newOracleContract) public onlyGovernance {
         oracleContract = _newOracleContract;
-        emit OracleChange(_newOracleContract, block.number);
+        emit OracleChange(_newOracleContract);
     }
 
     function getOracleContract() public view returns(address) {
@@ -377,7 +376,7 @@ contract MorpherStateBeta is Ownable {
 
     function setAdministrator(address _newAdministrator) public onlyGovernance {
         administrator = _newAdministrator;
-        emit AdministratorChange(_newAdministrator, block.number);
+        emit AdministratorChange(_newAdministrator);
     }
 
     function getAdministrator() public view returns(address) {
@@ -390,48 +389,32 @@ contract MorpherStateBeta is Ownable {
 
     function setRewardAddress(address _newRewardsAddress) public onlyOwner {
         morpherRewards = _newRewardsAddress;
-        emit RewardsChange(_newRewardsAddress, getRewardBasisPoints(), block.number);
+        emit RewardsChange(_newRewardsAddress, rewardBasisPoints);
     }
 
-    function getRewardAddress() public view returns(address) {
-        return morpherRewards;
-    }
-
-    function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyOwner returns(bool) {
-        require(_newRewardBasisPoints <= 15000, "Reward basis points need to be less or equal to 15000.");
+    function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyOwner {
+        require(_newRewardBasisPoints <= 15000, "MorpherState: Reward basis points need to be less or equal to 15000.");
         rewardBasisPoints = _newRewardBasisPoints;
-        emit RewardsChange(getRewardAddress(), _newRewardBasisPoints, block.number);
-        return true;
+        emit RewardsChange(morpherRewards, _newRewardBasisPoints);
     }
 
-    function getRewardBasisPoints() public view returns(uint256) {
-        return rewardBasisPoints;
-    }
-
-    function setLastRewardTime(uint256 _lastRewardTime) private returns(bool) {
+    function setLastRewardTime(uint256 _lastRewardTime) private {
         lastRewardTime = _lastRewardTime;
-        emit LastRewardTime(_lastRewardTime, block.number);
-        return true;
-    }
-
-    function getLastRewardTime() public view returns(uint256 _lastRewardTime) {
-        return lastRewardTime;
+        emit LastRewardTime(_lastRewardTime);
     }
 
 // ----------------------------------------------------------------------------
 // Setter/Getter functions for platform administration
 // ----------------------------------------------------------------------------
 
-    function activateMarket(bytes32 _activateMarket) public onlyAdministrator returns (bool _success) {
+    function activateMarket(bytes32 _activateMarket) public onlyAdministrator {
         marketActive[_activateMarket] = true;
-        emit MarketActivated(_activateMarket, block.number);
-        return true;
+        emit MarketActivated(_activateMarket);
     }
 
-    function deActivateMarket(bytes32 _deActivateMarket) public onlyAdministrator returns (bool _success) {
+    function deActivateMarket(bytes32 _deActivateMarket) public onlyAdministrator {
         marketActive[_deActivateMarket] = false;
-        emit MarketDeActivated(_deActivateMarket, block.number);
-        return true;
+        emit MarketDeActivated(_deActivateMarket);
     }
 
     function getMarketActive(bytes32 _marketId) public view returns(bool _active) {
@@ -440,23 +423,21 @@ contract MorpherStateBeta is Ownable {
 
     function setMaxLeverage(uint256 _newMaxLeverage) public onlyAdministrator {
         maxLeverage = _newMaxLeverage;
-        emit MaxLeverageChange(_newMaxLeverage, block.number);
+        emit MaxLeverageChange(_newMaxLeverage);
     }
 
     function getMaxLeverage() public view returns(uint256 _maxLeverage) {
         return maxLeverage;
     }
 
-    function pauseState() public onlyAdministrator returns (bool _success) {
+    function pauseState() public onlyAdministrator {
         paused = true;
-        emit StatePaused(msg.sender, block.number);
-        return true;
+        emit StatePaused(msg.sender);
     }
 
-    function unPauseState() public onlyAdministrator returns (bool _success) {
+    function unPauseState() public onlyAdministrator {
         paused = false;
-        emit StateUnPaused(msg.sender, block.number);
-        return true;
+        emit StateUnPaused(msg.sender);
     }
 
 // ----------------------------------------------------------------------------
@@ -467,7 +448,7 @@ contract MorpherStateBeta is Ownable {
         sideChainMerkleRoot = _sideChainMerkleRoot;
         sideChainMerkleRootWrittenAtTime = now;
         payOperatingReward;
-        emit SideChainMerkleRootUpdate(_sideChainMerkleRoot, sideChainMerkleRootWrittenAtTime, block.number);
+        emit SideChainMerkleRootUpdate(_sideChainMerkleRoot, sideChainMerkleRootWrittenAtTime);
     }
 
     function getSideChainMerkleRoot() public view returns(bytes32 _sideChainMerkleRoot) {
@@ -476,7 +457,7 @@ contract MorpherStateBeta is Ownable {
 
     function setSideChainOperator(address _address) public onlyOwner {
         sideChainOperator = _address;
-        emit NewSideChainOperator(_address, block.number);
+        emit NewSideChainOperator(_address);
     }
 
     function getSideChainOperator() public view returns (address _address) {
@@ -501,7 +482,7 @@ contract MorpherStateBeta is Ownable {
         uint256 _meanEntrySpread,
         uint256 _meanEntryLeverage,
         uint256 _liquidationPrice
-        ) public onlyPlatform returns (bool _success) {
+        ) public onlyPlatform {
         portfolio[_address][_marketId].lastUpdated = _timeStamp;
         portfolio[_address][_marketId].longShares = _longShares;
         portfolio[_address][_marketId].shortShares = _shortShares;
@@ -525,8 +506,7 @@ contract MorpherStateBeta is Ownable {
         } else {
             deleteExposureByMarket(_marketId, _address);
         }
-        emit SetPosition(portfolio[_address][_marketId].positionHash, _address, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice, block.number );
-        return true;
+        emit SetPosition(portfolio[_address][_marketId].positionHash, _address, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice);
     }
 
     function getPosition(
@@ -654,11 +634,11 @@ contract MorpherStateBeta is Ownable {
 // ----------------------------------------------------------------------------
 
     function payOperatingReward() public returns(uint256 _reward) {
-        if (now > getLastRewardTime() + 1 days) {
-            _reward = getTotalSupply().div(PRECISION).mul(getRewardBasisPoints());
-            setLastRewardTime(getLastRewardTime().add(1 days));
-            mint(getRewardAddress(), _reward);
-            updateTotalSupply(getTotalSupply().add(_reward));
+        if (now > lastRewardTime + 1 days) {
+            _reward = totalSupply.div(PRECISION).mul(rewardBasisPoints);
+            setLastRewardTime(lastRewardTime.add(1 days));
+            mint(morpherRewards, _reward);
+            updateTotalSupply(totalSupply.add(_reward));
         }
         return _reward;
     }
