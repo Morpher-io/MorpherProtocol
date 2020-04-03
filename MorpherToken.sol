@@ -1,11 +1,9 @@
 pragma solidity 0.5.16;
 
-import "./Context.sol";
 import "./IERC20.sol";
 import "./Ownable.sol";
 import "./SafeMath.sol";
-import "./MorpherStateBeta.sol";
-
+import "./MorpherState.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -31,25 +29,33 @@ import "./MorpherStateBeta.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract MorpherToken is Context, IERC20, Ownable {
+contract MorpherToken is IERC20, Ownable {
 
-    MorpherStateBeta state;
+    MorpherState state;
     using SafeMath for uint256;
 
     string public constant name     = "Morpher";
     string public constant symbol   = "MPH";
     uint8  public constant decimals = 18;
+    
+    bool public mainChain;
 
     modifier onlyState {
-        require(msg.sender == address(state), "Caller must be MorpherState contract.");
+        require(msg.sender == address(state), "ERC20: caller must be MorpherState contract.");
+        _;
+    }
+
+    modifier canTransfer {
+        require(mainChain == true || state.getCanTransfer(msg.sender), "ERC20: token transfers disabled on sidechain.");
         _;
     }
 
     // ------------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------------
-    constructor(address _stateAddress) public {
-        state = MorpherStateBeta(_stateAddress);
+    constructor(address _stateAddress, bool _mainChain) public {
+        state = MorpherState(_stateAddress);
+        mainChain = _mainChain;
     }
 
     /**
@@ -73,9 +79,11 @@ contract MorpherToken is Context, IERC20, Ownable {
      *
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
+     * 
+     * Emits a {Transfer} event via emitTransfer called by MorpherState
      */
     function transfer(address _recipient, uint256 _amount) public returns (bool) {
-        _transfer(_msgSender(), _recipient, _amount);
+        _transfer(msg.sender, _recipient, _amount);
         return true;
     }
 
@@ -94,7 +102,7 @@ contract MorpherToken is Context, IERC20, Ownable {
      * - `spender` cannot be the zero address.
      */
     function approve(address _spender, uint256 _amount) public returns (bool) {
-        _approve(_msgSender(), _spender, _amount);
+        _approve(msg.sender, _spender, _amount);
         return true;
     }
 
@@ -112,7 +120,7 @@ contract MorpherToken is Context, IERC20, Ownable {
      */
     function transferFrom(address _sender, address _recipient, uint256 amount) public returns (bool) {
         _transfer(_sender, _recipient, amount);
-        _approve(_sender, _msgSender(), state.getAllowance(_sender, _msgSender()).sub(amount, "ERC20: transfer amount exceeds allowance"));
+        _approve(_sender, msg.sender, state.getAllowance(_sender, msg.sender).sub(amount, "ERC20: transfer amount exceeds allowance"));
         return true;
     }
 
@@ -129,8 +137,7 @@ contract MorpherToken is Context, IERC20, Ownable {
      * - `_spender` cannot be the zero address.
      */
     function increaseAllowance(address _spender, uint256 _addedValue) public returns (bool) {
-        // _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
-        state.setAllowance(_msgSender(), _spender, state.getAllowance(_msgSender(), _spender).add(_addedValue));
+        _approve(msg.sender, _spender, state.getAllowance(msg.sender, _spender).add(_addedValue));
         return true;
     }
 
@@ -149,20 +156,37 @@ contract MorpherToken is Context, IERC20, Ownable {
      * `subtractedValue`.
      */
     function decreaseAllowance(address _spender, uint256 _subtractedValue) public returns (bool) {
-        state.setAllowance(_msgSender(), _spender, state.getAllowance(_msgSender(), _spender).sub(_subtractedValue, "ERC20: decreased allowance below zero"));
+        _approve(msg.sender, _spender,  state.getAllowance(msg.sender, _spender).sub(_subtractedValue, "ERC20: decreased allowance below zero"));
         return true;
     }
 
-    function stateMint(address _account, uint256 _amount) public onlyState {
-        _mint(_account, _amount);
+    /**
+     * @dev Caller destroys `_amount` tokens permanently
+     *
+     * Emits a {Transfer} event to zero address called by MorpherState via emitTransfer.
+     *
+     * Requirements:
+     *
+     * - Caller must have token balance of at least `_amount`
+     * 
+     */
+     function burn(uint256 _amount) public returns (bool) {
+        state.burn(msg.sender, _amount);
+        return true;
     }
 
-     function stateBurn(address _account, uint256 _amount) public onlyState {
-        _burn(_account, _amount);
-    }
-
-     function burn(uint256 _amount) public {
-        _burn(_msgSender(), _amount);
+    /**
+     * @dev Emits a {Transfer} event
+     *
+     * MorpherState emits a {Transfer} event.
+     *
+     * Requirements:
+     *
+     * - Caller must be MorpherState
+     * 
+     */
+     function emitTransfer(address _from, address _to, uint256 _amount) public onlyState {
+        emit Transfer(_from, _to, _amount);
     }
 
      /**
@@ -171,7 +195,7 @@ contract MorpherToken is Context, IERC20, Ownable {
      * This is internal function is equivalent to {transfer}, and can be used to
      * e.g. implement automatic token fees, slashing mechanisms, etc.
      *
-     * Emits a {Transfer} event.
+     * Emits a {Transfer} event via emitTransfer called by MorpherState
      *
      * Requirements:
      *
@@ -179,45 +203,11 @@ contract MorpherToken is Context, IERC20, Ownable {
      * - `_recipient` cannot be the zero address.
      * - `_sender` must have a balance of at least `_amount`.
      */
-    function _transfer(address _sender, address _recipient, uint256 _amount) internal {
+    function _transfer(address _sender, address _recipient, uint256 _amount) canTransfer internal {
         require(_sender != address(0), "ERC20: transfer from the zero address");
         require(_recipient != address(0), "ERC20: transfer to the zero address");
         require(state.balanceOf(_sender) >= _amount, "ERC20: transfer amount exceeds balance");
-        state.subBalance(_sender, _amount);
-        state.addBalance(_sender, _amount);
-        emit Transfer(_sender, _recipient, _amount);
-    }
-
-    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
-     * the total supply.
-     *
-     * Emits a {Transfer} event with `from` set to the zero address.
-     *
-     * Requirements
-     *
-     * - `to` cannot be the zero address.
-     */
-    function _mint(address _account, uint256 _amount) internal {
-        require(_account != address(0), "ERC20: mint to the zero address");
-        state.addBalance(_account, _amount);
-        emit Transfer(address(0), _account, _amount);
-    }
-
-    /**
-     * @dev Destroys `_amount` tokens from `_account`, reducing the
-     * total supply.
-     *
-     * Emits a {Transfer} event with `to` set to the zero address.
-     *
-     * Requirements
-     *
-     * - `_account` cannot be the zero address.
-     * - `_account` must have at least `_amount` tokens.
-     */
-    function _burn(address account, uint256 amount) internal {
-        require(account != address(0), "ERC20: burn from the zero address");
-        state.subBalance(account, amount);
-        emit Transfer(account, address(0), amount);
+        state.transfer(_sender, _recipient, _amount);
     }
 
     /**
@@ -233,35 +223,17 @@ contract MorpherToken is Context, IERC20, Ownable {
      * - `owner` cannot be the zero address.
      * - `spender` cannot be the zero address.
      */
-    function _approve(address owner, address spender, uint256 _amount) internal {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
-        state.setAllowance(owner, spender, _amount);
-        emit Approval(owner, spender, _amount);
+    function _approve(address _owner, address _spender, uint256 _amount) internal {
+        require(_owner != address(0), "ERC20: approve from the zero address");
+        require(_spender != address(0), "ERC20: approve to the zero address");
+        state.setAllowance(_owner, _spender, _amount);
+        emit Approval(_owner, _spender, _amount);
     }
 
-    /**
-     * @dev Destroys `_amount` tokens from `account`.`_amount` is then deducted
-     * from the caller's allowance.
-     *
-     * See {_burn} and {_approve}.
-     */
-    function _burnFrom(address account, uint256 _amount) internal {
-        _burn(account, _amount);
-        state.setAllowance(account, _msgSender(), state.getAllowance(account, _msgSender()).sub(_amount));
-    }
-    
     // ------------------------------------------------------------------------
     // Don't accept ETH
     // ------------------------------------------------------------------------
     function () external payable {
-        revert("You can't deposit Ether here");
-    }
-
-    // ------------------------------------------------------------------------
-    // Owner can transfer out any accidentally sent ERC20 tokens
-    // ------------------------------------------------------------------------
-    function transferAnyERC20Token(address _tokenAddress, uint256 _tokens) public onlyOwner returns (bool _success) {
-        return IERC20(_tokenAddress).transfer(owner(), _tokens);
+        revert("ERC20: You can't deposit Ether here");
     }
 }
