@@ -1,8 +1,5 @@
 pragma solidity 0.5.16;
 
-//import "../node_modules/@openzeppelin/contracts/ownership/Ownable.sol";
-//import "../node_modules/@openzeppelin/contracts/math/SafeMath.sol";
-
 import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./IMorpherToken.sol";
@@ -19,7 +16,7 @@ contract MorpherState is Ownable {
 
     uint256 public totalSupply;
     uint256 public totalCashSupply;
-    uint256 public maxLeverage = 10;
+    uint256 public maximumLeverage = 10**9; // Leverage precision is 1e8, maximum leverage equals 10 initially
     uint256 constant PRECISION = 10**8;
     uint256 constant DECIMALS = 18;
     bool public paused = false;
@@ -107,7 +104,7 @@ contract MorpherState is Ownable {
     event TokenChange(address indexed tokenAddress);
     event AdministratorChange(address indexed administratorAddress);
     event OracleChange(address indexed oracleContract);
-    event MaxLeverageChange(uint256 maxLeverage);
+    event MaximumLeverageChange(uint256 maxLeverage);
     event MarketActivated(bytes32 indexed activateMarket);
     event MarketDeActivated(bytes32 indexed deActivateMarket);
     event NewBridge(address _bridgeAddress);
@@ -117,11 +114,20 @@ contract MorpherState is Ownable {
 
     event NewTotalSupply(uint256 newTotalSupply);
     event NewTotalCashSupply(uint256 newTotalCashSupply);
-    event StatePaused(address administrator);
-    event StateUnPaused(address administrator);
+    event StatePaused(address administrator, bool _paused);
     
     event SetAllowance(address indexed sender, address indexed spender, uint256 tokens);
-    event SetPosition(bytes32 indexed positionHash, address indexed sender, bytes32 indexed marketId, uint256 timeStamp, uint256 longShares, uint256 shortShares, uint256 meanEntryPrice, uint256 meanEntrySpread, uint256 meanEntryLeverage, uint256 liquidationPrice);
+    event SetPosition(bytes32 indexed positionHash,
+        address indexed sender,
+        bytes32 indexed marketId,
+        uint256 timeStamp,
+        uint256 longShares,
+        uint256 shortShares,
+        uint256 meanEntryPrice,
+        uint256 meanEntrySpread,
+        uint256 meanEntryLeverage,
+        uint256 liquidationPrice
+    );
     
     constructor() public {
         setRewardAddress(owner());
@@ -421,23 +427,24 @@ contract MorpherState is Ownable {
         return marketActive[_marketId];
     }
 
-    function setMaxLeverage(uint256 _newMaxLeverage) public onlyAdministrator {
-        maxLeverage = _newMaxLeverage;
-        emit MaxLeverageChange(_newMaxLeverage);
+    function setMaximumLeverage(uint256 _newMaximumLeverage) public onlyAdministrator {
+        require(_newMaximumLeverage > PRECISION, "MorpherState: Leverage precision is 1e8");
+        maximumLeverage = _newMaximumLeverage;
+        emit MaximumLeverageChange(_newMaximumLeverage);
     }
 
-    function getMaxLeverage() public view returns(uint256 _maxLeverage) {
-        return maxLeverage;
+    function getMaximumLeverage() public view returns(uint256 _maxLeverage) {
+        return maximumLeverage;
     }
 
     function pauseState() public onlyAdministrator {
         paused = true;
-        emit StatePaused(msg.sender);
+        emit StatePaused(msg.sender, true);
     }
 
     function unPauseState() public onlyAdministrator {
         paused = false;
-        emit StateUnPaused(msg.sender);
+        emit StatePaused(msg.sender, false);
     }
 
 // ----------------------------------------------------------------------------
@@ -506,7 +513,18 @@ contract MorpherState is Ownable {
         } else {
             deleteExposureByMarket(_marketId, _address);
         }
-        emit SetPosition(portfolio[_address][_marketId].positionHash, _address, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice);
+        emit SetPosition(
+            portfolio[_address][_marketId].positionHash,
+            _address,
+            _marketId,
+            _timeStamp,
+            _longShares,
+            _shortShares,
+            _meanEntryPrice,
+            _meanEntrySpread,
+            _meanEntryLeverage,
+            _liquidationPrice
+        );
     }
 
     function getPosition(
