@@ -19,7 +19,6 @@ contract MorpherTradeEngine is Ownable {
 // Precision of prices and leverage
 // ----------------------------------------------------------------------------
     uint256 constant PRECISION = 10**8;
-    uint256 public maximumLeverage;
     uint256 public orderNonce;
     bytes32 public lastOrderId;
 
@@ -58,33 +57,68 @@ contract MorpherTradeEngine is Ownable {
 // Order created/processed events are fired by MorpherOracle.
 // ----------------------------------------------------------------------------
 
-    event LongPositionLiquidated(
+    event PositionLiquidated(
         address indexed _address,
         bytes32 indexed _marketId,
+        bool _longPosition,
         uint256 _timeStamp,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _blockTimeStamp
     );
 
-    event ShortPositionLiquidated(
-        address indexed _address,
-        bytes32 indexed _marketId,
-        uint256 _timeStamp,
-        uint256 _marketPrice,
-        uint256 _marketSpread,
-        uint256 _blockTimeStamp
-        );
-        
-    event CancelOrder(
+    event OrderCancelled(
         bytes32 indexed _orderId,
         address indexed _address,
         uint256 _blockTimeStamp
-        );
+    );
+
+    event OrderIdRequested(
+        bytes32 _orderId,
+        address indexed _address,
+        bytes32 indexed _marketId,
+        bool _tradeAmountGivenInShares,
+        uint256 _tradeAmount,
+        bool _tradeDirection,
+        uint256 _orderLeverage,
+        uint256 _timeStamp
+    );
+    
+    event OrderProcessed(
+        bytes32 _orderId,
+        uint256 _marketPrice,
+        uint256 _marketSpread,
+        uint256 _liquidationTimestamp,
+        uint256 _timeStamp,
+        uint256 _newLongShares,
+        uint256 _newShortShares,
+        uint256 _newAverageEntry,
+        uint256 _newAverageSpread,
+        uint256 _newAverageLeverage,
+        uint256 _liquidationPrice
+    );
+
+    event PositionUpdated(
+        address _userId,
+        bytes32 _marketId,
+        uint256 _timeStamp,
+        uint256 _newLongShares,
+        uint256 _newShortShares,
+        uint256 _newMeanEntryPrice,
+        uint256 _newMeanEntrySpread,
+        uint256 _newMeanEntryLeverage,
+        uint256 _newLiquidationPrice,
+        uint256 _mint,
+        uint256 _burn
+    );
+    
+    event LinkState(
+        address _address,
+        uint256 _timeStamp
+    );
 
     constructor(address _stateAddress) public {
         setMorpherState(_stateAddress);
-        maximumLeverage = 10**9; // Leverage precision is 1e8, maximum leverage equals 10 initially
     }
 
     modifier onlyOracle {
@@ -99,15 +133,12 @@ contract MorpherTradeEngine is Ownable {
 
 // ----------------------------------------------------------------------------
 // Administrative functions
-// Set state address and maximum permitted leverage on platform
+// Set state address, get administrator address
 // ----------------------------------------------------------------------------
 
     function setMorpherState(address _stateAddress) public onlyOwner {
         state = MorpherState(_stateAddress);
-    }
-
-    function setMaximumLeverage(uint256 _maximumLeverage) public onlyAdministrator {
-        maximumLeverage = _maximumLeverage;
+        emit LinkState(_stateAddress, block.timestamp);
     }
 
     function getAdministrator() public view returns(address _administrator) {
@@ -129,7 +160,7 @@ contract MorpherTradeEngine is Ownable {
         uint256 _orderLeverage
         ) public onlyOracle returns (bytes32 _orderId) {
         require(_orderLeverage >= PRECISION, "MorpherTradeEngine: leverage too small. Leverage precision is 1e8");
-        require(_orderLeverage <= maximumLeverage, "MorpherTradeEngine: leverage exceeds maximum allowed leverage.");
+        require(_orderLeverage <= state.getMaximumLeverage(), "MorpherTradeEngine: leverage exceeds maximum allowed leverage.");
         require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
         require(state.getNumberOfRequests(_address) <= state.getNumberOfRequestsLimit() || 
             state.getLastRequestBlock(_address) < block.number, 
@@ -157,6 +188,16 @@ contract MorpherTradeEngine is Ownable {
         orders[_orderId].tradeAmount = _tradeAmount;
         orders[_orderId].tradeDirection = _tradeDirection;
         orders[_orderId].orderLeverage = _orderLeverage;
+        emit OrderIdRequested(
+            _orderId,
+            _address,
+            _marketId,
+            _tradeAmountGivenInShares,
+            _tradeAmount,
+            _tradeDirection,
+            _orderLeverage,
+            block.timestamp
+        );
         return _orderId;
     }
 
@@ -196,7 +237,7 @@ contract MorpherTradeEngine is Ownable {
             orders[_orderId].tradeDirection, 
             orders[_orderId].balanceUp, 
             orders[_orderId].balanceDown
-            );
+        );
     }
 
     function getPosition(address _address, bytes32 _marketId) public view returns (
@@ -214,7 +255,7 @@ contract MorpherTradeEngine is Ownable {
             state.getMeanEntrySpread(_address,_marketId),
             state.getMeanEntryLeverage(_address,_marketId),
             state.getLiquidationPrice(_address,_marketId)
-            );
+        );
     }
 
 // ----------------------------------------------------------------------------
@@ -239,9 +280,10 @@ contract MorpherTradeEngine is Ownable {
                     0,
                     PRECISION,
                     0);
-                emit LongPositionLiquidated(
+                emit PositionLiquidated(
                     _address,
                     _marketId,
+                    true,
                     orders[_orderId].timeStamp,
                     orders[_orderId].marketPrice,
                     orders[_orderId].marketSpread,
@@ -260,9 +302,11 @@ contract MorpherTradeEngine is Ownable {
                     PRECISION,
                     0
                 );
-                emit ShortPositionLiquidated(
+                emit PositionLiquidated(
                     _address,
-                    _marketId, orders[_orderId].timeStamp,
+                    _marketId,
+                    false,
+                    orders[_orderId].timeStamp,
                     orders[_orderId].marketPrice,
                     orders[_orderId].marketSpread,
                     block.timestamp
@@ -291,7 +335,7 @@ contract MorpherTradeEngine is Ownable {
             uint256 _newAverageSpread,
             uint256 _newAverageLeverage,
             uint256 _liquidationPrice
-            ) {
+        ) {
         require(orders[_orderId].userId != address(0), "MorpherTradeEngine: unable to process, order has been deleted.");
         require(_marketPrice > 0, "MorpherTradeEngine: market priced at zero. Buy order cannot be processed.");
         require(_marketPrice >= _marketSpread, "MorpherTradeEngine: market price lower then market spread. Order cannot be processed.");
@@ -317,6 +361,19 @@ contract MorpherTradeEngine is Ownable {
 		}	
 
         delete orders[_orderId];
+        emit OrderProcessed(
+            _orderId,
+            _marketPrice,
+            _marketSpread,
+            _liquidationTimestamp,
+            _timeStamp,
+            _newLongShares,
+            _newShortShares,
+            _newAverageEntry,
+            _newAverageSpread,
+            _newAverageLeverage,
+            _liquidationPrice
+        );
         return (
             state.getLongShares(_address, _marketId),
             state.getShortShares(_address, _marketId),
@@ -324,7 +381,7 @@ contract MorpherTradeEngine is Ownable {
             state.getMeanEntrySpread(_address,_marketId),
             state.getMeanEntryLeverage(_address,_marketId),
             state.getLiquidationPrice(_address,_marketId)
-            );
+        );
     }
 
 // ----------------------------------------------------------------------------
@@ -335,7 +392,7 @@ contract MorpherTradeEngine is Ownable {
         require(_address == orders[_orderId].userId || _address == getAdministrator(), "MorpherTradeEngine: only Administrator or user can cancel an order.");
         require(orders[_orderId].userId != address(0), "MorpherTradeEngine: unable to process, order does not exist.");
         delete orders[_orderId];
-        emit CancelOrder(_orderId, _address, block.timestamp);
+        emit OrderCancelled(_orderId, _address, block.timestamp);
     }
 
 // ----------------------------------------------------------------------------
@@ -716,10 +773,19 @@ contract MorpherTradeEngine is Ownable {
     function setPositionInState(bytes32 _orderId) private {
         require(state.balanceOf(orders[_orderId].userId).add(orders[_orderId].balanceUp) >= orders[_orderId].balanceDown, "MorpherTradeEngine: insufficient funds.");
         computeLiquidationPrice(_orderId);
+        // Net balanceUp and balanceDown
         if (orders[_orderId].balanceUp > orders[_orderId].balanceDown) {
-            state.mint(orders[_orderId].userId, orders[_orderId].balanceUp.sub(orders[_orderId].balanceDown));
+            orders[_orderId].balanceUp.sub(orders[_orderId].balanceDown);
+            orders[_orderId].balanceDown = 0;
         } else {
-            state.burn(orders[_orderId].userId, orders[_orderId].balanceDown.sub(orders[_orderId].balanceUp));
+            orders[_orderId].balanceDown.sub(orders[_orderId].balanceUp);
+            orders[_orderId].balanceUp = 0;
+        }
+        if (orders[_orderId].balanceUp > 0) {
+            state.mint(orders[_orderId].userId, orders[_orderId].balanceUp);
+        }
+        if (orders[_orderId].balanceDown > 0) {
+            state.burn(orders[_orderId].userId, orders[_orderId].balanceDown);
         }
         state.setPosition(
             orders[_orderId].userId,
@@ -731,6 +797,19 @@ contract MorpherTradeEngine is Ownable {
             orders[_orderId].newMeanEntrySpread,
             orders[_orderId].newMeanEntryLeverage,
             orders[_orderId].newLiquidationPrice
+        );
+        emit PositionUpdated(
+            orders[_orderId].userId,
+            orders[_orderId].marketId,
+            orders[_orderId].timeStamp,
+            orders[_orderId].newLongShares,
+            orders[_orderId].newShortShares,
+            orders[_orderId].newMeanEntryPrice,
+            orders[_orderId].newMeanEntrySpread,
+            orders[_orderId].newMeanEntryLeverage,
+            orders[_orderId].newLiquidationPrice,
+            orders[_orderId].balanceUp,
+            orders[_orderId].balanceDown
         );
     }
 }
