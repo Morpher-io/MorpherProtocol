@@ -14,9 +14,10 @@ import "./IERC20.sol";
 contract MorpherState is Ownable {
     using SafeMath for uint256;
 
+    bool public mainChain;
     uint256 public totalSupply;
     uint256 public totalCashSupply;
-    uint256 public maximumLeverage = 10**9; // Leverage precision is 1e8, maximum leverage equals 10 initially
+    uint256 public maximumLeverage = 10**9; // Leverage precision is 1e8, maximum leverage set to 10 initially
     uint256 constant PRECISION = 10**8;
     uint256 constant DECIMALS = 18;
     bool public paused = false;
@@ -37,13 +38,13 @@ contract MorpherState is Ownable {
 
     uint256 public mainChainWithdrawLimit24;
 
-    mapping(address => bool) stateAccess;
-    mapping(address => bool) transferAllowed;
+    mapping(address => bool) public stateAccess;
+    mapping(address => bool) public transferAllowed;
     
-    mapping(address => uint256) balances;
-    mapping(address => mapping(address => uint256)) allowed;
+    mapping(address => uint256) public balances;
+    mapping(address => mapping(address => uint256)) public allowed;
 
-    mapping(bytes32 => bool) marketActive;
+    mapping(bytes32 => bool) public marketActive;
 
 // ----------------------------------------------------------------------------
 // Position struct records virtual futures
@@ -73,13 +74,29 @@ contract MorpherState is Ownable {
         mapping(uint256 => address) addy;
     }
 
-    mapping(bytes32 => hasExposure) exposureByMarket;
+    mapping(bytes32 => hasExposure) public exposureByMarket;
+
+// ----------------------------------------------------------------------------
+// Bridge Variables
+// ----------------------------------------------------------------------------
+    mapping (address => uint256) public tokenClaimedOnThisChain;
+    mapping (address => uint256) public tokenSentToLinkedChain;
+    mapping (address => uint256) public tokenSentToLinkedChainTime;
+    mapping (bytes32 => bool) public positionClaimedOnMainChain;
+
+    uint256 public lastWithdrawLimitReductionTime;
+    uint256 public last24HoursAmountWithdrawn;
+    uint256 public withdrawLimit24Hours; 
+    uint256 public inactivityPeriod;
+    uint256 public transferNonce;
+    bool public fastTransfersEnabled;
 
 // ----------------------------------------------------------------------------
 // Sidechain spam protection
 // ----------------------------------------------------------------------------
-    mapping(address => uint256) lastRequestBlock;
-    mapping(address => uint256) numberOfRequests;
+
+    mapping(address => uint256) public lastRequestBlock;
+    mapping(address => uint256) public numberOfRequests;
     uint256 public numberOfRequestsLimit;
 
 // ----------------------------------------------------------------------------
@@ -107,11 +124,22 @@ contract MorpherState is Ownable {
     event MaximumLeverageChange(uint256 maxLeverage);
     event MarketActivated(bytes32 indexed activateMarket);
     event MarketDeActivated(bytes32 indexed deActivateMarket);
-    event NewBridge(address _bridgeAddress);
+    event BridgeChange(address _bridgeAddress);
     event SideChainMerkleRootUpdate(bytes32 indexed sideChainMerkleRoot, uint256 updateTime);
     event NewSideChainOperator(address indexed sideChainOperator);
+    event NumberOfRequestsLimitUpdate(uint256 _numberOfRequests);
+    
     event MainChainWithdrawLimitUpdate(uint256 indexed mainChainWithdrawLimit24);
-
+    event TokenSentToLinkedChain(address _address, uint256 _token, uint256 _timeStamp);
+    event TransferredTokenClaimed(address _address, uint256 _token, uint256 _timeStamp);
+    event LastWithdrawAt(uint256 _timeStamp);
+    event RollingWithdrawnAmountUpdated(uint256 _amount, uint256 _timeStamp);
+    event WithdrawLimitUpdated(uint256 _amount, uint256 _timeStamp);
+    event InactivityPeriodUpdated(uint256 _periodLength, uint256 _timeStamp);
+    event FastWithdrawsDisabled(uint256 _timeStamp);
+    event NewBridgeNonce(uint256 _transferNonce, uint256 _timeStamp);
+    event Last24HoursAmountWithdrawnReset(uint256 _timeStamp);
+    
     event NewTotalSupply(uint256 newTotalSupply);
     event NewTotalCashSupply(uint256 newTotalCashSupply);
     event StatePaused(address administrator, bool _paused);
@@ -129,14 +157,22 @@ contract MorpherState is Ownable {
         uint256 liquidationPrice
     );
     
-    constructor() public {
+    constructor(bool _mainChain) public {
         setRewardAddress(owner());
         setLastRewardTime(now);
-        balances[owner()] = 1000000000 * 10**(DECIMALS);
+        mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
         totalSupply = 1000000000 * 10**(DECIMALS);
-        emit Mint(owner(), balanceOf(owner()), totalSupply);
         grantAccess(owner());
-        setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
+        if (mainChain == false) { // Create token only on sidechain
+            balances[owner()] = 575000000 * 10**(DECIMALS); // Create airdrop and team token on sidechain
+            emit Mint(owner(), balanceOf(owner()), totalSupply);
+            setRewardBasisPoints(0); // Reward is minted on mainchain
+        } else {
+            balances[owner()] = 425000000 * 10**(DECIMALS); // Create treasury and investor token on mainchain
+            emit Mint(owner(), balanceOf(owner()), totalSupply);
+            setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
+        }
+        fastTransfersEnabled = true;
         setNumberOfRequestsLimit(3);
         setMainChainWithdrawLimit(totalSupply / 50);
         denyAccess(owner());
@@ -169,6 +205,16 @@ contract MorpherState is Ownable {
 
     modifier onlyBridge {
         require(msg.sender == getMorpherBridge(), "MorpherState: Caller is not the Bridge. Aborting.");
+        _;
+    }
+
+    modifier onlyMainChain {
+        require(mainChain == true, "MorpherState: Can only be called on mainchain.");
+        _;
+    }
+
+    modifier onlySideChain {
+        require(mainChain == false, "MorpherState: Can only be called on mainchain.");
         _;
     }
 
@@ -206,6 +252,80 @@ contract MorpherState is Ownable {
     }
 
 // ----------------------------------------------------------------------------
+// Setter/Getter functions for bridge variables
+// ----------------------------------------------------------------------------
+    function setTokenClaimedOnThisChain(address _address, uint256 _token) public onlyBridge {
+        tokenClaimedOnThisChain[_address] = _token;
+        emit TransferredTokenClaimed(_address, _token, now);
+    }
+
+    function getTokenClaimedOnThisChain(address _address) public view returns (uint256 _token) {
+        return tokenClaimedOnThisChain[_address];
+    }
+    
+    function setTokenSentToLinkedChain(address _address, uint256 _token) public onlyBridge {
+        tokenSentToLinkedChain[_address] = _token;
+        tokenSentToLinkedChainTime[_address] = now;
+        emit TokenSentToLinkedChain(_address, _token, now);
+    }
+
+    function getTokenSentToLinkedChain(address _address) public view returns (uint256 _token) {
+        return tokenSentToLinkedChain[_address];
+    }
+    
+    function getTokenSentToLinkedChainTime(address _address) public view returns (uint256 _timeStamp) {
+        return tokenSentToLinkedChainTime[_address];
+    }
+    
+    function add24HoursWithdrawn(uint256 _amount) public onlyBridge {
+        last24HoursAmountWithdrawn = last24HoursAmountWithdrawn.add(_amount);
+        emit RollingWithdrawnAmountUpdated(last24HoursAmountWithdrawn, now);
+    }
+
+    function update24HoursWithdrawLimit(uint256 _amount) public onlyBridge {
+        if (last24HoursAmountWithdrawn > _amount) {
+            last24HoursAmountWithdrawn = last24HoursAmountWithdrawn.sub(_amount);
+        } else {
+            last24HoursAmountWithdrawn = 0;
+        }
+        lastWithdrawLimitReductionTime = now;
+        emit RollingWithdrawnAmountUpdated(last24HoursAmountWithdrawn, lastWithdrawLimitReductionTime);
+    }
+    
+    function setWithdrawLimit(uint256 _limit) public onlyBridge {
+        withdrawLimit24Hours = _limit;
+        emit WithdrawLimitUpdated(_limit, now);
+    }
+    
+    function resetLast24HoursAmountWithdrawn() public onlyOwner {
+        last24HoursAmountWithdrawn = 0;
+        emit Last24HoursAmountWithdrawnReset(now);
+    }
+    function setInactivityPeriod(uint256 _periodLength) public onlyBridge {
+        inactivityPeriod = _periodLength;
+        emit InactivityPeriodUpdated(_periodLength, now);
+    }
+    
+    function getBridgeNonce() public onlyBridge returns (uint256 _nonce) {
+        transferNonce++;
+        emit NewBridgeNonce(transferNonce, now);
+        return transferNonce;
+    }
+    
+    function disableFastWithdraws() public onlyBridge {
+        fastTransfersEnabled = false;
+        emit FastWithdrawsDisabled(now);
+    }
+    
+    function setPositionClaimedOnMainChain(bytes32 _positionHash) public onlyBridge {
+        positionClaimedOnMainChain[_positionHash] = true;  
+    }
+    
+    function getPositionClaimedOnMainChain(bytes32 _positionHash) public view returns (bool _alreadyClaimed) {
+        return positionClaimedOnMainChain[_positionHash];  
+    }
+    
+// ----------------------------------------------------------------------------
 // Setter/Getter functions for spam protection
 // ----------------------------------------------------------------------------
 
@@ -231,6 +351,7 @@ contract MorpherState is Ownable {
 
     function setNumberOfRequestsLimit(uint256 _numberOfRequestsLimit) public onlyPlatform {
         numberOfRequestsLimit = _numberOfRequestsLimit;
+        emit NumberOfRequestsLimitUpdate(_numberOfRequestsLimit);        
     }
 
     function getNumberOfRequestsLimit() public view returns (uint256 _numberOfRequestsLimit) {
@@ -355,7 +476,7 @@ contract MorpherState is Ownable {
 
     function setMorpherBridge(address _newBridge) public onlyOwner {
         morpherBridge = _newBridge;
-        emit NewBridge(_newBridge);
+        emit BridgeChange(_newBridge);
     }
 
     function getMorpherBridge() public view returns (address _currentBridge) {
@@ -651,7 +772,7 @@ contract MorpherState is Ownable {
 // day.
 // ----------------------------------------------------------------------------
 
-    function payOperatingReward() public returns(uint256 _reward) {
+    function payOperatingReward() public onlyMainChain returns(uint256 _reward) {
         if (now > lastRewardTime + 1 days) {
             _reward = totalSupply.div(PRECISION).mul(rewardBasisPoints);
             setLastRewardTime(lastRewardTime.add(1 days));
