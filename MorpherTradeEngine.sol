@@ -112,13 +112,11 @@ contract MorpherTradeEngine is Ownable {
         uint256 _burn
     );
     
-    event LinkState(
-        address _address,
-        uint256 _timeStamp
-    );
+    event LinkState(address _address);
 
-    constructor(address _stateAddress) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
         setMorpherState(_stateAddress);
+        transferOwnership(_coldStorageOwnerAddress);        
     }
 
     modifier onlyOracle {
@@ -138,7 +136,7 @@ contract MorpherTradeEngine is Ownable {
 
     function setMorpherState(address _stateAddress) public onlyOwner {
         state = MorpherState(_stateAddress);
-        emit LinkState(_stateAddress, block.timestamp);
+        emit LinkState(_stateAddress);
     }
 
     function getAdministrator() public view returns(address _administrator) {
