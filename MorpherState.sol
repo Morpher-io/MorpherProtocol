@@ -20,6 +20,7 @@ contract MorpherState is Ownable {
     uint256 public maximumLeverage = 10**9; // Leverage precision is 1e8, maximum leverage set to 10 initially
     uint256 constant PRECISION = 10**8;
     uint256 constant DECIMALS = 18;
+    uint256 constant REWARDPERIOD = 1 days;
     bool public paused = false;
 
     address public morpherGovernance;
@@ -114,6 +115,7 @@ contract MorpherState is Ownable {
     event Transfer(address indexed sender, address indexed recipient, uint256 amount, uint256 totalCashSupply);
     event Mint(address indexed recipient, uint256 amount, uint256 totalCashSupply);
     event Burn(address indexed recipient, uint256 amount, uint256 totalCashSupply);
+    event OperatingRewardMinted(address indexed recipient, uint256 amount);
 
     event RewardsChange(address indexed rewardsAddress, uint256 indexed rewardsBasisPoints);
     event LastRewardTime(uint256 indexed rewardsTime);
@@ -130,15 +132,15 @@ contract MorpherState is Ownable {
     event NumberOfRequestsLimitUpdate(uint256 _numberOfRequests);
     
     event MainChainWithdrawLimitUpdate(uint256 indexed mainChainWithdrawLimit24);
-    event TokenSentToLinkedChain(address _address, uint256 _token, uint256 _timeStamp);
-    event TransferredTokenClaimed(address _address, uint256 _token, uint256 _timeStamp);
-    event LastWithdrawAt(uint256 _timeStamp);
-    event RollingWithdrawnAmountUpdated(uint256 _amount, uint256 _timeStamp);
-    event WithdrawLimitUpdated(uint256 _amount, uint256 _timeStamp);
-    event InactivityPeriodUpdated(uint256 _periodLength, uint256 _timeStamp);
-    event FastWithdrawsDisabled(uint256 _timeStamp);
-    event NewBridgeNonce(uint256 _transferNonce, uint256 _timeStamp);
-    event Last24HoursAmountWithdrawnReset(uint256 _timeStamp);
+    event TokenSentToLinkedChain(address _address, uint256 _token);
+    event TransferredTokenClaimed(address _address, uint256 _token);
+    event LastWithdrawAt();
+    event RollingWithdrawnAmountUpdated(uint256 _last24HoursAmountWithdrawn, uint256 _lastWithdrawLimitReductionTime);
+    event WithdrawLimitUpdated(uint256 _amount);
+    event InactivityPeriodUpdated(uint256 _periodLength);
+    event FastWithdrawsDisabled();
+    event NewBridgeNonce(uint256 _transferNonce);
+    event Last24HoursAmountWithdrawnReset();
     
     event NewTotalSupply(uint256 newTotalSupply);
     event NewTotalCashSupply(uint256 newTotalCashSupply);
@@ -157,27 +159,6 @@ contract MorpherState is Ownable {
         uint256 liquidationPrice
     );
     
-    constructor(bool _mainChain) public {
-        setRewardAddress(owner());
-        setLastRewardTime(now);
-        mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
-        totalSupply = 1000000000 * 10**(DECIMALS);
-        grantAccess(owner());
-        if (mainChain == false) { // Create token only on sidechain
-            balances[owner()] = 575000000 * 10**(DECIMALS); // Create airdrop and team token on sidechain
-            emit Mint(owner(), balanceOf(owner()), totalSupply);
-            setRewardBasisPoints(0); // Reward is minted on mainchain
-        } else {
-            balances[owner()] = 425000000 * 10**(DECIMALS); // Create treasury and investor token on mainchain
-            emit Mint(owner(), balanceOf(owner()), totalSupply);
-            setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
-        }
-        fastTransfersEnabled = true;
-        setNumberOfRequestsLimit(3);
-        setMainChainWithdrawLimit(totalSupply / 50);
-        denyAccess(owner());
-    }
-
     modifier notPaused {
         require(paused == false, "MorpherState: Contract paused, aborting");
         _;
@@ -218,6 +199,28 @@ contract MorpherState is Ownable {
         _;
     }
 
+    constructor(bool _mainChain) public {
+        // Transfer State Ownership to cold storage address after deploying protocol
+        setRewardAddress(owner());
+        setLastRewardTime(now);
+        mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
+        totalSupply = 1000000000 * 10**(DECIMALS);
+        grantAccess(owner());
+        if (mainChain == false) { // Create token only on sidechain
+            balances[owner()] = 575000000 * 10**(DECIMALS); // Create airdrop and team token on sidechain
+            emit Mint(owner(), balanceOf(owner()), totalSupply);
+            setRewardBasisPoints(0); // Reward is minted on mainchain
+        } else {
+            balances[owner()] = 425000000 * 10**(DECIMALS); // Create treasury and investor token on mainchain
+            emit Mint(owner(), balanceOf(owner()), totalSupply);
+            setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
+        }
+        fastTransfersEnabled = true;
+        setNumberOfRequestsLimit(3);
+        setMainChainWithdrawLimit(totalSupply / 50);
+        denyAccess(owner());
+    }
+
 // ----------------------------------------------------------------------------
 // Setter/Getter functions for market wise exposure
 // ----------------------------------------------------------------------------
@@ -256,7 +259,7 @@ contract MorpherState is Ownable {
 // ----------------------------------------------------------------------------
     function setTokenClaimedOnThisChain(address _address, uint256 _token) public onlyBridge {
         tokenClaimedOnThisChain[_address] = _token;
-        emit TransferredTokenClaimed(_address, _token, now);
+        emit TransferredTokenClaimed(_address, _token);
     }
 
     function getTokenClaimedOnThisChain(address _address) public view returns (uint256 _token) {
@@ -266,7 +269,7 @@ contract MorpherState is Ownable {
     function setTokenSentToLinkedChain(address _address, uint256 _token) public onlyBridge {
         tokenSentToLinkedChain[_address] = _token;
         tokenSentToLinkedChainTime[_address] = now;
-        emit TokenSentToLinkedChain(_address, _token, now);
+        emit TokenSentToLinkedChain(_address, _token);
     }
 
     function getTokenSentToLinkedChain(address _address) public view returns (uint256 _token) {
@@ -279,7 +282,7 @@ contract MorpherState is Ownable {
     
     function add24HoursWithdrawn(uint256 _amount) public onlyBridge {
         last24HoursAmountWithdrawn = last24HoursAmountWithdrawn.add(_amount);
-        emit RollingWithdrawnAmountUpdated(last24HoursAmountWithdrawn, now);
+        emit RollingWithdrawnAmountUpdated(last24HoursAmountWithdrawn, lastWithdrawLimitReductionTime);
     }
 
     function update24HoursWithdrawLimit(uint256 _amount) public onlyBridge {
@@ -292,29 +295,30 @@ contract MorpherState is Ownable {
         emit RollingWithdrawnAmountUpdated(last24HoursAmountWithdrawn, lastWithdrawLimitReductionTime);
     }
     
-    function setWithdrawLimit(uint256 _limit) public onlyBridge {
+    function set24HourWithdrawLimit(uint256 _limit) public onlyBridge {
         withdrawLimit24Hours = _limit;
-        emit WithdrawLimitUpdated(_limit, now);
+        emit WithdrawLimitUpdated(_limit);
     }
     
-    function resetLast24HoursAmountWithdrawn() public onlyOwner {
+    function resetLast24HoursAmountWithdrawn() public onlyBridge {
         last24HoursAmountWithdrawn = 0;
-        emit Last24HoursAmountWithdrawnReset(now);
+        emit Last24HoursAmountWithdrawnReset();
     }
+    
     function setInactivityPeriod(uint256 _periodLength) public onlyBridge {
         inactivityPeriod = _periodLength;
-        emit InactivityPeriodUpdated(_periodLength, now);
+        emit InactivityPeriodUpdated(_periodLength);
     }
     
     function getBridgeNonce() public onlyBridge returns (uint256 _nonce) {
         transferNonce++;
-        emit NewBridgeNonce(transferNonce, now);
+        emit NewBridgeNonce(transferNonce);
         return transferNonce;
     }
     
     function disableFastWithdraws() public onlyBridge {
         fastTransfersEnabled = false;
-        emit FastWithdrawsDisabled(now);
+        emit FastWithdrawsDisabled();
     }
     
     function setPositionClaimedOnMainChain(bytes32 _positionHash) public onlyBridge {
@@ -767,18 +771,17 @@ contract MorpherState is Ownable {
 
 // ----------------------------------------------------------------------------
 // Calculate and send operating reward
-// Every 24 hours the protocol mints rewardBasisPoints/(10**8) percent of the total 
+// Every 24 hours the protocol mints rewardBasisPoints/(PRECISION) percent of the total 
 // supply as reward for the protocol operator. The amount can not exceed 0.015% per
 // day.
 // ----------------------------------------------------------------------------
 
-    function payOperatingReward() public onlyMainChain returns(uint256 _reward) {
-        if (now > lastRewardTime + 1 days) {
-            _reward = totalSupply.div(PRECISION).mul(rewardBasisPoints);
-            setLastRewardTime(lastRewardTime.add(1 days));
+    function payOperatingReward() public onlyMainChain {
+        if (now > lastRewardTime.add(REWARDPERIOD)) {
+            uint256 _reward = totalSupply.mul(rewardBasisPoints).div(PRECISION);
+            setLastRewardTime(lastRewardTime.add(REWARDPERIOD));
             mint(morpherRewards, _reward);
-            updateTotalSupply(totalSupply.add(_reward));
+            emit OperatingRewardMinted(morpherRewards, _reward);
         }
-        return _reward;
     }
 }
