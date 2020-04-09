@@ -57,7 +57,8 @@ activateMarket(0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf
 
 activateMarket(0x5376ff169a3705b2003892fe730060ee74ec83e5701da29318221aa782271779)
 
-
 // ------ MorpherState: set Governance properly ------ 
 
 setGovernanceContract(morpherGovernanceAddress)
+
+transferOwnership(ownerAddress)
