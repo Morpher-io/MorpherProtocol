@@ -59,6 +59,6 @@ activateMarket(0x5376ff169a3705b2003892fe730060ee74ec83e5701da29318221aa78227177
 
 // ------ MorpherState: set Governance properly ------ 
 
-setGovernanceContract(morpherGovernanceAddress)
+ONLY MAIN CHAIN: setGovernanceContract(morpherGovernanceAddress)
 
 transferOwnership(ownerAddress)
