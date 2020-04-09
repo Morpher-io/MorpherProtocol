@@ -117,8 +117,9 @@ contract MorpherOracle is Ownable {
         _;
     }
     
-   constructor(address _tradeEngineAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress) public {
+   constructor(address _tradeEngineAddress, address _callBackAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress) public {
         setTradeEngineAddress(_tradeEngineAddress);
+        enableCallbackAddress(_callBackAddress);
         setCallbackCollectionAddress(_gasCollectionAddress);
         setGasForCallback(_gasForCallback);
         transferOwnership(_coldStorageOwnerAddress); 
