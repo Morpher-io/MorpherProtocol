@@ -37,8 +37,9 @@ contract MorpherState is Ownable {
     bytes32 public sideChainMerkleRoot;
     uint256 public sideChainMerkleRootWrittenAtTime;
 
-    uint256 public mainChainWithdrawLimit24;
-
+// Set initial withdraw limit from sidechain to 20m token or 2% of initial supply
+    uint256 public mainChainWithdrawLimit24 = 2 * 10**25;
+                     
     mapping(address => bool) public stateAccess;
     mapping(address => bool) public transferAllowed;
     
@@ -88,7 +89,7 @@ contract MorpherState is Ownable {
     uint256 public lastWithdrawLimitReductionTime;
     uint256 public last24HoursAmountWithdrawn;
     uint256 public withdrawLimit24Hours; 
-    uint256 public inactivityPeriod;
+    uint256 public inactivityPeriod = 3 days;
     uint256 public transferNonce;
     bool public fastTransfersEnabled;
 
