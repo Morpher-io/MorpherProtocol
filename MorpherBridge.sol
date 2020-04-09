@@ -38,14 +38,6 @@ contract MorpherBridge is Ownable {
 
     constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
         setMorpherState(_stateAddress);
-        if (state.mainChain() == false) {
-            // Set initial withdraw limit from sidechain to 20m token or 2% of initial supply            
-            set24HourWithdrawLimit(20000000 * 10**18);
-        } else {
-            // Set initial withdraw limit from mainchain to 100m token or 10% of initial supply
-            set24HourWithdrawLimit(100000000 * 10**18);
-        }
-        state.setInactivityPeriod(3 days);
         transferOwnership(_coldStorageOwnerAddress);
     }
 
