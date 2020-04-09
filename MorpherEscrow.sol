@@ -6,27 +6,30 @@ import "./IERC20.sol";
 
 // ----------------------------------------------------------------------------------
 // Escrow contract to safely store and release the token allocated to Morpher at
-// protocol  inception
+// protocol inception
 // ----------------------------------------------------------------------------------
 
 contract MorpherEscrow is Ownable{
     using SafeMath for uint256;
     
-    uint256 public lastEscrowTransferTime;    
+    uint256 public lastEscrowTransferTime;  
     address public recipient;
     address public morpherToken;
     
-    uint256 constant DECIMALS = 18;
+    uint256 public constant RELEASEAMOUNT = 10**25;
+    uint256 public constant RELEASEPERIOD = 1 days;
     
     event EscrowReleased(uint256 _released, uint256 _leftInEscrow, uint256 _timeStamp);    
     
-    constructor(address _recipientAddress) public {
+    constructor(address _recipientAddress, address _tokenAddress, address _coldStorageOwnerAddress) public {
         setRecipientAddress(_recipientAddress);
+        setMorpherTokenAddress(_tokenAddress);
         lastEscrowTransferTime = now;
+        transferOwnership(_coldStorageOwnerAddress);
     }
 
 // ----------------------------------------------------------------------------------
-// Owner can modify recipient address and link to MorpherState
+// Owner can modify recipient address and update morpherToken adddress
 // ----------------------------------------------------------------------------------
     function setRecipientAddress(address _recipientAddress) public onlyOwner {
         recipient = _recipientAddress;
@@ -42,17 +45,17 @@ contract MorpherEscrow is Ownable{
 // ----------------------------------------------------------------------------------
     function releaseFromEscrow() public {
         require(IERC20(morpherToken).balanceOf(address(this)) > 0, "No funds left in escrow.");
-        // !! Change to 30 days after testing !!
         uint256 _releasedAmount;
-        if (now > lastEscrowTransferTime.add(1 days)) {
-            if (IERC20(morpherToken).balanceOf(address(this)) > (10**DECIMALS).mul(10000000)) {
-                _releasedAmount = (10**DECIMALS).mul(10000000);
+        // !! Change to 30 days after testing !!
+        if (now > lastEscrowTransferTime.add(RELEASEPERIOD)) {
+            if (IERC20(morpherToken).balanceOf(address(this)) > RELEASEAMOUNT) {
+                _releasedAmount = RELEASEAMOUNT;
             } else {
                 _releasedAmount = IERC20(morpherToken).balanceOf(address(this));
             }
             IERC20(morpherToken).transfer(recipient, _releasedAmount);
             // !! Change to 30 days after testing !!
-            lastEscrowTransferTime = lastEscrowTransferTime.add(1 days);
+            lastEscrowTransferTime = lastEscrowTransferTime.add(RELEASEPERIOD);
             emit EscrowReleased(_releasedAmount, IERC20(morpherToken).balanceOf(address(this)), now);
         }
     }
