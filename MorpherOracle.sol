@@ -117,10 +117,11 @@ contract MorpherOracle is Ownable {
         _;
     }
     
-   constructor(address _tradeEngineAddress, address payable _gasCollectionAddress, uint256 _gasForCallback) public {
+   constructor(address _tradeEngineAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress) public {
         setTradeEngineAddress(_tradeEngineAddress);
         setCallbackCollectionAddress(_gasCollectionAddress);
         setGasForCallback(_gasForCallback);
+        transferOwnership(_coldStorageOwnerAddress); 
     }
 
 // ----------------------------------------------------------------------------------
@@ -294,6 +295,7 @@ contract MorpherOracle is Ownable {
             );
         return (_newLongShares, _newShortShares, _newMeanEntry, _newMeanSpread, _newMeanLeverage, _liquidationPrice);
     }
+
 /*
 // ----------------------------------------------------------------------------------
 // stockSplits()
@@ -303,7 +305,6 @@ contract MorpherOracle is Ownable {
         tradeEngine.stockSplits(_marketId, _fromIx, _toIx, _nominator, _denominator);
         return true;
     }
-
 // ----------------------------------------------------------------------------------
 // dividendsAndRolls()
 // ----------------------------------------------------------------------------------
@@ -313,6 +314,7 @@ contract MorpherOracle is Ownable {
         return true;
     }
 */
+
 // ----------------------------------------------------------------------------------
 // Auxiliary function to hash a string market name i.e.
 // "CRYPTO_BTC" => 0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf9;
