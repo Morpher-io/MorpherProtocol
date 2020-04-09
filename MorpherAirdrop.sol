@@ -31,9 +31,10 @@ contract MorpherAirdrop is Ownable {
     event AirdropSent(address indexed _operator, address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized, uint256 _timeStamp);    
     event SetAirdropAuthorized(address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized, uint256 _timeStamp);    
     
-    constructor(address _airdropAdminAddress, address _morpherToken) public {
+    constructor(address _airdropAdminAddress, address _morpherToken, address _coldStorageOwnerAddress) public {
         setAirdropAdmin(_airdropAdminAddress);
         setMorpherTokenAddress(_morpherToken);
+        transferOwnership(_coldStorageOwnerAddress);        
     }
 
     modifier onlyAirdropAdmin {
