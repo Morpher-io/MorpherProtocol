@@ -38,24 +38,22 @@ contract MorpherToken is IERC20, Ownable {
     string public constant symbol   = "MPH";
     uint8  public constant decimals = 18;
     
-    bool public mainChain;
-
     modifier onlyState {
         require(msg.sender == address(state), "ERC20: caller must be MorpherState contract.");
         _;
     }
 
     modifier canTransfer {
-        require(mainChain == true || state.getCanTransfer(msg.sender), "ERC20: token transfers disabled on sidechain.");
+        require(state.mainChain() == true || state.getCanTransfer(msg.sender), "ERC20: token transfers disabled on sidechain.");
         _;
     }
 
     // ------------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------------
-    constructor(address _stateAddress, bool _mainChain) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
         state = MorpherState(_stateAddress);
-        mainChain = _mainChain;
+        transferOwnership(_coldStorageOwnerAddress);
     }
 
     /**
