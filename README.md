@@ -45,10 +45,6 @@ setAdministrator(addressOfDeployer)
 
 setOracle(oracleAddress)
 
-// ------ to be able to send token from Owner to other addresses on sidechain grant Owner access.
-
-grantAccess(addressOfDeployer)
-
 // ------ Enable "CRYPTO_BTC" and "CRYPTO_ETH" as markets for testing purposes ------ 
 
 activateMarket(0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf9)
@@ -64,5 +60,3 @@ enableCallbackAddress(addressOracleCallback)
 // ------ MorpherState: set Governance properly ------ 
 
 setGovernanceContract(morpherGovernanceAddress)
-
-denyAccess(addressOfDeployer)
