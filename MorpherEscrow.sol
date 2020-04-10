@@ -17,13 +17,13 @@ contract MorpherEscrow is Ownable{
     address public morpherToken;
     
     uint256 public constant RELEASEAMOUNT = 10**25;
-    uint256 public constant RELEASEPERIOD = 1 days;
+    uint256 public constant RELEASEPERIOD = 30 days;
     
     event EscrowReleased(uint256 _released, uint256 _leftInEscrow, uint256 _timeStamp);    
     
-    constructor(address _recipientAddress, address _tokenAddress, address _coldStorageOwnerAddress) public {
+    constructor(address _recipientAddress, address _morpherToken, address _coldStorageOwnerAddress) public {
         setRecipientAddress(_recipientAddress);
-        setMorpherTokenAddress(_tokenAddress);
+        setMorpherTokenAddress(_morpherToken);
         lastEscrowTransferTime = now;
         transferOwnership(_coldStorageOwnerAddress);
     }
