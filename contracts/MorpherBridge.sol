@@ -7,7 +7,7 @@
 // 72 hours positions and balaces from side chain can be transferred to main chain.
 // ------------------------------------------------------------------------
 
-pragma solidity 0.5.16;
+pragma solidity >=0.4.25 <0.6.0;
 
 import "./Ownable.sol";
 import "./SafeMath.sol";

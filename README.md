@@ -1,3 +1,26 @@
+# How to run the tests
+Before you start:
+* Install Ganache https://www.trufflesuite.com/ganache on your system and run it successfully on port 7545.
+
+* Install Node.js, Npm and build-essential (Linux and MacOS package to build Web3 C/C++ files) on your computer. 
+
+In the Linux terminal:
+
+`curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -`
+
+`sudo apt-get install nodejs` for node and npm
+
+`sudo apt-get install build-essential`
+
+
+* Install Truffle by running `sudo npm install truffle@5.0.41 -g`. Be sure to use this exact version in case of compatibility issues.
+
+After the initial setup is done, run the following commands to start the test suite.
+* `npm install` to install all the truffle/node dependencies.
+* Rename .env.example to .env and input all the required variables. If you're testing locally with Ganache, you only need to input `MORPHER_DEPLOYER` and `MORPHER_DEPLOYER_KEY` which is the first account you see in the Ganache GUI.
+* If everything is configured correctly, run the last command: `truffle test --network local`
+
+If you want to see exactly what assertions are being made, you can take a look at the `test` folder.
 # SmartContract-Beta
 Morpher Smart Contract collection for on chain transactions and trustless state recovery from sidechain
 
