@@ -67,17 +67,17 @@ contract('MorpherState', (accounts) => {
         assert.equal(testAddress2Balance, '4000000');
 
         // Test total cash supply functions.
-        await truffleAssert.reverts(morpherState.setTotalCashSupply('1000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
-        await morpherState.setTotalCashSupply('2000000000', { from: testAddress1 });
+        await truffleAssert.reverts(morpherState.setTotalInPositions('1000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
+        await morpherState.setTotalInPositions('2000000000', { from: testAddress1 });
 
-        let totalCashSupply = (await morpherState.totalCashSupply({ from: testAddress1 })).toString();
-        assert.equal(totalCashSupply, '2000000000');
+        let totalInPositions = (await morpherState.totalInPositions({ from: testAddress1 })).toString();
+        assert.equal(totalInPositions, '2000000000');
 
-        await truffleAssert.reverts(morpherState.setTotalCashSupply('3000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
-        await morpherState.setTotalCashSupply('4000000000', { from: testAddress1 });
+        await truffleAssert.reverts(morpherState.setTotalInPositions('3000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
+        await morpherState.setTotalInPositions('4000000000', { from: testAddress1 });
 
-        totalCashSupply = (await morpherState.totalCashSupply({ from: testAddress1 })).toString();
-        assert.equal(totalCashSupply, '4000000000');
+        totalInPositions = (await morpherState.totalInPositions({ from: testAddress1 })).toString();
+        assert.equal(totalInPositions, '4000000000');
 
         // Test reward addresses functions.
         await truffleAssert.reverts(morpherState.setRewardAddress(testAddress2, { from: testAddress1 })); // fails
@@ -89,10 +89,7 @@ contract('MorpherState', (accounts) => {
 
         await truffleAssert.reverts(morpherState.setRewardBasisPoints(1000, { from: testAddress1 })); // fails
         await truffleAssert.reverts(morpherState.setRewardBasisPoints(65000, { from: deployerAddress })); // fails
-        await morpherState.setRewardBasisPoints(14000, { from: deployerAddress });
-
-        const rewardsBasisPoints = await morpherState.rewardBasisPoints({ from: testAddress1 });
-        assert.equal(rewardsBasisPoints, '14000');
+        await truffleAssert.reverts(morpherState.setRewardBasisPoints(14000, { from: deployerAddress })); // fails
 
         // Test set morpher bridge functions.
         await truffleAssert.reverts(morpherState.setMorpherBridge(deployerAddress, { from: testAddress1 })); // fails

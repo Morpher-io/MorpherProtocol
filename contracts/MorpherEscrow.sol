@@ -11,16 +11,16 @@ import "./IERC20.sol";
 
 contract MorpherEscrow is Ownable{
     using SafeMath for uint256;
-    
-    uint256 public lastEscrowTransferTime;  
+
+    uint256 public lastEscrowTransferTime;
     address public recipient;
     address public morpherToken;
-    
+
     uint256 public constant RELEASEAMOUNT = 10**25;
     uint256 public constant RELEASEPERIOD = 30 days;
-    
-    event EscrowReleased(uint256 _released, uint256 _leftInEscrow, uint256 _timeStamp);    
-    
+
+    event EscrowReleased(uint256 _released, uint256 _leftInEscrow, uint256 _timeStamp);
+
     constructor(address _recipientAddress, address _morpherToken, address _coldStorageOwnerAddress) public {
         setRecipientAddress(_recipientAddress);
         setMorpherTokenAddress(_morpherToken);
@@ -28,9 +28,9 @@ contract MorpherEscrow is Ownable{
         transferOwnership(_coldStorageOwnerAddress);
     }
 
-// ----------------------------------------------------------------------------------
-// Owner can modify recipient address and update morpherToken adddress
-// ----------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------
+    // Owner can modify recipient address and update morpherToken adddress
+    // ----------------------------------------------------------------------------------
     function setRecipientAddress(address _recipientAddress) public onlyOwner {
         recipient = _recipientAddress;
     }
@@ -39,10 +39,10 @@ contract MorpherEscrow is Ownable{
         morpherToken = _address;
     }
 
-// ----------------------------------------------------------------------------------
-// Anyone can release funds from escrow if enough time has elapsed
-// Every 30 days 1% of the total initial supply or 10m token are released to Morpher
-// ----------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------
+    // Anyone can release funds from escrow if enough time has elapsed
+    // Every 30 days 1% of the total initial supply or 10m token are released to Morpher
+    // ----------------------------------------------------------------------------------
     function releaseFromEscrow() public {
         require(IERC20(morpherToken).balanceOf(address(this)) > 0, "No funds left in escrow.");
         uint256 _releasedAmount;

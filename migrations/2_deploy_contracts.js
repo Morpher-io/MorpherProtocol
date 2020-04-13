@@ -32,7 +32,7 @@ module.exports = async function(deployer, network, accounts) {
         gasCollectionAddress = deployerAddress;
     }
 
-    await deployer.deploy(MorpherState, false); // boolean isMainchain
+    await deployer.deploy(MorpherState, false, deployerAddress, ownerAddress); // boolean isMainchain
     await deployer.deploy(MorpherToken, MorpherState.address, ownerAddress);
     await deployer.deploy(MorpherTradeEngine, MorpherState.address, ownerAddress);
     await deployer.deploy(MorpherBridge, MorpherState.address, ownerAddress);

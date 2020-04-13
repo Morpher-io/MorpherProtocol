@@ -34,8 +34,8 @@ contract('MorpherEscrow', (accounts) => {
         morpherEscrowBalance = await morpherToken.balanceOf(morpherEscrow.address, { from: testAddress2 });
         assert.equal(morpherEscrowBalance.toString(), '21000000000000000000000000');
 
-        // Simulate one day wait in blockchain (3600s * 25 hours as a threshold).
-        await advanceTimeAndBlock(3600 * 25);
+        // Simulate one month wait in blockchain (3600s * 24 hours * 31 days as a threshold).
+        await advanceTimeAndBlock(3600 * 24 * 31);
 
         await morpherEscrow.releaseFromEscrow({ from: testAddress2 });
 
@@ -47,8 +47,8 @@ contract('MorpherEscrow', (accounts) => {
         morpherEscrowBalance = await morpherToken.balanceOf(morpherEscrow.address, { from: testAddress2 });
         assert.equal(morpherEscrowBalance.toString(), '11000000000000000000000000');
 
-        // Simulate one day wait in blockchain (3600s * 25 hours as a threshold).
-        await advanceTimeAndBlock(3600 * 25);
+        // Simulate one month wait in blockchain (3600s * 24 hours * 31 days as a threshold).
+        await advanceTimeAndBlock(3600 * 24 * 31);
 
         await morpherEscrow.releaseFromEscrow({ from: testAddress2 });
 
@@ -60,7 +60,8 @@ contract('MorpherEscrow', (accounts) => {
         morpherEscrowBalance = await morpherToken.balanceOf(morpherEscrow.address, { from: testAddress2 });
         assert.equal(morpherEscrowBalance.toString(), '1000000000000000000000000');
 
-        await advanceTimeAndBlock(3600 * 25);
+        // Simulate one month wait in blockchain (3600s * 24 hours * 31 days as a threshold).
+        await advanceTimeAndBlock(3600 * 24 * 31);
 
         await morpherEscrow.releaseFromEscrow({ from: testAddress2 });
 
