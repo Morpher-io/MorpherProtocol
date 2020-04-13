@@ -16,7 +16,9 @@ contract MorpherState is Ownable {
 
     bool public mainChain;
     uint256 public totalSupply;
-    uint256 public totalCashSupply;
+    uint256 public totalToken;
+    uint256 public totalInPositions;
+    uint256 public totalOnOtherChain;
     uint256 public maximumLeverage = 10**9; // Leverage precision is 1e8, maximum leverage set to 10 initially
     uint256 constant PRECISION = 10**8;
     uint256 constant DECIMALS = 18;
@@ -110,12 +112,12 @@ contract MorpherState is Ownable {
     event TransfersEnabled(address indexed whiteList);
     event TransfersDisabled(address indexed blackList);
 
-    event CreditAddress(address indexed recipient, uint256 indexed amount, uint256 totalCashSupply);
-    event DebitAddress(address indexed payer, uint256 indexed amount, uint256 totalCashSupply);
-
-    event Transfer(address indexed sender, address indexed recipient, uint256 amount, uint256 totalCashSupply);
-    event Mint(address indexed recipient, uint256 amount, uint256 totalCashSupply);
-    event Burn(address indexed recipient, uint256 amount, uint256 totalCashSupply);
+    event Transfer(address indexed sender, address indexed recipient, uint256 amount);
+    event Mint(address indexed recipient, uint256 amount, uint256 totalToken);
+    event Burn(address indexed recipient, uint256 amount, uint256 totalToken);
+    event NewTotalSupply(uint256 newTotalSupply);
+    event NewTotalOnOtherChain(uint256 newTotalOnOtherChain);
+    event NewTotalInPositions(uint256 newTotalOnOtherChain);    
     event OperatingRewardMinted(address indexed recipient, uint256 amount);
 
     event RewardsChange(address indexed rewardsAddress, uint256 indexed rewardsBasisPoints);
@@ -142,9 +144,7 @@ contract MorpherState is Ownable {
     event FastWithdrawsDisabled();
     event NewBridgeNonce(uint256 _transferNonce);
     event Last24HoursAmountWithdrawnReset();
-    
-    event NewTotalSupply(uint256 newTotalSupply);
-    event NewTotalCashSupply(uint256 newTotalCashSupply);
+
     event StatePaused(address administrator, bool _paused);
     
     event SetAllowance(address indexed sender, address indexed spender, uint256 tokens);
@@ -180,6 +180,11 @@ contract MorpherState is Ownable {
         _;
     }
 
+    modifier onlySideChainOperator {
+        require(msg.sender == sideChainOperator, "MorpherState: Caller is not the Sidechain Operator. Aborting.");
+        _;
+    }
+
     modifier canTransfer {
         require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
         _;
@@ -200,25 +205,33 @@ contract MorpherState is Ownable {
         _;
     }
 
-    constructor(bool _mainChain) public {
-        // Transfer State Ownership to cold storage address after deploying protocol
-        setRewardAddress(owner());
-        setLastRewardTime(now);
+    constructor(bool _mainChain, address _sideChainOperator, address _rewardAddress) public {
+    // @Deployer: Transfer State Ownership to cold storage address after deploying protocol       
         mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
-        totalSupply = 1000000000 * 10**(DECIMALS);
+        setLastRewardTime(now);
+        uint256 _sideChainMint = 575000000 * 10**(DECIMALS);
+        uint256 _mainChainMint = 425000000 * 10**(DECIMALS);
         grantAccess(owner());
+        setSideChainOperator(owner());
         if (mainChain == false) { // Create token only on sidechain
-            balances[owner()] = 575000000 * 10**(DECIMALS); // Create airdrop and team token on sidechain
-            emit Mint(owner(), balanceOf(owner()), totalSupply);
+            balances[owner()] = _sideChainMint; // Create airdrop and team token on sidechain
+            totalToken = _sideChainMint;
+            emit Mint(owner(), balanceOf(owner()), _sideChainMint);
             setRewardBasisPoints(0); // Reward is minted on mainchain
+            setRewardAddress(address(0));
+            setTotalOnOtherChain(_mainChainMint);
         } else {
-            balances[owner()] = 425000000 * 10**(DECIMALS); // Create treasury and investor token on mainchain
-            emit Mint(owner(), balanceOf(owner()), totalSupply);
+            balances[owner()] = _mainChainMint; // Create treasury and investor token on mainchain
+            totalToken = _mainChainMint;            
+            emit Mint(owner(), balanceOf(owner()), _mainChainMint);
             setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
+            setRewardAddress(_rewardAddress);
+            setTotalOnOtherChain(_sideChainMint);
         }
         fastTransfersEnabled = true;
         setNumberOfRequestsLimit(3);
         setMainChainWithdrawLimit(totalSupply / 50);
+        setSideChainOperator(_sideChainOperator);
         denyAccess(owner());
     }
 
@@ -417,40 +430,44 @@ contract MorpherState is Ownable {
         balances[_from] = balances[_from].sub(_token);
         balances[_to] = balances[_to].add(_token);
         IMorpherToken(morpherToken).emitTransfer(_from, _to, _token);
-        emit Transfer(_from, _to, _token, totalSupply);
+        emit Transfer(_from, _to, _token);
     }
 
     function mint(address _address, uint256 _token) public onlyPlatform notPaused {
         balances[_address] = balances[_address].add(_token);
-        totalSupply.add(_token);
+        totalToken.add(_token);
+        updateTotalSupply();
         IMorpherToken(morpherToken).emitTransfer(address(0), _address, _token);
-        emit Mint(_address, _token, totalCashSupply);
+        emit Mint(_address, _token, totalToken);
     }
 
     function burn(address _address, uint256 _token) public onlyPlatform notPaused {
         require(balances[_address] >= _token, "MorpherState: Not enough token.");
         balances[_address] = balances[_address].sub(_token);
-        totalSupply.sub(_token);
+        totalToken.sub(_token);
+        updateTotalSupply();        
         IMorpherToken(morpherToken).emitTransfer(_address, address(0), _token);
-        emit Burn(_address, _token, totalCashSupply);
+        emit Burn(_address, _token, totalToken);
     }
 
 // ----------------------------------------------------------------------------
 // Setter/Getter functions for balance and token functions (ERC20)
 // ----------------------------------------------------------------------------
-    function setTotalSupply(uint256 _newTotalSupply) public onlyAdministrator {
-        totalSupply = _newTotalSupply;
-        emit NewTotalSupply(_newTotalSupply);
+    function updateTotalSupply() private {
+        totalSupply = totalToken.add(totalInPositions).add(totalOnOtherChain);
+        emit NewTotalSupply(totalSupply);
      }
 
-    function updateTotalSupply(uint256 _newTotalSupply) private {
-        totalSupply = _newTotalSupply;
-        emit NewTotalSupply(_newTotalSupply);
+    function setTotalInPositions(uint256 _totalInPositions) public onlyAdministrator {
+        totalInPositions = _totalInPositions;
+        updateTotalSupply();
+        emit NewTotalInPositions(_totalInPositions);
      }
 
-    function setTotalCashSupply(uint256 _newTotalCashSupply) public onlyAdministrator {
-        totalCashSupply = _newTotalCashSupply;
-        emit NewTotalSupply(_newTotalCashSupply);
+    function setTotalOnOtherChain(uint256 _newTotalOnOtherChain) public onlySideChainOperator {
+        totalOnOtherChain = _newTotalOnOtherChain;
+        updateTotalSupply();        
+        emit NewTotalOnOtherChain(_newTotalOnOtherChain);
      }
 
     function balanceOf(address _tokenOwner) public view returns (uint256 balance) {
@@ -525,7 +542,11 @@ contract MorpherState is Ownable {
     }
 
     function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyOwner {
-        require(_newRewardBasisPoints <= 15000, "MorpherState: Reward basis points need to be less or equal to 15000.");
+        if (mainChain == true) {
+            require(_newRewardBasisPoints <= 15000, "MorpherState: Reward basis points need to be less or equal to 15000.");
+        } else {
+            require(_newRewardBasisPoints == 0, "MorpherState: Reward basis points can only be set on Ethereum.");
+        }
         rewardBasisPoints = _newRewardBasisPoints;
         emit RewardsChange(morpherRewards, _newRewardBasisPoints);
     }
