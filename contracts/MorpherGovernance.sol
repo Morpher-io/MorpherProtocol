@@ -105,7 +105,7 @@ contract MorpherGovernance is Ownable {
         uint256 _requiredAmount = MINVALIDATORLOCKUP.mul(numberOfValidators.add(1));
         require(state.balanceOf(msg.sender) > _requiredAmount, "MorpherGovernance: Insufficient balance to become Validator.");
         require(isValidator(msg.sender) == false, "MorpherGovernance: Address is already Validator.");
-        require(numberOfValidators <= MAXVALIDATORS, "Number of Validators should not exceed Max Validators.");
+        require(numberOfValidators <= MAXVALIDATORS, "MorpherGovernance: number of Validators can not exceed Max Validators.");
         state.transfer(msg.sender, address(this), _requiredAmount);
         numberOfValidators = numberOfValidators.add(1);
         validatorIndex[msg.sender] = numberOfValidators;
