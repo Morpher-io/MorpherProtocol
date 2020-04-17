@@ -56,7 +56,7 @@ library SafeMath {
      * @dev Get it via `npm install @openzeppelin/contracts@next`.
      */
     function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        require(b <= a, errorMessage);
+        require(b <= a, errorMessage, "SafeMath: substraction overflow");
         uint256 c = a - b;
 
         return c;
@@ -115,7 +115,7 @@ library SafeMath {
      */
     function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         // Solidity only automatically asserts when dividing by 0
-        require(b > 0, errorMessage);
+        require(b > 0, errorMessage, "SafeMath: division by 0 is not allowed.");
         uint256 c = a / b;
         // assert(a == b * c + a % b); // There is no case in which this doesn't hold
 
@@ -152,7 +152,7 @@ library SafeMath {
      * @dev Get it via `npm install @openzeppelin/contracts@next`.
      */
     function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        require(b != 0, errorMessage);
+        require(b != 0, errorMessage, "SafeMath: Argument should not be 0.");
         return a % b;
     }
 }

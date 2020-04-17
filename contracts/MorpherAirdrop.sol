@@ -73,11 +73,11 @@ contract MorpherAirdrop is Ownable {
 // ----------------------------------------------------------------------------
     function setAirdropAuthorized(address _userAddress, uint256 _authorized) public onlyAirdropAdmin returns (bool _success) {
         // Can only set authorized amount to be higher than claimed
-        require(_authorized >= airdropClaimed[_userAddress]);
+        require(_authorized >= airdropClaimed[_userAddress], "Airdrop authorized should be more than claimed.");
         // Authorized amount can be higher or lower than previously authorized amount, adjust accordingly
         totalAirdropAuthorized = totalAirdropAuthorized.sub(getAirdropAuthorized(_userAddress)).add(_authorized);
         airdropAuthorized[_userAddress] = _authorized;
-        emit SetAirdropAuthorized(_userAddress, airdropClaimed[_userAddress], _authorized, now);    
+        emit SetAirdropAuthorized(_userAddress, airdropClaimed[_userAddress], _authorized, now);
         return true;
     }
 

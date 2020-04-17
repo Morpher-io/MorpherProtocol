@@ -407,16 +407,20 @@ contract MorpherTradeEngine is Ownable {
         uint256 _orderLeverage,
         bool _sell
         ) public pure returns (uint256 _shareValue) {
+
+        uint256 _averagePrice = _positionAveragePrice;
+        uint256 _averageLeverage = _positionAverageLeverage;
+
         if (_positionAverageLeverage < PRECISION) {
             // Leverage can never be less than 1. Fail safe for empty positions, i.e. undefined _positionAverageLeverage
-            _positionAverageLeverage = PRECISION;
+            _averageLeverage = PRECISION;
         }
         if (_sell == false) {
             // New short position
             // It costs marketPrice + marketSpread to build up a new short position
-            _positionAveragePrice = _marketPrice;
+            _averagePrice = _marketPrice;
 	        // This is the average Leverage
-	        _positionAverageLeverage = _orderLeverage;
+	        _averageLeverage = _orderLeverage;
         }
         if (
             _liquidationPrice <= _marketPrice
@@ -425,12 +429,12 @@ contract MorpherTradeEngine is Ownable {
             _shareValue = 0;
         } else {
             // The regular share value is 2x the entry price minus the current price for short positions.
-            _shareValue = _positionAveragePrice.mul((PRECISION.add(_positionAverageLeverage))).div(PRECISION);
-            _shareValue = _shareValue.sub(_marketPrice.mul(_positionAverageLeverage).div(PRECISION));
+            _shareValue = _averagePrice.mul((PRECISION.add(_averageLeverage))).div(PRECISION);
+            _shareValue = _shareValue.sub(_marketPrice.mul(_averageLeverage).div(PRECISION));
             if (_sell == true) {
                 // We have to reduce the share value by the average spread (i.e. the average expense to build up the position)
                 // and reduce the value further by the spread for selling.
-                _shareValue = _shareValue.sub(_marketSpread.mul(_positionAverageLeverage).div(PRECISION));
+                _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
             } else {
                 // If a new short position is built up each share costs value + spread
                 _shareValue = _shareValue.add(_marketSpread.mul(_orderLeverage).div(PRECISION));
@@ -448,16 +452,20 @@ contract MorpherTradeEngine is Ownable {
         uint256 _orderLeverage,
         bool _sell
         ) public pure returns (uint256 _shareValue) {
+
+        uint256 _averagePrice = _positionAveragePrice;
+        uint256 _averageLeverage = _positionAverageLeverage;
+
         if (_positionAverageLeverage < PRECISION) {
             // Leverage can never be less than 1. Fail safe for empty positions, i.e. undefined _positionAverageLeverage
-            _positionAverageLeverage = PRECISION;
+            _averageLeverage = PRECISION;
         }
         if (_sell == false) {
             // New long position
             // It costs marketPrice + marketSpread to build up a new long position
-            _positionAveragePrice = _marketPrice;
+            _averagePrice = _marketPrice;
 	        // This is the average Leverage
-	        _positionAverageLeverage = _orderLeverage;
+	        _averageLeverage = _orderLeverage;
         }
         if (
             _marketPrice <= _liquidationPrice
@@ -465,12 +473,12 @@ contract MorpherTradeEngine is Ownable {
 	        // Position is worthless
             _shareValue = 0;
         } else {
-            _shareValue = _positionAveragePrice.mul(_positionAverageLeverage.sub(PRECISION)).div(PRECISION);
+            _shareValue = _averagePrice.mul(_averageLeverage.sub(PRECISION)).div(PRECISION);
             // The regular share value is market price times leverage minus entry price times entry leverage minus one.
-            _shareValue = (_marketPrice.mul(_positionAverageLeverage).div(PRECISION)).sub(_shareValue);
+            _shareValue = (_marketPrice.mul(_averageLeverage).div(PRECISION)).sub(_shareValue);
             if (_sell == true) {
                 // We sell a long and have to correct the shareValue with the averageSpread and the currentSpread for selling.
-                _shareValue = _shareValue.sub(_marketSpread.mul(_positionAverageLeverage).div(PRECISION));
+                _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
             } else {
                 // We buy a new long position and have to pay the spread
                 _shareValue = _shareValue.add(_marketSpread.mul(_orderLeverage).div(PRECISION));

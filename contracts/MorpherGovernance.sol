@@ -104,8 +104,8 @@ contract MorpherGovernance is Ownable {
         // After a warmup period of 7 days the new validator can vote on Oracle contract and protocol Administrator
         uint256 _requiredAmount = MINVALIDATORLOCKUP.mul(numberOfValidators.add(1));
         require(state.balanceOf(msg.sender) > _requiredAmount, "MorpherGovernance: Insufficient balance to become Validator.");
-        require(isValidator(msg.sender) == false, "MorpherGovernance: Address is already Valdiator.");
-        require(numberOfValidators <= MAXVALIDATORS);
+        require(isValidator(msg.sender) == false, "MorpherGovernance: Address is already Validator.");
+        require(numberOfValidators <= MAXVALIDATORS, "Number of Validators should not exceed Max Validators.");
         state.transfer(msg.sender, address(this), _requiredAmount);
         numberOfValidators = numberOfValidators.add(1);
         validatorIndex[msg.sender] = numberOfValidators;
