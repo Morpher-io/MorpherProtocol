@@ -230,7 +230,7 @@ contract MorpherBridge is Ownable {
         uint256 _meanEntryLeverage,
         uint256 _liquidationPrice
         ) public sideChainInactive onlyMainchain {
-        require(_leaf == state.getPositionHash(msg.sender, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice), "Leaf is not the same as position hash.");
+        require(_leaf == state.getPositionHash(msg.sender, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice), "MorpherBridge: leaf does not equal position hash.");
         require(state.getPositionClaimedOnMainChain(_leaf) == false, "MorpherBridge: Position already transferred.");
         require(mProof(_proof,_leaf) == true, "MorpherBridge: Merkle proof failed.");
         state.setPositionClaimedOnMainChain(_leaf);
