@@ -435,7 +435,7 @@ contract MorpherState is Ownable {
 
     function mint(address _address, uint256 _token) public onlyPlatform notPaused {
         balances[_address] = balances[_address].add(_token);
-        totalToken.add(_token);
+        totalToken = totalToken.add(_token);
         updateTotalSupply();
         IMorpherToken(morpherToken).emitTransfer(address(0), _address, _token);
         emit Mint(_address, _token, totalToken);
@@ -444,7 +444,7 @@ contract MorpherState is Ownable {
     function burn(address _address, uint256 _token) public onlyPlatform notPaused {
         require(balances[_address] >= _token, "MorpherState: Not enough token.");
         balances[_address] = balances[_address].sub(_token);
-        totalToken.sub(_token);
+        totalToken = totalToken.sub(_token);
         updateTotalSupply();
         IMorpherToken(morpherToken).emitTransfer(_address, address(0), _token);
         emit Burn(_address, _token, totalToken);
