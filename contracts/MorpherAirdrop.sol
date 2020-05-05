@@ -1,4 +1,4 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
 
 import "./Ownable.sol";
 import "./SafeMath.sol";
@@ -6,7 +6,7 @@ import "./IERC20.sol";
 
 // ----------------------------------------------------------------------------------
 // Holds the Airdrop Token balance on contract address
-// AirdropAdmin can authorize addresses to receive airdrop. 
+// AirdropAdmin can authorize addresses to receive airdrop.
 // Users have to claim their airdrop actively or Admin initiates transfer.
 // ----------------------------------------------------------------------------------
 
@@ -16,25 +16,25 @@ contract MorpherAirdrop is Ownable {
 // ----------------------------------------------------------------------------
 // Mappings for authorized / claimed airdrop
 // ----------------------------------------------------------------------------
-    mapping(address => uint256) airdropClaimed;
-    mapping(address => uint256) airdropAuthorized;
-    
+    mapping(address => uint256) private airdropClaimed;
+    mapping(address => uint256) private airdropAuthorized;
+
     uint256 public totalAirdropAuthorized;
     uint256 public totalAirdropClaimed;
-    
+
     address public airdropAdmin;
     address public morpherToken;
 
 // ----------------------------------------------------------------------------
 // Events
 // ----------------------------------------------------------------------------
-    event AirdropSent(address indexed _operator, address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized, uint256 _timeStamp);    
-    event SetAirdropAuthorized(address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized, uint256 _timeStamp);    
-    
+    event AirdropSent(address indexed _operator, address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
+    event SetAirdropAuthorized(address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
+
     constructor(address _airdropAdminAddress, address _morpherToken, address _coldStorageOwnerAddress) public {
         setAirdropAdmin(_airdropAdminAddress);
         setMorpherTokenAddress(_morpherToken);
-        transferOwnership(_coldStorageOwnerAddress);        
+        transferOwnership(_coldStorageOwnerAddress);
     }
 
     modifier onlyAirdropAdmin {
@@ -71,37 +71,34 @@ contract MorpherAirdrop is Ownable {
 // ----------------------------------------------------------------------------
 // Airdrop Administrator can authorize airdrop amount per address
 // ----------------------------------------------------------------------------
-    function setAirdropAuthorized(address _userAddress, uint256 _authorized) public onlyAirdropAdmin returns (bool _success) {
+    function setAirdropAuthorized(address _userAddress, uint256 _authorized) public onlyAirdropAdmin {
         // Can only set authorized amount to be higher than claimed
         require(_authorized >= airdropClaimed[_userAddress], "MorpherAirdrop: airdrop authorized must be larger than claimed.");
         // Authorized amount can be higher or lower than previously authorized amount, adjust accordingly
         totalAirdropAuthorized = totalAirdropAuthorized.sub(getAirdropAuthorized(_userAddress)).add(_authorized);
         airdropAuthorized[_userAddress] = _authorized;
-        emit SetAirdropAuthorized(_userAddress, airdropClaimed[_userAddress], _authorized, now);
-        return true;
+        emit SetAirdropAuthorized(_userAddress, airdropClaimed[_userAddress], _authorized);
     }
 
 // ----------------------------------------------------------------------------
 // User claims their entire airdrop
 // ----------------------------------------------------------------------------
     function claimAirdrop() public {
-        require(airdropAuthorized[msg.sender] > airdropClaimed[msg.sender], "MorpherAirdrop: no airdrop left to claim.");
         uint256 _amount = airdropAuthorized[msg.sender].sub(airdropClaimed[msg.sender]);
         _sendAirdrop(msg.sender, _amount);
     }
-    
+
 // ----------------------------------------------------------------------------
 // User claims part of their airdrop
 // ----------------------------------------------------------------------------
     function claimSomeAirdrop(uint256 _amount) public {
         _sendAirdrop(msg.sender, _amount);
     }
-    
+
 // ----------------------------------------------------------------------------
 // Administrator sends user their entire airdrop
 // ----------------------------------------------------------------------------
     function adminSendAirdrop(address _recipient) public onlyAirdropAdmin {
-        require(airdropAuthorized[_recipient] > airdropClaimed[_recipient], "MorpherAirdrop: no airdrop left to claim.");
         uint256 _amount = airdropAuthorized[_recipient].sub(airdropClaimed[_recipient]);
         _sendAirdrop(_recipient, _amount);
     }
@@ -121,7 +118,7 @@ contract MorpherAirdrop is Ownable {
         airdropClaimed[_recipient] = airdropClaimed[_recipient].add(_amount);
         totalAirdropClaimed = totalAirdropClaimed.add(_amount);
         IERC20(morpherToken).transfer(_recipient, _amount);
-        emit AirdropSent(msg.sender, _recipient, airdropClaimed[_recipient], airdropAuthorized[_recipient], now);
+        emit AirdropSent(msg.sender, _recipient, airdropClaimed[_recipient], airdropAuthorized[_recipient]);
     }
 
 // ----------------------------------------------------------------------------
