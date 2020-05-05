@@ -1,9 +1,8 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
 
 import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./IMorpherToken.sol";
-import "./IERC20.sol";
 
 // ----------------------------------------------------------------------------------
 // Data and token balance storage of the Morpher platform
@@ -42,13 +41,13 @@ contract MorpherState is Ownable {
     // Set initial withdraw limit from sidechain to 20m token or 2% of initial supply
     uint256 public mainChainWithdrawLimit24 = 2 * 10**25;
 
-    mapping(address => bool) public stateAccess;
-    mapping(address => bool) public transferAllowed;
+    mapping(address => bool) private stateAccess;
+    mapping(address => bool) private transferAllowed;
 
-    mapping(address => uint256) public balances;
-    mapping(address => mapping(address => uint256)) public allowed;
+    mapping(address => uint256) private balances;
+    mapping(address => mapping(address => uint256)) private allowed;
 
-    mapping(bytes32 => bool) public marketActive;
+    mapping(bytes32 => bool) private marketActive;
 
     // ----------------------------------------------------------------------------
     // Position struct records virtual futures
@@ -67,7 +66,7 @@ contract MorpherState is Ownable {
     // ----------------------------------------------------------------------------
     // A portfolio is an address specific collection of postions
     // ----------------------------------------------------------------------------
-    mapping(address => mapping(bytes32 => position)) public portfolio;
+    mapping(address => mapping(bytes32 => position)) private portfolio;
 
     // ----------------------------------------------------------------------------
     // Record all addresses that hold a position of a market, needed for clean stock splits
@@ -78,15 +77,15 @@ contract MorpherState is Ownable {
         mapping(uint256 => address) addy;
     }
 
-    mapping(bytes32 => hasExposure) public exposureByMarket;
+    mapping(bytes32 => hasExposure) private exposureByMarket;
 
     // ----------------------------------------------------------------------------
     // Bridge Variables
     // ----------------------------------------------------------------------------
-    mapping (address => uint256) public tokenClaimedOnThisChain;
-    mapping (address => uint256) public tokenSentToLinkedChain;
-    mapping (address => uint256) public tokenSentToLinkedChainTime;
-    mapping (bytes32 => bool) public positionClaimedOnMainChain;
+    mapping (address => uint256) private tokenClaimedOnThisChain;
+    mapping (address => uint256) private tokenSentToLinkedChain;
+    mapping (address => uint256) private tokenSentToLinkedChainTime;
+    mapping (bytes32 => bool) private positionClaimedOnMainChain;
 
     uint256 public lastWithdrawLimitReductionTime;
     uint256 public last24HoursAmountWithdrawn;
@@ -99,8 +98,8 @@ contract MorpherState is Ownable {
     // Sidechain spam protection
     // ----------------------------------------------------------------------------
 
-    mapping(address => uint256) public lastRequestBlock;
-    mapping(address => uint256) public numberOfRequests;
+    mapping(address => uint256) private lastRequestBlock;
+    mapping(address => uint256) private numberOfRequests;
     uint256 public numberOfRequestsLimit;
 
     // ----------------------------------------------------------------------------
@@ -130,7 +129,7 @@ contract MorpherState is Ownable {
     event MarketActivated(bytes32 indexed activateMarket);
     event MarketDeActivated(bytes32 indexed deActivateMarket);
     event BridgeChange(address _bridgeAddress);
-    event SideChainMerkleRootUpdate(bytes32 indexed sideChainMerkleRoot, uint256 updateTime);
+    event SideChainMerkleRootUpdate(bytes32 indexed sideChainMerkleRoot);
     event NewSideChainOperator(address indexed sideChainOperator);
     event NumberOfRequestsLimitUpdate(uint256 _numberOfRequests);
 
@@ -602,7 +601,7 @@ contract MorpherState is Ownable {
         sideChainMerkleRoot = _sideChainMerkleRoot;
         sideChainMerkleRootWrittenAtTime = now;
         payOperatingReward;
-        emit SideChainMerkleRootUpdate(_sideChainMerkleRoot, sideChainMerkleRootWrittenAtTime);
+        emit SideChainMerkleRootUpdate(_sideChainMerkleRoot);
     }
 
     function getSideChainMerkleRoot() public view returns(bytes32 _sideChainMerkleRoot) {
