@@ -1,4 +1,4 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
 
 import "./Ownable.sol";
 import "./SafeMath.sol";
@@ -19,7 +19,7 @@ contract MorpherEscrow is Ownable{
     uint256 public constant RELEASEAMOUNT = 10**25;
     uint256 public constant RELEASEPERIOD = 30 days;
 
-    event EscrowReleased(uint256 _released, uint256 _leftInEscrow, uint256 _timeStamp);
+    event EscrowReleased(uint256 _released, uint256 _leftInEscrow);
 
     constructor(address _recipientAddress, address _morpherToken, address _coldStorageOwnerAddress) public {
         setRecipientAddress(_recipientAddress);
@@ -46,7 +46,6 @@ contract MorpherEscrow is Ownable{
     function releaseFromEscrow() public {
         require(IERC20(morpherToken).balanceOf(address(this)) > 0, "No funds left in escrow.");
         uint256 _releasedAmount;
-        // !! Change to 30 days after testing !!
         if (now > lastEscrowTransferTime.add(RELEASEPERIOD)) {
             if (IERC20(morpherToken).balanceOf(address(this)) > RELEASEAMOUNT) {
                 _releasedAmount = RELEASEAMOUNT;
@@ -54,9 +53,8 @@ contract MorpherEscrow is Ownable{
                 _releasedAmount = IERC20(morpherToken).balanceOf(address(this));
             }
             IERC20(morpherToken).transfer(recipient, _releasedAmount);
-            // !! Change to 30 days after testing !!
             lastEscrowTransferTime = lastEscrowTransferTime.add(RELEASEPERIOD);
-            emit EscrowReleased(_releasedAmount, IERC20(morpherToken).balanceOf(address(this)), now);
+            emit EscrowReleased(_releasedAmount, IERC20(morpherToken).balanceOf(address(this)));
         }
     }
 }
