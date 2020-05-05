@@ -1,4 +1,4 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
 
 import "./IERC20.sol";
 import "./Ownable.sol";
@@ -47,13 +47,23 @@ contract MorpherToken is IERC20, Ownable {
         require(state.mainChain() == true || state.getCanTransfer(msg.sender), "ERC20: token transfers disabled on sidechain.");
         _;
     }
+    
+    event LinkState(address _address);
 
     // ------------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------------
     constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
-        state = MorpherState(_stateAddress);
+        setMorpherState(_stateAddress);
         transferOwnership(_coldStorageOwnerAddress);
+    }
+
+    // ------------------------------------------------------------------------
+    // Links Token Contract with State
+    // ------------------------------------------------------------------------
+    function setMorpherState(address _stateAddress) public onlyOwner {
+        state = MorpherState(_stateAddress);
+        emit LinkState(_stateAddress);
     }
 
     /**
