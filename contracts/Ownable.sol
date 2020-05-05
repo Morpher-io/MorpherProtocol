@@ -1,4 +1,6 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
+
+import "./IERC20.sol";
 
 /**
  * @title Ownable
@@ -69,5 +71,11 @@ contract Ownable {
         require(newOwner != address(0), "Ownable: use renounce ownership instead.");
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
+    }
+    // ------------------------------------------------------------------------
+    // Owner can transfer out any accidentally sent ERC20 tokens
+    // ------------------------------------------------------------------------
+    function transferAnyERC20Token(address _tokenAddress, uint256 _tokens) public onlyOwner returns (bool _success) {
+        return IERC20(_tokenAddress).transfer(owner(), _tokens);
     }
 }
