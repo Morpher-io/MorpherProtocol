@@ -1,4 +1,4 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
 // ------------------------------------------------------------------------
 // Morpher Governance (MAIN CHAIN ONLY)
 //
@@ -26,14 +26,14 @@ contract MorpherGovernance is Ownable {
 
     using SafeMath for uint256;
     MorpherState state;
-    
+
     event BecomeValidator(address indexed _sender, uint256 indexed _myValidatorIndex);
     event StepDownAsValidator(address indexed _sender, uint256 indexed _myValidatorIndex);
     event ElectedAdministrator(address indexed _administratorAddress, uint256 _votes);
     event ElectedOracle(address indexed _oracleAddress, uint256 _votes);
 
     uint256 public constant MINVALIDATORLOCKUP = 10**25;
-    uint256 public constant MAXVALIDATORS = 99;
+    uint256 public constant MAXVALIDATORS = 21;
     uint256 public constant VALIDATORWARMUPPERIOD = 7 days;
 
     uint256 public numberOfValidators;
@@ -42,18 +42,18 @@ contract MorpherGovernance is Ownable {
 
     address public morpherToken;
 
-    mapping(address => uint256) public validatorIndex;
-    mapping(address => uint256) public validatorJoinedAtTime;
-    mapping(uint256 => address) public validatorAddress;
-    mapping(address => address) public oracleVote;
-    mapping(address => address) public administratorVote;
-    mapping(address => uint256) public countVotes;
+    mapping(address => uint256) private validatorIndex;
+    mapping(address => uint256) private validatorJoinedAtTime;
+    mapping(uint256 => address) private validatorAddress;
+    mapping(address => address) private oracleVote;
+    mapping(address => address) private administratorVote;
+    mapping(address => uint256) private countVotes;
 
     constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
         setMorpherState(_stateAddress);
-        transferOwnership(_coldStorageOwnerAddress);        
+        transferOwnership(_coldStorageOwnerAddress);
     }
-    
+
     modifier onlyValidator() {
         require(isValidator(msg.sender), "MorpherGovernance: Only Validators can invoke that function.");
         _;
@@ -121,8 +121,8 @@ contract MorpherGovernance is Ownable {
         // all validators who joined after the validator stepping down receive 10^7 * 0.99 token from
         // escrow, and their validator ordinal number is reduced by one. E.g. if validator 3 of 5 steps down
         // validator 4 becomes validator 3, and validator 5 becomes validator 4. Both receive 10^7 * 0.99 token
-        // from escrow, as their new position requires fewer token in lockup. 1% of the token released from escrow 
-        // are burned for every validator receiving a payout. 
+        // from escrow, as their new position requires fewer token in lockup. 1% of the token released from escrow
+        // are burned for every validator receiving a payout.
         // Burning prevents vote delay attacks: validators stepping down and re-joining could
         // delay votes for VALIDATORWARMUPPERIOD.
         uint256 _myValidatorIndex = validatorIndex[msg.sender];
