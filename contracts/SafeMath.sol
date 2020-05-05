@@ -1,4 +1,4 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow
@@ -52,11 +52,10 @@ library SafeMath {
      * Requirements:
      * - Subtraction cannot overflow.
      *
-     * NOTE: This is a feature of the next version of OpenZeppelin Contracts.
-     * @dev Get it via `npm install @openzeppelin/contracts@next`.
+     * _Available since v2.4.0._
      */
     function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        require(b <= a, errorMessage, "SafeMath: substraction overflow");
+        require(b <= a, errorMessage);
         uint256 c = a - b;
 
         return c;
@@ -110,12 +109,12 @@ library SafeMath {
      *
      * Requirements:
      * - The divisor cannot be zero.
-     * NOTE: This is a feature of the next version of OpenZeppelin Contracts.
-     * @dev Get it via `npm install @openzeppelin/contracts@next`.
+     *
+     * _Available since v2.4.0._
      */
     function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         // Solidity only automatically asserts when dividing by 0
-        require(b > 0, errorMessage, "SafeMath: division by 0 is not allowed.");
+        require(b > 0, errorMessage);
         uint256 c = a / b;
         // assert(a == b * c + a % b); // There is no case in which this doesn't hold
 
@@ -148,11 +147,10 @@ library SafeMath {
      * Requirements:
      * - The divisor cannot be zero.
      *
-     * NOTE: This is a feature of the next version of OpenZeppelin Contracts.
-     * @dev Get it via `npm install @openzeppelin/contracts@next`.
+     * _Available since v2.4.0._
      */
     function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        require(b != 0, errorMessage, "SafeMath: Argument should not be 0.");
+        require(b != 0, errorMessage);
         return a % b;
     }
 }
