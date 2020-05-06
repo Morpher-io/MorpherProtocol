@@ -4,7 +4,7 @@ Before you start:
 
 * Install Node.js, Npm and build-essential (Linux and MacOS package to build Web3 C/C++ files) on your computer. 
 
-In the Linux terminal:
+In the Ubuntu Linux terminal:
 
 `curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -`
 
@@ -12,13 +12,13 @@ In the Linux terminal:
 
 `sudo apt-get install build-essential`
 
-
-* Install Truffle by running `sudo npm install truffle@5.0.41 -g`. Be sure to use this exact version in case of compatibility issues.
+* Git clone this repo and `cd` into it.
 
 After the initial setup is done, run the following commands to start the test suite.
 * `npm install` to install all the truffle/node dependencies.
 * Rename .env.example to .env and input all the required variables. If you're testing locally with Ganache, you only need to input `MORPHER_DEPLOYER` and `MORPHER_DEPLOYER_KEY` which is the first account you see in the Ganache GUI.
-* If everything is configured correctly, run the last command: `truffle test --network local`
+* When everything is configured correctly, run the last command: `./node_modules/truffle/build/cli.bundled.js test --network local
+`
 
 If you want to see exactly what assertions are being made, you can take a look at the `test` folder.
 # SmartContract-Beta
