@@ -1,4 +1,6 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
+
+import "./IERC20.sol";
 
 /**
  * @title Ownable
@@ -30,7 +32,7 @@ contract Ownable {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        require(isOwner(), "Caller should be owner.");
+        require(isOwner(), "Ownable: caller should be owner.");
         _;
     }
 
@@ -66,8 +68,14 @@ contract Ownable {
      * @param newOwner The address to transfer ownership to.
      */
     function _transferOwnership(address newOwner) internal {
-        require(newOwner != address(0), "New address should not be the same as old address.");
+        require(newOwner != address(0), "Ownable: use renounce ownership instead.");
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
+    }
+    // ------------------------------------------------------------------------
+    // Owner can transfer out any accidentally sent ERC20 tokens
+    // ------------------------------------------------------------------------
+    function transferAnyERC20Token(address _tokenAddress, uint256 _tokens) public onlyOwner returns (bool _success) {
+        return IERC20(_tokenAddress).transfer(owner(), _tokens);
     }
 }

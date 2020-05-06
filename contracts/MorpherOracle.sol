@@ -1,4 +1,4 @@
-pragma solidity >=0.4.25 <0.6.0;
+pragma solidity 0.5.16;
 
 import "./Ownable.sol";
 import "./MorpherTradeEngine.sol";
@@ -17,12 +17,12 @@ contract MorpherOracle is Ownable {
     MorpherTradeEngine tradeEngine;
 
     bool public paused;
-   
+
     uint256 public gasForCallback;
     address payable public callBackCollectionAddress;
-    
+
     mapping(address => bool) public callBackAddress;
-    
+
 // ----------------------------------------------------------------------------------
 // Events
 // ----------------------------------------------------------------------------------
@@ -33,18 +33,16 @@ contract MorpherOracle is Ownable {
         bool _tradeAmountGivenInShares,
         uint256 _tradeAmount,
         bool _tradeDirection,
-        uint256 _orderLeverage,
-        uint256 _timeStamp
+        uint256 _orderLeverage
         );
-        
+
     event LiquidationOrderCreated(
         bytes32 indexed _orderId,
         address _sender,
         address indexed _address,
-        bytes32 indexed _marketId,
-        uint256 _timeStamp
+        bytes32 indexed _marketId
         );
-        
+
     event OrderProcessed(
         bytes32 indexed _orderId,
         uint256 _price,
@@ -56,10 +54,9 @@ contract MorpherOracle is Ownable {
         uint256 _newMeanEntry,
         uint256 _newMeanSprad,
         uint256 _newMeanLeverage,
-        uint256 _liquidationPrice,
-        uint256 _blockTimeStamp
+        uint256 _liquidationPrice
         );
-        
+
     event OrderFailed(
         bytes32 indexed _orderId,
         address indexed _address,
@@ -67,44 +64,36 @@ contract MorpherOracle is Ownable {
         bool _tradeAmountGivenInShares,
         uint256 _tradeAmount,
         bool _tradeDirection,
-        uint256 _orderLeverage,
-        uint256 _timeStamp
+        uint256 _orderLeverage
         );
-        
+
     event OrderCancelled(
         bytes32 indexed _orderId,
-        address indexed _sender,
-        uint256 _timeStamp
+        address indexed _sender
         );
 
     event CallbackAddressEnabled(
-        address indexed _address,
-        uint256 _timeStamp
+        address indexed _address
         );
 
     event CallbackAddressDisabled(
-        address indexed _address,
-        uint256 _timeStamp
+        address indexed _address
         );
 
     event OraclePaused(
-        bool _paused,      
-        uint256 _timeStamp
+        bool _paused
         );
-        
+
     event CallBackCollectionAddressChange(
-        address _address,
-        uint256 _timeStamp
+        address _address
         );
 
     event SetGasForCallback(
-        uint256 _gasForCallback,
-        uint256 _timeStamp
+        uint256 _gasForCallback
         );
 
     event LinkTradeEngine(
-        address _address,
-        uint256 _timeStamp
+        address _address
         );
 
     modifier onlyOracleOperator {
@@ -116,13 +105,13 @@ contract MorpherOracle is Ownable {
         require(paused == false, "MorpherOracle: Oracle paused, aborting");
         _;
     }
-    
+
    constructor(address _tradeEngineAddress, address _callBackAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress) public {
         setTradeEngineAddress(_tradeEngineAddress);
         enableCallbackAddress(_callBackAddress);
         setCallbackCollectionAddress(_gasCollectionAddress);
         setGasForCallback(_gasForCallback);
-        transferOwnership(_coldStorageOwnerAddress); 
+        transferOwnership(_coldStorageOwnerAddress);
     }
 
 // ----------------------------------------------------------------------------------
@@ -131,22 +120,22 @@ contract MorpherOracle is Ownable {
 // ----------------------------------------------------------------------------------
     function setTradeEngineAddress(address _address) public onlyOwner {
         tradeEngine = MorpherTradeEngine(_address);
-        emit LinkTradeEngine(_address, block.timestamp);
+        emit LinkTradeEngine(_address);
     }
 
     function setGasForCallback(uint256 _gasForCallback) public onlyOwner {
         gasForCallback = _gasForCallback;
-        emit SetGasForCallback(_gasForCallback, block.timestamp);
+        emit SetGasForCallback(_gasForCallback);
     }
 
     function enableCallbackAddress(address _address) public onlyOwner {
         callBackAddress[_address] = true;
-        emit CallbackAddressEnabled(_address, block.timestamp);
+        emit CallbackAddressEnabled(_address);
     }
 
     function disableCallbackAddress(address _address) public onlyOwner {
         callBackAddress[_address] = false;
-        emit CallbackAddressDisabled(_address, block.timestamp);    
+        emit CallbackAddressDisabled(_address);
     }
 
     function isCallbackAddress(address _address) public view returns (bool _isCallBackAddress) {
@@ -155,7 +144,7 @@ contract MorpherOracle is Ownable {
 
     function setCallbackCollectionAddress(address payable _address) public onlyOwner {
         callBackCollectionAddress = _address;
-        emit CallBackCollectionAddressChange(_address, block.timestamp);
+        emit CallBackCollectionAddressChange(_address);
     }
 
 // ----------------------------------------------------------------------------------
@@ -169,8 +158,7 @@ contract MorpherOracle is Ownable {
         bool _tradeAmountGivenInShares,
         uint256 _tradeAmount,
         bool _tradeDirection,
-        uint256 _orderLeverage,
-        uint256 _timeStamp
+        uint256 _orderLeverage
     ) public onlyOracleOperator {
         emit OrderFailed(
             _orderId,
@@ -179,8 +167,7 @@ contract MorpherOracle is Ownable {
             _tradeAmountGivenInShares,
             _tradeAmount,
             _tradeDirection,
-            _orderLeverage,
-            _timeStamp);
+            _orderLeverage);
     }
 
 // ----------------------------------------------------------------------------------
@@ -196,7 +183,7 @@ contract MorpherOracle is Ownable {
         ) public payable notPaused returns (bytes32 _orderId) {
         if (gasForCallback > 0) {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
-            callBackCollectionAddress.transfer(msg.value);          
+            callBackCollectionAddress.transfer(msg.value);
         }
         _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage);
         emit OrderCreated(
@@ -206,8 +193,7 @@ contract MorpherOracle is Ownable {
             _tradeAmountGivenInShares,
             _tradeAmount,
             _tradeDirection,
-            _orderLeverage,
-            block.timestamp
+            _orderLeverage
             );
         return _orderId;
     }
@@ -217,15 +203,10 @@ contract MorpherOracle is Ownable {
 // Users can cancel their own orders before the _callback has been executed
 // ----------------------------------------------------------------------------------
     function cancelOrder(bytes32 _orderId) public {
-        if (msg.sender == tradeEngine.getAdministrator()) {
-            tradeEngine.cancelOrder(_orderId, tradeEngine.getAdministrator());
-        } else {
-            tradeEngine.cancelOrder(_orderId, msg.sender);
-        }
+        tradeEngine.cancelOrder(_orderId, msg.sender);
         emit OrderCancelled(
             _orderId,
-            msg.sender,
-            block.timestamp
+            msg.sender
             );
     }
 
@@ -234,12 +215,12 @@ contract MorpherOracle is Ownable {
 // ----------------------------------------------------------------------------------
     function pauseOracle() public onlyOwner {
         paused = true;
-        emit OraclePaused(true, block.timestamp);
+        emit OraclePaused(true);
     }
 
     function unpauseOracle() public onlyOwner {
         paused = false;
-        emit OraclePaused(false, block.timestamp);    
+        emit OraclePaused(false);
     }
 
 // ----------------------------------------------------------------------------------
@@ -256,7 +237,7 @@ contract MorpherOracle is Ownable {
             callBackCollectionAddress.transfer(msg.value);
         }
         _orderId = tradeEngine.requestOrderId(_address, _marketId, true, 0, true, 10**8);
-        emit LiquidationOrderCreated(_orderId, msg.sender, _address, _marketId, block.timestamp);
+        emit LiquidationOrderCreated(_orderId, msg.sender, _address, _marketId);
         return _orderId;
     }
 
@@ -291,30 +272,10 @@ contract MorpherOracle is Ownable {
             _newMeanEntry,
             _newMeanSpread,
             _newMeanLeverage,
-            _liquidationPrice,
-            block.timestamp
+            _liquidationPrice
             );
         return (_newLongShares, _newShortShares, _newMeanEntry, _newMeanSpread, _newMeanLeverage, _liquidationPrice);
     }
-
-/*
-// ----------------------------------------------------------------------------------
-// stockSplits()
-// ----------------------------------------------------------------------------------
-    function stockSplits(bytes32 _marketId, uint256 _fromIx, uint256 _toIx, uint256 _nominator, uint256 _denominator) public onlyOracleOperator returns (bool _success){
-        // If no _fromIx and _toIx specified, do entire _list
-        tradeEngine.stockSplits(_marketId, _fromIx, _toIx, _nominator, _denominator);
-        return true;
-    }
-// ----------------------------------------------------------------------------------
-// dividendsAndRolls()
-// ----------------------------------------------------------------------------------
-    function contractRolls(bytes32 _marketId, uint256 _fromIx, uint256 _toIx, uint256 _rollUp, uint256 _rollDown) public onlyOracleOperator returns (bool _success){
-        // If no _fromIx and _toIx specified, do entire _list
-        tradeEngine.contractRolls(_marketId, _fromIx, _toIx, _rollUp, _rollDown);
-        return true;
-    }
-*/
 
 // ----------------------------------------------------------------------------------
 // Auxiliary function to hash a string market name i.e.
