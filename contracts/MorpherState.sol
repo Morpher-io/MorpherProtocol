@@ -204,7 +204,7 @@ contract MorpherState is Ownable {
         _;
     }
 
-    constructor(bool _mainChain, address _sideChainOperator, address _rewardAddress) public {
+    constructor(bool _mainChain, address _sideChainOperator, address _morpherTreasury) public {
         // @Deployer: Transfer State Ownership to cold storage address after deploying protocol
         mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
         setLastRewardTime(now);
@@ -224,7 +224,7 @@ contract MorpherState is Ownable {
             totalToken = _mainChainMint;
             emit Mint(owner(), balanceOf(owner()), _mainChainMint);
             setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
-            setRewardAddress(_rewardAddress);
+            setRewardAddress(_morpherTreasury);
             setTotalOnOtherChain(_sideChainMint);
         }
         fastTransfersEnabled = true;
