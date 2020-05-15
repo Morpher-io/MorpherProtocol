@@ -19,27 +19,33 @@ module.exports = async function(deployer, network, accounts) {
     const deployerAddress = process.env.MORPHER_DEPLOYER;
     const deployerKey = Buffer.from(process.env.MORPHER_DEPLOYER_KEY, 'hex');
 
-    let callbackAddress = process.env.CALLBACK_ADDRESS;
     let ownerAddress = process.env.MORPHER_OWNER;
+    let treasuryAddress = process.env.MORPHER_TREASURY;
+    let administratorAddress = process.env.MORPHER_ADMINISTRATOR;
+    let callbackAddress = process.env.CALLBACK_ADDRESS;
+    let gasCollectionAddress = process.env.GAS_COLLECTION;
+    let sidechainOperatorAddress = process.env.SIDECHAIN_OPERATOR;
     let airdropAdminAddress = process.env.AIRDROP_ADMIN;
-    let gasCollectionAddress = process.env.GAS_COLLECTION_ADDRESS;
 
     if(network === 'local'){
         web3 = new Web3('http://127.0.0.1:7545');
-        callbackAddress = deployerAddress;
         ownerAddress = deployerAddress;
-        airdropAdminAddress = deployerAddress;
+        treasuryAddress = deployerAddress;
+        administratorAddress = deployerAddress;
+        callbackAddress = deployerAddress;
         gasCollectionAddress = deployerAddress;
+        sidechainOperatorAddress = deployerAddress;
+        airdropAdminAddress = deployerAddress
     }
 
-    await deployer.deploy(MorpherState, false, deployerAddress, ownerAddress); // boolean isMainchain
-    await deployer.deploy(MorpherToken, MorpherState.address, ownerAddress);
+    await deployer.deploy(MorpherState, false, sidechainOperatorAddress, deployerAddress); // deployer is changed to owner later
+    await deployer.deploy(MorpherToken, MorpherState.address, deployerAddress); // deployer is changed to owner later
     await deployer.deploy(MorpherTradeEngine, MorpherState.address, ownerAddress);
     await deployer.deploy(MorpherBridge, MorpherState.address, ownerAddress);
     await deployer.deploy(MorpherGovernance, MorpherState.address, ownerAddress);
     await deployer.deploy(MorpherAirdrop, airdropAdminAddress, MorpherToken.address, ownerAddress);
-    await deployer.deploy(MorpherEscrow, deployerAddress, MorpherToken.address, ownerAddress);
-    await deployer.deploy(MorpherOracle, MorpherTradeEngine.address, callbackAddress, gasCollectionAddress, 0, ownerAddress); // 0 is gasForCallback
+    await deployer.deploy(MorpherEscrow, treasuryAddress, MorpherToken.address, ownerAddress);
+    await deployer.deploy(MorpherOracle, MorpherTradeEngine.address, callbackAddress, gasCollectionAddress, 0, deployerAddress); // deployer is changed to owner later
 
     if(network === 'local'){
         let data;
