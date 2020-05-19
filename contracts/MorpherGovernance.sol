@@ -12,7 +12,7 @@ pragma solidity 0.5.16;
 //
 // It becomes progressively harder to become a valdiator. Each new validator
 // has to lock up (numberOfValidators + 1) * 10m Morpher token. Upon stepping
-// down as validator only 95% of the locked up token are returned, the other 5%
+// down as validator only 99% of the locked up token are returned, the other 1%
 // are burned.
 //
 // Governance is expected to become more sophisticated in the future
@@ -26,7 +26,7 @@ contract MorpherGovernance is Ownable {
 
     using SafeMath for uint256;
     MorpherState state;
-
+    
     event BecomeValidator(address indexed _sender, uint256 indexed _myValidatorIndex);
     event StepDownAsValidator(address indexed _sender, uint256 indexed _myValidatorIndex);
     event ElectedAdministrator(address indexed _administratorAddress, uint256 _votes);
@@ -51,9 +51,9 @@ contract MorpherGovernance is Ownable {
 
     constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
         setMorpherState(_stateAddress);
-        transferOwnership(_coldStorageOwnerAddress);
+        transferOwnership(_coldStorageOwnerAddress);        
     }
-
+    
     modifier onlyValidator() {
         require(isValidator(msg.sender), "MorpherGovernance: Only Validators can invoke that function.");
         _;
@@ -103,7 +103,7 @@ contract MorpherGovernance is Ownable {
         // To become a validator you have to lock up 10m * (number of validators + 1) Morpher Token in escrow
         // After a warmup period of 7 days the new validator can vote on Oracle contract and protocol Administrator
         uint256 _requiredAmount = MINVALIDATORLOCKUP.mul(numberOfValidators.add(1));
-        require(state.balanceOf(msg.sender) > _requiredAmount, "MorpherGovernance: Insufficient balance to become Validator.");
+        require(state.balanceOf(msg.sender) >= _requiredAmount, "MorpherGovernance: Insufficient balance to become Validator.");
         require(isValidator(msg.sender) == false, "MorpherGovernance: Address is already Validator.");
         require(numberOfValidators <= MAXVALIDATORS, "MorpherGovernance: number of Validators can not exceed Max Validators.");
         state.transfer(msg.sender, address(this), _requiredAmount);
@@ -121,8 +121,8 @@ contract MorpherGovernance is Ownable {
         // all validators who joined after the validator stepping down receive 10^7 * 0.99 token from
         // escrow, and their validator ordinal number is reduced by one. E.g. if validator 3 of 5 steps down
         // validator 4 becomes validator 3, and validator 5 becomes validator 4. Both receive 10^7 * 0.99 token
-        // from escrow, as their new position requires fewer token in lockup. 1% of the token released from escrow
-        // are burned for every validator receiving a payout.
+        // from escrow, as their new position requires fewer token in lockup. 1% of the token released from escrow 
+        // are burned for every validator receiving a payout. 
         // Burning prevents vote delay attacks: validators stepping down and re-joining could
         // delay votes for VALIDATORWARMUPPERIOD.
         uint256 _myValidatorIndex = validatorIndex[msg.sender];
