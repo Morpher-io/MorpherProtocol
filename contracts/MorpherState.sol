@@ -134,7 +134,7 @@ contract MorpherState is Ownable {
     event NumberOfRequestsLimitUpdate(uint256 _numberOfRequests);
 
     event MainChainWithdrawLimitUpdate(uint256 indexed mainChainWithdrawLimit24);
-    event TokenSentToLinkedChain(address _address, uint256 _token);
+    event TokenSentToLinkedChain(address _address, uint256 _token, uint256 _totalTokenSent, bytes32 indexed _tokenSentToLinkedChainHash);
     event TransferredTokenClaimed(address _address, uint256 _token);
     event LastWithdrawAt();
     event RollingWithdrawnAmountUpdated(uint256 _last24HoursAmountWithdrawn, uint256 _lastWithdrawLimitReductionTime);
@@ -158,6 +158,8 @@ contract MorpherState is Ownable {
         uint256 meanEntryLeverage,
         uint256 liquidationPrice
     );
+    event SetBalance(address indexed account, uint256 balance, bytes32 indexed balanceHash);
+    event TokenTransferredToOtherChain(address indexed account, uint256 tokenTransferredToOtherChain, bytes32 indexed transferHash);
 
     modifier notPaused {
         require(paused == false, "MorpherState: Contract paused, aborting");
@@ -282,7 +284,7 @@ contract MorpherState is Ownable {
     function setTokenSentToLinkedChain(address _address, uint256 _token) public onlyBridge {
         tokenSentToLinkedChain[_address] = _token;
         tokenSentToLinkedChainTime[_address] = now;
-        emit TokenSentToLinkedChain(_address, _token);
+        emit TokenSentToLinkedChain(_address, _token, tokenSentToLinkedChain[_address], getBalanceHash(_address, tokenSentToLinkedChain[_address]));
     }
 
     function getTokenSentToLinkedChain(address _address) public view returns (uint256 _token) {
@@ -430,6 +432,8 @@ contract MorpherState is Ownable {
         balances[_to] = balances[_to].add(_token);
         IMorpherToken(morpherToken).emitTransfer(_from, _to, _token);
         emit Transfer(_from, _to, _token);
+        emit SetBalance(_from, balances[_from], getBalanceHash(_from, balances[_from]));
+        emit SetBalance(_to, balances[_to], getBalanceHash(_to, balances[_to]));
     }
 
     function mint(address _address, uint256 _token) public onlyPlatform notPaused {
@@ -438,6 +442,7 @@ contract MorpherState is Ownable {
         updateTotalSupply();
         IMorpherToken(morpherToken).emitTransfer(address(0), _address, _token);
         emit Mint(_address, _token, totalToken);
+        emit SetBalance(_address, balances[_address], getBalanceHash(_address, balances[_address]));
     }
 
     function burn(address _address, uint256 _token) public onlyPlatform notPaused {
@@ -447,6 +452,7 @@ contract MorpherState is Ownable {
         updateTotalSupply();
         IMorpherToken(morpherToken).emitTransfer(_address, address(0), _token);
         emit Burn(_address, _token, totalToken);
+        emit SetBalance(_address, balances[_address], getBalanceHash(_address, balances[_address]));
     }
 
     // ----------------------------------------------------------------------------
