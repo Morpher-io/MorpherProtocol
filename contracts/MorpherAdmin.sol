@@ -13,6 +13,13 @@ contract MorpherAdmin {
     MorpherTradeEngine tradeEngine;
     using SafeMath for uint256;
 
+    event AdminLiquidationOrderCreated(
+        bytes32 indexed _orderId,
+        address _sender,
+        address indexed _address,
+        bytes32 indexed _marketId
+        );
+
 // ----------------------------------------------------------------------------
 // Precision of prices and leverage
 // ----------------------------------------------------------------------------
@@ -104,9 +111,6 @@ contract MorpherAdmin {
         address _address;
         
         for (uint256 i = _fromIx; i <= _toIx; i++) {
-             // GET position from state
-             // shift by _upMove and _downMove (one of them is supposed to be zero)
-             // Write back to state
             _address = state.getExposureMappingAddress(_marketId, i);
             (_positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice) = state.getPosition(_address, _marketId);
             _positionAveragePrice    = _positionAveragePrice.add(_rollUp).sub(_rollDown);
@@ -116,6 +120,57 @@ contract MorpherAdmin {
                 _liquidationPrice    = tradeEngine.getLiquidationPrice(_positionAveragePrice, _positionAverageLeverage, true);
             }               
             state.setPosition(_address, _marketId, now, _positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice);   
+        }
+    }
+    
+// ----------------------------------------------------------------------------------
+// delistMarket(bytes32 _marketId)
+// Administrator closes out all existing positions on _marketId market at current prices
+// ----------------------------------------------------------------------------------
+    function delistMarket(bytes32 _marketId, uint256 _fromIx, uint256 _toIx) public onlyAdministrator {
+        require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
+        // If no _fromIx and _toIx specified, do entire _list
+        if (_fromIx == 0) {
+            _fromIx = 1;
+        }
+        if (_toIx == 0) {
+            _toIx = state.getMaxMappingIndex(_marketId);
+        }
+        address _address;
+        for (uint256 i = _fromIx; i <= _toIx; i++) {
+            _address = state.getExposureMappingAddress(_marketId, i);
+            adminLiquidationOrder(_address, _marketId);
+        }
+    }
+
+// ----------------------------------------------------------------------------------
+// delistMarket(bytes32 _marketId)
+// Administrator closes out an existing positions on _marketId market at current price
+// ----------------------------------------------------------------------------------
+    function adminLiquidationOrder(
+        address _address,
+        bytes32 _marketId
+        ) public onlyAdministrator returns (bytes32 _orderId) {
+            uint256 _positionLongShares = state.getLongShares(_address, _marketId);
+            uint256 _positionShortShares = state.getShortShares(_address, _marketId);
+            if (_positionLongShares > 0) {
+                _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionLongShares, false, 10**8);
+            }
+            if (_positionShortShares > 0) {
+                _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionShortShares, true, 10**8);
+            }
+            emit AdminLiquidationOrderCreated(_orderId, msg.sender, _address, _marketId);
+            return _orderId;
+    }
+
+    function payOperatingReward() public view {
+        if (state.mainChain() == true) {
+            uint256 _lastRewardTime = state.lastRewardTime();
+            if (now > _lastRewardTime) {
+                for (uint256 i = 1; i <= now.sub(state.lastRewardTime()).div(86400); i++) {
+                    state.payOperatingReward;
+                }
+            }
         }
     }
 
