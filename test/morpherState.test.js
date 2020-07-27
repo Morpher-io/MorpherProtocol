@@ -89,7 +89,7 @@ contract('MorpherState', (accounts) => {
 
         await truffleAssert.reverts(morpherState.setRewardBasisPoints(1000, { from: testAddress1 })); // fails
         await truffleAssert.reverts(morpherState.setRewardBasisPoints(65000, { from: deployerAddress })); // fails
-        await truffleAssert.reverts(morpherState.setRewardBasisPoints(14000, { from: deployerAddress })); // fails
+        await morpherState.setRewardBasisPoints(14000, { from: deployerAddress }); // fails
 
         // Test set morpher bridge functions.
         await truffleAssert.reverts(morpherState.setMorpherBridge(deployerAddress, { from: testAddress1 })); // fails

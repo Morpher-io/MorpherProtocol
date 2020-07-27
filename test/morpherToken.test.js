@@ -36,7 +36,7 @@ contract('MorpherToken', (accounts) => {
         const testAddress2Balance = await morpherState.balanceOf(testAddress2);
         const allowance = await morpherState.getAllowance(testAddress1, testAddress2);
 
-        assert.equal(deployerBalance.toString(), '574900000000000000000000000'); // 5.749×10^26
+        assert.equal(deployerBalance.toString(), '424900000000000000000000000'); // 4.249×10^26
         assert.equal(testAddress1Balance.toString(), '90900000000000000000000'); // 9.09x10^22
         assert.equal(testAddress2Balance.toString(), '9100000000000000000000'); // 9.1x10^21
         assert.equal(allowance.toString(), '900000000000000000000'); // 9x10^20

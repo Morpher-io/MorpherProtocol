@@ -38,7 +38,7 @@ module.exports = async function(deployer, network, accounts) {
         airdropAdminAddress = deployerAddress
     }
 
-    await deployer.deploy(MorpherState, false, sidechainOperatorAddress, deployerAddress); // deployer is changed to owner later
+    await deployer.deploy(MorpherState, true, sidechainOperatorAddress, deployerAddress); // deployer is changed to owner later
     await deployer.deploy(MorpherToken, MorpherState.address, deployerAddress); // deployer is changed to owner later
     await deployer.deploy(MorpherTradeEngine, MorpherState.address, ownerAddress);
     await deployer.deploy(MorpherBridge, MorpherState.address, ownerAddress);
