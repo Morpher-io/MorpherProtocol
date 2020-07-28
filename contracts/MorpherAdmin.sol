@@ -15,9 +15,12 @@ contract MorpherAdmin {
 
     event AdminLiquidationOrderCreated(
         bytes32 indexed _orderId,
-        address _sender,
         address indexed _address,
-        bytes32 indexed _marketId
+        bytes32 indexed _marketId,
+        bool _tradeAmountGivenInShares,
+        uint256 _tradeAmount,
+        bool _tradeDirection,
+        uint256 _orderLeverage
         );
 
 // ----------------------------------------------------------------------------
@@ -155,14 +158,19 @@ contract MorpherAdmin {
             uint256 _positionShortShares = state.getShortShares(_address, _marketId);
             if (_positionLongShares > 0) {
                 _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionLongShares, false, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, true, _positionLongShares, false, 10**8);
             }
             if (_positionShortShares > 0) {
                 _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionShortShares, true, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, true, _positionShortShares, true, 10**8);
             }
-            emit AdminLiquidationOrderCreated(_orderId, msg.sender, _address, _marketId);
             return _orderId;
     }
 
+// ----------------------------------------------------------------------------------
+// payOperatingReward()
+// Calls paying of operating reward in state
+// ----------------------------------------------------------------------------------
     function payOperatingReward() public view {
         if (state.mainChain() == true) {
             uint256 _lastRewardTime = state.lastRewardTime();
