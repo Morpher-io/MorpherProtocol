@@ -1,7 +1,7 @@
 # Introduction
 This is the repository for the core Morpher smart contract components of https://morpher.com
 
-Morpher Smart Contracts are a collection of solidity files for on chain transactions and trustless state recovery from sidechain.
+Morpher Smart Contracts are a collection of solidity files for on chain transactions and trustless state recovery from sidechain. 😳
 
 ![](https://img.shields.io/david/Morpher-io/MorpherProtocol) ![](https://img.shields.io/github/last-commit/Morpher-io/MorpherProtocol) ![](https://img.shields.io/github/license/Morpher-io/MorpherProtocol)
 
@@ -9,11 +9,11 @@ Morpher Smart Contracts are a collection of solidity files for on chain transact
 
 Morpher rebuilts financial markets from the ground up on the Ethereum Blockchain. All in the pursuit of the perfect trading experience.
 
-![Image of Morpher](./docs/laptop_phone_shot.3303f142.webp)
+[![Image of Morpher](./docs/laptop_phone_shot.3303f142.webp)](https://morpher.com)
 
 # Audit
 
-Morpher Smart Contracts are fully and regularly audited.
+Morpher Smart Contracts are fully and regularly audited. 🙌
 
 The Smart Contracts were last audited by Capacity and passed on Mon. Apr 20 14:24:19 2020 +0200 at the following commit https://github.com/Morpher-io/MorpherProtocol/commit/3090075bdd3a6c866d067c7c8c2164262497374f
 
@@ -25,27 +25,36 @@ You can find the full PDF with the Results here:
 # Getting Started
 ## Prerequisites
 * Install Ganache https://www.trufflesuite.com/ganache on your system and run it successfully on port 7545.
-
 * Install Node.js, Npm and build-essential (Linux and MacOS package to build Web3 C/C++ files) on your computer. 
-
-In the Ubuntu Linux terminal:
-
-`curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -`
-
-`sudo apt-get install nodejs` for node and npm
-
-`sudo apt-get install build-essential`
-
 * Git clone this repo and `cd` into it.
 
-## How to run the tests
-Run the following commands to start the test suite.
+## How to run the Tests
+Run the following commands to start the test suite. 😎
 * `npm install` to install all the truffle/node dependencies.
 * Rename .env.example to .env and input all the required variables. If you're testing locally with Ganache, you only need to input `MORPHER_DEPLOYER` and `MORPHER_DEPLOYER_KEY` which is the first account you see in the Ganache GUI.
 * When everything is configured correctly, run the last command: `./node_modules/truffle/build/cli.bundled.js test --network local
 `
 
 If you want to see exactly what assertions are being made, you can take a look at the `test` folder.
+
+### Example In the Ubuntu Linux terminal:
+
+`curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -`
+
+`sudo apt-get install nodejs build-essential`
+
+`git clone https://github.com/Morpher-io/MorpherProtocol.git`
+
+`cd MorpherProtocol`
+
+`npm install`
+
+`cp .env.example .env`
+
+Then open .env and input Ganache Accounts for MORPHER_DEPLOYER and MORPHER_DEPLOYER_KEY
+
+`./node_modules/truffle/build/cli.bundled.js test --network local`
+
 
 
 # Smart Contract Components
