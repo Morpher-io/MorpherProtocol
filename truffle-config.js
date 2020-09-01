@@ -21,7 +21,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_KEY,
-          "https://ropsten.infura.io/v3/bd662e299bd84d23add2c296449da83b"
+          "https://ropsten.infura.io/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '3',
       gasPrice: 15000000000,
@@ -30,7 +30,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_KEY,
-          "https://kovan.infura.io/v3/bd662e299bd84d23add2c296449da83b"
+          "https://kovan.infura.io/v3/"  + process.env.INFURA_PROJECT_ID
         ),
       network_id: '*',
       gasPrice: 2000000000,
