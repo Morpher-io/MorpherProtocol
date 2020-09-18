@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.7.0;
+pragma solidity 0.5.16;
 
 import "./IERC20.sol";
 import "./MorpherState.sol";
@@ -48,13 +48,13 @@ contract MorpherAccountMigration {
     /**
      * @notice the modifier checks if an target-address allows migration
      */
-    modifier isAllowedToMigrate(address _to) {
+    modifier isAllowedToMigrateTo(address _to) {
         require(isAllowedToMigrateUntil[_to] >= block.timestamp, "Migration to Address not allowed");
         require(sourceAddressAllowedToOverwriteTo[msg.sender] == _to, "Address is not allowed to migrate to target address");
         _;
     }
 
-    function startMigrate(address _to) public isAllowedToMigrate(_to) {
+    function startMigrate(address _to) public isAllowedToMigrateTo(_to) {
         migrateTokens(_to);
         bool migrationComplete = migratePositions(_to);
         if(migrationComplete) {
@@ -68,10 +68,10 @@ contract MorpherAccountMigration {
      * @notice To migrate the tokens we send it from the msg.sender address to _to and emit an event that TokenMigrationComplete
      * @dev the "if" is intentional, so that we can re-call the function as many times as we want, but it will only execute one time only
      */
-    function migrateTokens(address _to) internal isAllowedToMigrate(_to) {
+    function migrateTokens(address _to) internal isAllowedToMigrateTo(_to) {
         if(tokensMigratedFrom[msg.sender] == false) {
             IERC20 token = IERC20(tokenAddress);
-            uint balance = token.getBalance(msg.sender);
+            uint balance = token.balanceOf(msg.sender);
             token.transfer(_to, balance);
             tokensMigratedFrom[msg.sender] = true;
             emit TokenMigrationComplete(msg.sender, _to, balance, block.timestamp);
@@ -86,8 +86,8 @@ contract MorpherAccountMigration {
             if(marketMigrated[marketHashes[i]] == false) {
                 (uint longShares, uint shortShares, uint meanEntryPrice, uint meanEntrySpread, uint meanEntryLeverage, uint liquidationPrice) = state.getPosition(msg.sender, marketHashes[i]);
                 if(longShares > 0 || shortShares > 0) {
-                    state.setPosition(_to, marketHashes[i], block.timestamp, longShares, shortShares, meanEntryPrice, meanEntryLeverage, liquidationPrice); //create a new position for the "to" address with the same parameters
-                    state.setPosition(msg.sender, marketHashes[i], block.timestamp, 0,0,0,0,0); //delete the current position
+                    state.setPosition(_to, marketHashes[i], block.timestamp, longShares, shortShares, meanEntryPrice, meanEntrySpread, meanEntryLeverage, liquidationPrice); //create a new position for the "to" address with the same parameters
+                    state.setPosition(msg.sender, marketHashes[i], block.timestamp, 0,0,0,0,0,0); //delete the current position
                     marketMigrated[marketHashes[i]] = true; //avoid 
                     emit MarketMigrationComplete(marketHashes[i], msg.sender, _to, block.timestamp);
                     if(gasleft() < 50000 && i != (marketHashes.length - 1)) {
