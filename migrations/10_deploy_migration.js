@@ -37,12 +37,13 @@ module.exports = async function (deployer, network, accounts) {
     for(let i = 0; i < markets.length; i++) {
       marketHashesArray.push(web3.utils.sha3(markets[i]));
       if(marketHashesArray.length == 100) {
-        await morpherAccountMigration.addMarketHash(marketHashesArray);
+        await morpherAccountMigration.addMarketHashes(marketHashesArray);
         marketHashesArray = [];
       }
     }
-    await morpherAccountMigration.addMarketHash(marketHashesArray);
-    //await morpherAccountMigration.addMarketHash(['0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf9']);
+    await morpherAccountMigration.addMarketHashes(marketHashesArray);
+    //test with a single market below:
+    //await morpherAccountMigration.addMarketHashes([web3.utils.sha3('CRYPTO_BTC')]);
     //let migrations = 
 
 

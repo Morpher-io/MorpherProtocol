@@ -1,12 +1,20 @@
 require("dotenv").config();
-let HDWalletProvider = require("truffle-hdwallet-provider");
+let HDWalletProvider = require("@truffle/hdwallet-provider");
+let Web3 = require("web3");
 
 module.exports = {
   networks: {
     local: {
-      host: "127.0.0.1",
-      port: 8545,
+      // provider: () =>
+      //   new HDWalletProvider(
+      //     process.env.MORPHER_DEPLOYER_KEY,
+      //     new Web3.providers.WebsocketProvider('http://127.0.0.1:8545'), 0, 5
+      //   ),
+      host: '127.0.0.1',
+      port: '7545',
       network_id: "*",
+      //from: '0x346D8BA24650Ba37c42750a84810613Abb4A83FB',
+      test_timeout: 3600000,
     },
     morpher: {
       provider: () =>
@@ -47,4 +55,9 @@ module.exports = {
       },
     },
   },
+  mocha: {
+    enableTimeouts: false,
+    before_timeout: 3600000,
+    test_timeout: 3600000,
+  }
 };

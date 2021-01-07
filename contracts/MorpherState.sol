@@ -576,7 +576,8 @@ contract MorpherState is Ownable {
     }
 
     function getMarketActive(bytes32 _marketId) public view returns(bool _active) {
-        return marketActive[_marketId];
+        return true;
+        //return marketActive[_marketId];
     }
 
     function setMaximumLeverage(uint256 _newMaximumLeverage) public onlyAdministrator {
