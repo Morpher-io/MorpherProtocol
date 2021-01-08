@@ -48,11 +48,11 @@ contract("MorpherAccountMigration", (accounts) => {
       deployerAddress,
       testAddress1,
       testAddress2,
-      testAddress3,
-      testAddress4,
+      fortmaticAddress,
+      zerowalletAddress,
     ] = accounts;
-    let currentBlockGasLimit = (await web3.eth.getBlock("latest")).gasLimit;
-    console.log(currentBlockGasLimit);
+    // let currentBlockGasLimit = (await web3.eth.getBlock("latest")).gasLimit;
+    // console.log(currentBlockGasLimit);
     const morpherToken = await MorpherToken.deployed();
     const morpherState = await MorpherState.deployed();
     const morpherOracle = await MorpherOracle.deployed();
@@ -61,22 +61,31 @@ contract("MorpherAccountMigration", (accounts) => {
     // Set balance of testing account. Add 2 Ether
     //(address to, uint256 tokens)
     await morpherToken.transfer(
-      testAddress3,
+      fortmaticAddress,
       web3.utils.toBN(2 * Math.pow(10, 18)),
       { from: deployerAddress }
     );
 
-    for (let i = 0; i < markets.length; i++) {
-      let marketHash = web3.utils.sha3(markets[i]);
+    /**
+     * Let's do 50 markets, the average person on morpher currently has 10
+     */
+    console.log("Creating orders for 50 markets");
+    let marketNumber = 0;
+    for (const marketName in markets) {
+      marketNumber++;
+      if (marketNumber == 50) {
+        break;
+      }
+      let marketHash = markets[marketName];
       /**
        * Create a new orders and then fullfil it so a position is created!
        */
-      //await morpherState.activateMarket(marketHash, {from: deployerAddress});
-      console.log("Enabled Market " + markets[i]);
+      await morpherState.activateMarket(marketHash, { from: deployerAddress });
+      console.log("Enabled Market " + marketName);
       //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
       let orderId = (
         await morpherOracle.createOrder(marketHash, true, 1, true, 100000000, {
-          from: testAddress3,
+          from: fortmaticAddress,
         })
       ).logs[0].args._orderId;
       console.log("Created Order " + orderId);
@@ -88,25 +97,35 @@ contract("MorpherAccountMigration", (accounts) => {
       //if(i == 10) { break; }
     }
 
-    
+
 
     /**
      * allowance for token and allowance to migrate
      */
-    await morpherMigration.allowMigrationFor12Hours(testAddress3, {
-      from: testAddress4,
+    let resultAllowMigration = await morpherMigration.allowMigrationFrom(fortmaticAddress, {
+      from: zerowalletAddress,
     }); //"to" address needs to approve the merge
+
+    assert.equal(resultAllowMigration.logs[0].event, 'MigrationPermissionGiven', "The MigrationPermissionGiven Event was not fired");
+    /**
+     * backend also needs to confirm this
+     */
+    await morpherMigration.ownerConfirmMigrationAddresses(fortmaticAddress, zerowalletAddress, { from: deployerAddress });
+
+    /**
+     * next the fortmatic address needs to approve in the token that the tokens can be transferred by the migrations contract on behalf of the user
+     */
     await morpherToken.approve(
       morpherMigration.address,
-      await morpherToken.balanceOf(testAddress3),
-      { from: testAddress3 }
+      await morpherToken.balanceOf(fortmaticAddress),
+      { from: fortmaticAddress }
     ); //from address needs to allow the migrations smart contract to move the money
     currentBlockGasLimit = (await web3.eth.getBlock("latest")).gasLimit;
-    console.log("Current Block Gas Limit:" + currentBlockGasLimit);
-    let result = await morpherMigration.startMigrate(testAddress4, {
-      from: testAddress3,
+    let result = await morpherMigration.startMigrate(zerowalletAddress, {
+      from: fortmaticAddress,
       gas: currentBlockGasLimit,
     });
+    console.log("Starting the migration...");
     let i = 1;
     while (result.logs[result.logs.length - 1].event == "MigrationIncomplete") {
       console.log("Migration Round No: " + i);
@@ -114,8 +133,8 @@ contract("MorpherAccountMigration", (accounts) => {
       currentBlockGasLimit = (await web3.eth.getBlock("latest")).gasLimit;
       console.log("Current Block Gas Limit:" + currentBlockGasLimit);
       i++;
-      result = await morpherMigration.startMigrate(testAddress4, {
-        from: testAddress3,
+      result = await morpherMigration.startMigrate(zerowalletAddress, {
+        from: fortmaticAddress,
         gas: currentBlockGasLimit,
       });
     }

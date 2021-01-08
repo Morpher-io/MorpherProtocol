@@ -1,14 +1,15 @@
 const MorpherState = artifacts.require("MorpherState");
 const MorpherToken = artifacts.require("MorpherToken");
 const MorpherAccountMigration = artifacts.require("MorpherAccountMigration");
+MorpherAccountMigration.synchronization_timeout = 300; //timeout in seconds
 
 const markets = require("../markets.json");
 
 module.exports = async function (deployer, network, accounts) {
   const ownerAddress = process.env.MORPHER_OWNER || accounts[0];
 
-  const morpherState = await MorpherState.deployed();
-  const morpherToken = await MorpherToken.deployed();
+  const morpherState = await MorpherState.at("0xb07E7bEC3be6782F2f43bd3F4AbCCAA9B544B934");
+  const morpherToken = await MorpherToken.at("0xe9D5afBae107A92A92cb57397C77154Dbc58CA9d");
 
   /**
    * Only setting the Governance on Mainchain
@@ -37,6 +38,7 @@ module.exports = async function (deployer, network, accounts) {
     for (const marketName in markets) {
       marketHashesArray.push(markets[marketName]);
       if(marketHashesArray.length == 100) {
+        console.log("Deploying until " + marketName);
         await morpherAccountMigration.addMarketHashes(marketHashesArray);
         marketHashesArray = [];
       }

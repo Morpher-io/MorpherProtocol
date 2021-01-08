@@ -19,21 +19,25 @@ contract MorpherAccountMigration is Ownable {
     constructor(address _morpherTokenAddress, address _morpherStateAddress) public {
         tokenAddress = _morpherTokenAddress;
         stateAddress = _morpherStateAddress;
-
     }
     
-    //this holds a boolean for the _target_ address, the target must allow first to migrate to, otherwise one could overwrite any address
-    mapping(address => uint) public isAllowedToMigrateUntil;
     //this holds a source->target address, so that only the old source can overwrite a new target address
     mapping(address => address) public sourceAddressAllowedToOverwriteTo;
     //this one is to check if the morpherWallet address has started a migration process. UX wise it should be impossible to do anything until it's completed
     mapping(address => address) public destinationAddressAllowsOverwriting;
+
+    //this mapping is set by the admin. It is here to let the backend do another sanity check that the user is really the user (formatic from => zerowallet to)
+    mapping(address => address) public ownerSetMigrationAllowance;
+
 
     //this holds a boolean if the market is already migrated or not for a specific address
     mapping(bytes32 => mapping(address => bool)) marketMigrated;
 
     //this holds a boolean for successful token migration from an address away (source address bound)
     mapping(address => bool) tokensMigratedFrom;
+
+    //this is the index for running through the market hashes array. So when a migration is incomplete that at the next time it calls "startMigrate" the for-loop won't start from scratch
+    mapping(address => uint) indexMarketHash;
 
     //this mapping tells you if the migration process has started
     mapping(address => bool) public sourceAddressMigrationStarted;
@@ -44,6 +48,8 @@ contract MorpherAccountMigration is Ownable {
 
     event MigrationIncomplete(address _from, address _to, uint _timestamp);
     event MigrationComplete(address _from, address _to, uint _timestamp);
+
+    event MigrationPermissionGiven(address _from, address _to, uint _timestamp);
 
     mapping(bytes32 => uint) marketHashId;
     bytes32[] marketHashes;
@@ -59,21 +65,28 @@ contract MorpherAccountMigration is Ownable {
     }
 
     /**
-     * @notice This function will open a 12 hour window to allow migration to a target address from a _from-source address
+     * @notice This function will allow migration to a target address from a _from-source address
     */
-    function allowMigrationFor12Hours(address _from) public {
+    function allowMigrationFrom(address _from) public {
         require(destinationAddressAllowsOverwriting[msg.sender] == address(0), "cannot split address migration");
-        isAllowedToMigrateUntil[msg.sender] = block.timestamp + 12 hours;
         sourceAddressAllowedToOverwriteTo[_from] = msg.sender;
         destinationAddressAllowsOverwriting[msg.sender] = _from;
+        emit MigrationPermissionGiven(_from, msg.sender, block.timestamp);
+    }
+
+    /**
+    * @notice This modifier and the function below are for the backend to set a source and destination address. The user needs to be a registered user in our signup/login flow.
+    */
+   function ownerConfirmMigrationAddresses(address _from, address _to) public onlyOwner {
+        ownerSetMigrationAllowance[_from] = _to;
     }
 
     /**
      * @notice the modifier checks if an target-address allows migration
      */
     modifier isAllowedToMigrateTo(address _to) {
-        require(isAllowedToMigrateUntil[_to] >= block.timestamp, "Migration to Address not allowed");
         require(sourceAddressAllowedToOverwriteTo[msg.sender] == _to, "Address is not allowed to migrate to target address");
+        require(ownerSetMigrationAllowance[msg.sender] == _to, "Address is not whitelisted by backend");
         _;
     }
 
@@ -106,9 +119,10 @@ contract MorpherAccountMigration is Ownable {
     function migratePositions(address _to) internal isAllowedToMigrateTo(_to) returns (bool) {
         IMorpherState state = IMorpherState(stateAddress);
 
-        for(uint i = 0; i < marketHashes.length; i++) {
+        for(uint i = indexMarketHash[msg.sender]; i < marketHashes.length; i++) {
             if(marketMigrated[marketHashes[i]][_to] == false) {
                 if(gasleft() < 500000) { //stop if there's not enough gas to write the next transaction
+                    indexMarketHash[msg.sender] = i;
                     return false;
                 }
             
