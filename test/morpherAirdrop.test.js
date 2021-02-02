@@ -3,8 +3,6 @@ const MorpherAirdrop = artifacts.require("MorpherAirdrop");
 
 const truffleAssert = require('truffle-assertions');
 
-const CRYPTO_BTC = '0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf9';
-
 contract('MorpherAirdrop', (accounts) => {
     it('test airdrop authorizations', async () => {
         const deployerAddress = accounts[0]; const testAddress1 = accounts[1]; const testAddress2 = accounts[2];
