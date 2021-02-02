@@ -123,7 +123,12 @@ contract MorpherOracle is Ownable {
         emit LinkTradeEngine(_address);
     }
 
-    function setGasForCallback(uint256 _gasForCallback) public onlyOwner {
+    function overrideGasForCallback(uint256 _gasForCallback) public onlyOwner {
+        gasForCallback = _gasForCallback;
+        emit SetGasForCallback(_gasForCallback);
+    }
+    
+    function setGasForCallback(uint256 _gasForCallback) private {
         gasForCallback = _gasForCallback;
         emit SetGasForCallback(_gasForCallback);
     }
@@ -275,7 +280,7 @@ contract MorpherOracle is Ownable {
             _newMeanLeverage,
             _liquidationPrice
             );
-        gasForCallback = _gasForNextCallback;
+        setGasForCallback(_gasForNextCallback);
         return (_newLongShares, _newShortShares, _newMeanEntry, _newMeanSpread, _newMeanLeverage, _liquidationPrice);
     }
 

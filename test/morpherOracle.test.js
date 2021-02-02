@@ -3,6 +3,7 @@ const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
 const MorpherOracle = artifacts.require("MorpherOracle");
 
 const truffleAssert = require('truffle-assertions');
+const BN = require("bn.js");
 
 const MARKET = 'CRYPTO_BTC';
 const gasPriceInGwei = 200; //gwei gas price for callback funding
@@ -85,7 +86,7 @@ contract('MorpherOracle', (accounts) => {
 
         // Test successful state variables change and order creation.
         const setGasForCallbackValue = web3.utils.toWei("0.001", "ether");
-        await morpherOracle.setGasForCallback(setGasForCallbackValue);
+        await morpherOracle.overrideGasForCallback(setGasForCallbackValue);
         await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
 
         const gasForCallback = await morpherOracle.gasForCallback();
@@ -105,7 +106,6 @@ contract('MorpherOracle', (accounts) => {
 
     it('Gas Escrow does not drain Oracle Wallet', async () => {
         const morpherOracle = await MorpherOracle.deployed();
-        const morpherTradeEngine = await MorpherTradeEngine.deployed();
         const morpherToken = await MorpherToken.deployed();
 
         // Topup test accounts with MorpherToken.
@@ -114,7 +114,7 @@ contract('MorpherOracle', (accounts) => {
 
         // Test successful state variables change and order creation.
         const setGasForCallbackValue = web3.utils.toWei("0.001", "ether");
-        await morpherOracle.setGasForCallback(setGasForCallbackValue);
+        await morpherOracle.overrideGasForCallback(setGasForCallbackValue);
         await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
         await morpherOracle.setCallbackCollectionAddress(oracleCallbackAddress);
 
@@ -169,8 +169,8 @@ contract('MorpherOracle', (accounts) => {
 
         }
 
-        const oracleBalanceAfterOrders = await web3.eth.getBalance(oracleCallbackAddress);
-        assert.isTrue(oracleBalanceAfterOrders >= oracleStartingBalance, "We're loosing money at the callback, it should not happen normally " + oracleBalanceAfterOrders + " vs " + oracleStartingBalance);
+        const oracleBalanceAfterOrders = new BN(await web3.eth.getBalance(oracleCallbackAddress));
+        assert.isTrue(oracleBalanceAfterOrders.gte(new BN(oracleStartingBalance)), "We're loosing money at the callback, it should not happen normally " + oracleBalanceAfterOrders + " vs " + oracleStartingBalance);
         //console.log(oracleBalanceAfterOrders, oracleStartingBalance);
     });
 });
