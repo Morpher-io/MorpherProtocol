@@ -63,7 +63,7 @@ contract MorpherOracle is Ownable {
     event OrderProcessed(
         bytes32 indexed _orderId,
         uint256 _price,
-        uint256 _adjustedPrice,
+        uint256 _unadjustedMarketPrice,
         uint256 _spread,
         uint256 _positionLiquidationTimestamp,
         uint256 _timeStamp,
@@ -396,7 +396,7 @@ contract MorpherOracle is Ownable {
     function __callback(
         bytes32 _orderId,
         uint256 _price,
-        uint256 _originalPrice,
+        uint256 _unadjustedMarketPrice,
         uint256 _spread,
         uint256 _liquidationTimestamp,
         uint256 _timeStamp,
@@ -418,7 +418,7 @@ contract MorpherOracle is Ownable {
         emit OrderProcessed(
             _orderId,
             _price,
-            _originalPrice,
+            _unadjustedMarketPrice,
             _spread,
             _liquidationTimestamp,
             _timeStamp,
