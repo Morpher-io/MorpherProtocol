@@ -5,7 +5,7 @@ module.exports = {
   networks: {
     local: {
       host: "127.0.0.1",
-      port: 7545,
+      port: 8545,
       network_id: "*",
     },
     morpher: {
@@ -30,7 +30,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_KEY,
-          "https://kovan.infura.io/v3/"  + process.env.INFURA_PROJECT_ID
+          "https://kovan.infura.io/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '*',
       gasPrice: 2000000000,
@@ -47,4 +47,8 @@ module.exports = {
       },
     },
   },
+  mocha: {
+    enableTimeouts: false,
+    before_timeout: 120000 // Here is 2min but can be whatever timeout is suitable for you.
+  }
 };

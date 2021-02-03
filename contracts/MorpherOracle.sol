@@ -177,12 +177,21 @@ contract MorpherOracle is Ownable {
         emit LinkTradeEngine(_address);
     }
 
+<<<<<<< HEAD
     function setStateAddress(address _address) public onlyOwner {
         state = MorpherState(_address);
         emit LinkMorpherState(_address);
     }
 
     function setGasForCallback(uint256 _gasForCallback) public onlyOwner {
+=======
+    function overrideGasForCallback(uint256 _gasForCallback) public onlyOwner {
+        gasForCallback = _gasForCallback;
+        emit SetGasForCallback(_gasForCallback);
+    }
+    
+    function setGasForCallback(uint256 _gasForCallback) private {
+>>>>>>> feature/DEV-1605-escrow-callback
         gasForCallback = _gasForCallback;
         emit SetGasForCallback(_gasForCallback);
     }
@@ -393,7 +402,8 @@ contract MorpherOracle is Ownable {
         uint256 _adjustedPrice,
         uint256 _spread,
         uint256 _liquidationTimestamp,
-        uint256 _timeStamp
+        uint256 _timeStamp,
+        uint256 _gasForNextCallback
         ) public onlyOracleOperator notPaused returns (uint256 _newLongShares, uint256 _newShortShares, uint256 _newMeanEntry, uint256 _newMeanSpread, uint256 _newMeanLeverage, uint256 _liquidationPrice)  {
         require(checkOrderConditions(_orderId, _price));
         if (_adjustedPrice > 0) {
@@ -432,6 +442,7 @@ contract MorpherOracle is Ownable {
             _newMeanLeverage,
             _liquidationPrice
             );
+        setGasForCallback(_gasForNextCallback);
         return (_newLongShares, _newShortShares, _newMeanEntry, _newMeanSpread, _newMeanLeverage, _liquidationPrice);
     }
 
