@@ -22,7 +22,7 @@ contract MorpherOracle is Ownable {
     using SafeMath for uint256;
 
     bool public paused;
-    bool public useWhiteList;
+    bool public useWhiteList; //always false at the moment
 
     uint256 public gasForCallback;
 
@@ -177,21 +177,17 @@ contract MorpherOracle is Ownable {
         emit LinkTradeEngine(_address);
     }
 
-<<<<<<< HEAD
     function setStateAddress(address _address) public onlyOwner {
         state = MorpherState(_address);
         emit LinkMorpherState(_address);
     }
 
-    function setGasForCallback(uint256 _gasForCallback) public onlyOwner {
-=======
     function overrideGasForCallback(uint256 _gasForCallback) public onlyOwner {
         gasForCallback = _gasForCallback;
         emit SetGasForCallback(_gasForCallback);
     }
     
     function setGasForCallback(uint256 _gasForCallback) private {
->>>>>>> feature/DEV-1605-escrow-callback
         gasForCallback = _gasForCallback;
         emit SetGasForCallback(_gasForCallback);
     }
@@ -223,6 +219,7 @@ contract MorpherOracle is Ownable {
 // Oracle Owner can use a whitelist and authorize individual addresses
 // ----------------------------------------------------------------------------------
     function setUseWhiteList(bool _useWhiteList) public onlyOracleOperator {
+        require(false, "Cannot use this functionality in the oracle at the moment");
         useWhiteList = _useWhiteList;
         emit SetUseWhiteList(_useWhiteList);
     }
@@ -399,39 +396,29 @@ contract MorpherOracle is Ownable {
     function __callback(
         bytes32 _orderId,
         uint256 _price,
-        uint256 _adjustedPrice,
+        uint256 _originalPrice,
         uint256 _spread,
         uint256 _liquidationTimestamp,
         uint256 _timeStamp,
         uint256 _gasForNextCallback
         ) public onlyOracleOperator notPaused returns (uint256 _newLongShares, uint256 _newShortShares, uint256 _newMeanEntry, uint256 _newMeanSpread, uint256 _newMeanLeverage, uint256 _liquidationPrice)  {
-        require(checkOrderConditions(_orderId, _price));
-        if (_adjustedPrice > 0) {
-            // There has been a stock split, dividend, contract roll or similar, and the Oracle Operator adjusted the market price accordingly
-            (
-                _newLongShares,
-                _newShortShares,
-                _newMeanEntry,
-                _newMeanSpread,
-                _newMeanLeverage,
-                _liquidationPrice
-            ) = tradeEngine.processOrder(_orderId, _adjustedPrice, _spread, _liquidationTimestamp, _timeStamp);
-        } else {
-            // Adjusted price hasn't been set by Oracle Operator, use regular _price
-            (
-                _newLongShares,
-                _newShortShares,
-                _newMeanEntry,
-                _newMeanSpread,
-                _newMeanLeverage,
-                _liquidationPrice
-            ) = tradeEngine.processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
-        }
+        
+        require(checkOrderConditions(_orderId, _price), 'Error: Order Conditions are not met');
+       
+        (
+            _newLongShares,
+            _newShortShares,
+            _newMeanEntry,
+            _newMeanSpread,
+            _newMeanLeverage,
+            _liquidationPrice
+        ) = tradeEngine.processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
+        
         clearOrderConditions(_orderId);
         emit OrderProcessed(
             _orderId,
             _price,
-            _adjustedPrice,
+            _originalPrice,
             _spread,
             _liquidationTimestamp,
             _timeStamp,

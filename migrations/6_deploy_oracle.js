@@ -26,8 +26,8 @@ module.exports = async function (deployer, network, accounts) {
 
 
   const morpherTradeEngine = await MorpherTradeEngine.deployed();
-  await deployer.deploy(MorpherOracle, morpherTradeEngine.address, callbackAddress, gasCollectionAddress, 0, coldStorageOwnerAddress); // deployer is changed to owner later
-
+  
+  await deployer.deploy(MorpherOracle, morpherTradeEngine.address, morpherState.address, callbackAddress, gasCollectionAddress, 0, coldStorageOwnerAddress); // deployer is changed to owner later
 
   await morpherState.setOracleContract(MorpherOracle.address);
 

@@ -55,11 +55,11 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, BTC, 0, 10, 0, roundToInteger(300), 2000000, 200000000, liquidationPrice);
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(BTC, false, 220000000000, false, 500000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(BTC, false, 220000000000, false, 500000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
         // console.log(orderId);
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(200), 1000000, 0, 0, 0, { from: account0 });
+        await morpherOracle.__callback(orderId, roundToInteger(200), roundToInteger(200), 1000000, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, BTC);
@@ -130,11 +130,11 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, BTC, 0, 0, 100, roundToInteger(300), 2000000, 300000000, liquidationPrice);
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(BTC, false, 10000000000000, true, 500000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(BTC, false, 10000000000000, true, 500000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
         // console.log(orderId);
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(200), 1000000, 0, 0, 0, { from: account0 });
+        await morpherOracle.__callback(orderId, roundToInteger(200), roundToInteger(200), 1000000, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, BTC);

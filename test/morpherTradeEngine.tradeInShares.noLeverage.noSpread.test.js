@@ -75,10 +75,10 @@ contract('MorpherTradeEngine', async (accounts) => {
         await morpherToken.transfer(tradingAccount, balanceToUser, { from: oracleCallbackAddress });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), { from: tradingAccount })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), 0, 0, 0, 0, { from: tradingAccount })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(orderId, pricePerShare, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(tradingAccount, MARKET);
@@ -150,10 +150,10 @@ contract('MorpherTradeEngine', async (accounts) => {
         await morpherToken.transfer(tradingAccount, balanceToUser, { from: oracleCallbackAddress });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), { from: tradingAccount })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), 0, 0, 0, 0, { from: tradingAccount })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(orderId, pricePerShare, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(tradingAccount, MARKET);
@@ -237,10 +237,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(tradingAccount, MARKET, 0, shares, 0, pricePerExistingShare, 0, getLeverage(leverage), liquidationPrice, { from: oracleCallbackAddress });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), { from: tradingAccount })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), 0, 0, 0, 0, { from: tradingAccount })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(orderId, pricePerShare, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(tradingAccount, web3.utils.sha3(symbol));
@@ -326,10 +326,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(tradingAccount, MARKET, 0, 0, shares, pricePerExistingShare, 0, getLeverage(leverage), liquidationPrice, { from: oracleCallbackAddress });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), { from: tradingAccount })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, amountGivenInShares, shares, tradeDirectionIsLong, getLeverage(leverage), 0, 0, 0, 0, { from: tradingAccount })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(orderId, pricePerShare, pricePerShare, spread, liquidationTimestamp, 0, callbackGasEscrowForNextTrade, { from: oracleCallbackAddress });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(tradingAccount, web3.utils.sha3(symbol));
@@ -395,10 +395,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, MARKET, 0, 10, 0, roundToInteger(50), 0, 100000000, liquidationPrice, { from: account0 });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, true, 5, true, 100000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, true, 5, true, 100000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(200), 0, 0, 0, 0, { from: account0 });
+        await morpherOracle.__callback(orderId, roundToInteger(200), 0, 0, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, MARKET);
@@ -463,10 +463,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, MARKET, 0, 0, roundToInteger(5), 10000000000, 0, 100000000, liquidationPrice, { from: account0 });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, true, roundToInteger(5), false, 100000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, true, roundToInteger(5), false, 100000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(80), 0, 0, 0, 0, { from: account0 });
+        await morpherOracle.__callback(orderId, roundToInteger(80), 0, 0, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, MARKET);
@@ -530,10 +530,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, MARKET, 0, 10, 0, roundToInteger(50), 0, 100000000, liquidationPrice, { from: account0 });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, true, 15, false, 100000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, true, 15, false, 100000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(40), 0, 0, 0, 0, { from: account0 });
+        await morpherOracle.__callback(orderId, roundToInteger(40), 0, 0, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, MARKET);
@@ -597,10 +597,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, MARKET, 0, 0, 2, roundToInteger(100), 0, 100000000, liquidationPrice, { from: account0 });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, true, 3, true, 100000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, true, 3, true, 100000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(80), 0, 0, 0, 0, { from: account0 });
+        await morpherOracle.__callback(orderId, roundToInteger(80), 0, 0, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, MARKET);
@@ -664,10 +664,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, MARKET, 0, 0, 1, roundToInteger(90), 0, 100000000, liquidationPrice, { from: account0 });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, true, 1, true, 100000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, true, 1, true, 100000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
-        //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(200), 0, 0, 0, 0, { from: account0 });
+        //(_orderId, _price, originalPrice, _spread, _liquidationTimestamp, _timeStamp)
+        await morpherOracle.__callback(orderId, roundToInteger(200), 0, 0, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, MARKET);
@@ -731,10 +731,10 @@ contract('MorpherTradeEngine', (accounts) => {
         await morpherState.setPosition(account1, MARKET, 0, 1, 0, roundToInteger(300), 0, 100000000, liquidationPrice, { from: account0 });
 
         //(_marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage)
-        let orderId = (await morpherOracle.createOrder(MARKET, true, 1, false, 100000000, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+        let orderId = (await morpherOracle.createOrder(MARKET, true, 1, false, 100000000, 0, 0, 0, 0,{ from: account1, value: 301000000000000 })).logs[0].args._orderId;
 
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        await morpherOracle.__callback(orderId, roundToInteger(400), 0, 0, 0, 0, { from: account0 });
+        await morpherOracle.__callback(orderId, roundToInteger(400), 0, 0, 0, 0, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
         let position = await morpherState.getPosition(account1, MARKET);
