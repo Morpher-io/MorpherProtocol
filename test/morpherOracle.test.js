@@ -40,12 +40,12 @@ contract('MorpherOracle', (accounts) => {
         const morpherTradeEngine = await MorpherTradeEngine.deployed();
         const morpherToken = await MorpherToken.deployed();
         await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
-        const orderId1 = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
+        const orderId1 = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
         // Asserts
         assert.notEqual(orderId1, null);
         // Test order failure if oracle is paused.
         await morpherOracle.pauseOracle({ from: deployerAddress });
-        await truffleAssert.reverts(morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress }), "Oracle paused");
+        await truffleAssert.reverts(morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress }), "Oracle paused");
         await truffleAssert.reverts(morpherOracle.__callback(orderId1, 100000000, 100000000, 1000000, 0, 1234, 0, { from: oracleCallbackAddress }), "Oracle paused");
 
         // Test last created order is orderId1 not orderId2 because Oracle was paused.
@@ -58,7 +58,7 @@ contract('MorpherOracle', (accounts) => {
 
         // orderID1 should have '0' values because we successfully called the callback.
         const order = await morpherTradeEngine.getOrder(orderId1);
-        assert.equal(order._tradeAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
 
@@ -69,13 +69,13 @@ contract('MorpherOracle', (accounts) => {
         await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
 
         // Test new order creation and cancellation.
-        const orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
+        const orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
         assert.notEqual(orderId, null);
 
         await morpherOracle.cancelOrder(orderId, { from: testUserAddress });
 
         const order = await morpherTradeEngine.getOrder(orderId);
-        assert.equal(order._tradeAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
     it('goodUntil fails if in the past', async () => {
@@ -92,7 +92,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const goodUntil = Math.round((Date.now() / 1000))-10;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), 0, 0, goodUntil, 0, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, 0, goodUntil, 0, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_goodUntil'], goodUntil);
@@ -119,7 +119,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const goodUntil = Math.round((Date.now() / 1000)) + 120;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), 0, 0, goodUntil, 0, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, 0, goodUntil, 0, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_goodUntil'], goodUntil);
@@ -127,7 +127,7 @@ contract('MorpherOracle', (accounts) => {
         await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
-        assert.equal(order._tradeAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
     it('goodFrom fails if in the future', async () => {
@@ -144,7 +144,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const goodFrom = Math.round((Date.now() / 1000))+10;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), 0, 0, 0, goodFrom, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, 0, 0, goodFrom, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_goodFrom'], goodFrom);
@@ -171,7 +171,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const goodFrom = Math.round((Date.now() / 1000)) - 10;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), 0, 0, 0, goodFrom, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, 0, 0, goodFrom, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_goodFrom'], goodFrom);
@@ -179,7 +179,7 @@ contract('MorpherOracle', (accounts) => {
         await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
-        assert.equal(order._tradeAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
     
@@ -197,7 +197,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const priceAbove = 12;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), priceAbove, 0, 0, 0, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), priceAbove, 0, 0, 0, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceAbove'], priceAbove);
@@ -224,7 +224,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const priceAbove = 10;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), priceAbove, 0, 0, 0, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), priceAbove, 0, 0, 0, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceAbove'], priceAbove);
@@ -232,7 +232,7 @@ contract('MorpherOracle', (accounts) => {
         await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
-        assert.equal(order._tradeAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
     
@@ -250,7 +250,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const priceBelow = 9;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), 0, priceBelow, 0, 0, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, priceBelow, 0, 0, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceBelow'], priceBelow);
@@ -277,7 +277,7 @@ contract('MorpherOracle', (accounts) => {
 
 
         const priceBelow = 12;
-        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, getLeverage(1), 0, priceBelow, 0, 0, { from: testUserAddress });
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, priceBelow, 0, 0, { from: testUserAddress });
 
         // Asserts
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceBelow'], priceBelow);
@@ -285,7 +285,7 @@ contract('MorpherOracle', (accounts) => {
         await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
-        assert.equal(order._tradeAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
     it('Oracle can do gasCallbacks correctly', async () => {
@@ -305,7 +305,7 @@ contract('MorpherOracle', (accounts) => {
         const gasForCallback = await morpherOracle.gasForCallback();
         assert.equal(gasForCallback.toString(), setGasForCallbackValue);
 
-        const orderId1 = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress, value: gasForCallback })).logs[0].args._orderId;
+        const orderId1 = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress, value: gasForCallback })).logs[0].args._orderId;
 
         // Asserts
         assert.notEqual(orderId1, null);
@@ -314,7 +314,7 @@ contract('MorpherOracle', (accounts) => {
 
         // orderID1 should have '0' values because we successfully called the callback.
         const order = await morpherTradeEngine.getOrder(orderId1);
-        assert.equal(order._tradeAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
     it('Gas Escrow does not drain Oracle Wallet', async () => {
@@ -341,7 +341,7 @@ contract('MorpherOracle', (accounts) => {
 
         for (let i = 0; i < 10; i++) {
 
-            let orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), true, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress, value: nextOrderGasEscrowInEther })).logs[0].args._orderId;
+            let orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress, value: nextOrderGasEscrowInEther })).logs[0].args._orderId;
 
             // Asserts
             assert.notEqual(orderId, null);

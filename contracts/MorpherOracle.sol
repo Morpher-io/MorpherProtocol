@@ -43,8 +43,8 @@ contract MorpherOracle is Ownable {
         bytes32 indexed _orderId,
         address indexed _address,
         bytes32 indexed _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage,
         uint256 _onlyIfPriceBelow,
@@ -79,8 +79,8 @@ contract MorpherOracle is Ownable {
         bytes32 indexed _orderId,
         address indexed _address,
         bytes32 indexed _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage,
         uint256 _onlyIfPriceBelow,
@@ -138,8 +138,8 @@ contract MorpherOracle is Ownable {
         bytes32 indexed _orderId,
         address indexed _address,
         bytes32 indexed _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage
         );
@@ -249,8 +249,8 @@ contract MorpherOracle is Ownable {
         bytes32 _orderId,
         address _address,
         bytes32 _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage,
         uint256 _onlyIfPriceBelow,
@@ -262,8 +262,8 @@ contract MorpherOracle is Ownable {
             _orderId,
             _address,
             _marketId,
-            _tradeAmountGivenInShares,
-            _tradeAmount,
+            _closeSharesAmount,
+            _openMPHTokenAmount,
             _tradeDirection,
             _orderLeverage,
             _onlyIfPriceBelow,
@@ -278,8 +278,8 @@ contract MorpherOracle is Ownable {
 // ----------------------------------------------------------------------------------
     function createOrder(
         bytes32 _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage,
         uint256 _onlyIfPriceAbove,
@@ -292,7 +292,8 @@ contract MorpherOracle is Ownable {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
             callBackCollectionAddress.transfer(msg.value);
         }
-        _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _tradeAmountGivenInShares, _tradeAmount, _tradeDirection, _orderLeverage);
+        _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage);
+
         priceAbove[_orderId] = _onlyIfPriceAbove;
         priceBelow[_orderId] = _onlyIfPriceBelow;
         goodFrom[_orderId]   = _goodFrom;
@@ -301,8 +302,8 @@ contract MorpherOracle is Ownable {
             _orderId,
             msg.sender,
             _marketId,
-            _tradeAmountGivenInShares,
-            _tradeAmount,
+            _closeSharesAmount,
+            _openMPHTokenAmount,
             _tradeDirection,
             _orderLeverage,
             _onlyIfPriceBelow,
@@ -383,7 +384,7 @@ contract MorpherOracle is Ownable {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
             callBackCollectionAddress.transfer(msg.value);
         }
-        _orderId = tradeEngine.requestOrderId(_address, _marketId, true, 0, true, 10**8);
+        _orderId = tradeEngine.requestOrderId(_address, _marketId, 0, 0, true, 10**8);
         emit LiquidationOrderCreated(_orderId, msg.sender, _address, _marketId);
         return _orderId;
     }
@@ -464,12 +465,12 @@ contract MorpherOracle is Ownable {
             uint256 _positionLongShares = state.getLongShares(_address, _marketId);
             uint256 _positionShortShares = state.getShortShares(_address, _marketId);
             if (_positionLongShares > 0) {
-                _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionLongShares, false, 10**8);
-                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, true, _positionLongShares, false, 10**8);
+                _orderId = tradeEngine.requestOrderId(_address, _marketId, _positionLongShares, 0, false, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, _positionLongShares, 0, false, 10**8);
             }
             if (_positionShortShares > 0) {
-                _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionShortShares, true, 10**8);
-                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, true, _positionShortShares, true, 10**8);
+                _orderId = tradeEngine.requestOrderId(_address, _marketId, _positionShortShares, 0, true, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, _positionShortShares, 0, true, 10**8);
             }
             return _orderId;
     }
