@@ -189,17 +189,16 @@ contract MorpherTradeEngine is Ownable {
             "MorpherTradeEngine: request exceeded maximum permitted requests per block."
         );
 
-
         /**
          * The user can't partially close a position and open another one with MPH
          */
          if(_openMPHTokenAmount > 0) {
             if(_tradeDirection) {
                 //long
-                 require(_closeSharesAmount == state.getShortShares(orders[_orderId].userId, orders[_orderId].marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
+                require(_closeSharesAmount == state.getShortShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
             } else {
                 //short
-                require(_closeSharesAmount == state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
+                require(_closeSharesAmount == state.getLongShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
             }
          }
         
