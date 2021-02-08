@@ -36,6 +36,8 @@ contract MorpherOracle is Ownable {
     mapping(bytes32 => uint256) public goodFrom;
     mapping(bytes32 => uint256) public goodUntil;
 
+    mapping(bytes32 => bool) public ordercancellationRequested;
+
 // ----------------------------------------------------------------------------------
 // Events
 // ----------------------------------------------------------------------------------
@@ -90,6 +92,11 @@ contract MorpherOracle is Ownable {
         );
 
     event OrderCancelled(
+        bytes32 indexed _orderId,
+        address indexed _sender
+        );
+
+    event OrdercancellationRequested(
         bytes32 indexed _orderId,
         address indexed _sender
         );
@@ -314,10 +321,18 @@ contract MorpherOracle is Ownable {
         return _orderId;
     }
 
-// ----------------------------------------------------------------------------------
-// cancelOrder(bytes32  _orderId)
-// User or Administrator can cancel their own orders before the _callback has been executed
-// ----------------------------------------------------------------------------------
+    function initiateCancelOrder(bytes32 _orderId) public {
+        require(ordercancellationRequested[_orderId] == false, "Aborting: Order was already canceled");
+        (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
+        require(userId == msg.sender, "Aborting: Only the user can request an order cancellation");
+        ordercancellationRequested[_orderId] = true;
+        emit OrdercancellationRequested(_orderId, msg.sender);
+
+    }
+    // ----------------------------------------------------------------------------------
+    // cancelOrder(bytes32  _orderId)
+    // User or Administrator can cancel their own orders before the _callback has been executed
+    // ----------------------------------------------------------------------------------
     function cancelOrder(bytes32 _orderId) public {
         tradeEngine.cancelOrder(_orderId, msg.sender);
         clearOrderConditions(_orderId);
