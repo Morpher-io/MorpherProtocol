@@ -159,3 +159,75 @@ contract('MorpherTradeEngine', (accounts) => {
         assert.equal(userBalance, '999999996017205000000');
     });
 });
+
+
+contract('MorpherTradeEngine', (accounts) => {
+    // ---- TEST 9 -----
+    // userBalance               = 80000000000000000000;
+    // position.averagePrice     = 9000000000;
+    // position.longShares       = 0;
+    // position.shortShares      = 1;
+    // position.averageSpread    = 500000;
+    //
+    // market.price              = 20000000000;
+    // market.spread             = 200000;
+    //
+    // trade.amount              = 1;
+    // trade.amountGivenInShares = true;
+    // trade.direction           = long; //true
+    //
+    // ---- RESULT 9 -----
+    //
+    // position.value            = 0;
+    // position.averagePrice     = 0;
+    // position.longShares       = 0;
+    // position.shortShares      = 0;
+    // position.averageSpread    = 0;
+    //
+    // userBalance               = 80000000000000000000;
+    it('test case 9: liquidate a short position, price + spread calculation', async () => {
+        let account0 = accounts[0]; let account1 = accounts[1];
+
+        let morpherTradeEngine = await MorpherTradeEngine.deployed();
+        let morpherToken = await MorpherToken.deployed();
+        let morpherState = await MorpherState.deployed();
+        let morpherOracle = await MorpherOracle.deployed();
+
+        // Set balance of testing account.
+        //(address to, uint256 tokens)
+        await morpherToken.transfer(account1, '80000000000000000000');
+
+        //(_newMeanEntryPrice, _newMeanEntryLeverage, _long)
+        let liquidationPrice = (await morpherTradeEngine.getLiquidationPrice(roundToInteger(90), 100000000, false)).toNumber();
+
+        //(_address, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice)
+        await morpherState.setPosition(account1, BTC, 0, 0, 1, roundToInteger(90), 500000, 100000000, liquidationPrice, { from: account0 });
+
+        //(_marketId, _closeSharesAmount, _openMPHAmount, _tradeDirection, _orderLeverage, _onlyIfPriceAbove, _onlyIfPriceBelow, _goodUntil, _goodFrom)
+        let orderId = (await morpherOracle.createOrder(BTC, 1, 0, true, 100000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 })).logs[0].args._orderId;
+
+        // console.log(orderId);
+        //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
+        await morpherOracle.__callback(orderId, roundToInteger(200), 0, 200000, 0, 0, 0, { from: account0 });
+
+        // (address _address, bytes32 _marketId)
+        let position = await morpherState.getPosition(account1, BTC);
+
+        // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
+        let positionValue = position._longShares.toNumber() *
+            (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+                roundToInteger(200), 200000, 100000000, true)).toNumber();
+
+        let userBalance = (await morpherState.balanceOf(account1)).toString();
+
+        assert.equal(positionValue, 0);
+
+        assert.equal(position._meanEntryPrice.toNumber(), 0);
+        assert.equal(position._longShares.toNumber(), 0);
+        assert.equal(position._shortShares.toNumber(), 0);
+        assert.equal(position._meanEntrySpread.toNumber(), 0);
+
+        assert.equal(userBalance, '80000000000000000000');
+    });
+});

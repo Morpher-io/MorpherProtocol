@@ -23,7 +23,6 @@ contract MorpherTradeEngine is Ownable {
     bytes32 public lastOrderId;
 
     address public escrowOpenOrderAddress = 0x1111111111111111111111111111111111111111;
-    mapping(bytes32 => uint256) public orderEscrowAmount;
     bool public escrowOpenOrderEnabled;
 
 // ----------------------------------------------------------------------------
@@ -52,6 +51,7 @@ contract MorpherTradeEngine is Ownable {
         uint256 newMeanEntrySpread;
         uint256 newMeanEntryLeverage;
         uint256 newLiquidationPrice;
+        uint256 orderEscrowAmount;
     }
 
     mapping(bytes32 => order) private orders;
@@ -152,10 +152,10 @@ contract MorpherTradeEngine is Ownable {
     
     function paybackEscrow(bytes32 _orderId) private {
         //pay back the escrow to the user so he has it back on his balance/**
-        if(orderEscrowAmount[_orderId] > 0) {
+        if(orders[_orderId].orderEscrowAmount > 0) {
             //checks effects interaction
-            uint256 paybackAmount = orderEscrowAmount[_orderId];
-            orderEscrowAmount[_orderId] = 0;
+            uint256 paybackAmount = orders[_orderId].orderEscrowAmount;
+            orders[_orderId].orderEscrowAmount = 0;
             state.transfer(escrowOpenOrderAddress, orders[_orderId].userId, paybackAmount);
         }
     }
@@ -163,7 +163,7 @@ contract MorpherTradeEngine is Ownable {
     function buildupEscrow(bytes32 _orderId, uint256 _amountInMPH) private {
         if(escrowOpenOrderEnabled && _amountInMPH > 0) {
             state.transfer(orders[_orderId].userId, escrowOpenOrderAddress, _amountInMPH);
-            orderEscrowAmount[_orderId] = _amountInMPH;
+            orders[_orderId].orderEscrowAmount = _amountInMPH;
         }
     }
 

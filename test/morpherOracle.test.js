@@ -62,7 +62,7 @@ contract('MorpherOracle', (accounts) => {
     });
 
 
-    it('Orders can be canceled', async () => {
+    it('Orders can be canceled if requested', async () => {
         const morpherOracle = await MorpherOracle.deployed();
         const morpherTradeEngine = await MorpherTradeEngine.deployed();
         const morpherToken = await MorpherToken.deployed();
@@ -70,12 +70,36 @@ contract('MorpherOracle', (accounts) => {
 
         // Test new order creation and cancellation.
         const orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
-        assert.notEqual(orderId, null);
+        await truffleAssert.fails(morpherOracle.cancelOrder(orderId, { from: testUserAddress }), truffleAssert.REVERT, "MorpherOracle: Only the oracle operator can call this function.");
 
-        await morpherOracle.cancelOrder(orderId, { from: testUserAddress });
+        let cancellationResult = await morpherOracle.initiateCancelOrder(orderId, { from: testUserAddress });
+
+        await truffleAssert.eventEmitted(cancellationResult, "OrderCancellationRequestedEvent", { _orderId: orderId, _sender: testUserAddress });
 
         const order = await morpherTradeEngine.getOrder(orderId);
-        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
+        assert.equal(order._openMPHTokenAmount, '200'); // order not canceled yet
+
+        let oracleCancelCallback = await morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress });
+        
+        await truffleAssert.eventEmitted(oracleCancelCallback, "OrderCancelled", { _orderId: orderId, _sender: testUserAddress, _oracleAddress: oracleCallbackAddress });
+        const orderAfterCancel = await morpherTradeEngine.getOrder(orderId);
+        assert.equal(orderAfterCancel._openMPHTokenAmount, '0'); // order canceled
+
+    });
+
+    it('Orders can not be canceled if not requested by user', async () => {
+        const morpherOracle = await MorpherOracle.deployed();
+        const morpherTradeEngine = await MorpherTradeEngine.deployed();
+        const morpherToken = await MorpherToken.deployed();
+        await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+
+        // Test new order creation and cancellation.
+        const orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
+        await truffleAssert.fails(morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress }), truffleAssert.REVERT, "Aborting: Order-Cancellation was not requested.");
+
+        const order = await morpherTradeEngine.getOrder(orderId);
+        assert.equal(order._openMPHTokenAmount, '200'); // order not canceled yet
+
     });
 
     it('goodUntil fails if in the past', async () => {
@@ -91,7 +115,7 @@ contract('MorpherOracle', (accounts) => {
         await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
 
 
-        const goodUntil = Math.round((Date.now() / 1000))-10;
+        const goodUntil = Math.round((Date.now() / 1000)) - 10;
         const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, 0, goodUntil, 0, { from: testUserAddress });
 
         // Asserts
@@ -143,7 +167,7 @@ contract('MorpherOracle', (accounts) => {
         await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
 
 
-        const goodFrom = Math.round((Date.now() / 1000))+10;
+        const goodFrom = Math.round((Date.now() / 1000)) + 10;
         const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, 0, 0, goodFrom, { from: testUserAddress });
 
         // Asserts
@@ -182,7 +206,7 @@ contract('MorpherOracle', (accounts) => {
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
-    
+
     it('onlyIfPriceAbove fails if smaller', async () => {
         const morpherOracle = await MorpherOracle.deployed();
         const morpherToken = await MorpherToken.deployed();
@@ -235,7 +259,7 @@ contract('MorpherOracle', (accounts) => {
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
     });
 
-    
+
     it('onlyIfPriceBelow fails if smaller', async () => {
         const morpherOracle = await MorpherOracle.deployed();
         const morpherToken = await MorpherToken.deployed();
@@ -351,7 +375,7 @@ contract('MorpherOracle', (accounts) => {
              */
             const transactionRequiresGasToFinish = await morpherOracle.__callback.estimateGas(orderId, 100000000, 100000000, 1000000, 0, 1234, nextOrderGasEscrowInEther, { from: oracleCallbackAddress });
 
-            if(historicalGasConsumptionFromOracle.length == 0) {
+            if (historicalGasConsumptionFromOracle.length == 0) {
                 historicalGasConsumptionFromOracle.push(transactionRequiresGasToFinish); // we don't have anything yet, we need to start with something
             }
 
@@ -374,7 +398,7 @@ contract('MorpherOracle', (accounts) => {
             // let balanceAfter = await web3.eth.getBalance(oracleCallbackAddress);
             // console.log(i + ";" + gasRequiredOnAverage + ";" + transactionRequiresGasToFinish + ";" + receipt.receipt.gasUsed + ";" + web3.utils.fromWei(balanceAfter, 'ether'));
             historicalGasConsumptionFromOracle.push(receipt.receipt.gasUsed);
-            if(historicalGasConsumptionFromOracle.length > 10) {
+            if (historicalGasConsumptionFromOracle.length > 10) {
                 historicalGasConsumptionFromOracle.shift();
             }
 
@@ -386,4 +410,5 @@ contract('MorpherOracle', (accounts) => {
         assert.isTrue(oracleBalanceAfterOrders.gte(new BN(oracleStartingBalance)), "We're loosing money at the callback, it should not happen normally " + oracleBalanceAfterOrders + " vs " + oracleStartingBalance);
         //console.log(oracleBalanceAfterOrders, oracleStartingBalance);
     });
+
 });
