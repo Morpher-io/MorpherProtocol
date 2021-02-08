@@ -29,7 +29,7 @@ module.exports = {
     kovan: {
       provider: () =>
         new HDWalletProvider(
-          process.env.MORPHER_DEPLOYER_KEY,
+          process.env.MORPHER_DEPLOYER_PK,
           "https://kovan.infura.io/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '*',
