@@ -3,6 +3,7 @@ pragma solidity 0.5.16;
 import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./MorpherState.sol";
+import "./IMorpherStaking.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -13,6 +14,7 @@ import "./MorpherState.sol";
 
 contract MorpherTradeEngine is Ownable {
     MorpherState state;
+    IMorpherStaking staking;
     using SafeMath for uint256;
 
 // ----------------------------------------------------------------------------
@@ -115,12 +117,14 @@ contract MorpherTradeEngine is Ownable {
     );
 
     event LinkState(address _address);
+    event LinkStaking(address _stakingAddress);
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, bool _escrowOpenOrderEnabled) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public {
         setMorpherState(_stateAddress);
+        setMorpherStaking(_stakingContractAddress);
         transferOwnership(_coldStorageOwnerAddress);
         escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
-        deployedTimeStamp = now;
+        deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
     }
 
     modifier onlyOracle {
@@ -141,6 +145,11 @@ contract MorpherTradeEngine is Ownable {
     function setMorpherState(address _stateAddress) public onlyOwner {
         state = MorpherState(_stateAddress);
         emit LinkState(_stateAddress);
+    }
+
+    function setMorpherStaking(address _stakingAddress) public onlyOwner {
+        staking = IMorpherStaking(_stakingAddress);
+        emit LinkStaking(_stakingAddress);
     }
 
     function getAdministrator() public view returns(address _administrator) {
@@ -473,17 +482,18 @@ contract MorpherTradeEngine is Ownable {
                 // We have to reduce the share value by the average spread (i.e. the average expense to build up the position)
                 // and reduce the value further by the spread for selling.
                 _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
+                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStamp);
+                if (_marginInterest <= _shareValue) {
+                    _shareValue = _shareValue.sub(_marginInterest);
+                } else {
+                    _shareValue = 0;
+                }
             } else {
                 // If a new short position is built up each share costs value + spread
                 _shareValue = _shareValue.add(_marketSpread.mul(_orderLeverage).div(PRECISION));
             }
         }
-        uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStamp);
-        if (_marginInterest <= _shareValue) {
-            _shareValue = _shareValue.sub(_marginInterest);
-        } else {
-            _shareValue = 0;
-        }
+      
         return _shareValue;
     }
 
@@ -524,16 +534,17 @@ contract MorpherTradeEngine is Ownable {
             if (_sell == true) {
                 // We sell a long and have to correct the shareValue with the averageSpread and the currentSpread for selling.
                 _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
+                
+                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStamp);
+                if (_marginInterest <= _shareValue) {
+                    _shareValue = _shareValue.sub(_marginInterest);
+                } else {
+                    _shareValue = 0;
+                }
             } else {
                 // We buy a new long position and have to pay the spread
                 _shareValue = _shareValue.add(_marketSpread.mul(_orderLeverage).div(PRECISION));
             }
-        }
-        uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStamp);
-        if (_marginInterest <= _shareValue) {
-            _shareValue = _shareValue.sub(_marginInterest);
-        } else {
-            _shareValue = 0;
         }
         return _shareValue;
     }
@@ -543,13 +554,17 @@ contract MorpherTradeEngine is Ownable {
 // Calculates the interest for leveraged positions
 // ----------------------------------------------------------------------------
 
-    function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStamp) private view returns (uint256 _marginInterest) {
+function getNow() public view returns(uint) {
+    return now;
+}
+    function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStamp) public view returns (uint256 _marginInterest) {
         if (_positionTimeStamp < deployedTimeStamp) {
             _positionTimeStamp = deployedTimeStamp;
         }
         _marginInterest = _averagePrice.mul(_averageLeverage.sub(PRECISION));
-        _marginInterest = _marginInterest.mul(now.sub(_positionTimeStamp).div(86400).add(1));
-        _marginInterest = _marginInterest.mul(state.rewardBasisPoints()).div(PRECISION);
+        uint256 timestamp_diff = now.sub(_positionTimeStamp);
+        _marginInterest = _marginInterest.mul(timestamp_diff.div(86400).add(1));
+        _marginInterest = _marginInterest.mul(staking.interestRate()).div(PRECISION).div(PRECISION);
         return _marginInterest;
     }
 
