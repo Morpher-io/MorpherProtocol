@@ -713,7 +713,6 @@ contract MorpherTradeEngine is Ownable {
 
         setPositionInState(_orderId);
     }
-event BalanceUp(uint256 _balanceUp);
 // ----------------------------------------------------------------------------
 // closeLong(bytes32 _orderId)
 // Closes an existing long position. Average entry price/spread/leverage do not change.
@@ -744,7 +743,6 @@ event BalanceUp(uint256 _balanceUp);
         orders[_orderId].newMeanEntryPrice = _newMeanEntry;
         orders[_orderId].newMeanEntrySpread = _newMeanSpread;
         orders[_orderId].newMeanEntryLeverage = _newMeanLeverage;
-        emit BalanceUp(_balanceUp);
 
         setPositionInState(_orderId);
     }
