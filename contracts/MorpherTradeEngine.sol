@@ -554,16 +554,13 @@ contract MorpherTradeEngine is Ownable {
 // Calculates the interest for leveraged positions
 // ----------------------------------------------------------------------------
 
-function getNow() public view returns(uint) {
-    return now;
-}
+
     function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStamp) public view returns (uint256 _marginInterest) {
         if (_positionTimeStamp < deployedTimeStamp) {
             _positionTimeStamp = deployedTimeStamp;
         }
         _marginInterest = _averagePrice.mul(_averageLeverage.sub(PRECISION));
-        uint256 timestamp_diff = now.sub(_positionTimeStamp);
-        _marginInterest = _marginInterest.mul(timestamp_diff.div(86400).add(1));
+        _marginInterest = _marginInterest.mul((now.sub(_positionTimeStamp).div(86400)).add(1));
         _marginInterest = _marginInterest.mul(staking.interestRate()).div(PRECISION).div(PRECISION);
         return _marginInterest;
     }
@@ -716,7 +713,7 @@ function getNow() public view returns(uint) {
 
         setPositionInState(_orderId);
     }
-
+event BalanceUp(uint256 _balanceUp);
 // ----------------------------------------------------------------------------
 // closeLong(bytes32 _orderId)
 // Closes an existing long position. Average entry price/spread/leverage do not change.
@@ -747,6 +744,7 @@ function getNow() public view returns(uint) {
         orders[_orderId].newMeanEntryPrice = _newMeanEntry;
         orders[_orderId].newMeanEntrySpread = _newMeanSpread;
         orders[_orderId].newMeanEntryLeverage = _newMeanLeverage;
+        emit BalanceUp(_balanceUp);
 
         setPositionInState(_orderId);
     }
@@ -760,7 +758,7 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
         bytes32 _marketId = orders[_orderId].marketId;
         uint256 _shareValue;
 
-        if (orders[_orderId].tradeDirection) {
+        if (orders[_orderId].tradeDirection == false) { //we are selling our long shares
             _balanceUp = orders[_orderId].longSharesOrder;
             _shareValue = longShareValue(
                 state.getMeanEntryPrice(_userId, _marketId),
@@ -772,7 +770,7 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
                 state.getMeanEntryLeverage(_userId, _marketId),
                 true
             );
-        } else {
+        } else { //we are going long, we are selling our short shares
             _balanceUp = orders[_orderId].shortSharesOrder;
             _shareValue = shortShareValue(
                 state.getMeanEntryPrice(_userId, _marketId),

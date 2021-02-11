@@ -7,8 +7,8 @@ module.exports = async function(deployer, network, accounts) {
 
     const morpherState = await MorpherState.deployed();
     let deployedTimestamp = 0;
-    if(network == "local") {
-        deployedTimestamp = '1581333093'; //settings this for testing to 2020-february
+    if(network == "local" || network == "test") {
+        deployedTimestamp = Math.round(Date.now() / 1000) - (60*60*24*30); //settings this for testing to 2020-february
     }
     await deployer.deploy(MorpherTradeEngine, morpherState.address, ownerAddress, MorpherStaking.address, true, deployedTimestamp);
 
