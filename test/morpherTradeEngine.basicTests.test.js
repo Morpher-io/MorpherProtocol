@@ -64,7 +64,7 @@ contract('MorpherTradeEngine: Trade long/short with MPH', (accounts) => {
         // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._longShares.toNumber() *
             (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(150), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -132,7 +132,7 @@ contract('MorpherTradeEngine: Trade long/short with MPH', (accounts) => {
         // shortShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._shortShares.toNumber() *
             (await morpherTradeEngine.shortShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(10), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -173,7 +173,7 @@ contract('MorpherTradeEngine cannot close with MPH', (accounts) => {
 
         //(_marketId, _closeSharesAmount, _openMPHAmount, _tradeDirection, _orderLeverage, _onlyIfPriceAbove, _onlyIfPriceBelow, _goodUntil, _goodFrom)
         truffleAssertions.fails(
-            morpherOracle.createOrder(BTC, 0, roundToInteger(160), false, 100000000, 0, 0, 0, 0, { from: account1, value: 301000000000000 }),
+            morpherOracle.createOrder(BTC, 0, roundToInteger(160), false, 100000000, 0, 0, 0, 0, { from: account1 }),
             truffleAssertions.ErrorType.REVERT,
             "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction"
         );
@@ -184,7 +184,7 @@ contract('MorpherTradeEngine cannot close with MPH', (accounts) => {
         // shortShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._shortShares.toNumber() *
             (await morpherTradeEngine.shortShareValue(position._meanEntryPrice.toNumber(),
-                position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+                position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(80), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -225,7 +225,7 @@ contract('MorpherTradeEngine cannot close with MPH', (accounts) => {
         // shortShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._shortShares.toNumber() *
             (await morpherTradeEngine.shortShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(40), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -294,7 +294,7 @@ contract('MorpherTradeEngine: Double down tests long/short', (accounts) => {
         // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._longShares.toNumber() *
             (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(100), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -369,7 +369,7 @@ contract('MorpherTradeEngine: Double down tests long/short', (accounts) => {
         // shortShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._shortShares.toNumber() *
             (await morpherTradeEngine.shortShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(80), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -443,7 +443,7 @@ contract('MorpherTradeEngine: rollover tests', (accounts) => {
         // shortShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._shortShares.toNumber() *
             (await morpherTradeEngine.shortShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(40), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -515,7 +515,7 @@ contract('MorpherTradeEngine: rollover tests', (accounts) => {
         // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._longShares.toNumber() *
             (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(80), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -583,7 +583,7 @@ contract('MorpherTradeEngine: partial closing tests', (accounts) => {
         // shortShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._longShares.toNumber() *
             (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(40), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -651,7 +651,7 @@ contract('MorpherTradeEngine: partial closing tests', (accounts) => {
         // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._shortShares.toNumber() *
             (await morpherTradeEngine.shortShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), position._liquidationPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), 0, position._liquidationPrice.toNumber(),
                 roundToInteger(80), 0, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
