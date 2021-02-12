@@ -2,7 +2,7 @@ pragma solidity 0.5.16;
 
 import "./Ownable.sol";
 import "./SafeMath.sol";
-import "./MorpherState.sol";
+import "./IMorpherState.sol";
 
 // ----------------------------------------------------------------------------------
 // Staking Morpher Token generates interest
@@ -13,13 +13,13 @@ import "./MorpherState.sol";
 
 contract MorpherStaking is Ownable {
     using SafeMath for uint256;
-    MorpherState state;
+    IMorpherState state;
 
     uint256 constant PRECISION = 10**8;
     uint256 constant INTERVAL  = 1 days;
 
-    mapping(address => uint256) private poolShares;
-    mapping(address => uint256) private lockup;
+    //mapping(address => uint256) private poolShares;
+    //mapping(address => uint256) private lockup;
 
     uint256 public poolShareValue = PRECISION;
     uint256 public lastReward;
@@ -29,6 +29,9 @@ contract MorpherStaking is Ownable {
     uint256 public minimumStake = 10**23; // 100k MPH minimum
 
     address public stakingAdmin;
+
+    address public stakingAddress = 0x2222222222222222222222222222222222222222;
+    bytes32 public marketIdStakingMPH = 0x9a31fdde7a3b1444b1befb10735dcc3b72cbd9dd604d2ff45144352bf0f359a6; //STAKING_MPH
 
 // ----------------------------------------------------------------------------
 // Events
@@ -41,7 +44,7 @@ contract MorpherStaking is Ownable {
     
     event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
     event StakingRewardsMinted(uint256 indexed lastReward, uint256 delta);
-    event Staked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);
+    event Staked(address indexed userAddress, uint256 indexed amount, uint256 poolShares, uint256 lockedUntil);
     event Unstaked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);
     
     modifier onlyStakingAdmin {
@@ -82,10 +85,10 @@ contract MorpherStaking is Ownable {
 
     function mintStakingRewards() private {
         uint256 _targetBalance = poolShareValue.mul(totalShares);
-        if (state.balanceOf(address(this)) < _targetBalance) {
+        if (state.balanceOf(stakingAddress) < _targetBalance) {
             // If there are not enough token held by the contract, mint them
-            uint256 _delta = _targetBalance.sub(state.balanceOf(address(this)));
-            state.mint(address(this), _delta);
+            uint256 _delta = _targetBalance.sub(state.balanceOf(stakingAddress));
+            state.mint(stakingAddress, _delta);
             emit StakingRewardsMinted(lastReward, _delta);
         }
     }
@@ -100,29 +103,32 @@ contract MorpherStaking is Ownable {
         require(state.balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
         _poolShares = _amount.div(poolShareValue);
-        require(minimumStake >= poolShares[msg.sender].add(_poolShares).mul(poolShareValue), "MorpherStaking: stake amount lower than minimum stake");
-        state.transfer(msg.sender, address(this), _poolShares.mul(poolShareValue));
+        (uint256 _numOfShares, , , , , ) = state.getPosition(msg.sender, marketIdStakingMPH);
+        require(minimumStake <= _numOfShares.add(_poolShares).mul(poolShareValue), "MorpherStaking: stake amount lower than minimum stake");
+        state.transfer(msg.sender, stakingAddress, _poolShares.mul(poolShareValue));
         totalShares = totalShares.add(_poolShares);
-        poolShares[msg.sender] = poolShares[msg.sender].add(_poolShares);
-        lockup[msg.sender] = now;
-        emit Staked(msg.sender, _amount, _poolShares);
+        state.setPosition(msg.sender, marketIdStakingMPH, now.add(lockupPeriod), _numOfShares.add(_poolShares), 0, 0, 0, 0, 0);
+        emit Staked(msg.sender, _amount, _poolShares, now.add(lockupPeriod));
         return _poolShares;
     }
 
 // ----------------------------------------------------------------------------
-// unStake(uint256 _amount)
+// unstake(uint256 _amount)
 // User specifies number of Pool Shares they want to unstake. 
 // Pool Shares get deleted and the user receives their MPH plus interest
 // ----------------------------------------------------------------------------
 
-    function unStake(uint256 _numOfShares) public returns (uint256 _amount) {
-        require(_numOfShares >= poolShares[msg.sender], "MorpherStaking: insufficient pool shares");
-        require(now >= lockup[msg.sender].add(lockupPeriod), "MorpherStaking: cannot unstake before lockup expiration");
+    function unstake(uint256 _numOfShares) public returns (uint256 _amount) {
+        (uint256 _numOfExistingShares, , , , , ) = state.getPosition(msg.sender, marketIdStakingMPH);
+        require(_numOfShares <= _numOfExistingShares, "MorpherStaking: insufficient pool shares");
+
+        uint256 lockedInUntil = state.getLastUpdated(msg.sender, marketIdStakingMPH);
+        require(now >= lockedInUntil, "MorpherStaking: cannot unstake before lockup expiration");
         updatePoolShareValue();
-        poolShares[msg.sender] = poolShares[msg.sender].sub(_numOfShares);
+        state.setPosition(msg.sender, marketIdStakingMPH, lockedInUntil, _numOfExistingShares.sub(_numOfShares), 0, 0, 0, 0, 0);
         totalShares = totalShares.sub(_numOfShares);
         _amount = _numOfShares.mul(poolShareValue);
-        state.transfer(address(this), msg.sender, _amount);
+        state.transfer(stakingAddress, msg.sender, _amount);
         emit Unstaked(msg.sender, _amount, _numOfShares);
         return _amount;
     }
@@ -137,7 +143,7 @@ contract MorpherStaking is Ownable {
     }
 
     function setMorpherStateAddress(address _stateAddress) public onlyOwner {
-        state = MorpherState(_stateAddress);
+        state = IMorpherState(_stateAddress);
         emit LinkState(_stateAddress);
     }
 
@@ -165,17 +171,17 @@ contract MorpherStaking is Ownable {
         return poolShareValue.mul(totalShares);
     }
 
-    function getTotalShares() public view returns (uint256 _totalShares) {
-        return totalShares;
-    }
-
     function getStake(address _address) public view returns (uint256 _poolShares) {
-        return poolShares[_address];
+        (uint256 _numOfShares, , , , , ) = state.getPosition(_address, marketIdStakingMPH);
+        return _numOfShares;
     }
 
     function getStakeValue(address _address) public view returns(uint256 _value, uint256 _lastUpdate) {
         // Only accurate if poolShareValue is up to date
-        return (poolShares[_address].mul(poolShareValue), lastReward);
+        
+        (uint256 _numOfShares, , , , , ) = state.getPosition(_address, marketIdStakingMPH);
+
+        return (_numOfShares.mul(poolShareValue), lastReward);
     }
     
 // ------------------------------------------------------------------------
