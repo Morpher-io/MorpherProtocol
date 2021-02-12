@@ -2,6 +2,7 @@ pragma solidity 0.5.16;
 contract IMorpherStaking {
     
     function lastReward() public view returns (uint256);
+
     function totalShares() public view returns (uint256);
 
     function interestRate() public view returns (uint256);
