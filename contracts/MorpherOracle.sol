@@ -457,20 +457,28 @@ contract MorpherOracle is Ownable {
 // delistMarket(bytes32 _marketId)
 // Administrator closes out all existing positions on _marketId market at current prices
 // ----------------------------------------------------------------------------------
-    function delistMarket(bytes32 _marketId, uint256 _fromIx, uint256 _toIx) public onlyAdministrator {
+    uint delistMarketFromIx = 0;
+    event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
+    event DelistMarketComplete(bytes32 _marketId);
+    function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyAdministrator {
         require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
         // If no _fromIx and _toIx specified, do entire _list
-        if (_fromIx == 0) {
-            _fromIx = 1;
+        if (_startFromScratch) {
+            delistMarketFromIx = 0;
         }
-        if (_toIx == 0) {
-            _toIx = state.getMaxMappingIndex(_marketId);
-        }
+        
+        uint _toIx = state.getMaxMappingIndex(_marketId);
+        
         address _address;
-        for (uint256 i = _fromIx; i <= _toIx; i++) {
+        for (uint256 i = delistMarketFromIx; i <= _toIx; i++) {
             _address = state.getExposureMappingAddress(_marketId, i);
             adminLiquidationOrder(_address, _marketId);
+             if(gasleft() < 150000 && i != _toIx) { //stop if there's not enough gas to write the next transaction
+                delistMarketFromIx = i;
+                emit DelistMarketIncomplete(_marketId, _toIx);
+            }
         }
+        emit DelistMarketComplete(_marketId);
     }
 
 // ----------------------------------------------------------------------------------
