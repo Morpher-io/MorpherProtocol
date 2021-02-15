@@ -498,12 +498,15 @@ contract MorpherOracle is Ownable {
         
         address _address;
         for (uint256 i = delistMarketFromIx; i <= _toIx; i++) {
-            _address = state.getExposureMappingAddress(_marketId, i);
-            adminLiquidationOrder(_address, _marketId);
-             if(gasleft() < 150000 && i != _toIx) { //stop if there's not enough gas to write the next transaction
+             if(gasleft() < 250000 && i != _toIx) { //stop if there's not enough gas to write the next transaction
                 delistMarketFromIx = i;
                 emit DelistMarketIncomplete(_marketId, _toIx);
-            }
+                return;
+            } 
+            
+            _address = state.getExposureMappingAddress(_marketId, i);
+            adminLiquidationOrder(_address, _marketId);
+            
         }
         emit DelistMarketComplete(_marketId);
     }
