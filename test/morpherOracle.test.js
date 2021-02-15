@@ -102,6 +102,23 @@ contract('MorpherOracle', (accounts) => {
 
     });
 
+    it('Updating Orders can trigger an order cancellation', async () => {
+        const morpherOracle = await MorpherOracle.deployed();
+        const morpherTradeEngine = await MorpherTradeEngine.deployed();
+        const morpherToken = await MorpherToken.deployed();
+        await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+
+        // Test new order creation and cancellation.
+        const orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
+        await truffleAssert.fails(morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress }), truffleAssert.REVERT, "Aborting: Order-Cancellation was not requested.");
+
+        let result = await morpherOracle.adminCancelOrder(orderId, { from: oracleCallbackAddress });
+        await truffleAssert.eventEmitted(result, 'AdminOrderCancelled');
+        const order = await morpherTradeEngine.getOrder(orderId);
+        assert.equal(order._openMPHTokenAmount, '0'); // order canceled
+
+    });
+
     it('goodUntil fails if in the past', async () => {
         const morpherOracle = await MorpherOracle.deployed();
         const morpherToken = await MorpherToken.deployed();
@@ -122,7 +139,7 @@ contract('MorpherOracle', (accounts) => {
         assert.equal(txReceipt.logs[0].args['_goodUntil'], goodUntil);
 
         await truffleAssert.fails(
-            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress }),
+            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Date.now(), 0, { from: oracleCallbackAddress }),
             truffleAssert.ErrorType.REVERT,
             "Error: Order Conditions are not met"
         );
@@ -148,7 +165,7 @@ contract('MorpherOracle', (accounts) => {
         // Asserts
         assert.equal(txReceipt.logs[0].args['_goodUntil'], goodUntil);
 
-        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Date.now(), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
@@ -174,7 +191,7 @@ contract('MorpherOracle', (accounts) => {
         assert.equal(txReceipt.logs[0].args['_goodFrom'], goodFrom);
 
         await truffleAssert.fails(
-            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress }),
+            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Date.now(), 0, { from: oracleCallbackAddress }),
             truffleAssert.ErrorType.REVERT,
             "Error: Order Conditions are not met"
         );
@@ -200,7 +217,7 @@ contract('MorpherOracle', (accounts) => {
         // Asserts
         assert.equal(txReceipt.logs[0].args['_goodFrom'], goodFrom);
 
-        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Date.now(), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
@@ -227,7 +244,7 @@ contract('MorpherOracle', (accounts) => {
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceAbove'], priceAbove);
 
         await truffleAssert.fails(
-            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress }),
+            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Date.now(), 0, { from: oracleCallbackAddress }),
             truffleAssert.ErrorType.REVERT,
             "Error: Order Conditions are not met"
         );
@@ -253,7 +270,7 @@ contract('MorpherOracle', (accounts) => {
         // Asserts
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceAbove'], priceAbove);
 
-        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Date.now(), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
@@ -280,7 +297,7 @@ contract('MorpherOracle', (accounts) => {
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceBelow'], priceBelow);
 
         await truffleAssert.fails(
-            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress }),
+            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Date.now(), 0, { from: oracleCallbackAddress }),
             truffleAssert.ErrorType.REVERT,
             "Error: Order Conditions are not met"
         );
@@ -306,7 +323,7 @@ contract('MorpherOracle', (accounts) => {
         // Asserts
         assert.equal(txReceipt.logs[0].args['_onlyIfPriceBelow'], priceBelow);
 
-        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Date.now(), 0, { from: oracleCallbackAddress });
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully

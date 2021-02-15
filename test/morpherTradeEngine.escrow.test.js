@@ -45,7 +45,7 @@ contract('MorpherOracle', (accounts) => {
         const balanceAfterOpenOrderTestUser = await morpherToken.balanceOf(testUserAddress);
         assert.equal(balanceAfterOpenOrderTestUser.toString(), 0, "Balance of User should be 0");
 
-        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 10, 10, 0, 0, Math.round(Date.now() / 1000), 0, { from: oracleCallbackAddress });
+        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 10, 10, 0, 0, Date.now(), 0, { from: oracleCallbackAddress });
 
         
         const balanceAfterProcessOrder = await morpherToken.balanceOf(escrowAddress);
