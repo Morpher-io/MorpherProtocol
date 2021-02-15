@@ -96,6 +96,12 @@ contract MorpherOracle is Ownable {
         address indexed _sender,
         address indexed _oracleAddress
         );
+    
+    event AdminOrderCancelled(
+        bytes32 indexed _orderId,
+        address indexed _sender,
+        address indexed _oracleAddress
+        );
 
     event OrderCancellationRequestedEvent(
         bytes32 indexed _orderId,
@@ -348,6 +354,21 @@ contract MorpherOracle is Ownable {
         tradeEngine.cancelOrder(_orderId, userId);
         clearOrderConditions(_orderId);
         emit OrderCancelled(
+            _orderId,
+            userId,
+            msg.sender
+            );
+    }
+    
+    // ----------------------------------------------------------------------------------
+    // adminCancelOrder(bytes32  _orderId)
+    // Administrator can cancel before the _callback has been executed to provide an updateOrder functionality
+    // ----------------------------------------------------------------------------------
+    function adminCancelOrder(bytes32 _orderId) public onlyOracleOperator {
+        (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
+        tradeEngine.cancelOrder(_orderId, userId);
+        clearOrderConditions(_orderId);
+        emit AdminOrderCancelled(
             _orderId,
             userId,
             msg.sender

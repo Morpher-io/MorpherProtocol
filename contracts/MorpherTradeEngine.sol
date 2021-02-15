@@ -364,7 +364,7 @@ contract MorpherTradeEngine is Ownable {
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _liquidationTimestamp,
-        uint256 _timeStamp
+        uint256 _timeStampInMS
         ) public onlyOracle returns (
             uint256 _newLongShares,
             uint256 _newShortShares,
@@ -381,7 +381,7 @@ contract MorpherTradeEngine is Ownable {
         require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
         orders[_orderId].marketPrice = _marketPrice;
         orders[_orderId].marketSpread = _marketSpread;
-        orders[_orderId].timeStamp = _timeStamp;
+        orders[_orderId].timeStamp = _timeStampInMS;
         orders[_orderId].liquidationTimestamp = _liquidationTimestamp;
 
         // Check if previous position on that market was liquidated
@@ -403,7 +403,7 @@ contract MorpherTradeEngine is Ownable {
             _marketPrice,
             _marketSpread,
             _liquidationTimestamp,
-            _timeStamp,
+            _timeStampInMS,
             _newLongShares,
             _newShortShares,
             _newAverageEntry,
@@ -447,7 +447,7 @@ contract MorpherTradeEngine is Ownable {
     function shortShareValue(
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
-        uint256 _positionTimeStamp,
+        uint256 _positionTimeStampInMs,
         uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
@@ -482,7 +482,7 @@ contract MorpherTradeEngine is Ownable {
                 // We have to reduce the share value by the average spread (i.e. the average expense to build up the position)
                 // and reduce the value further by the spread for selling.
                 _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
-                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStamp);
+                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStampInMs);
                 if (_marginInterest <= _shareValue) {
                     _shareValue = _shareValue.sub(_marginInterest);
                 } else {
@@ -500,7 +500,7 @@ contract MorpherTradeEngine is Ownable {
     function longShareValue(
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
-        uint256 _positionTimeStamp,
+        uint256 _positionTimeStampInMs,
         uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
@@ -535,7 +535,7 @@ contract MorpherTradeEngine is Ownable {
                 // We sell a long and have to correct the shareValue with the averageSpread and the currentSpread for selling.
                 _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
                 
-                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStamp);
+                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStampInMs);
                 if (_marginInterest <= _shareValue) {
                     _shareValue = _shareValue.sub(_marginInterest);
                 } else {
@@ -555,12 +555,12 @@ contract MorpherTradeEngine is Ownable {
 // ----------------------------------------------------------------------------
 
 
-    function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStamp) public view returns (uint256 _marginInterest) {
-        if (_positionTimeStamp < deployedTimeStamp) {
-            _positionTimeStamp = deployedTimeStamp;
+    function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStampInMs) public view returns (uint256 _marginInterest) {
+        if (_positionTimeStampInMs.div(1000) < deployedTimeStamp) {
+            _positionTimeStampInMs = deployedTimeStamp.mul(1000);
         }
         _marginInterest = _averagePrice.mul(_averageLeverage.sub(PRECISION));
-        _marginInterest = _marginInterest.mul((now.sub(_positionTimeStamp).div(86400)).add(1));
+        _marginInterest = _marginInterest.mul((now.sub(_positionTimeStampInMs.div(1000)).div(86400)).add(1));
         _marginInterest = _marginInterest.mul(staking.interestRate()).div(PRECISION).div(PRECISION);
         return _marginInterest;
     }

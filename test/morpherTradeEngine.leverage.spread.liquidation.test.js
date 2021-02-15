@@ -13,7 +13,7 @@ contract('MorpherTradeEngine', (accounts) => {
 
     it('margin calculation works correctly', async () => {
         let morpherTradeEngine = await MorpherTradeEngine.deployed();
-        let createdTimestamp = Math.round(Date.now() / 1000) - 2592000; //today  - 30 days
+        let createdTimestamp = Date.now() - 2592000000; //today  - 30 days
         //30 days should yield interest = price * (leverage - 1) * (days + 1) * 0.000015 percent
         //30000000000 * (200000000 - 100000000) * ( (2592000 / 86400) + 1) * (15000 / 100000000) / 100000000 percent = 13950000 is the interest on the exsting position 
 
@@ -61,7 +61,7 @@ contract('MorpherTradeEngine', (accounts) => {
         //(_newMeanEntryPrice, _newMeanEntryLeverage, _long)
         let liquidationPrice = (await morpherTradeEngine.getLiquidationPrice(roundToInteger(300), 200000000, true)).toNumber();
 
-        let createdTimestamp = Math.round(Date.now() / 1000) - 2592000 + 100; //today  - 30 days + 100 seconds buffer for rollover from 1 day to the other
+        let createdTimestamp = Date.now() - 2592000000 + 100000; //today  - 30 days + 100 seconds buffer for rollover from 1 day to the other
         //30 days should yield interest = price * (leverage - 1) * (days + 1) * 0.000015 percent
         //30000000000 * (200000000 - 100000000) * ( (2592000 / 86400) + 1) * (15000 / 100000000) / 100000000 percent = 13950000 is the interest on the exsting position 
 
@@ -84,7 +84,7 @@ contract('MorpherTradeEngine', (accounts) => {
 
 
         //(_orderId, _price, _unadjustedPrice, _spread, _liquidationTimestamp, _timeStamp, gasForNextCallback)
-        const oracleTimestampForPosition = Math.round(Date.now() / 1000) - 60; //1 minute delay
+        const oracleTimestampForPosition = Date.now() - 60000; //1 minute delay
         await morpherOracle.__callback(orderId, roundToInteger(200), roundToInteger(200), 1000000, 0, oracleTimestampForPosition, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
@@ -151,7 +151,7 @@ contract('MorpherTradeEngine', (accounts) => {
         let liquidationPrice = (await morpherTradeEngine.getLiquidationPrice(roundToInteger(300), 300000000, false)).toNumber();
 
         
-        let createdTimestamp = Math.round(Date.now() / 1000) - 2592000 + 100; //today  - 30 days + 100 seconds buffer for rollover from 1 day to the other
+        let createdTimestamp = Date.now() - 2592000000 + 100000; //today  - 30 days + 100 seconds buffer for rollover from 1 day to the other
 
         //(_address, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice)
         await morpherState.setPosition(account1, BTC, createdTimestamp, 0, 100, roundToInteger(300), 2000000, 300000000, liquidationPrice);
@@ -161,7 +161,7 @@ contract('MorpherTradeEngine', (accounts) => {
 
         // console.log(orderId);
         //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
-        const oracleTimestampForPosition = Math.round(Date.now() / 1000) - 60; //1 minute delay
+        const oracleTimestampForPosition = Date.now() - 60000; //1 minute delay
         await morpherOracle.__callback(orderId, roundToInteger(200), roundToInteger(200), 1000000, 0, oracleTimestampForPosition, 0, { from: account0 });
 
         // (address _address, bytes32 _marketId)
