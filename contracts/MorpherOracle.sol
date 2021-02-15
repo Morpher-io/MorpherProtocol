@@ -152,6 +152,14 @@ contract MorpherOracle is Ownable {
         uint256 _orderLeverage
         );
 
+    /**
+     * Delisting markets is a function that stops when gas is running low
+     * if it reached all positions it will emit "DelistMarketComplete"
+     * otherwise it needs to be re-run.
+     */
+    event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
+    event DelistMarketComplete(bytes32 _marketId);
+
     modifier onlyOracleOperator {
         require(isCallbackAddress(msg.sender), "MorpherOracle: Only the oracle operator can call this function.");
         _;
@@ -458,8 +466,6 @@ contract MorpherOracle is Ownable {
 // Administrator closes out all existing positions on _marketId market at current prices
 // ----------------------------------------------------------------------------------
     uint delistMarketFromIx = 0;
-    event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
-    event DelistMarketComplete(bytes32 _marketId);
     function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyAdministrator {
         require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
         // If no _fromIx and _toIx specified, do entire _list
