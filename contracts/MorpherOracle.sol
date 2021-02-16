@@ -165,6 +165,7 @@ contract MorpherOracle is Ownable {
      */
     event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
     event DelistMarketComplete(bytes32 _marketId);
+    event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
     modifier onlyOracleOperator {
         require(isCallbackAddress(msg.sender), "MorpherOracle: Only the oracle operator can call this function.");
@@ -316,23 +317,45 @@ contract MorpherOracle is Ownable {
         }
         _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage);
 
-        priceAbove[_orderId] = _onlyIfPriceAbove;
-        priceBelow[_orderId] = _onlyIfPriceBelow;
-        goodFrom[_orderId]   = _goodFrom;
-        goodUntil[_orderId]  = _goodUntil;
-        emit OrderCreated(
-            _orderId,
-            msg.sender,
-            _marketId,
-            _closeSharesAmount,
-            _openMPHTokenAmount,
-            _tradeDirection,
-            _orderLeverage,
-            _onlyIfPriceBelow,
-            _onlyIfPriceAbove,
-            _goodFrom,
-            _goodUntil
-            );
+        //if the market was deactivated, and the trader didn't fail yet, then we got an orderId to close the position with a locked in price
+        if(state.getMarketActive(_marketId) == false) {
+
+            //price will come from the position where price is stored forever
+            tradeEngine.processOrder(_orderId, tradeEngine.getDeactivatedMarketPrice(_marketId), 0, 0, now.mul(1000));
+            
+            emit OrderProcessed(
+                _orderId,
+                tradeEngine.getDeactivatedMarketPrice(_marketId),
+                0,
+                0,
+                0,
+                now.mul(1000),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+                );
+        } else {
+            priceAbove[_orderId] = _onlyIfPriceAbove;
+            priceBelow[_orderId] = _onlyIfPriceBelow;
+            goodFrom[_orderId]   = _goodFrom;
+            goodUntil[_orderId]  = _goodUntil;
+            emit OrderCreated(
+                _orderId,
+                msg.sender,
+                _marketId,
+                _closeSharesAmount,
+                _openMPHTokenAmount,
+                _tradeDirection,
+                _orderLeverage,
+                _onlyIfPriceBelow,
+                _onlyIfPriceAbove,
+                _goodFrom,
+                _goodUntil
+                );
+        }
         return _orderId;
     }
 
@@ -509,6 +532,17 @@ contract MorpherOracle is Ownable {
             
         }
         emit DelistMarketComplete(_marketId);
+    }
+
+    /**
+     * Course of action would be:
+     * 1. de-activate market through state
+     * 2. set the Deactivated Market Price
+     * 3. let users still close their positions
+     */
+    function setDeactivatedMarketPrice(bytes32 _marketId, uint256 _price) public onlyAdministrator {
+        tradeEngine.setDeactivatedMarketPrice(_marketId, _price);
+        emit LockedPriceForClosingPositions(_marketId, _price);
     }
 
 // ----------------------------------------------------------------------------------
