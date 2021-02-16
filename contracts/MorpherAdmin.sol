@@ -17,8 +17,8 @@ contract MorpherAdmin {
         bytes32 indexed _orderId,
         address indexed _address,
         bytes32 indexed _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage
         );
@@ -157,12 +157,12 @@ contract MorpherAdmin {
             uint256 _positionLongShares = state.getLongShares(_address, _marketId);
             uint256 _positionShortShares = state.getShortShares(_address, _marketId);
             if (_positionLongShares > 0) {
-                _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionLongShares, false, 10**8);
-                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, true, _positionLongShares, false, 10**8);
+                _orderId = tradeEngine.requestOrderId(_address, _marketId, _positionLongShares, 0, false, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, _positionLongShares, 0, false, 10**8);
             }
             if (_positionShortShares > 0) {
-                _orderId = tradeEngine.requestOrderId(_address, _marketId, true, _positionShortShares, true, 10**8);
-                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, true, _positionShortShares, true, 10**8);
+                _orderId = tradeEngine.requestOrderId(_address, _marketId, _positionShortShares, 0, true, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, _positionShortShares, 0, true, 10**8);
             }
             return _orderId;
     }
