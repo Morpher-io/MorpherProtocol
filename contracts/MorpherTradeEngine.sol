@@ -28,8 +28,10 @@ contract MorpherTradeEngine is Ownable {
     address public escrowOpenOrderAddress = 0x1111111111111111111111111111111111111111;
     bool public escrowOpenOrderEnabled;
 
+
     //we're locking positions in for this price at a market marketId;
     address public closedMarketPriceLock = 0x0000000000000000000000000000000000000001;
+
 
 // ----------------------------------------------------------------------------
 // Order struct contains all order specific varibles. Variables are completed
@@ -122,8 +124,10 @@ contract MorpherTradeEngine is Ownable {
     event LinkState(address _address);
     event LinkStaking(address _stakingAddress);
 
+
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
+
 
     constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public {
         setMorpherState(_stateAddress);
@@ -182,6 +186,7 @@ contract MorpherTradeEngine is Ownable {
             orders[_orderId].orderEscrowAmount = _amountInMPH;
         }
     }
+
 
     function validateClosedMarketOrderConditions(address _address, bytes32 _marketId, uint256 _closeSharesAmount, uint256 _openMPHTokenAmount, bool _tradeDirection ) internal view {
         //markets active? Still tradeable?
@@ -249,9 +254,6 @@ contract MorpherTradeEngine is Ownable {
                 require(_closeSharesAmount == state.getLongShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
             }
         }
-
-        
-        
 
         state.setLastRequestBlock(_address);
         state.increaseNumberOfRequests(_address);

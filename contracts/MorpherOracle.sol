@@ -167,6 +167,7 @@ contract MorpherOracle is Ownable {
     event DelistMarketComplete(bytes32 _marketId);
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
+
     modifier onlyOracleOperator {
         require(isCallbackAddress(msg.sender), "MorpherOracle: Only the oracle operator can call this function.");
         _;
@@ -356,6 +357,7 @@ contract MorpherOracle is Ownable {
                 _goodUntil
                 );
         }
+
         return _orderId;
     }
 
@@ -509,6 +511,7 @@ contract MorpherOracle is Ownable {
 // delistMarket(bytes32 _marketId)
 // Administrator closes out all existing positions on _marketId market at current prices
 // ----------------------------------------------------------------------------------
+
     uint delistMarketFromIx = 0;
     function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyAdministrator {
         require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
@@ -543,6 +546,7 @@ contract MorpherOracle is Ownable {
     function setDeactivatedMarketPrice(bytes32 _marketId, uint256 _price) public onlyAdministrator {
         tradeEngine.setDeactivatedMarketPrice(_marketId, _price);
         emit LockedPriceForClosingPositions(_marketId, _price);
+
     }
 
 // ----------------------------------------------------------------------------------
