@@ -95,7 +95,7 @@ contract('MorpherOracle', (accounts) => {
 
         // Test new order creation and cancellation.
         const orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
-        await truffleAssert.fails(morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress }), truffleAssert.REVERT, "Aborting: Order-Cancellation was not requested.");
+        await truffleAssert.fails(morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress }), truffleAssert.REVERT, "MorpherOracle: Order-Cancellation was not requested.");
 
         const order = await morpherTradeEngine.getOrder(orderId);
         assert.equal(order._openMPHTokenAmount, '200'); // order not canceled yet
@@ -110,7 +110,7 @@ contract('MorpherOracle', (accounts) => {
 
         // Test new order creation and cancellation.
         const orderId = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 200, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
-        await truffleAssert.fails(morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress }), truffleAssert.REVERT, "Aborting: Order-Cancellation was not requested.");
+        await truffleAssert.fails(morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress }), truffleAssert.REVERT, "MorpherOracle: Order-Cancellation was not requested.");
 
         let result = await morpherOracle.adminCancelOrder(orderId, { from: oracleCallbackAddress });
         await truffleAssert.eventEmitted(result, 'AdminOrderCancelled');

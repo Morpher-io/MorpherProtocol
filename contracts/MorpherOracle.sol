@@ -233,7 +233,7 @@ contract MorpherOracle is Ownable {
 // Oracle Owner can use a whitelist and authorize individual addresses
 // ----------------------------------------------------------------------------------
     function setUseWhiteList(bool _useWhiteList) public onlyOracleOperator {
-        require(false, "Cannot use this functionality in the oracle at the moment");
+        require(false, "MorpherOracle: Cannot use this functionality in the oracle at the moment");
         useWhiteList = _useWhiteList;
         emit SetUseWhiteList(_useWhiteList);
     }
@@ -329,9 +329,9 @@ contract MorpherOracle is Ownable {
     }
 
     function initiateCancelOrder(bytes32 _orderId) public {
-        require(orderCancellationRequested[_orderId] == false, "Aborting: Order was already canceled.");
+        require(orderCancellationRequested[_orderId] == false, "MorpherOracle: Order was already canceled.");
         (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
-        require(userId == msg.sender, "Aborting: Only the user can request an order cancellation.");
+        require(userId == msg.sender, "MorpherOracle: Only the user can request an order cancellation.");
         orderCancellationRequested[_orderId] = true;
         emit OrderCancellationRequestedEvent(_orderId, msg.sender);
 
@@ -341,7 +341,7 @@ contract MorpherOracle is Ownable {
     // User or Administrator can cancel their own orders before the _callback has been executed
     // ----------------------------------------------------------------------------------
     function cancelOrder(bytes32 _orderId) public onlyOracleOperator {
-        require(orderCancellationRequested[_orderId] == true, "Aborting: Order-Cancellation was not requested.");
+        require(orderCancellationRequested[_orderId] == true, "MorpherOracle: Order-Cancellation was not requested.");
         (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
         tradeEngine.cancelOrder(_orderId, userId);
         clearOrderConditions(_orderId);
@@ -444,7 +444,7 @@ contract MorpherOracle is Ownable {
         uint256 _gasForNextCallback
         ) public onlyOracleOperator notPaused returns (uint256 _newLongShares, uint256 _newShortShares, uint256 _newMeanEntry, uint256 _newMeanSpread, uint256 _newMeanLeverage, uint256 _liquidationPrice)  {
         
-        require(checkOrderConditions(_orderId, _price), 'Error: Order Conditions are not met');
+        require(checkOrderConditions(_orderId, _price), 'MorpherOracle Error: Order Conditions are not met');
        
         (
             _newLongShares,
