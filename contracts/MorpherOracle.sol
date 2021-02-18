@@ -158,6 +158,16 @@ contract MorpherOracle is Ownable {
         uint256 _orderLeverage
         );
 
+    /**
+     * Delisting markets is a function that stops when gas is running low
+     * if it reached all positions it will emit "DelistMarketComplete"
+     * otherwise it needs to be re-run.
+     */
+    event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
+    event DelistMarketComplete(bytes32 _marketId);
+    event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
+
+
     modifier onlyOracleOperator {
         require(isCallbackAddress(msg.sender), "MorpherOracle: Only the oracle operator can call this function.");
         _;
@@ -308,23 +318,46 @@ contract MorpherOracle is Ownable {
         }
         _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage);
 
-        priceAbove[_orderId] = _onlyIfPriceAbove;
-        priceBelow[_orderId] = _onlyIfPriceBelow;
-        goodFrom[_orderId]   = _goodFrom;
-        goodUntil[_orderId]  = _goodUntil;
-        emit OrderCreated(
-            _orderId,
-            msg.sender,
-            _marketId,
-            _closeSharesAmount,
-            _openMPHTokenAmount,
-            _tradeDirection,
-            _orderLeverage,
-            _onlyIfPriceBelow,
-            _onlyIfPriceAbove,
-            _goodFrom,
-            _goodUntil
-            );
+        //if the market was deactivated, and the trader didn't fail yet, then we got an orderId to close the position with a locked in price
+        if(state.getMarketActive(_marketId) == false) {
+
+            //price will come from the position where price is stored forever
+            tradeEngine.processOrder(_orderId, tradeEngine.getDeactivatedMarketPrice(_marketId), 0, 0, now.mul(1000));
+            
+            emit OrderProcessed(
+                _orderId,
+                tradeEngine.getDeactivatedMarketPrice(_marketId),
+                0,
+                0,
+                0,
+                now.mul(1000),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+                );
+        } else {
+            priceAbove[_orderId] = _onlyIfPriceAbove;
+            priceBelow[_orderId] = _onlyIfPriceBelow;
+            goodFrom[_orderId]   = _goodFrom;
+            goodUntil[_orderId]  = _goodUntil;
+            emit OrderCreated(
+                _orderId,
+                msg.sender,
+                _marketId,
+                _closeSharesAmount,
+                _openMPHTokenAmount,
+                _tradeDirection,
+                _orderLeverage,
+                _onlyIfPriceBelow,
+                _onlyIfPriceAbove,
+                _goodFrom,
+                _goodUntil
+                );
+        }
+
         return _orderId;
     }
 
@@ -478,20 +511,42 @@ contract MorpherOracle is Ownable {
 // delistMarket(bytes32 _marketId)
 // Administrator closes out all existing positions on _marketId market at current prices
 // ----------------------------------------------------------------------------------
-    function delistMarket(bytes32 _marketId, uint256 _fromIx, uint256 _toIx) public onlyAdministrator {
+
+    uint delistMarketFromIx = 0;
+    function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyAdministrator {
         require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
         // If no _fromIx and _toIx specified, do entire _list
-        if (_fromIx == 0) {
-            _fromIx = 1;
+        if (_startFromScratch) {
+            delistMarketFromIx = 0;
         }
-        if (_toIx == 0) {
-            _toIx = state.getMaxMappingIndex(_marketId);
-        }
+        
+        uint _toIx = state.getMaxMappingIndex(_marketId);
+        
         address _address;
-        for (uint256 i = _fromIx; i <= _toIx; i++) {
+        for (uint256 i = delistMarketFromIx; i <= _toIx; i++) {
+             if(gasleft() < 250000 && i != _toIx) { //stop if there's not enough gas to write the next transaction
+                delistMarketFromIx = i;
+                emit DelistMarketIncomplete(_marketId, _toIx);
+                return;
+            } 
+            
             _address = state.getExposureMappingAddress(_marketId, i);
             adminLiquidationOrder(_address, _marketId);
+            
         }
+        emit DelistMarketComplete(_marketId);
+    }
+
+    /**
+     * Course of action would be:
+     * 1. de-activate market through state
+     * 2. set the Deactivated Market Price
+     * 3. let users still close their positions
+     */
+    function setDeactivatedMarketPrice(bytes32 _marketId, uint256 _price) public onlyAdministrator {
+        tradeEngine.setDeactivatedMarketPrice(_marketId, _price);
+        emit LockedPriceForClosingPositions(_marketId, _price);
+
     }
 
 // ----------------------------------------------------------------------------------

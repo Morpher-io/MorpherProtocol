@@ -28,6 +28,11 @@ contract MorpherTradeEngine is Ownable {
     address public escrowOpenOrderAddress = 0x1111111111111111111111111111111111111111;
     bool public escrowOpenOrderEnabled;
 
+
+    //we're locking positions in for this price at a market marketId;
+    address public closedMarketPriceLock = 0x0000000000000000000000000000000000000001;
+
+
 // ----------------------------------------------------------------------------
 // Order struct contains all order specific varibles. Variables are completed
 // during processing of trade. State changes are saved in the order struct as
@@ -119,6 +124,11 @@ contract MorpherTradeEngine is Ownable {
     event LinkState(address _address);
     event LinkStaking(address _stakingAddress);
 
+
+    
+    event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
+
+
     constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public {
         setMorpherState(_stateAddress);
         setMorpherStaking(_stakingContractAddress);
@@ -177,6 +187,32 @@ contract MorpherTradeEngine is Ownable {
         }
     }
 
+
+    function validateClosedMarketOrderConditions(address _address, bytes32 _marketId, uint256 _closeSharesAmount, uint256 _openMPHTokenAmount, bool _tradeDirection ) internal view {
+        //markets active? Still tradeable?
+        if(_openMPHTokenAmount > 0) {
+            require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
+        } else {
+            //we're just closing a position, but it needs a forever price locked in if market is not active
+            //the user needs to close his complete position
+            if(state.getMarketActive(_marketId) == false) {
+                require(getDeactivatedMarketPrice(_marketId) > 0, "MorpherTradeEngine: Can't close a position, market not active and closing price not locked");
+                if(_tradeDirection) {
+                    //long
+                    require(_closeSharesAmount == state.getShortShares(_address, _marketId), "MorpherTradeEngine: Deactivated market order needs all shares to be closed");
+                } else {
+                    //short
+                    require(_closeSharesAmount == state.getLongShares(_address, _marketId), "MorpherTradeEngine: Deactivated market order needs all shares to be closed");
+                }
+            }
+        }
+    }
+
+    //wrapper for stack too deep errors
+    function validateClosedMarketOrder(bytes32 _orderId) internal view {
+         validateClosedMarketOrderConditions(orders[_orderId].userId, orders[_orderId].marketId, orders[_orderId].closeSharesAmount, orders[_orderId].openMPHTokenAmount, orders[_orderId].tradeDirection);
+    }
+
 // ----------------------------------------------------------------------------
 // requestOrderId(address _address, bytes32 _marketId, bool _closeSharesAmount, uint256 _openMPHTokenAmount, bool _tradeDirection, uint256 _orderLeverage)
 // Creates a new order object with unique orderId and assigns order information.
@@ -191,9 +227,13 @@ contract MorpherTradeEngine is Ownable {
         bool _tradeDirection,
         uint256 _orderLeverage
         ) public onlyOracle returns (bytes32 _orderId) {
+            
         require(_orderLeverage >= PRECISION, "MorpherTradeEngine: leverage too small. Leverage precision is 1e8");
         require(_orderLeverage <= state.getMaximumLeverage(), "MorpherTradeEngine: leverage exceeds maximum allowed leverage.");
-        require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
+
+        validateClosedMarketOrderConditions(_address, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection);
+
+        //request limits
         require(state.getNumberOfRequests(_address) <= state.getNumberOfRequestsLimit() ||
             state.getLastRequestBlock(_address) < block.number,
             "MorpherTradeEngine: request exceeded maximum permitted requests per block."
@@ -297,6 +337,28 @@ contract MorpherTradeEngine is Ownable {
         );
     }
 
+    function setDeactivatedMarketPrice(bytes32 _marketId, uint256 _price) public onlyOracle {
+         state.setPosition(
+            closedMarketPriceLock,
+            _marketId,
+            now.mul(1000),
+            0,
+            0,
+            _price,
+            0,
+            0,
+            0
+        );
+
+        emit LockedPriceForClosingPositions(_marketId, _price);
+
+    }
+
+    function getDeactivatedMarketPrice(bytes32 _marketId) public view returns(uint256) {
+        ( , , uint positionForeverClosingPrice, , ,) = state.getPosition(closedMarketPriceLock, _marketId);
+        return positionForeverClosingPrice;
+    }
+
 // ----------------------------------------------------------------------------
 // liquidate(bytes32 _orderId)
 // Checks for bankruptcy of position between its last update and now
@@ -376,18 +438,26 @@ contract MorpherTradeEngine is Ownable {
         require(orders[_orderId].userId != address(0), "MorpherTradeEngine: unable to process, order has been deleted.");
         require(_marketPrice > 0, "MorpherTradeEngine: market priced at zero. Buy order cannot be processed.");
         require(_marketPrice >= _marketSpread, "MorpherTradeEngine: market price lower then market spread. Order cannot be processed.");
-        address _address = orders[_orderId].userId;
-        bytes32 _marketId = orders[_orderId].marketId;
-        require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
+        
         orders[_orderId].marketPrice = _marketPrice;
         orders[_orderId].marketSpread = _marketSpread;
         orders[_orderId].timeStamp = _timeStampInMS;
         orders[_orderId].liquidationTimestamp = _liquidationTimestamp;
-
+        
+        /**
+        * If the market is deactivated, then override the price with the locked in market price
+        * if the price wasn't locked in: error out.
+        */
+        if(state.getMarketActive(orders[_orderId].marketId) == false) {
+            validateClosedMarketOrder(_orderId);
+            orders[_orderId].marketPrice = getDeactivatedMarketPrice(orders[_orderId].marketId);
+        }
+        
         // Check if previous position on that market was liquidated
-        if (_liquidationTimestamp > state.getLastUpdated(_address, _marketId)) {
+        if (_liquidationTimestamp > state.getLastUpdated(orders[_orderId].userId, orders[_orderId].marketId)) {
             liquidate(_orderId);
         }
+    
 
         paybackEscrow(_orderId);
 
@@ -397,6 +467,8 @@ contract MorpherTradeEngine is Ownable {
             processSellOrder(_orderId);
         }
 
+        address _address = orders[_orderId].userId;
+        bytes32 _marketId = orders[_orderId].marketId;
         delete orders[_orderId];
         emit OrderProcessed(
             _orderId,
