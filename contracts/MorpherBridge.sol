@@ -19,6 +19,12 @@ contract MorpherBridge is Ownable {
     MorpherState state;
     using SafeMath for uint256;
 
+    mapping(address => mapping(uint256 => uint256)) withdrawalPerDay; //[address][day] = withdrawalAmount
+    mapping(address => mapping(uint256 => uint256)) withdrawalPerMonth; //[address][month] = withdrawalAmount
+
+    uint256 public withdrawalLimitDaily = 200000 * (10**18); //200k MPH per day
+    uint256 public withdrawalLimitMonthly = 1000000 * (10 ** 18); //1M MPH per month
+
     event TransferToLinkedChain(
         address indexed from,
         uint256 tokens,
@@ -35,6 +41,8 @@ contract MorpherBridge is Ownable {
     event SideChainMerkleRootUpdated(bytes32 _rootHash);
     event WithdrawLimitReset();
     event WithdrawLimitChanged(uint256 _withdrawLimit);
+    event WithdrawLimitDailyChanged(uint256 _oldLimit, uint256 _newLimit);
+    event WithdrawLimitMonthlyChanged(uint256 _oldLimit, uint256 _newLimit);
     event LinkState(address _address);
 
     constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
@@ -93,6 +101,16 @@ contract MorpherBridge is Ownable {
         emit WithdrawLimitChanged(_withdrawLimit);
     }
 
+    function updateWithdrawLimitDaily(uint256 _withdrawLimit) public onlySideChainOperator {
+        emit WithdrawLimitDailyChanged(withdrawalLimitDaily, _withdrawLimit);
+        withdrawalLimitDaily = _withdrawLimit;
+    }
+
+    function updateWithdrawLimitMonthly(uint256 _withdrawLimit) public onlySideChainOperator {
+        emit WithdrawLimitMonthlyChanged(withdrawalLimitMonthly, _withdrawLimit);
+        withdrawalLimitMonthly = _withdrawLimit;
+    }
+
     function getTokenSentToLinkedChain(address _address) public view returns (uint256 _token) {
         return state.getTokenSentToLinkedChain(_address);
     }
@@ -123,6 +141,23 @@ contract MorpherBridge is Ownable {
         } else {
             return false;
         }
+    }
+
+    function isNotDailyLimitExceeding(uint256 _amount) public view returns(bool) {
+        return (withdrawalPerDay[msg.sender][block.timestamp / 1 days].add(_amount) <= withdrawalLimitDaily);
+    }
+    function isNotMonthlyLimitExceeding(uint256 _amount) public view returns(bool) {
+        return (withdrawalPerMonth[msg.sender][block.timestamp / 30 days].add(_amount) <= withdrawalLimitMonthly);
+    }
+
+    function verifyUpdateDailyLimit(uint256 _amount) public {
+        require(isNotDailyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds daily limit");
+        withdrawalPerDay[msg.sender][block.timestamp / 1 days] = withdrawalPerDay[msg.sender][block.timestamp / 1 days].add(_amount);
+    }
+
+    function verifyUpdateMonthlyLimit(uint256 _amount) public {
+        require(isNotMonthlyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds monthly limit");
+        withdrawalPerMonth[msg.sender][block.timestamp / 30 days] = withdrawalPerMonth[msg.sender][block.timestamp / 30 days].add(_amount);
     }
 
     // ------------------------------------------------------------------------
@@ -178,6 +213,8 @@ contract MorpherBridge is Ownable {
         uint256 _tokenClaimed = state.getTokenClaimedOnThisChain(msg.sender);        
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         require(verifyWithdrawOk(_numOfToken), "MorpherBridge: Withdraw amount exceeds permitted 24 hour limit. Please try again in a few hours.");
+        verifyUpdateDailyLimit(_numOfToken);
+        verifyUpdateMonthlyLimit(_numOfToken);
         require(_tokenClaimed.add(_numOfToken) <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain.");     
         _chainTransfer(msg.sender, _tokenClaimed, _numOfToken);   
         emit TrustlessWithdrawFromSideChain(msg.sender, _numOfToken);
