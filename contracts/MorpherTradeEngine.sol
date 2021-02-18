@@ -228,9 +228,6 @@ contract MorpherTradeEngine is Ownable {
         uint256 _orderLeverage
         ) public onlyOracle returns (bytes32 _orderId) {
             
-        //does the user even own a position?!
-        require(_closeSharesAmount > 0 || _openMPHTokenAmount > 0, "MorpherTradeEngine: Can't open an order without trading anything");
-
         require(_orderLeverage >= PRECISION, "MorpherTradeEngine: leverage too small. Leverage precision is 1e8");
         require(_orderLeverage <= state.getMaximumLeverage(), "MorpherTradeEngine: leverage exceeds maximum allowed leverage.");
 
