@@ -7,7 +7,7 @@ module.exports = async function(deployer, network, accounts) {
     const sidechainOperatorAddress = process.env.SIDECHAIN_OPERATOR || accounts[0];
 
     let isMainChain = false;
-    if(network === 'mainchain') {
+    if(network === 'mainchain' || network === 'kovan') {
         isMainChain = true;
     }
     

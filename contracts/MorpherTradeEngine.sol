@@ -3,6 +3,7 @@ pragma solidity 0.5.16;
 import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./MorpherState.sol";
+import "./IMorpherStaking.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -13,6 +14,7 @@ import "./MorpherState.sol";
 
 contract MorpherTradeEngine is Ownable {
     MorpherState state;
+    IMorpherStaking staking;
     using SafeMath for uint256;
 
 // ----------------------------------------------------------------------------
@@ -21,6 +23,15 @@ contract MorpherTradeEngine is Ownable {
     uint256 constant PRECISION = 10**8;
     uint256 public orderNonce;
     bytes32 public lastOrderId;
+    uint256 public deployedTimeStamp;
+
+    address public escrowOpenOrderAddress = 0x1111111111111111111111111111111111111111;
+    bool public escrowOpenOrderEnabled;
+
+
+    //we're locking positions in for this price at a market marketId;
+    address public closedMarketPriceLock = 0x0000000000000000000000000000000000000001;
+
 
 // ----------------------------------------------------------------------------
 // Order struct contains all order specific varibles. Variables are completed
@@ -29,9 +40,9 @@ contract MorpherTradeEngine is Ownable {
 // ----------------------------------------------------------------------------
     struct order {
         address userId;
-        bool tradeAmountGivenInShares;
         bytes32 marketId;
-        uint256 tradeAmount;
+        uint256 closeSharesAmount;
+        uint256 openMPHTokenAmount;
         bool tradeDirection; // true = long, false = short
         uint256 liquidationTimestamp;
         uint256 marketPrice;
@@ -48,6 +59,7 @@ contract MorpherTradeEngine is Ownable {
         uint256 newMeanEntrySpread;
         uint256 newMeanEntryLeverage;
         uint256 newLiquidationPrice;
+        uint256 orderEscrowAmount;
     }
 
     mapping(bytes32 => order) private orders;
@@ -75,8 +87,8 @@ contract MorpherTradeEngine is Ownable {
         bytes32 _orderId,
         address indexed _address,
         bytes32 indexed _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage
     );
@@ -110,10 +122,19 @@ contract MorpherTradeEngine is Ownable {
     );
 
     event LinkState(address _address);
+    event LinkStaking(address _stakingAddress);
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
+
+    
+    event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
+
+
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public {
         setMorpherState(_stateAddress);
+        setMorpherStaking(_stakingContractAddress);
         transferOwnership(_coldStorageOwnerAddress);
+        escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
+        deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
     }
 
     modifier onlyOracle {
@@ -136,12 +157,64 @@ contract MorpherTradeEngine is Ownable {
         emit LinkState(_stateAddress);
     }
 
+    function setMorpherStaking(address _stakingAddress) public onlyOwner {
+        staking = IMorpherStaking(_stakingAddress);
+        emit LinkStaking(_stakingAddress);
+    }
+
     function getAdministrator() public view returns(address _administrator) {
         return state.getAdministrator();
     }
 
+    function setEscrowOpenOrderEnabled(bool _isEnabled) public onlyOwner {
+        escrowOpenOrderEnabled = _isEnabled;
+    }
+    
+    function paybackEscrow(bytes32 _orderId) private {
+        //pay back the escrow to the user so he has it back on his balance/**
+        if(orders[_orderId].orderEscrowAmount > 0) {
+            //checks effects interaction
+            uint256 paybackAmount = orders[_orderId].orderEscrowAmount;
+            orders[_orderId].orderEscrowAmount = 0;
+            state.transfer(escrowOpenOrderAddress, orders[_orderId].userId, paybackAmount);
+        }
+    }
+
+    function buildupEscrow(bytes32 _orderId, uint256 _amountInMPH) private {
+        if(escrowOpenOrderEnabled && _amountInMPH > 0) {
+            state.transfer(orders[_orderId].userId, escrowOpenOrderAddress, _amountInMPH);
+            orders[_orderId].orderEscrowAmount = _amountInMPH;
+        }
+    }
+
+
+    function validateClosedMarketOrderConditions(address _address, bytes32 _marketId, uint256 _closeSharesAmount, uint256 _openMPHTokenAmount, bool _tradeDirection ) internal view {
+        //markets active? Still tradeable?
+        if(_openMPHTokenAmount > 0) {
+            require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
+        } else {
+            //we're just closing a position, but it needs a forever price locked in if market is not active
+            //the user needs to close his complete position
+            if(state.getMarketActive(_marketId) == false) {
+                require(getDeactivatedMarketPrice(_marketId) > 0, "MorpherTradeEngine: Can't close a position, market not active and closing price not locked");
+                if(_tradeDirection) {
+                    //long
+                    require(_closeSharesAmount == state.getShortShares(_address, _marketId), "MorpherTradeEngine: Deactivated market order needs all shares to be closed");
+                } else {
+                    //short
+                    require(_closeSharesAmount == state.getLongShares(_address, _marketId), "MorpherTradeEngine: Deactivated market order needs all shares to be closed");
+                }
+            }
+        }
+    }
+
+    //wrapper for stack too deep errors
+    function validateClosedMarketOrder(bytes32 _orderId) internal view {
+         validateClosedMarketOrderConditions(orders[_orderId].userId, orders[_orderId].marketId, orders[_orderId].closeSharesAmount, orders[_orderId].openMPHTokenAmount, orders[_orderId].tradeDirection);
+    }
+
 // ----------------------------------------------------------------------------
-// requestOrderId(address _address, bytes32 _marketId, bool _tradeAmountGivenInShares, uint256 _tradeAmount, bool _tradeDirection, uint256 _orderLeverage)
+// requestOrderId(address _address, bytes32 _marketId, bool _closeSharesAmount, uint256 _openMPHTokenAmount, bool _tradeDirection, uint256 _orderLeverage)
 // Creates a new order object with unique orderId and assigns order information.
 // Must be called by MorpherOracle contract.
 // ----------------------------------------------------------------------------
@@ -149,18 +222,36 @@ contract MorpherTradeEngine is Ownable {
     function requestOrderId(
         address _address,
         bytes32 _marketId,
-        bool _tradeAmountGivenInShares,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage
         ) public onlyOracle returns (bytes32 _orderId) {
+            
         require(_orderLeverage >= PRECISION, "MorpherTradeEngine: leverage too small. Leverage precision is 1e8");
         require(_orderLeverage <= state.getMaximumLeverage(), "MorpherTradeEngine: leverage exceeds maximum allowed leverage.");
-        require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
+
+        validateClosedMarketOrderConditions(_address, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection);
+
+        //request limits
         require(state.getNumberOfRequests(_address) <= state.getNumberOfRequestsLimit() ||
             state.getLastRequestBlock(_address) < block.number,
             "MorpherTradeEngine: request exceeded maximum permitted requests per block."
         );
+
+        /**
+         * The user can't partially close a position and open another one with MPH
+         */
+        if(_openMPHTokenAmount > 0) {
+            if(_tradeDirection) {
+                //long
+                require(_closeSharesAmount == state.getShortShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
+            } else {
+                //short
+                require(_closeSharesAmount == state.getLongShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
+            }
+        }
+
         state.setLastRequestBlock(_address);
         state.increaseNumberOfRequests(_address);
         orderNonce++;
@@ -169,8 +260,8 @@ contract MorpherTradeEngine is Ownable {
                 _address,
                 block.number,
                 _marketId,
-                _tradeAmountGivenInShares,
-                _tradeAmount,
+                _closeSharesAmount,
+                _openMPHTokenAmount,
                 _tradeDirection,
                 _orderLeverage,
                 orderNonce
@@ -179,19 +270,28 @@ contract MorpherTradeEngine is Ownable {
         lastOrderId = _orderId;
         orders[_orderId].userId = _address;
         orders[_orderId].marketId = _marketId;
-        orders[_orderId].tradeAmountGivenInShares = _tradeAmountGivenInShares;
-        orders[_orderId].tradeAmount = _tradeAmount;
+        orders[_orderId].closeSharesAmount = _closeSharesAmount;
+        orders[_orderId].openMPHTokenAmount = _openMPHTokenAmount;
         orders[_orderId].tradeDirection = _tradeDirection;
         orders[_orderId].orderLeverage = _orderLeverage;
         emit OrderIdRequested(
             _orderId,
             _address,
             _marketId,
-            _tradeAmountGivenInShares,
-            _tradeAmount,
+            _closeSharesAmount,
+            _openMPHTokenAmount,
             _tradeDirection,
             _orderLeverage
         );
+
+        /**
+         * put the money in escrow here if given MPH to open an order
+         * - also, can only close positions if in shares, so it will
+         * definitely trigger a mint there.
+         * The money must be put in escrow even though we have an existing position
+         */
+        buildupEscrow(_orderId, _openMPHTokenAmount);
+
         return _orderId;
     }
 
@@ -202,7 +302,8 @@ contract MorpherTradeEngine is Ownable {
     function getOrder(bytes32 _orderId) public view returns (
         address _userId,
         bytes32 _marketId,
-        uint256 _tradeAmount,
+        uint256 _closeSharesAmount,
+        uint256 _openMPHTokenAmount,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _orderLeverage
@@ -210,28 +311,12 @@ contract MorpherTradeEngine is Ownable {
         return(
             orders[_orderId].userId,
             orders[_orderId].marketId,
-            orders[_orderId].tradeAmount,
+            orders[_orderId].closeSharesAmount,
+            orders[_orderId].openMPHTokenAmount,
             orders[_orderId].marketPrice,
             orders[_orderId].marketSpread,
             orders[_orderId].orderLeverage
             );
-    }
-
-    function getOrderShares(bytes32 _orderId) public view returns (
-        uint256 _longSharesOrder,
-        uint256 _shortSharesOrder,
-        uint256 _tradeAmount,
-        bool _tradeDirection,
-        uint256 _balanceUp,
-        uint256 _balanceDown) {
-        return(
-            orders[_orderId].longSharesOrder,
-            orders[_orderId].shortSharesOrder,
-            orders[_orderId].tradeAmount,
-            orders[_orderId].tradeDirection,
-            orders[_orderId].balanceUp,
-            orders[_orderId].balanceDown
-        );
     }
 
     function getPosition(address _address, bytes32 _marketId) public view returns (
@@ -250,6 +335,28 @@ contract MorpherTradeEngine is Ownable {
             state.getMeanEntryLeverage(_address,_marketId),
             state.getLiquidationPrice(_address,_marketId)
         );
+    }
+
+    function setDeactivatedMarketPrice(bytes32 _marketId, uint256 _price) public onlyOracle {
+         state.setPosition(
+            closedMarketPriceLock,
+            _marketId,
+            now.mul(1000),
+            0,
+            0,
+            _price,
+            0,
+            0,
+            0
+        );
+
+        emit LockedPriceForClosingPositions(_marketId, _price);
+
+    }
+
+    function getDeactivatedMarketPrice(bytes32 _marketId) public view returns(uint256) {
+        ( , , uint positionForeverClosingPrice, , ,) = state.getPosition(closedMarketPriceLock, _marketId);
+        return positionForeverClosingPrice;
     }
 
 // ----------------------------------------------------------------------------
@@ -319,7 +426,7 @@ contract MorpherTradeEngine is Ownable {
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _liquidationTimestamp,
-        uint256 _timeStamp
+        uint256 _timeStampInMS
         ) public onlyOracle returns (
             uint256 _newLongShares,
             uint256 _newShortShares,
@@ -331,34 +438,44 @@ contract MorpherTradeEngine is Ownable {
         require(orders[_orderId].userId != address(0), "MorpherTradeEngine: unable to process, order has been deleted.");
         require(_marketPrice > 0, "MorpherTradeEngine: market priced at zero. Buy order cannot be processed.");
         require(_marketPrice >= _marketSpread, "MorpherTradeEngine: market price lower then market spread. Order cannot be processed.");
-        address _address = orders[_orderId].userId;
-        bytes32 _marketId = orders[_orderId].marketId;
-        require(state.getMarketActive(_marketId) == true, "MorpherTradeEngine: market unknown or currently not enabled for trading.");
+        
         orders[_orderId].marketPrice = _marketPrice;
         orders[_orderId].marketSpread = _marketSpread;
-        orders[_orderId].timeStamp = _timeStamp;
+        orders[_orderId].timeStamp = _timeStampInMS;
         orders[_orderId].liquidationTimestamp = _liquidationTimestamp;
-
+        
+        /**
+        * If the market is deactivated, then override the price with the locked in market price
+        * if the price wasn't locked in: error out.
+        */
+        if(state.getMarketActive(orders[_orderId].marketId) == false) {
+            validateClosedMarketOrder(_orderId);
+            orders[_orderId].marketPrice = getDeactivatedMarketPrice(orders[_orderId].marketId);
+        }
+        
         // Check if previous position on that market was liquidated
-        if (_liquidationTimestamp > state.getLastUpdated(_address, _marketId)) {
+        if (_liquidationTimestamp > state.getLastUpdated(orders[_orderId].userId, orders[_orderId].marketId)) {
             liquidate(_orderId);
         }
+    
 
-		if (orders[_orderId].tradeAmount > 0)  {
-            if (orders[_orderId].tradeDirection) {
-                processBuyOrder(_orderId);
-            } else {
-                processSellOrder(_orderId);
-		    }
-		}	
+        paybackEscrow(_orderId);
 
+        if (orders[_orderId].tradeDirection) {
+            processBuyOrder(_orderId);
+        } else {
+            processSellOrder(_orderId);
+        }
+
+        address _address = orders[_orderId].userId;
+        bytes32 _marketId = orders[_orderId].marketId;
         delete orders[_orderId];
         emit OrderProcessed(
             _orderId,
             _marketPrice,
             _marketSpread,
             _liquidationTimestamp,
-            _timeStamp,
+            _timeStampInMS,
             _newLongShares,
             _newShortShares,
             _newAverageEntry,
@@ -366,6 +483,7 @@ contract MorpherTradeEngine is Ownable {
             _newAverageLeverage,
             _liquidationPrice
         );
+
         return (
             state.getLongShares(_address, _marketId),
             state.getShortShares(_address, _marketId),
@@ -383,6 +501,12 @@ contract MorpherTradeEngine is Ownable {
     function cancelOrder(bytes32 _orderId, address _address) public onlyOracle {
         require(_address == orders[_orderId].userId || _address == getAdministrator(), "MorpherTradeEngine: only Administrator or user can cancel an order.");
         require(orders[_orderId].userId != address(0), "MorpherTradeEngine: unable to process, order does not exist.");
+
+        /**
+         * Pay back any escrow there
+         */
+        paybackEscrow(_orderId);
+
         delete orders[_orderId];
         emit OrderCancelled(_orderId, _address);
     }
@@ -395,12 +519,13 @@ contract MorpherTradeEngine is Ownable {
     function shortShareValue(
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
+        uint256 _positionTimeStampInMs,
         uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _orderLeverage,
         bool _sell
-        ) public pure returns (uint256 _shareValue) {
+        ) public view returns (uint256 _shareValue) {
 
         uint256 _averagePrice = _positionAveragePrice;
         uint256 _averageLeverage = _positionAverageLeverage;
@@ -429,23 +554,31 @@ contract MorpherTradeEngine is Ownable {
                 // We have to reduce the share value by the average spread (i.e. the average expense to build up the position)
                 // and reduce the value further by the spread for selling.
                 _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
+                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStampInMs);
+                if (_marginInterest <= _shareValue) {
+                    _shareValue = _shareValue.sub(_marginInterest);
+                } else {
+                    _shareValue = 0;
+                }
             } else {
                 // If a new short position is built up each share costs value + spread
                 _shareValue = _shareValue.add(_marketSpread.mul(_orderLeverage).div(PRECISION));
             }
         }
+      
         return _shareValue;
     }
 
     function longShareValue(
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
+        uint256 _positionTimeStampInMs,
         uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _orderLeverage,
         bool _sell
-        ) public pure returns (uint256 _shareValue) {
+        ) public view returns (uint256 _shareValue) {
 
         uint256 _averagePrice = _positionAveragePrice;
         uint256 _averageLeverage = _positionAverageLeverage;
@@ -473,12 +606,35 @@ contract MorpherTradeEngine is Ownable {
             if (_sell == true) {
                 // We sell a long and have to correct the shareValue with the averageSpread and the currentSpread for selling.
                 _shareValue = _shareValue.sub(_marketSpread.mul(_averageLeverage).div(PRECISION));
+                
+                uint256 _marginInterest = calculateMarginInterest(_averagePrice, _averageLeverage, _positionTimeStampInMs);
+                if (_marginInterest <= _shareValue) {
+                    _shareValue = _shareValue.sub(_marginInterest);
+                } else {
+                    _shareValue = 0;
+                }
             } else {
                 // We buy a new long position and have to pay the spread
                 _shareValue = _shareValue.add(_marketSpread.mul(_orderLeverage).div(PRECISION));
             }
         }
         return _shareValue;
+    }
+
+// ----------------------------------------------------------------------------
+// calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStamp)
+// Calculates the interest for leveraged positions
+// ----------------------------------------------------------------------------
+
+
+    function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStampInMs) public view returns (uint256 _marginInterest) {
+        if (_positionTimeStampInMs.div(1000) < deployedTimeStamp) {
+            _positionTimeStampInMs = deployedTimeStamp.mul(1000);
+        }
+        _marginInterest = _averagePrice.mul(_averageLeverage.sub(PRECISION));
+        _marginInterest = _marginInterest.mul((now.sub(_positionTimeStampInMs.div(1000)).div(86400)).add(1));
+        _marginInterest = _marginInterest.mul(staking.interestRate()).div(PRECISION).div(PRECISION);
+        return _marginInterest;
     }
 
 // ----------------------------------------------------------------------------
@@ -489,76 +645,38 @@ contract MorpherTradeEngine is Ownable {
 // ----------------------------------------------------------------------------
 
     function processBuyOrder(bytes32 _orderId) private {
-        if (orders[_orderId].tradeAmountGivenInShares == false) {
-            // Investment was specified in units of MPH
-            if (orders[_orderId].tradeAmount <= state.getShortShares(
-                        orders[_orderId].userId,
-                        orders[_orderId].marketId
-                    ).mul(
-                        shortShareValue(
-                            state.getMeanEntryPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                            state.getMeanEntryLeverage(orders[_orderId].userId, orders[_orderId].marketId),
-                            state.getLiquidationPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                            orders[_orderId].marketPrice,
-                            orders[_orderId].marketSpread,
-                            PRECISION,
-                            true
-                    ))
-                ) {
+        if (orders[_orderId].closeSharesAmount > 0) {
+            //calcualte the balanceUp/down first
+            //then reopen the position with MPH amount
+
+             // Investment was specified in shares
+            if (orders[_orderId].closeSharesAmount <= state.getShortShares(orders[_orderId].userId, orders[_orderId].marketId)) {
                 // Partial closing of short position
-                orders[_orderId].longSharesOrder = 0;
-                orders[_orderId].shortSharesOrder = orders[_orderId].tradeAmount.div(shortShareValue(
-                    state.getMeanEntryPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                    state.getMeanEntryLeverage(orders[_orderId].userId, orders[_orderId].marketId),
-                    state.getLiquidationPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                    orders[_orderId].marketPrice,
-                    orders[_orderId].marketSpread,
-                    PRECISION,
-                    true
-                ));
+                orders[_orderId].shortSharesOrder = orders[_orderId].closeSharesAmount;
             } else {
                 // Closing of entire short position
                 orders[_orderId].shortSharesOrder = state.getShortShares(orders[_orderId].userId, orders[_orderId].marketId);
-                orders[_orderId].longSharesOrder = orders[_orderId].tradeAmount.sub((
-                    state.getShortShares(
-                        orders[_orderId].userId,
-                        orders[_orderId].marketId
-                    ).mul(
-                        shortShareValue(
-                        state.getMeanEntryPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        state.getMeanEntryLeverage(orders[_orderId].userId, orders[_orderId].marketId),
-                        state.getLiquidationPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        orders[_orderId].marketPrice,
-                        orders[_orderId].marketSpread,
-                        PRECISION,
-                        true
-                    ))
-                ));
-                orders[_orderId].longSharesOrder = orders[_orderId].longSharesOrder.div(
-                    longShareValue(
-                        orders[_orderId].marketPrice,
-                        orders[_orderId].orderLeverage,
-                        0,
-                        orders[_orderId].marketPrice,
-                        orders[_orderId].marketSpread,
-                        orders[_orderId].orderLeverage,
-                        false
-                ));
-            }
-        } else {
-            // Investment was specified in shares
-            if (orders[_orderId].tradeAmount <= state.getShortShares(orders[_orderId].userId, orders[_orderId].marketId)) {
-                // Partial closing of short position
-                orders[_orderId].longSharesOrder = 0;
-                orders[_orderId].shortSharesOrder = orders[_orderId].tradeAmount;
-            } else {
-                // Closing of entire short position
-                orders[_orderId].shortSharesOrder = state.getShortShares(orders[_orderId].userId, orders[_orderId].marketId);
-                orders[_orderId].longSharesOrder = orders[_orderId].tradeAmount.sub(
-                    state.getShortShares(orders[_orderId].userId, orders[_orderId].marketId)
-                );
             }
         }
+
+        //calculate the long shares, but only if the old position is completely closed out (if none exist shortSharesOrder = 0)
+        if(
+            orders[_orderId].shortSharesOrder == state.getShortShares(orders[_orderId].userId, orders[_orderId].marketId) && 
+            orders[_orderId].openMPHTokenAmount > 0
+        ) {
+            orders[_orderId].longSharesOrder = orders[_orderId].openMPHTokenAmount.div(
+                longShareValue(
+                    orders[_orderId].marketPrice,
+                    orders[_orderId].orderLeverage,
+                    now,
+                    0,
+                    orders[_orderId].marketPrice,
+                    orders[_orderId].marketSpread,
+                    orders[_orderId].orderLeverage,
+                    false
+            ));
+        }
+
         // Investment equals number of shares now.
         if (orders[_orderId].shortSharesOrder > 0) {
             closeShort(_orderId);
@@ -576,74 +694,35 @@ contract MorpherTradeEngine is Ownable {
 // ----------------------------------------------------------------------------
 
     function processSellOrder(bytes32 _orderId) private {
-        if (orders[_orderId].tradeAmountGivenInShares == false) {
-            // Investment was specified in units of MPH
-            if (orders[_orderId].tradeAmount <= state.getLongShares(
-                    orders[_orderId].userId,
-                    orders[_orderId].marketId
-                ).mul(
-                    longShareValue(
-                        state.getMeanEntryPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        state.getMeanEntryLeverage(orders[_orderId].userId, orders[_orderId].marketId),
-                        state.getLiquidationPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        orders[_orderId].marketPrice,
-                        orders[_orderId].marketSpread,
-                        PRECISION,
-                        true
-                        ))) {
+        if (orders[_orderId].closeSharesAmount > 0) {
+            //calcualte the balanceUp/down first
+            //then reopen the position with MPH amount
+
+            // Investment was specified in shares
+            if (orders[_orderId].closeSharesAmount <= state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId)) {
                 // Partial closing of long position
-                orders[_orderId].shortSharesOrder = 0;
-                orders[_orderId].longSharesOrder = orders[_orderId].tradeAmount.div(
-                    longShareValue(
-                        state.getMeanEntryPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        state.getMeanEntryLeverage(orders[_orderId].userId, orders[_orderId].marketId),
-                        state.getLiquidationPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        orders[_orderId].marketPrice,
-                        orders[_orderId].marketSpread,
-                        PRECISION,
-                        true
-                ));
+                orders[_orderId].longSharesOrder = orders[_orderId].closeSharesAmount;
             } else {
                 // Closing of entire long position
                 orders[_orderId].longSharesOrder = state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId);
-                orders[_orderId].shortSharesOrder = orders[_orderId].tradeAmount.sub((
-                    state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId
-                ).mul(
-                    longShareValue(
-                        state.getMeanEntryPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        state.getMeanEntryLeverage(orders[_orderId].userId,
-                        orders[_orderId].marketId),
-                        state.getLiquidationPrice(orders[_orderId].userId, orders[_orderId].marketId),
-                        orders[_orderId].marketPrice,
-                        orders[_orderId].marketSpread,
-                        PRECISION,
-                        true
-                    ))
-                ));
-                orders[_orderId].shortSharesOrder = orders[_orderId].shortSharesOrder.div(
+            }
+        }
+
+        if(
+            orders[_orderId].longSharesOrder == state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId) && 
+            orders[_orderId].openMPHTokenAmount > 0
+        ) {
+        orders[_orderId].shortSharesOrder = orders[_orderId].openMPHTokenAmount.div(
                     shortShareValue(
                         orders[_orderId].marketPrice,
                         orders[_orderId].orderLeverage,
+                        now,
                         orders[_orderId].marketPrice.mul(100),
                         orders[_orderId].marketPrice,
                         orders[_orderId].marketSpread,
                         orders[_orderId].orderLeverage,
                         false
                 ));
-            }
-        } else {
-            // Investment was specified in shares
-            if (orders[_orderId].tradeAmount <= state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId)) {
-                // Partial closing of long position
-                orders[_orderId].shortSharesOrder = 0;
-                orders[_orderId].longSharesOrder = orders[_orderId].tradeAmount;
-            } else {
-                // Closing of entire long position
-                orders[_orderId].longSharesOrder = state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId);
-                orders[_orderId].shortSharesOrder = orders[_orderId].tradeAmount.sub(
-                    state.getLongShares(orders[_orderId].userId, orders[_orderId].marketId)
-                );
-            }
         }
         // Investment equals number of shares now.
         if (orders[_orderId].longSharesOrder > 0) {
@@ -706,7 +785,6 @@ contract MorpherTradeEngine is Ownable {
 
         setPositionInState(_orderId);
     }
-
 // ----------------------------------------------------------------------------
 // closeLong(bytes32 _orderId)
 // Closes an existing long position. Average entry price/spread/leverage do not change.
@@ -714,17 +792,8 @@ contract MorpherTradeEngine is Ownable {
      function closeLong(bytes32 _orderId) private {
         address _userId = orders[_orderId].userId;
         bytes32 _marketId = orders[_orderId].marketId;
-
         uint256 _newLongShares  = state.getLongShares(_userId, _marketId).sub(orders[_orderId].longSharesOrder);
-        uint256 _balanceUp = orders[_orderId].longSharesOrder.mul(longShareValue(
-            state.getMeanEntryPrice(_userId, _marketId),
-            state.getMeanEntryLeverage(_userId, _marketId),
-            state.getLiquidationPrice(_userId, _marketId),
-            orders[_orderId].marketPrice, orders[_orderId].marketSpread,
-            state.getMeanEntryLeverage(_userId, _marketId),
-            true
-        ));
-
+        uint256 _balanceUp = calculateBalanceUp(_orderId);
         uint256 _newMeanEntry;
         uint256 _newMeanSpread;
         uint256 _newMeanLeverage;
@@ -754,27 +823,48 @@ contract MorpherTradeEngine is Ownable {
 // closeShort(bytes32 _orderId)
 // Closes an existing short position. Average entry price/spread/leverage do not change.
 // ----------------------------------------------------------------------------
-
-    function closeShort(bytes32 _orderId) private {
+function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _balanceUp) {
         address _userId = orders[_orderId].userId;
         bytes32 _marketId = orders[_orderId].marketId;
+        uint256 _shareValue;
 
-        uint256 _newMeanEntry;
-        uint256 _newMeanSpread;
-        uint256 _newMeanLeverage;
-
-        uint256 _newShortShares = state.getShortShares(_userId, _marketId).sub(orders[_orderId].shortSharesOrder);
-        uint256 _balanceUp = orders[_orderId].shortSharesOrder.mul(
-            shortShareValue(
+        if (orders[_orderId].tradeDirection == false) { //we are selling our long shares
+            _balanceUp = orders[_orderId].longSharesOrder;
+            _shareValue = longShareValue(
                 state.getMeanEntryPrice(_userId, _marketId),
                 state.getMeanEntryLeverage(_userId, _marketId),
+                state.getLastUpdated(_userId, _marketId),
                 state.getLiquidationPrice(_userId, _marketId),
                 orders[_orderId].marketPrice,
                 orders[_orderId].marketSpread,
                 state.getMeanEntryLeverage(_userId, _marketId),
                 true
-        ));
+            );
+        } else { //we are going long, we are selling our short shares
+            _balanceUp = orders[_orderId].shortSharesOrder;
+            _shareValue = shortShareValue(
+                state.getMeanEntryPrice(_userId, _marketId),
+                state.getMeanEntryLeverage(_userId, _marketId),
+                state.getLastUpdated(_userId, _marketId),
+                state.getLiquidationPrice(_userId, _marketId),
+                orders[_orderId].marketPrice,
+                orders[_orderId].marketSpread,
+                state.getMeanEntryLeverage(_userId, _marketId),
+                true
+            );
+        }
+        return _balanceUp.mul(_shareValue); 
+    }
 
+    function closeShort(bytes32 _orderId) private {
+        address _userId = orders[_orderId].userId;
+        bytes32 _marketId = orders[_orderId].marketId;
+        uint256 _newMeanEntry;
+        uint256 _newMeanSpread;
+        uint256 _newMeanLeverage;
+        uint256 _newShortShares = state.getShortShares(_userId, _marketId).sub(orders[_orderId].shortSharesOrder);
+        uint256 _balanceUp = calculateBalanceUp(_orderId);
+        
         if (orders[_orderId].shortSharesOrder == state.getShortShares(_userId, _marketId)) {
             _newMeanEntry = 0;
             _newMeanSpread = 0;
