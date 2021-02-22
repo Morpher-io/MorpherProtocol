@@ -1,5 +1,6 @@
 require("dotenv").config();
 let HDWalletProvider = require("truffle-hdwallet-provider");
+const Web3 = require('web3');
 
 module.exports = {
   networks: {
@@ -21,19 +22,28 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_KEY,
-          "https://ropsten.infura.io/v3/" + process.env.INFURA_PROJECT_ID
+          new Web3.providers.WebsocketProvider("wss://ropsten.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
         ),
       network_id: '3',
       gasPrice: 15000000000,
+    },
+    mainnet: {
+      provider: () =>
+        new HDWalletProvider(
+          process.env.MORPHER_DEPLOYER_PK,
+          new Web3.providers.WebsocketProvider("wss://mainnet.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
+        ),
+      network_id: '1',
+      gasPrice: 150000000000,
     },
     kovan: {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_PK,
-          "https://kovan.infura.io/v3/" + process.env.INFURA_PROJECT_ID
+          new Web3.providers.WebsocketProvider("wss://kovan.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
         ),
       network_id: '*',
-      gasPrice: 2000000000,
+      gasPrice: 150000000000,
     },
   },
   compilers: {

@@ -11,12 +11,12 @@ pragma solidity 0.5.16;
 
 import "./Ownable.sol";
 import "./SafeMath.sol";
-import "./MorpherState.sol";
+import "./IMorpherState.sol";
 import "./MerkleProof.sol";
 
 contract MorpherBridge is Ownable {
 
-    MorpherState state;
+    IMorpherState state;
     using SafeMath for uint256;
 
     mapping(address => mapping(uint256 => uint256)) withdrawalPerDay; //[address][day] = withdrawalAmount
@@ -74,7 +74,7 @@ contract MorpherBridge is Ownable {
     // Links Token Contract with State
     // ------------------------------------------------------------------------
     function setMorpherState(address _stateAddress) public onlyOwner {
-        state = MorpherState(_stateAddress);
+        state = IMorpherState(_stateAddress);
         emit LinkState(_stateAddress);
     }
 
