@@ -412,12 +412,20 @@ contract MorpherOracle is Ownable {
         if (now < goodFrom[_orderId] && goodFrom[_orderId] > 0) {
             _conditionsMet = false;
         }
-        if (_price < priceAbove[_orderId] && priceAbove[_orderId] > 0) {
-            _conditionsMet = false;
+
+        if(priceAbove[_orderId] > 0 && priceBelow[_orderId] > 0) {
+            if(_price < priceAbove[_orderId] && _price > priceBelow[_orderId]) {
+                _conditionsMet = false;
+            }
+        } else {
+            if (_price < priceAbove[_orderId] && priceAbove[_orderId] > 0) {
+                _conditionsMet = false;
+            }
+            if (_price > priceBelow[_orderId] && priceBelow[_orderId] > 0) {
+                _conditionsMet = false;
+            }
         }
-        if (_price > priceBelow[_orderId] && priceBelow[_orderId] > 0) {
-            _conditionsMet = false;
-        }
+        
         return _conditionsMet;
     }
 
@@ -452,7 +460,7 @@ contract MorpherOracle is Ownable {
     function createLiquidationOrder(
         address _address,
         bytes32 _marketId
-        ) public notPaused payable returns (bytes32 _orderId) {
+        ) public notPaused onlyOracleOperator payable returns (bytes32 _orderId) {
         if (gasForCallback > 0) {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
             callBackCollectionAddress.transfer(msg.value);
