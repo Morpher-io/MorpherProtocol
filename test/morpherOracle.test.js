@@ -80,7 +80,7 @@ contract('MorpherOracle', (accounts) => {
         assert.equal(order._openMPHTokenAmount, '200'); // order not canceled yet
 
         let oracleCancelCallback = await morpherOracle.cancelOrder(orderId, { from: oracleCallbackAddress });
-        
+
         await truffleAssert.eventEmitted(oracleCancelCallback, "OrderCancelled", { _orderId: orderId, _sender: testUserAddress, _oracleAddress: oracleCallbackAddress });
         const orderAfterCancel = await morpherTradeEngine.getOrder(orderId);
         assert.equal(orderAfterCancel._openMPHTokenAmount, '0'); // order canceled
@@ -327,6 +327,86 @@ contract('MorpherOracle', (accounts) => {
 
         const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
+    });
+
+    it('price < onlyIfPriceBelow works in conjunction with onlyIfPriceAbove', async () => {
+        const morpherOracle = await MorpherOracle.deployed();
+        const morpherTradeEngine = await MorpherTradeEngine.deployed();
+        const morpherToken = await MorpherToken.deployed();
+
+        // Topup test accounts with MorpherToken.
+        await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+        await morpherToken.transfer(oracleCallbackAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+
+        // Test successful state variables change and order creation.
+        await morpherOracle.overrideGasForCallback(0);
+        await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
+
+
+        const priceBelow = 12;
+        //or
+        const priceAbove = 14;
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), priceAbove, priceBelow, 0, 0, { from: testUserAddress });
+
+        // Asserts
+        assert.equal(txReceipt.logs[0].args['_onlyIfPriceBelow'], priceBelow);
+
+        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 11, 11, 0, 0, Date.now(), 0, { from: oracleCallbackAddress });
+
+        const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
+    });
+
+    it('price > onlyIfPriceAbove works in conjunction with onlyIfPriceBelow', async () => {
+        const morpherOracle = await MorpherOracle.deployed();
+        const morpherTradeEngine = await MorpherTradeEngine.deployed();
+        const morpherToken = await MorpherToken.deployed();
+
+        // Topup test accounts with MorpherToken.
+        await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+        await morpherToken.transfer(oracleCallbackAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+
+        // Test successful state variables change and order creation.
+        await morpherOracle.overrideGasForCallback(0);
+        await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
+
+
+        const priceBelow = 12;
+        //or
+        const priceAbove = 14;
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), priceAbove, priceBelow, 0, 0, { from: testUserAddress });
+
+        // Asserts
+        assert.equal(txReceipt.logs[0].args['_onlyIfPriceBelow'], priceBelow);
+
+        await morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 15, 15, 0, 0, Date.now(), 0, { from: oracleCallbackAddress });
+
+        const order = await morpherTradeEngine.getOrder(txReceipt.logs[0].args['_orderId']);
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
+    });
+    it('price < onlyIfPriceAbove FAILS in conjunction with price > onlyIfPriceBelow', async () => {
+        const morpherOracle = await MorpherOracle.deployed();
+        const morpherTradeEngine = await MorpherTradeEngine.deployed();
+        const morpherToken = await MorpherToken.deployed();
+
+        // Topup test accounts with MorpherToken.
+        await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+        await morpherToken.transfer(oracleCallbackAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+
+        // Test successful state variables change and order creation.
+        await morpherOracle.overrideGasForCallback(0);
+        await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
+
+
+        const priceBelow = 12;
+        //or
+        const priceAbove = 14;
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), priceAbove, priceBelow, 0, 0, { from: testUserAddress });
+        await truffleAssert.fails(
+            morpherOracle.__callback(txReceipt.logs[0].args['_orderId'], 13, 13, 0, 0, Date.now(), 0, { from: oracleCallbackAddress }),
+            truffleAssert.ErrorType.REVERT,
+            "Error: Order Conditions are not met"
+        );
     });
 
     it('Oracle can do gasCallbacks correctly', async () => {
