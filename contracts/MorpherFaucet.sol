@@ -5,9 +5,8 @@ import "./SafeMath.sol";
 import "./MorpherToken.sol";
 
 // ----------------------------------------------------------------------------------
-// Holds the Airdrop Token balance on contract address
-// AirdropAdmin can authorize addresses to receive airdrop.
-// Users have to claim their airdrop actively or Admin initiates transfer.
+// Holds the Faucet Token balance on contract addressrdrop.
+// Users can topup to fillUpAmount
 // ----------------------------------------------------------------------------------
 
 contract MorpherFaucet is Ownable {
