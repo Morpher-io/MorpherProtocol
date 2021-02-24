@@ -520,7 +520,6 @@ contract MorpherTradeEngine is Ownable {
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
         uint256 _positionTimeStampInMs,
-        uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _orderLeverage,
@@ -542,7 +541,7 @@ contract MorpherTradeEngine is Ownable {
 	        _averageLeverage = _orderLeverage;
         }
         if (
-            _liquidationPrice <= _marketPrice
+            getLiquidationPrice(_averagePrice, _averageLeverage, false, _positionTimeStampInMs) <= _marketPrice
             ) {
 	        // Position is worthless
             _shareValue = 0;
@@ -573,7 +572,6 @@ contract MorpherTradeEngine is Ownable {
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
         uint256 _positionTimeStampInMs,
-        uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _orderLeverage,
@@ -595,7 +593,7 @@ contract MorpherTradeEngine is Ownable {
 	        _averageLeverage = _orderLeverage;
         }
         if (
-            _marketPrice <= _liquidationPrice
+            _marketPrice <= getLiquidationPrice(_averagePrice, _averageLeverage, true, _positionTimeStampInMs)
             ) {
 	        // Position is worthless
             _shareValue = 0;
@@ -669,7 +667,6 @@ contract MorpherTradeEngine is Ownable {
                     orders[_orderId].marketPrice,
                     orders[_orderId].orderLeverage,
                     now,
-                    0,
                     orders[_orderId].marketPrice,
                     orders[_orderId].marketSpread,
                     orders[_orderId].orderLeverage,
@@ -717,7 +714,6 @@ contract MorpherTradeEngine is Ownable {
                         orders[_orderId].marketPrice,
                         orders[_orderId].orderLeverage,
                         now,
-                        orders[_orderId].marketPrice.mul(100),
                         orders[_orderId].marketPrice,
                         orders[_orderId].marketSpread,
                         orders[_orderId].orderLeverage,
@@ -834,7 +830,6 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
                 state.getMeanEntryPrice(_userId, _marketId),
                 state.getMeanEntryLeverage(_userId, _marketId),
                 state.getLastUpdated(_userId, _marketId),
-                state.getLiquidationPrice(_userId, _marketId),
                 orders[_orderId].marketPrice,
                 orders[_orderId].marketSpread,
                 state.getMeanEntryLeverage(_userId, _marketId),
@@ -846,7 +841,6 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
                 state.getMeanEntryPrice(_userId, _marketId),
                 state.getMeanEntryLeverage(_userId, _marketId),
                 state.getLastUpdated(_userId, _marketId),
-                state.getLiquidationPrice(_userId, _marketId),
                 orders[_orderId].marketPrice,
                 orders[_orderId].marketSpread,
                 state.getMeanEntryLeverage(_userId, _marketId),
@@ -942,23 +936,26 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
     function computeLiquidationPrice(bytes32 _orderId) public returns(uint256 _liquidationPrice) {
         orders[_orderId].newLiquidationPrice = 0;
         if (orders[_orderId].newLongShares > 0) {
-            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, true);
+            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, true, orders[_orderId].timeStamp);
         }
         if (orders[_orderId].newShortShares > 0) {
-            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, false);
+            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, false, orders[_orderId].timeStamp);
         }
         return orders[_orderId].newLiquidationPrice;
     }
 
-    function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long) public pure returns (uint256 _liquidiationPrice) {
+    function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256 _liquidationPrice) {
         if (_long == true) {
-            _liquidiationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.sub(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.sub(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _liquidationPrice.add(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
         } else {
-            _liquidiationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.add(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.add(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _liquidationPrice.sub(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
         }
-        return _liquidiationPrice;
+        return _liquidationPrice;
     }
 
+    
 // ----------------------------------------------------------------------------
 // setPositionInState(bytes32 _orderId)
 // Updates the portfolio in Morpher State. Called by closeLong/closeShort/openLong/openShort
