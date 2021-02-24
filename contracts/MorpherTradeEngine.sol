@@ -541,7 +541,7 @@ contract MorpherTradeEngine is Ownable {
 	        _averageLeverage = _orderLeverage;
         }
         if (
-            getLiquidationPrice(_positionAveragePrice, _positionAverageLeverage, false, _positionTimeStampInMs) <= _marketPrice
+            getLiquidationPrice(_averagePrice, _averageLeverage, false, _positionTimeStampInMs) <= _marketPrice
             ) {
 	        // Position is worthless
             _shareValue = 0;
@@ -593,7 +593,7 @@ contract MorpherTradeEngine is Ownable {
 	        _averageLeverage = _orderLeverage;
         }
         if (
-            _marketPrice <= getLiquidationPrice(_positionAveragePrice, _positionAverageLeverage, true, _positionTimeStampInMs)
+            _marketPrice <= getLiquidationPrice(_averagePrice, _averageLeverage, true, _positionTimeStampInMs)
             ) {
 	        // Position is worthless
             _shareValue = 0;
