@@ -43,7 +43,7 @@ module.exports = {
           new Web3.providers.WebsocketProvider("wss://kovan.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
         ),
       network_id: '*',
-      gasPrice: 150000000000,
+      gasPrice: 10000000000,
     },
   },
   compilers: {
