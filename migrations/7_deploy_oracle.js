@@ -8,7 +8,7 @@ const CRYPTO_ETH = '0x5376ff169a3705b2003892fe730060ee74ec83e5701da29318221aa782
 module.exports = async function (deployer, network, accounts) {
   const ownerAddress = process.env.MORPHER_OWNER || accounts[0];
   const callbackAddress = process.env.CALLBACK_ADDRESS || accounts[0];
-  const coldStorageOwnerAddress = process.env.CALLBACK_ADDRESS || accounts[0];
+  const coldStorageOwnerAddress = process.env.COLDSTORAGE_OWNER_ADDRESS || accounts[0];
   const gasCollectionAddress = process.env.GAS_COLLECTION || accounts[0];
 
 
