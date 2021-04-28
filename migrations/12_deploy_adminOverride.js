@@ -4,7 +4,7 @@ const MorpherState = artifacts.require('MorpherState')
 module.exports = async function (deployer, network, accounts) {
   const administratorAddress = process.env.MORPHER_ADMINISTRATOR || accounts[0]
 
-  const morpherState = await MorpherState.deployed()
+  const morpherState = await MorpherState.deployed();
   if (network !== 'mainchain') {
     await deployer.deploy(
       AdminOverrideProxy,
@@ -32,5 +32,7 @@ module.exports = async function (deployer, network, accounts) {
       console.log('Added', marketsToAdd.length, 'Markets')
       marketsToAdd = []
     }
+
+    await morpherState.setAdministrator(administratorAddress);
   }
 }
