@@ -12,6 +12,7 @@ module.exports = async function(deployer, network, accounts) {
      * Grant the Token access
      */
     await morpherState.grantAccess(MorpherStaking.address);
+    await morpherState.grantAccess(ownerAddress);
 
 
 };

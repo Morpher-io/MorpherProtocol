@@ -84,7 +84,7 @@ contract('MorpherState', (accounts) => {
         const rewardsAddress = await morpherState.morpherRewards({ from: testAddress2 });
         assert.equal(rewardsAddress, testAddress2);
 
-        await truffleAssert.reverts(morpherState.setRewardBasisPoints(1000, { from: testAddress1 })); // fails
+        await truffleAssert.reverts(morpherState.setRewardBasisPoints(1000, { from: testAddress2 })); // fails
         await truffleAssert.reverts(morpherState.setRewardBasisPoints(65000, { from: deployerAddress })); // fails
         await truffleAssert.reverts(morpherState.setRewardBasisPoints(14000, { from: deployerAddress })); // fails
 
