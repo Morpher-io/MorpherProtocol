@@ -610,7 +610,7 @@ contract MorpherState is Ownable {
     function setSideChainMerkleRoot(bytes32 _sideChainMerkleRoot) public onlyBridge {
         sideChainMerkleRoot = _sideChainMerkleRoot;
         sideChainMerkleRootWrittenAtTime = now;
-        payOperatingReward;
+        payOperatingReward();
         emit SideChainMerkleRootUpdate(_sideChainMerkleRoot);
     }
 

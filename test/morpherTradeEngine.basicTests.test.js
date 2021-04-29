@@ -664,4 +664,28 @@ contract('MorpherTradeEngine: partial closing tests', (accounts) => {
 
         assert.equal(userBalance, startingBalance.add(new BN(roundToInteger(120*10))).toString());
     });
+    
+
+    it('test case 9: partial close timestamp reset', async () => {
+        let account0 = accounts[0]; let account1 = accounts[1];
+
+        let morpherTradeEngine = await MorpherTradeEngine.deployed();
+        let morpherState = await MorpherState.deployed();
+        let morpherOracle = await MorpherOracle.deployed();
+
+        //(_newMeanEntryPrice, _newMeanEntryLeverage, _long)
+        let liquidationPrice = (await morpherTradeEngine.getLiquidationPrice(roundToInteger(100), 100000000, false, Math.round(Date.now() / 1000))).toNumber();
+
+        //(_address, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice)
+        await morpherState.setPosition(account1, BTC, 123, 0, 20, roundToInteger(100), 0, 100000000, liquidationPrice, { from: account0 });
+
+        //(_marketId, _closeSharesAmount, _openMPHAmount, _tradeDirection, _orderLeverage, _onlyIfPriceAbove, _onlyIfPriceBelow, _goodUntil, _goodFrom)
+        let orderId = (await morpherOracle.createOrder(BTC, 10, 0, true, 100000000, 0 ,0 ,0 ,0, { from: account1 })).logs[0].args._orderId;
+
+        //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
+        await morpherOracle.__callback(orderId, roundToInteger(80), roundToInteger(80), 0, 0, 234, 0, { from: account0 });
+
+        let lastUpdated = await morpherState.getLastUpdated(account1, BTC);
+        assert.equal(lastUpdated, 123);
+    });
 });
