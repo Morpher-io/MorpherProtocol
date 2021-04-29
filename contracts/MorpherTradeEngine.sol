@@ -802,6 +802,7 @@ contract MorpherTradeEngine is Ownable {
             _newMeanEntry = state.getMeanEntryPrice(_userId, _marketId);
 	        _newMeanSpread = state.getMeanEntrySpread(_userId, _marketId);
 	        _newMeanLeverage = state.getMeanEntryLeverage(_userId, _marketId);
+            resetTimestampInOrderToLastUpdated(_orderId);
         }
 
         orders[_orderId].balanceDown = 0;
@@ -814,6 +815,15 @@ contract MorpherTradeEngine is Ownable {
 
         setPositionInState(_orderId);
     }
+
+event ResetTimestampInOrder(bytes32 _orderId, uint oldTimestamp, uint newTimestamp);
+function resetTimestampInOrderToLastUpdated(bytes32 _orderId) internal {
+    address userId = orders[_orderId].userId;
+    bytes32 marketId = orders[_orderId].marketId;
+    uint lastUpdated = state.getLastUpdated(userId, marketId);
+    emit ResetTimestampInOrder(_orderId, orders[_orderId].timeStamp, lastUpdated);
+    orders[_orderId].timeStamp = lastUpdated;
+}
 
 // ----------------------------------------------------------------------------
 // closeShort(bytes32 _orderId)
@@ -867,6 +877,11 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
             _newMeanEntry = state.getMeanEntryPrice(_userId, _marketId);
 	        _newMeanSpread = state.getMeanEntrySpread(_userId, _marketId);
 	        _newMeanLeverage = state.getMeanEntryLeverage(_userId, _marketId);
+
+            /**
+             * we need the timestamp of the old order for partial closes, not the new one
+             */
+            resetTimestampInOrderToLastUpdated(_orderId);
         }
 
         orders[_orderId].balanceDown = 0;
