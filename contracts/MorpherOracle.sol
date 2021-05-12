@@ -326,7 +326,7 @@ contract MorpherOracle is Ownable {
         require(isWhiteListed(msg.sender),"MorpherOracle: Address not eligible to create an order.");
         if (gasForCallback > 0) {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
-            callBackCollectionAddress.transfer(msg.value);
+            callBackCollectionAddress.transfer(gasForCallback);
         }
         //openBNBAmount and extend order struct
         _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, msg.value.sub(gasForCallback), _tradeDirection, _orderLeverage);
