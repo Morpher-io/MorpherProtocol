@@ -38,6 +38,19 @@ contract MorpherOracle is Ownable {
 
     mapping(bytes32 => bool) public orderCancellationRequested;
 
+/**
+ * User deposits => userPaidBNB + deposit => gets AAPL
+ * User converts AAPL back to BNB: userRetrievableBNB + withdrawal Amount
+ * User withdraws BNB: userRetrievedBNB + BNB
+ * Total Realized Return: userRetrievedBNB - userPaidBNB / userPaidBNB (or so)
+
+ NOT IN USE YET
+ */
+    uint256 public balanceBNB;
+    mapping(address => uint256) public userPaidBNB;
+    mapping(address => uint256) public userRetrievableBNB;
+    mapping(address => uint256) public userRetrievedBNB;
+
 // ----------------------------------------------------------------------------------
 // Events
 // ----------------------------------------------------------------------------------
@@ -46,7 +59,7 @@ contract MorpherOracle is Ownable {
         address indexed _address,
         bytes32 indexed _marketId,
         uint256 _closeSharesAmount,
-        uint256 _openMPHTokenAmount,
+        uint256 _openBNBAmount,
         bool _tradeDirection,
         uint256 _orderLeverage,
         uint256 _onlyIfPriceBelow,
@@ -303,7 +316,6 @@ contract MorpherOracle is Ownable {
     function createOrder(
         bytes32 _marketId,
         uint256 _closeSharesAmount,
-        uint256 _openMPHTokenAmount,
         bool _tradeDirection,
         uint256 _orderLeverage,
         uint256 _onlyIfPriceAbove,
@@ -316,7 +328,9 @@ contract MorpherOracle is Ownable {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
             callBackCollectionAddress.transfer(msg.value);
         }
-        _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage);
+        //openBNBAmount and extend order struct
+        _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, msg.value.sub(gasForCallback), _tradeDirection, _orderLeverage);
+        
 
         //if the market was deactivated, and the trader didn't fail yet, then we got an orderId to close the position with a locked in price
         if(state.getMarketActive(_marketId) == false) {
@@ -348,7 +362,7 @@ contract MorpherOracle is Ownable {
                 msg.sender,
                 _marketId,
                 _closeSharesAmount,
-                _openMPHTokenAmount,
+                msg.value.sub(gasForCallback),
                 _tradeDirection,
                 _orderLeverage,
                 _onlyIfPriceBelow,
@@ -482,37 +496,67 @@ contract MorpherOracle is Ownable {
         uint256 _spread,
         uint256 _liquidationTimestamp,
         uint256 _timeStamp,
-        uint256 _gasForNextCallback
-        ) public onlyOracleOperator notPaused returns (uint256 _newLongShares, uint256 _newShortShares, uint256 _newMeanEntry, uint256 _newMeanSpread, uint256 _newMeanLeverage, uint256 _liquidationPrice)  {
+        uint256 _gasForNextCallback,
+        uint256 _totalPoolShares,
+        uint256 _lastKnownTxCountToBackend
+        ) public onlyOracleOperator notPaused {
         
         require(checkOrderConditions(_orderId, _price), 'MorpherOracle Error: Order Conditions are not met');
        
-        (
-            _newLongShares,
-            _newShortShares,
-            _newMeanEntry,
-            _newMeanSpread,
-            _newMeanLeverage,
-            _liquidationPrice
-        ) = tradeEngine.processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
+        //mint the tokenAmount based on BNB and totalPoolShares
+        //update the order object with _openMPHTokenAmount
+        //fire a deposit event if mphTokenAmount > 0
+        tradeEngine.mintPoolShares(_orderId, _totalPoolShares, _lastKnownTxCountToBackend);
+
+        //stack too deep
+        runCallback(_orderId, _price, _unadjustedMarketPrice, _spread, _liquidationTimestamp, _timeStamp);
+
+        //convert all available MPH/PS from user to BNB based on _totalPoolShares
+        //stack to deep
+        payoutBnb(_orderId, tradeEngine.burnPoolShares(_orderId, _totalPoolShares, _lastKnownTxCountToBackend));
         
         clearOrderConditions(_orderId);
-        emit OrderProcessed(
-            _orderId,
-            _price,
-            _unadjustedMarketPrice,
-            _spread,
-            _liquidationTimestamp,
-            _timeStamp,
-            _newLongShares,
-            _newShortShares,
-            _newMeanEntry,
-            _newMeanSpread,
-            _newMeanLeverage,
-            _liquidationPrice
-            );
+        
         setGasForCallback(_gasForNextCallback);
-        return (_newLongShares, _newShortShares, _newMeanEntry, _newMeanSpread, _newMeanLeverage, _liquidationPrice);
+
+    }
+
+    function runCallback(bytes32 _orderId,
+        uint256 _price,
+        uint256 _unadjustedMarketPrice,
+        uint256 _spread,
+        uint256 _liquidationTimestamp,
+        uint256 _timeStamp) private {
+(
+                uint _newLongShares,
+                uint _newShortShares,
+                uint _newMeanEntry,
+                uint _newMeanSpread,
+                uint _newMeanLeverage,
+                uint _liquidationPrice
+            ) = tradeEngine.processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
+            emit OrderProcessed(
+                _orderId,
+                _price,
+                _unadjustedMarketPrice,
+                _spread,
+                _liquidationTimestamp,
+                _timeStamp,
+                _newLongShares,
+                _newShortShares,
+                _newMeanEntry,
+                _newMeanSpread,
+                _newMeanLeverage,
+                _liquidationPrice
+                );
+
+        }
+
+    function payoutBnb(bytes32 _orderId, uint256 bnbAmount) private {
+        (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
+
+        address payable payoutAddress = address(uint160(userId));
+        payoutAddress.transfer(bnbAmount);
     }
 
 // ----------------------------------------------------------------------------------

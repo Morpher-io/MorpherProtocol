@@ -32,6 +32,13 @@ contract MorpherTradeEngine is Ownable {
     //we're locking positions in for this price at a market marketId;
     address public closedMarketPriceLock = 0x0000000000000000000000000000000000000001;
 
+    //this influences the total pool shares, where it is known to the oracle 
+    //if the transaction goes through an in which order - per block
+    mapping(uint => uint) public burnedPoolSharesPerBlock;
+    mapping(uint => uint) public mintedPoolSharesPerBlock;
+    uint256 public totalPoolShareTokens;
+    uint256 public lastTxCountOracle;
+
 
 // ----------------------------------------------------------------------------
 // Order struct contains all order specific varibles. Variables are completed
@@ -43,6 +50,7 @@ contract MorpherTradeEngine is Ownable {
         bytes32 marketId;
         uint256 closeSharesAmount;
         uint256 openMPHTokenAmount;
+        uint256 openBNBAmount;
         bool tradeDirection; // true = long, false = short
         uint256 liquidationTimestamp;
         uint256 marketPrice;
@@ -169,6 +177,10 @@ contract MorpherTradeEngine is Ownable {
     function setEscrowOpenOrderEnabled(bool _isEnabled) public onlyOwner {
         escrowOpenOrderEnabled = _isEnabled;
     }
+
+    function setOpenMPHAmount(bytes32 _orderId, uint256 _openMPHTokenAmount) public onlyOracle {
+        orders[_orderId].openMPHTokenAmount = _openMPHTokenAmount;
+    }
     
     function paybackEscrow(bytes32 _orderId) private {
         //pay back the escrow to the user so he has it back on his balance/**
@@ -223,7 +235,7 @@ contract MorpherTradeEngine is Ownable {
         address _address,
         bytes32 _marketId,
         uint256 _closeSharesAmount,
-        uint256 _openMPHTokenAmount,
+        uint256 _openBNBAmount,
         bool _tradeDirection,
         uint256 _orderLeverage
         ) public onlyOracle returns (bytes32 _orderId) {
@@ -231,7 +243,8 @@ contract MorpherTradeEngine is Ownable {
         require(_orderLeverage >= PRECISION, "MorpherTradeEngine: leverage too small. Leverage precision is 1e8");
         require(_orderLeverage <= state.getMaximumLeverage(), "MorpherTradeEngine: leverage exceeds maximum allowed leverage.");
 
-        validateClosedMarketOrderConditions(_address, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection);
+//openBNB amount here can be openMPH token amount - just checking if the market is paused / disabled
+        validateClosedMarketOrderConditions(_address, _marketId, _closeSharesAmount, _openBNBAmount, _tradeDirection);
 
         //request limits
         require(state.getNumberOfRequests(_address) <= state.getNumberOfRequestsLimit() ||
@@ -242,7 +255,7 @@ contract MorpherTradeEngine is Ownable {
         /**
          * The user can't partially close a position and open another one with MPH
          */
-        if(_openMPHTokenAmount > 0) {
+        if(_openBNBAmount > 0) {
             if(_tradeDirection) {
                 //long
                 require(_closeSharesAmount == state.getShortShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
@@ -261,7 +274,7 @@ contract MorpherTradeEngine is Ownable {
                 block.number,
                 _marketId,
                 _closeSharesAmount,
-                _openMPHTokenAmount,
+                _openBNBAmount,
                 _tradeDirection,
                 _orderLeverage,
                 orderNonce
@@ -271,7 +284,7 @@ contract MorpherTradeEngine is Ownable {
         orders[_orderId].userId = _address;
         orders[_orderId].marketId = _marketId;
         orders[_orderId].closeSharesAmount = _closeSharesAmount;
-        orders[_orderId].openMPHTokenAmount = _openMPHTokenAmount;
+        orders[_orderId].openBNBAmount = _openBNBAmount;
         orders[_orderId].tradeDirection = _tradeDirection;
         orders[_orderId].orderLeverage = _orderLeverage;
         emit OrderIdRequested(
@@ -279,7 +292,7 @@ contract MorpherTradeEngine is Ownable {
             _address,
             _marketId,
             _closeSharesAmount,
-            _openMPHTokenAmount,
+            _openBNBAmount,
             _tradeDirection,
             _orderLeverage
         );
@@ -290,7 +303,7 @@ contract MorpherTradeEngine is Ownable {
          * definitely trigger a mint there.
          * The money must be put in escrow even though we have an existing position
          */
-        buildupEscrow(_orderId, _openMPHTokenAmount);
+        //buildupEscrow(_orderId, _openMPHTokenAmount);
 
         return _orderId;
     }
@@ -317,6 +330,42 @@ contract MorpherTradeEngine is Ownable {
             orders[_orderId].marketSpread,
             orders[_orderId].orderLeverage
             );
+    }
+
+    function mintPoolShares(bytes32 _orderId, uint256 _totalPoolShares, uint256 _lastTxCountFromBackend) public onlyOracle {
+
+        if(_lastTxCountFromBackend > lastTxCountOracle) {
+            lastTxCountOracle = _lastTxCountFromBackend;
+            totalPoolShareTokens = _totalPoolShares;
+        }
+        uint256 paidBNB = orders[_orderId].openBNBAmount;
+        uint256 totalBNB = address(state.getOracleContract()).balance;
+        uint256 totalPs = totalPoolShareTokens.add(mintedPoolSharesPerBlock[lastTxCountOracle]).sub(burnedPoolSharesPerBlock[lastTxCountOracle]);
+                //pool shares = (totalPS / totalBNB) * paidBNB
+        uint256 mintPoolShareTokens = totalPs.mul(paidBNB).div(totalBNB);
+        
+        //and mint them
+        mintedPoolSharesPerBlock[lastTxCountOracle] = mintedPoolSharesPerBlock[lastTxCountOracle].add(mintPoolShareTokens);
+        state.mint(orders[_orderId].userId, mintPoolShareTokens);
+
+        //and set the amount as openMPHAmount... so tradeengine can calculate the trade. We're trading everything. Obviously.
+        orders[_orderId].openMPHTokenAmount = mintPoolShareTokens;
+    }
+
+    function burnPoolShares(bytes32 _orderId, uint256 _totalPoolShares, uint256 _lastTxCountFromBackend) public onlyOracle returns(uint256) {
+        if(_lastTxCountFromBackend > lastTxCountOracle) {
+            lastTxCountOracle = _lastTxCountFromBackend;
+            totalPoolShareTokens = _totalPoolShares;
+        }
+        uint256 totalBNB = address(state.getOracleContract()).balance;
+        uint256 totalPs = totalPoolShareTokens.add(mintedPoolSharesPerBlock[lastTxCountOracle]).sub(burnedPoolSharesPerBlock[lastTxCountOracle]);
+        uint256 balancePSOfUser = state.balanceOf(orders[_orderId].userId);
+
+        //calulate the BNB and burn the tokens
+        uint256 payOutBNB = balancePSOfUser.mul(totalBNB).div(totalPs);
+        state.burn(orders[_orderId].userId, balancePSOfUser);
+        burnedPoolSharesPerBlock[lastTxCountOracle] = burnedPoolSharesPerBlock[lastTxCountOracle].add(balancePSOfUser);
+        return payOutBNB;
     }
 
     function getPosition(address _address, bytes32 _marketId) public view returns (
