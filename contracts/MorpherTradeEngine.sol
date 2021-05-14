@@ -32,12 +32,6 @@ contract MorpherTradeEngine is Ownable {
     //we're locking positions in for this price at a market marketId;
     address public closedMarketPriceLock = 0x0000000000000000000000000000000000000001;
 
-    //this influences the total pool shares, where it is known to the oracle 
-    //if the transaction goes through an in which order - per block
-    mapping(uint => uint) public burnedPoolSharesPerBlock;
-    mapping(uint => uint) public mintedPoolSharesPerBlock;
-    uint256 public totalPoolShareTokens;
-    uint256 public lastTxCountOracle;
 
 
 // ----------------------------------------------------------------------------
@@ -180,6 +174,10 @@ contract MorpherTradeEngine is Ownable {
 
     function setOpenMPHAmount(bytes32 _orderId, uint256 _openMPHTokenAmount) public onlyOracle {
         orders[_orderId].openMPHTokenAmount = _openMPHTokenAmount;
+    }
+
+    function getOpenBNBAmount(bytes32 _orderId) public view returns (uint256) {
+        return orders[_orderId].openBNBAmount;
     }
     
     function paybackEscrow(bytes32 _orderId) private {
@@ -332,41 +330,7 @@ contract MorpherTradeEngine is Ownable {
             );
     }
 
-    function mintPoolShares(bytes32 _orderId, uint256 _totalPoolShares, uint256 _lastTxCountFromBackend) public onlyOracle {
-
-        if(_lastTxCountFromBackend > lastTxCountOracle) {
-            lastTxCountOracle = _lastTxCountFromBackend;
-            totalPoolShareTokens = _totalPoolShares;
-        }
-        uint256 paidBNB = orders[_orderId].openBNBAmount;
-        uint256 totalBNB = address(state.getOracleContract()).balance;
-        uint256 totalPs = totalPoolShareTokens.add(mintedPoolSharesPerBlock[lastTxCountOracle]).sub(burnedPoolSharesPerBlock[lastTxCountOracle]);
-                //pool shares = (totalPS / totalBNB) * paidBNB
-        uint256 mintPoolShareTokens = totalPs.mul(paidBNB).div(totalBNB);
-        
-        //and mint them
-        mintedPoolSharesPerBlock[lastTxCountOracle] = mintedPoolSharesPerBlock[lastTxCountOracle].add(mintPoolShareTokens);
-        state.mint(orders[_orderId].userId, mintPoolShareTokens);
-
-        //and set the amount as openMPHAmount... so tradeengine can calculate the trade. We're trading everything. Obviously.
-        orders[_orderId].openMPHTokenAmount = mintPoolShareTokens;
-    }
-
-    function burnPoolShares(bytes32 _orderId, uint256 _totalPoolShares, uint256 _lastTxCountFromBackend) public onlyOracle returns(uint256) {
-        if(_lastTxCountFromBackend > lastTxCountOracle) {
-            lastTxCountOracle = _lastTxCountFromBackend;
-            totalPoolShareTokens = _totalPoolShares;
-        }
-        uint256 totalBNB = address(state.getOracleContract()).balance;
-        uint256 totalPs = totalPoolShareTokens.add(mintedPoolSharesPerBlock[lastTxCountOracle]).sub(burnedPoolSharesPerBlock[lastTxCountOracle]);
-        uint256 balancePSOfUser = state.balanceOf(orders[_orderId].userId);
-
-        //calulate the BNB and burn the tokens
-        uint256 payOutBNB = balancePSOfUser.mul(totalBNB).div(totalPs);
-        state.burn(orders[_orderId].userId, balancePSOfUser);
-        burnedPoolSharesPerBlock[lastTxCountOracle] = burnedPoolSharesPerBlock[lastTxCountOracle].add(balancePSOfUser);
-        return payOutBNB;
-    }
+   
 
     function getPosition(address _address, bytes32 _marketId) public view returns (
         uint256 _positionLongShares,

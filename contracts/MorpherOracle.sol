@@ -4,6 +4,7 @@ import "./Ownable.sol";
 import "./MorpherTradeEngine.sol";
 import "./MorpherState.sol";
 import "./SafeMath.sol";
+import "./MorpherPoolShareManager.sol";
 
 // ----------------------------------------------------------------------------------
 // Morpher Oracle contract v 2.0
@@ -18,6 +19,7 @@ contract MorpherOracle is Ownable {
 
     MorpherTradeEngine tradeEngine;
     MorpherState state; // read only, Oracle doesn't need writing access to state
+    MorpherPoolShareManager psManager;
 
     using SafeMath for uint256;
 
@@ -196,12 +198,13 @@ contract MorpherOracle is Ownable {
         _;
     }
 
-   constructor(address _tradeEngineAddress, address _morpherState, address _callBackAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress) public {
+   constructor(address _tradeEngineAddress, address _morpherState, address _callBackAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress, address _morpherPoolShareManagerAddress) public {
         setTradeEngineAddress(_tradeEngineAddress);
         setStateAddress(_morpherState);
         enableCallbackAddress(_callBackAddress);
         setCallbackCollectionAddress(_gasCollectionAddress);
         setGasForCallback(_gasForCallback);
+        psManager = MorpherPoolShareManager(_morpherPoolShareManagerAddress);
         transferOwnership(_coldStorageOwnerAddress);
     }
 
@@ -506,19 +509,25 @@ contract MorpherOracle is Ownable {
         //mint the tokenAmount based on BNB and totalPoolShares
         //update the order object with _openMPHTokenAmount
         //fire a deposit event if mphTokenAmount > 0
-        tradeEngine.mintPoolShares(_orderId, _totalPoolShares, _lastKnownTxCountToBackend);
+        mintAndSetPoolShares(_orderId, _totalPoolShares, _lastKnownTxCountToBackend);
 
         //stack too deep
         runCallback(_orderId, _price, _unadjustedMarketPrice, _spread, _liquidationTimestamp, _timeStamp);
 
         //convert all available MPH/PS from user to BNB based on _totalPoolShares
         //stack to deep
-        payoutBnb(_orderId, tradeEngine.burnPoolShares(_orderId, _totalPoolShares, _lastKnownTxCountToBackend));
+        payoutBNB(_orderId, _totalPoolShares, _lastKnownTxCountToBackend);
         
         clearOrderConditions(_orderId);
         
         setGasForCallback(_gasForNextCallback);
 
+    }
+
+    function mintAndSetPoolShares(bytes32 _orderId, uint _totalPoolShares, uint _lastKnownTxCountToBackend) private {
+        (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
+        uint mphPoolShareAmount = psManager.mintPoolShares(userId, _totalPoolShares, _lastKnownTxCountToBackend, tradeEngine.getOpenBNBAmount(_orderId));
+        tradeEngine.setOpenMPHAmount(_orderId, mphPoolShareAmount);
     }
 
     function runCallback(bytes32 _orderId,
@@ -552,9 +561,9 @@ contract MorpherOracle is Ownable {
 
         }
 
-    function payoutBnb(bytes32 _orderId, uint256 bnbAmount) private {
+    function payoutBNB(bytes32 _orderId, uint256 _totalPoolShares, uint256 _lastKnownTxCountToBackend) private {
         (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
-
+        uint256 bnbAmount = psManager.burnPoolShares(userId, _totalPoolShares, _lastKnownTxCountToBackend);
         address payable payoutAddress = address(uint160(userId));
         payoutAddress.transfer(bnbAmount);
     }
