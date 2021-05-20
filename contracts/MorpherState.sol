@@ -496,7 +496,7 @@ contract MorpherState is Ownable {
     // Setter/Getter functions for platform roles
     // ----------------------------------------------------------------------------
 
-    function setGovernanceContract(address _newGovernanceContractAddress) public onlyAdministrator {
+    function setGovernanceContract(address _newGovernanceContractAddress) public onlyGovernance {
         morpherGovernance = _newGovernanceContractAddress;
         emit GovernanceChange(_newGovernanceContractAddress);
     }
@@ -505,7 +505,7 @@ contract MorpherState is Ownable {
         return morpherGovernance;
     }
 
-    function setMorpherBridge(address _newBridge) public onlyAdministrator {
+    function setMorpherBridge(address _newBridge) public onlyGovernance {
         morpherBridge = _newBridge;
         emit BridgeChange(_newBridge);
     }
@@ -523,7 +523,7 @@ contract MorpherState is Ownable {
         return oracleContract;
     }
 
-    function setTokenContract(address _newTokenContract) public onlyAdministrator {
+    function setTokenContract(address _newTokenContract) public onlyGovernance {
         morpherToken = _newTokenContract;
         emit TokenChange(_newTokenContract);
     }
@@ -545,12 +545,12 @@ contract MorpherState is Ownable {
     // Setter/Getter functions for platform operating rewards
     // ----------------------------------------------------------------------------
 
-    function setRewardAddress(address _newRewardsAddress) public onlyAdministrator {
+    function setRewardAddress(address _newRewardsAddress) public onlyGovernance {
         morpherRewards = _newRewardsAddress;
         emit RewardsChange(_newRewardsAddress, rewardBasisPoints);
     }
 
-    function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyAdministrator {
+    function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyGovernance {
         if (mainChain == true) {
             require(_newRewardBasisPoints <= 15000, "MorpherState: Reward basis points need to be less or equal to 15000.");
         } else {
