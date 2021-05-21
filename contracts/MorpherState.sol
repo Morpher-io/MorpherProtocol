@@ -423,7 +423,7 @@ contract MorpherState is Ownable {
     }
 
     function getCanTransfer(address _address) public view returns(bool _hasAccess) {
-        return transferAllowed[_address];
+        return mainChain || transferAllowed[_address];
     }
 
     // ----------------------------------------------------------------------------
