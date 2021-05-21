@@ -186,8 +186,8 @@ contract MorpherState is Ownable {
         _;
     }
 
-    modifier canTransfer {
-        require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
+    modifier canTransfer(address sender) {
+        require(getCanTransfer(sender), "MorpherState: Caller may not transfer token. Aborting.");
         _;
     }
 
@@ -426,7 +426,7 @@ contract MorpherState is Ownable {
     // Minting/burning/transfer of token
     // ----------------------------------------------------------------------------
 
-    function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused {
+    function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused canTransfer(_from) {
         require(balances[_from] >= _token, "MorpherState: Not enough token.");
         balances[_from] = balances[_from].sub(_token);
         balances[_to] = balances[_to].add(_token);
