@@ -186,8 +186,8 @@ contract MorpherState is Ownable {
         _;
     }
 
-    modifier canTransfer {
-        require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
+    modifier canTransfer(address sender) {
+        require(getCanTransfer(sender), "MorpherState: Caller may not transfer token. Aborting.");
         _;
     }
 
@@ -212,6 +212,10 @@ contract MorpherState is Ownable {
         setLastRewardTime(now);
         uint256 _sideChainMint = 575000000 * 10**(DECIMALS);
         uint256 _mainChainMint = 425000000 * 10**(DECIMALS);
+        
+        administrator = owner(); //first set the owner as administrator
+        morpherGovernance = owner(); //first set the owner as governance
+        
         grantAccess(owner());
         setSideChainOperator(owner());
         if (mainChain == false) { // Create token only on sidechain
@@ -377,7 +381,7 @@ contract MorpherState is Ownable {
         return numberOfRequestsLimit;
     }
 
-    function setMainChainWithdrawLimit(uint256 _mainChainWithdrawLimit24) public onlyOwner {
+    function setMainChainWithdrawLimit(uint256 _mainChainWithdrawLimit24) public onlyGovernance {
         mainChainWithdrawLimit24 = _mainChainWithdrawLimit24;
         emit MainChainWithdrawLimitUpdate(_mainChainWithdrawLimit24);
     }
@@ -390,12 +394,12 @@ contract MorpherState is Ownable {
     // Setter/Getter functions for state access
     // ----------------------------------------------------------------------------
 
-    function grantAccess(address _address) public onlyOwner {
+    function grantAccess(address _address) public onlyAdministrator {
         stateAccess[_address] = true;
         emit StateAccessGranted(_address, block.number);
     }
 
-    function denyAccess(address _address) public onlyOwner {
+    function denyAccess(address _address) public onlyAdministrator {
         stateAccess[_address] = false;
         emit StateAccessDenied(_address, block.number);
     }
@@ -408,25 +412,25 @@ contract MorpherState is Ownable {
     // Setter/Getter functions for addresses that can transfer tokens (sidechain only)
     // ----------------------------------------------------------------------------
 
-    function enableTransfers(address _address) public onlyOwner {
+    function enableTransfers(address _address) public onlyAdministrator {
         transferAllowed[_address] = true;
         emit TransfersEnabled(_address);
     }
 
-    function disableTransfers(address _address) public onlyOwner {
+    function disableTransfers(address _address) public onlyAdministrator {
         transferAllowed[_address] = false;
         emit TransfersDisabled(_address);
     }
 
     function getCanTransfer(address _address) public view returns(bool _hasAccess) {
-        return transferAllowed[_address];
+        return mainChain || transferAllowed[_address];
     }
 
     // ----------------------------------------------------------------------------
     // Minting/burning/transfer of token
     // ----------------------------------------------------------------------------
 
-    function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused {
+    function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused canTransfer(_from) {
         require(balances[_from] >= _token, "MorpherState: Not enough token.");
         balances[_from] = balances[_from].sub(_token);
         balances[_to] = balances[_to].add(_token);
@@ -492,7 +496,7 @@ contract MorpherState is Ownable {
     // Setter/Getter functions for platform roles
     // ----------------------------------------------------------------------------
 
-    function setGovernanceContract(address _newGovernanceContractAddress) public onlyOwner {
+    function setGovernanceContract(address _newGovernanceContractAddress) public onlyGovernance {
         morpherGovernance = _newGovernanceContractAddress;
         emit GovernanceChange(_newGovernanceContractAddress);
     }
@@ -501,7 +505,7 @@ contract MorpherState is Ownable {
         return morpherGovernance;
     }
 
-    function setMorpherBridge(address _newBridge) public onlyOwner {
+    function setMorpherBridge(address _newBridge) public onlyGovernance {
         morpherBridge = _newBridge;
         emit BridgeChange(_newBridge);
     }
@@ -519,7 +523,7 @@ contract MorpherState is Ownable {
         return oracleContract;
     }
 
-    function setTokenContract(address _newTokenContract) public onlyOwner {
+    function setTokenContract(address _newTokenContract) public onlyGovernance {
         morpherToken = _newTokenContract;
         emit TokenChange(_newTokenContract);
     }
@@ -541,12 +545,12 @@ contract MorpherState is Ownable {
     // Setter/Getter functions for platform operating rewards
     // ----------------------------------------------------------------------------
 
-    function setRewardAddress(address _newRewardsAddress) public onlyOwner {
+    function setRewardAddress(address _newRewardsAddress) public onlyGovernance {
         morpherRewards = _newRewardsAddress;
         emit RewardsChange(_newRewardsAddress, rewardBasisPoints);
     }
 
-    function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyOwner {
+    function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyGovernance {
         if (mainChain == true) {
             require(_newRewardBasisPoints <= 15000, "MorpherState: Reward basis points need to be less or equal to 15000.");
         } else {
@@ -614,7 +618,7 @@ contract MorpherState is Ownable {
         return sideChainMerkleRoot;
     }
 
-    function setSideChainOperator(address _address) public onlyOwner {
+    function setSideChainOperator(address _address) public onlyAdministrator {
         sideChainOperator = _address;
         emit NewSideChainOperator(_address);
     }
