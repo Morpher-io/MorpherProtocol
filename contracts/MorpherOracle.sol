@@ -412,8 +412,8 @@ contract MorpherOracle is Ownable {
     // Administrator can cancel before the _callback has been executed to provide an updateOrder functionality
     // ----------------------------------------------------------------------------------
     function adminCancelOrder(bytes32 _orderId) public onlyOracleOperator {
-        (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
         MorpherTradeEngine _tradeEngine = MorpherTradeEngine(getTradeEngineFromOrderId(_orderId));
+        (address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
         _tradeEngine.cancelOrder(_orderId, userId);
         clearOrderConditions(_orderId);
         emit AdminOrderCancelled(
@@ -539,6 +539,7 @@ contract MorpherOracle is Ownable {
             callBackCollectionAddress.transfer(msg.value);
         }
         _orderId = tradeEngine.requestOrderId(_address, _marketId, 0, 0, true, 10**8);
+        orderIdTradeEngineAddress[_orderId] = address(tradeEngine);
         emit LiquidationOrderCreated(_orderId, msg.sender, _address, _marketId);
         return _orderId;
     }
@@ -626,6 +627,7 @@ contract MorpherOracle is Ownable {
      * 3. let users still close their positions
      */
     function setDeactivatedMarketPrice(bytes32 _marketId, uint256 _price) public onlyAdministrator {
+        //todo updateable tradeEngine
         tradeEngine.setDeactivatedMarketPrice(_marketId, _price);
         emit LockedPriceForClosingPositions(_marketId, _price);
 
@@ -649,6 +651,7 @@ contract MorpherOracle is Ownable {
                 _orderId = tradeEngine.requestOrderId(_address, _marketId, _positionShortShares, 0, true, 10**8);
                 emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, _positionShortShares, 0, true, 10**8);
             }
+            orderIdTradeEngineAddress[_orderId] = address(tradeEngine);
             return _orderId;
     }
     
