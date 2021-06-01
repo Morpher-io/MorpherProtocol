@@ -1,6 +1,8 @@
 const MorpherToken = artifacts.require("MorpherToken");
 const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
 const MorpherOracle = artifacts.require("MorpherOracle");
+const MorpherState = artifacts.require("MorpherState");
+const MorpherStaking = artifacts.require("MorpherStaking");
 
 const truffleAssert = require('truffle-assertions');
 const BN = require("bn.js");
@@ -59,6 +61,78 @@ contract('MorpherOracle', (accounts) => {
         // orderID1 should have '0' values because we successfully called the callback.
         const order = await morpherTradeEngine.getOrder(orderId1);
         assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
+    });
+
+    it('TradeEngine can be updated', async () => {
+        const morpherOracle = await MorpherOracle.deployed();
+        
+        const morpherTradeEngine = await MorpherTradeEngine.deployed();
+        const morpherState = await MorpherState.deployed();
+        const morpherStaking = await MorpherStaking.deployed();
+        
+        const morpherToken = await MorpherToken.deployed();
+        await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+        const orderId1 = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
+        // Asserts
+        assert.notEqual(orderId1, null);
+        
+        //deploy new trade engine
+        const morpherTradeEngine2 = await MorpherTradeEngine.new(morpherState.address, deployerAddress, morpherStaking.address, true, 0)
+        await morpherState.grantAccess(morpherTradeEngine2.address);
+        await morpherOracle.setTradeEngineAddress(morpherTradeEngine2.address);
+
+
+        await morpherOracle.__callback(orderId1, 100000000, 100000000, 1000000, 0, 1234, 0, { from: oracleCallbackAddress });
+        // orderID1 should have '0' values because we successfully called the callback.
+        const order = await morpherTradeEngine.getOrder(orderId1);
+        
+        assert.equal(order._openMPHTokenAmount, '0'); // callback was called successfully
+        const orderId2 = (await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, 100000000, 0, 0, 0, 0, { from: testUserAddress })).logs[0].args._orderId;
+        // orderID1 should have '0' values because we successfully called the callback.
+        const order2 = await morpherTradeEngine.getOrder(orderId2);
+        assert.equal(order2._openMPHTokenAmount, '0'); // not created in the original tradeEngine
+        const order2_newTradeEngine = await morpherTradeEngine2.getOrder(orderId2);
+        assert.equal(order2_newTradeEngine._openMPHTokenAmount.toString(), '10'); // not created in the original tradeEngine
+        await morpherOracle.__callback(orderId2, 100000000, 100000000, 1000000, 0, 1234, 0, { from: oracleCallbackAddress });
+
+        //set it back.
+        await morpherOracle.setTradeEngineAddress(morpherTradeEngine.address);
+        
+        
+    });
+
+    it('Oracle can be updated', async () => {
+        const morpherOracle = await MorpherOracle.deployed();
+        const morpherToken = await MorpherToken.deployed();
+        const morpherTradeEngine = await MorpherTradeEngine.deployed();
+        const morpherState = await MorpherState.deployed();
+
+        // Topup test accounts with MorpherToken.
+        await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+        await morpherToken.transfer(oracleCallbackAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
+
+        // Test successful state variables change and order creation.
+        await morpherOracle.overrideGasForCallback(0);
+        await morpherOracle.enableCallbackAddress(oracleCallbackAddress);
+
+
+        const goodFrom = Math.round((Date.now() / 1000)) + 10;
+        const txReceipt = await morpherOracle.createOrder(web3.utils.sha3(MARKET), 0, 10, true, getLeverage(1), 0, 0, 0, goodFrom, { from: testUserAddress });
+
+        // Asserts
+        assert.equal(txReceipt.logs[0].args['_goodFrom'], goodFrom);
+
+        //deploy a new oracle
+        const morpherOracle2 = await MorpherOracle.new(morpherTradeEngine.address, morpherState.address, oracleCallbackAddress, deployerAddress, 0, deployerAddress, '0x0000000000000000000000000000000000000000', morpherOracle.address);
+        await morpherState.setOracleContract(morpherOracle2.address);
+
+
+
+        await truffleAssert.fails(
+            morpherOracle2.__callback(txReceipt.logs[0].args['_orderId'], 100000000, 100000000, 0, 0, Date.now(), 0, { from: oracleCallbackAddress }),
+            truffleAssert.ErrorType.REVERT,
+            "Error: Order Conditions are not met"
+        );
     });
 
 
