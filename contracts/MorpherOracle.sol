@@ -40,6 +40,8 @@ contract MorpherOracle is Ownable {
 
     mapping(bytes32 => bool) public orderCancellationRequested;
 
+    mapping(bytes32 => address payable) public orderIdUserAddress;
+
 /**
  * User deposits => userPaidBNB + deposit => gets AAPL
  * User converts AAPL back to BNB: userRetrievableBNB + withdrawal Amount
@@ -334,6 +336,7 @@ contract MorpherOracle is Ownable {
         //openBNBAmount and extend order struct
         _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, msg.value.sub(gasForCallback), _tradeDirection, _orderLeverage);
         
+        orderIdUserAddress[_orderId] = msg.sender; //store that locally
 
         //if the market was deactivated, and the trader didn't fail yet, then we got an orderId to close the position with a locked in price
         if(state.getMarketActive(_marketId) == false) {
@@ -525,7 +528,7 @@ contract MorpherOracle is Ownable {
     }
 
     function mintAndSetPoolShares(bytes32 _orderId, uint _totalPoolShares, uint _lastKnownTxCountToBackend) private {
-        (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
+        address userId = orderIdUserAddress[_orderId];
         uint mphPoolShareAmount = psManager.mintPoolShares(userId, _totalPoolShares, _lastKnownTxCountToBackend, tradeEngine.getOpenBNBAmount(_orderId));
         tradeEngine.setOpenMPHAmount(_orderId, mphPoolShareAmount);
     }
@@ -562,10 +565,12 @@ contract MorpherOracle is Ownable {
         }
 
     function payoutBNB(bytes32 _orderId, uint256 _totalPoolShares, uint256 _lastKnownTxCountToBackend) private {
-        (address userId, , , , , , ) = tradeEngine.getOrder(_orderId);
+        address payable userId = orderIdUserAddress[_orderId];
+        require(userId != address(0), "MorpherOracle: The payout address cannot be 0");
         uint256 bnbAmount = psManager.burnPoolShares(userId, _totalPoolShares, _lastKnownTxCountToBackend);
-        address payable payoutAddress = address(uint160(userId));
-        payoutAddress.transfer(bnbAmount);
+        if(bnbAmount > 0) {
+            userId.transfer(bnbAmount);
+        }
     }
 
 // ----------------------------------------------------------------------------------
