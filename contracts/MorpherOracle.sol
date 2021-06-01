@@ -40,7 +40,6 @@ contract MorpherOracle is Ownable {
 
     mapping(bytes32 => address) public orderIdTradeEngineAddress;
     address public previousTradeEngineAddress;
-    mapping(bytes32 => address) public orderConditionsOracleAddress;
     address public previousOracleAddress;
 
 // ----------------------------------------------------------------------------------
