@@ -7,7 +7,9 @@ const CRYPTO_ETH = '0x5376ff169a3705b2003892fe730060ee74ec83e5701da29318221aa782
 
 module.exports = async function (deployer, network, accounts) {
   const ownerAddress = process.env.MORPHER_OWNER || accounts[0];
-  const callbackAddress = process.env.CALLBACK_ADDRESS || accounts[0];
+  const callbackAddress1 = process.env.CALLBACK_ADDRESS_1 || accounts[0];
+  const callbackAddress2 = process.env.CALLBACK_ADDRESS_2;
+  const callbackAddress3 = process.env.CALLBACK_ADDRESS_3;
   const coldStorageOwnerAddress = process.env.COLDSTORAGE_OWNER_ADDRESS || accounts[0];
   const gasCollectionAddress = process.env.GAS_COLLECTION || accounts[0];
 
@@ -27,10 +29,19 @@ module.exports = async function (deployer, network, accounts) {
 
   const morpherTradeEngine = await MorpherTradeEngine.deployed();
   
-  await deployer.deploy(MorpherOracle, morpherTradeEngine.address, morpherState.address, callbackAddress, gasCollectionAddress, 0, coldStorageOwnerAddress); // deployer is changed to owner later
+  await deployer.deploy(MorpherOracle, morpherTradeEngine.address, morpherState.address, callbackAddress1, gasCollectionAddress, 0, coldStorageOwnerAddress); // deployer is changed to owner later
 
   await morpherState.setGovernanceContract(ownerAddress); //will be set on 9_deploy_governance again
   await morpherState.setOracleContract(MorpherOracle.address);
+
+  let morpherOracle = await MorpherOracle.deployed();
+
+  if(callbackAddress2 !== undefined) {
+    await morpherOracle.enableCallbackAddress(callbackAddress2);
+  }
+  if(callbackAddress3 !== undefined) {
+    await morpherOracle.enableCallbackAddress(callbackAddress3);
+  }
 
   if (!isMainChain) {
     await morpherState.setAdministrator(ownerAddress);
