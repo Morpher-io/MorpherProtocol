@@ -9,7 +9,7 @@ module.exports = async function (deployer, network, accounts) {
   /**
    * Only setting the Governance on Mainchain
    */
-  if (network === "mainchain" || network === 'kovan') {
+  if (network === "mainchain") {
    
     await deployer.deploy(
       MorpherGovernance,
