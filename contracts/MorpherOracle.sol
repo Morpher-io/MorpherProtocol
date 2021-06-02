@@ -375,10 +375,16 @@ contract MorpherOracle is Ownable {
             return orderIdTradeEngineAddress[_orderId];
         }
 
+        //todo for later
+        //we can't do recursively call the oracle.getTradeEngineFromOrderId here, because the previously deployed oracle
+        //doesn't have this function yet. We can uncomment this in later updates of the oracle
+        // if(previousOracleAddress !== address(0)) {
+        //     MorpherOracle _oracle = MorpherOracle(previousOracleAddress)
+        //     return _oracle.getTradeEngineFromOrderId(_orderId);
+        // }
+
         //nothing in there, take the previous tradeEngine then.
         return previousTradeEngineAddress;
-        
-        //todo here: If we update the oracle again, also fetch first getTradeEngineFromOrderId from previous oracle.
     }
 
     function initiateCancelOrder(bytes32 _orderId) public {
