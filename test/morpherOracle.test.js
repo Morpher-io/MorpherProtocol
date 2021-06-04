@@ -631,6 +631,6 @@ contract('MorpherOracle', (accounts) => {
         const oracleBalanceAfterOrders = new BN(await web3.eth.getBalance(oracleCallbackAddress));
         assert.isTrue(oracleBalanceAfterOrders.gte(new BN(oracleStartingBalance)), "We're loosing money at the callback, it should not happen normally " + oracleBalanceAfterOrders + " vs " + oracleStartingBalance);
         //console.log(oracleBalanceAfterOrders, oracleStartingBalance);
-    });
+    }); 
 
 });
