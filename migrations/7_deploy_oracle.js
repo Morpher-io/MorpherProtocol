@@ -22,7 +22,7 @@ module.exports = async function (deployer, network, accounts) {
 
 
   let isMainChain = false;
-  console.log("NETWORK", network);
+  // console.log("NETWORK", network);
   if (network === "mainchain" || network === 'kovan' || network == "develop") {
     isMainChain = true;
   }
