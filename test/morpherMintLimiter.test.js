@@ -672,5 +672,27 @@ contract(
       escrowedAmount = await morpherMintingLimiter.escrowedTokens(tradeAccount)
       assert.equal(escrowedAmount.toString(), '0', '0 MPH should be in escrow')
     })
+    
+    it('Minting Limit Daily Reset, administrator approved', async () => {
+
+      let morpherMintingLimiter = await MorpherMintingLimiter.deployed()
+
+      //set minting limit daily to 1 MPH
+      assert.equal(
+        (await morpherMintingLimiter.mintingLimitDaily()).toString(),
+        web3.utils.toWei('1', 'ether'),
+        'Morpher Minting Limit is not 1 MPH',
+      )
+
+      let mintedTokensToday = await morpherMintingLimiter.getDailyMintedTokens();
+      assert(mintedTokensToday.toNumber() > 0);
+
+      let txResult = await morpherMintingLimiter.resetDailyMintedTokens();
+      truffleAssert.eventEmitted(txResult, "DailyMintedTokensReset");
+
+      let mintedTokensTodayAfterReset = await morpherMintingLimiter.getDailyMintedTokens();
+      assert(mintedTokensTodayAfterReset.toNumber() == 0, "getDailyMintedTokens should be back to 0");
+
+    })
   },
 )

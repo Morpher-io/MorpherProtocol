@@ -25,6 +25,7 @@ contract MorpherMintingLimiter {
     event MintingLimitUpdatedDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
     event TimeLockPeriodUpdated(uint256 _timeLockPeriodOld, uint256 _timeLockPeriodNew);
     event TradeEngineAddressSet(address _tradeEngineAddress);
+    event DailyMintedTokensReset();
 
     modifier onlyTradeEngine() {
         require(msg.sender == tradeEngineAddress, "MorpherMintingLimiter: Only Trade Engine is allowed to call this function");
@@ -92,5 +93,14 @@ contract MorpherMintingLimiter {
     function adminDisapproveMint(address _user, uint256 _tokenAmount) public onlyAdministrator {
         escrowedTokens[_user] = escrowedTokens[_user].sub(_tokenAmount);
         emit MintingDenied(_user, _tokenAmount);
+    }
+
+    function resetDailyMintedTokens() public onlyAdministrator {
+        dailyMintedTokens[block.timestamp / 1 days] = 0;
+        emit DailyMintedTokensReset();
+    }
+
+    function getDailyMintedTokens() public view returns(uint256) {
+        return dailyMintedTokens[block.timestamp / 1 days];
     }
 }
