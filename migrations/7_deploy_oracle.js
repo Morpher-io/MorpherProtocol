@@ -22,14 +22,15 @@ module.exports = async function (deployer, network, accounts) {
 
 
   let isMainChain = false;
-  if (network === "mainchain" || network === 'kovan') {
+  // console.log("NETWORK", network);
+  if (network === "mainchain" || network === 'kovan' || network == "develop") {
     isMainChain = true;
   }
 
 
   const morpherTradeEngine = await MorpherTradeEngine.deployed();
   
-  await deployer.deploy(MorpherOracle, morpherTradeEngine.address, morpherState.address, callbackAddress1, gasCollectionAddress, 0, coldStorageOwnerAddress); // deployer is changed to owner later
+  await deployer.deploy(MorpherOracle, morpherTradeEngine.address, morpherState.address, callbackAddress1, gasCollectionAddress, 0, coldStorageOwnerAddress, '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000'); // deployer is changed to owner later
 
   await morpherState.setGovernanceContract(ownerAddress); //will be set on 9_deploy_governance again
   await morpherState.setOracleContract(MorpherOracle.address);

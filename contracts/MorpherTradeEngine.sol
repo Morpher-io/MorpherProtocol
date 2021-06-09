@@ -4,6 +4,7 @@ import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./MorpherState.sol";
 import "./IMorpherStaking.sol";
+import "./MorpherMintingLimiter.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -15,6 +16,7 @@ import "./IMorpherStaking.sol";
 contract MorpherTradeEngine is Ownable {
     MorpherState state;
     IMorpherStaking staking;
+    MorpherMintingLimiter mintingLimiter;
     using SafeMath for uint256;
 
 // ----------------------------------------------------------------------------
@@ -123,15 +125,16 @@ contract MorpherTradeEngine is Ownable {
 
     event LinkState(address _address);
     event LinkStaking(address _stakingAddress);
-
+    event LinkMintingLimiter(address _mintingLimiterAddress);
 
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress) public {
         setMorpherState(_stateAddress);
         setMorpherStaking(_stakingContractAddress);
+        setMorpherMintingLimiter(_mintingLimiterAddress);
         transferOwnership(_coldStorageOwnerAddress);
         escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
         deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
@@ -160,6 +163,11 @@ contract MorpherTradeEngine is Ownable {
     function setMorpherStaking(address _stakingAddress) public onlyOwner {
         staking = IMorpherStaking(_stakingAddress);
         emit LinkStaking(_stakingAddress);
+    }
+
+    function setMorpherMintingLimiter(address _mintingLimiterAddress) public onlyOwner {
+        mintingLimiter = MorpherMintingLimiter(_mintingLimiterAddress);
+        emit LinkMintingLimiter(_mintingLimiterAddress);
     }
 
     function getAdministrator() public view returns(address _administrator) {
@@ -987,7 +995,7 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
             orders[_orderId].balanceUp = 0;
         }
         if (orders[_orderId].balanceUp > 0) {
-            state.mint(orders[_orderId].userId, orders[_orderId].balanceUp);
+            mintingLimiter.mint(orders[_orderId].userId, orders[_orderId].balanceUp);
         }
         if (orders[_orderId].balanceDown > 0) {
             state.burn(orders[_orderId].userId, orders[_orderId].balanceDown);
