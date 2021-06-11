@@ -15,11 +15,8 @@ Morpher rebuilts financial markets from the ground up on the Ethereum Blockchain
 
 Morpher Smart Contracts are fully and regularly audited. 🙌
 
-The Smart Contracts were last audited by Capacity and passed on Mon. Apr 20 14:24:19 2020 +0200 at the following commit https://github.com/Morpher-io/MorpherProtocol/commit/3090075bdd3a6c866d067c7c8c2164262497374f
-
-You can find the full PDF with the Results here:
-
-[![Capacty Audit](./docs/morpher_audit_capacity.png)](./docs/Capacity-MorpherAudit2Result.pdf)
+ * Audited by Solidified on April 12, 2021. [Full Report](./docs/solidified-audit-12.04.2021.pdf)
+ * Audited by Capacity on April 20, 2020. [Full Report](./docs/Capacity-MorpherAudit2Result.pdf)
 
 
 # Getting Started
