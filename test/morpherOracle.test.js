@@ -3,6 +3,7 @@ const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
 const MorpherOracle = artifacts.require("MorpherOracle");
 const MorpherState = artifacts.require("MorpherState");
 const MorpherStaking = artifacts.require("MorpherStaking");
+const MintingLimiter = artifacts.require("MorpherMintingLimiter");
 
 const truffleAssert = require('truffle-assertions');
 const BN = require("bn.js");
@@ -70,6 +71,7 @@ contract('MorpherOracle', (accounts) => {
         const morpherTradeEngine = await MorpherTradeEngine.deployed();
         const morpherState = await MorpherState.deployed();
         const morpherStaking = await MorpherStaking.deployed();
+        const mintingLimiter = await MintingLimiter.deployed();
         
         const morpherToken = await MorpherToken.deployed();
         await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
@@ -78,7 +80,7 @@ contract('MorpherOracle', (accounts) => {
         assert.notEqual(orderId1, null);
         
         //deploy new trade engine
-        const morpherTradeEngine2 = await MorpherTradeEngine.new(morpherState.address, deployerAddress, morpherStaking.address, true, 0)
+        const morpherTradeEngine2 = await MorpherTradeEngine.new(morpherState.address, deployerAddress, morpherStaking.address, true, 0, mintingLimiter.address)
         await morpherState.grantAccess(morpherTradeEngine2.address);
         await morpherOracle.setTradeEngineAddress(morpherTradeEngine2.address);
 
@@ -142,6 +144,7 @@ contract('MorpherOracle', (accounts) => {
         const morpherTradeEngine = await MorpherTradeEngine.deployed();
         const morpherState = await MorpherState.deployed();
         const morpherStaking = await MorpherStaking.deployed();
+        const morpherMintingLimiter = await MintingLimiter.deployed();
 
         // Topup test accounts with MorpherToken.
         await morpherToken.transfer(testUserAddress, web3.utils.toWei("1", "ether"), { from: deployerAddress });
@@ -171,7 +174,7 @@ contract('MorpherOracle', (accounts) => {
         );
 
         //deploy new trade engine
-        const morpherTradeEngine2 = await MorpherTradeEngine.new(morpherState.address, deployerAddress, morpherStaking.address, true, 0)
+        const morpherTradeEngine2 = await MorpherTradeEngine.new(morpherState.address, deployerAddress, morpherStaking.address, true, 0, morpherMintingLimiter.address)
         await morpherState.grantAccess(morpherTradeEngine2.address);
         await morpherOracle2.setTradeEngineAddress(morpherTradeEngine2.address);
 
