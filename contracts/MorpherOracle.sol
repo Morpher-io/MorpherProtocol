@@ -382,7 +382,7 @@ contract MorpherOracle is Ownable {
             MorpherOracle _oracle = MorpherOracle(previousOracleAddress);
             address _previousTradeEngine = _oracle.getTradeEngineFromOrderId(_orderId);
             if(_previousTradeEngine != 0xcEFe3876e6c07F227ABD05f076AF6e7368C5cEB0) { //fixing a typo
-                return _oracle.getTradeEngineFromOrderId(_orderId);
+                return _previousTradeEngine;
             }
         }
 
