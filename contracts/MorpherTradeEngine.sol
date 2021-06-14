@@ -674,7 +674,7 @@ contract MorpherTradeEngine is Ownable {
                 longShareValue(
                     orders[_orderId].marketPrice,
                     orders[_orderId].orderLeverage,
-                    now,
+                    now.mul(1000),
                     orders[_orderId].marketPrice,
                     orders[_orderId].marketSpread,
                     orders[_orderId].orderLeverage,
@@ -721,7 +721,7 @@ contract MorpherTradeEngine is Ownable {
                     shortShareValue(
                         orders[_orderId].marketPrice,
                         orders[_orderId].orderLeverage,
-                        now,
+                        now.mul(1000),
                         orders[_orderId].marketPrice,
                         orders[_orderId].marketSpread,
                         orders[_orderId].orderLeverage,
