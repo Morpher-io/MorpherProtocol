@@ -40,6 +40,7 @@ contract MorpherOracle is Ownable {
 
     mapping(bytes32 => address) public orderIdTradeEngineAddress;
     address public previousTradeEngineAddress;
+    address public skipPreviousTradeEngineAddress; //skips a trade engine address, e.g. typos
     address public previousOracleAddress;
 
 // ----------------------------------------------------------------------------------
@@ -172,6 +173,10 @@ contract MorpherOracle is Ownable {
     event DelistMarketComplete(bytes32 _marketId);
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
+
+    event FallbackOracleUpdated(address _oldFallbackOracle, address _newFallbackOracle);
+    event FallbackTradeEngineUpdated(address _oldFallbackTradeEngine, address _newFallbackTradeEngine);
+    event UpdateSkipPreviousTradeEngineAddress(address _oldAddress, address _newAddress);
 
     modifier onlyOracleOperator {
         require(isCallbackAddress(msg.sender), "MorpherOracle: Only the oracle operator can call this function.");
@@ -375,16 +380,33 @@ contract MorpherOracle is Ownable {
             return orderIdTradeEngineAddress[_orderId];
         }
 
-        //todo for later
-        //we can't do recursively call the oracle.getTradeEngineFromOrderId here, because the previously deployed oracle
-        //doesn't have this function yet. We can uncomment this in later updates of the oracle
-        // if(previousOracleAddress !== address(0)) {
-        //     MorpherOracle _oracle = MorpherOracle(previousOracleAddress)
-        //     return _oracle.getTradeEngineFromOrderId(_orderId);
-        // }
+        if(previousOracleAddress != address(0)) {
+            MorpherOracle _oracle = MorpherOracle(previousOracleAddress);
+            address _previousTradeEngine = _oracle.getTradeEngineFromOrderId(_orderId);
+            if(_previousTradeEngine != skipPreviousTradeEngineAddress) { //fixing a typo
+                return _previousTradeEngine;
+            }
+        }
 
         //nothing in there, take the previous tradeEngine then.
         return previousTradeEngineAddress;
+    }
+
+    function updateSkipTradeEngineAddress(address _skipTradeEngineAddress) public onlyAdministrator {
+        emit UpdateSkipPreviousTradeEngineAddress(skipPreviousTradeEngineAddress, _skipTradeEngineAddress);
+        skipPreviousTradeEngineAddress = _skipTradeEngineAddress;
+    }
+
+
+    function updateFallbackTradeEngineAddress(address _tradeEngineFallbackAddress) public onlyAdministrator {
+        emit FallbackTradeEngineUpdated(previousTradeEngineAddress, _tradeEngineFallbackAddress);
+        previousTradeEngineAddress = _tradeEngineFallbackAddress;
+    }
+
+
+    function updateFallbackOracleAddress(address _oracleFallbackAddress) public onlyAdministrator {
+        emit FallbackOracleUpdated(previousOracleAddress, _oracleFallbackAddress);
+        previousOracleAddress = _oracleFallbackAddress;
     }
 
     function initiateCancelOrder(bytes32 _orderId) public {
@@ -669,3 +691,4 @@ contract MorpherOracle is Ownable {
         return keccak256(abi.encodePacked(_source));
     }
 }
+
