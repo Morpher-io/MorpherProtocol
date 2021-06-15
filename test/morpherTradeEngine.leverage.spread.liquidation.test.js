@@ -260,3 +260,46 @@ contract('MorpherTradeEngine', (accounts) => {
         assert.equal(userBalance, '80000000000000000000');
     });
 });
+
+contract('MorpherTradeEngine', (accounts) => {
+
+    it('position opening is possible with leverage 10 and old deployed timestamp', async () => {
+        let account0 = accounts[0]; let account1 = accounts[1];
+
+        let morpherTradeEngine = await MorpherTradeEngine.deployed();
+        let morpherToken = await MorpherToken.deployed();
+        let morpherState = await MorpherState.deployed();
+        let morpherOracle = await MorpherOracle.deployed();
+
+        // Set balance of testing account.
+        //(address to, uint256 tokens)
+        await morpherToken.transfer(account1, web3.utils.toWei('1','ether'));
+        //(_marketId, _closeSharesAmount, _openMPHAmount, _tradeDirection, _orderLeverage, _onlyIfPriceAbove, _onlyIfPriceBelow, _goodUntil, _goodFrom)
+        let orderId = (await morpherOracle.createOrder(BTC, 0, web3.utils.toWei('1','ether'), true, 1000000000, 0, 0, 0, 0, { from: account1 })).logs[0].args._orderId;
+
+        // console.log(orderId);
+        //(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp)
+        const oracleTimestampForPosition = Math.round(Date.now() / 1000) - 60; //1 minute delay
+        await morpherOracle.__callback(orderId, roundToInteger(200), 0, 0, 0, oracleTimestampForPosition, 0, { from: account0 });
+
+        // (address _address, bytes32 _marketId)
+        let position = await morpherState.getPosition(account1, BTC);
+
+        // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
+        let positionValue = position._longShares.toNumber() *
+            (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
+            position._meanEntryLeverage.toNumber(), oracleTimestampForPosition, 
+                roundToInteger(200), 200000, 100000000, true)).toNumber();
+
+        let userBalance = (await morpherState.balanceOf(account1)).toString();
+
+        assert.equal(positionValue, 0);
+
+        assert.equal(position._meanEntryPrice.toNumber(), 20000000000);
+        assert.equal(position._longShares.toNumber(), 50000000);
+        assert.equal(position._shortShares.toNumber(), 0);
+        assert.equal(position._meanEntrySpread.toNumber(), 0);
+
+        assert.equal(userBalance, '0');
+    });
+});
