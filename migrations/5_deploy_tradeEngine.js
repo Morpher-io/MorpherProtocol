@@ -10,7 +10,7 @@ module.exports = async function(deployer, network, accounts) {
     const timelockPeriodMinting = process.env.MINTING_TIME_LOCK_PERIOD || 0;
 
     const morpherState = await MorpherState.deployed();
-    let deployedTimestamp = 0;
+    let deployedTimestamp = 1613399217;
     if(network == "local" || network == "test") {
         deployedTimestamp = Math.round(Date.now() / 1000) - (60*60*24*30*5); //settings this for testing 5 months back
     }
