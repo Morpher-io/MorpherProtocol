@@ -26,6 +26,8 @@ module.exports = async function(deployer, network, accounts) {
      */
     await morpherState.grantAccess(tradeEngine.address);
     await morpherState.grantAccess(morpherMintingLimiter.address);
+    await morpherState.enableTransfers(tradeEngine.address);
+    await morpherState.enableTransfers(morpherMintingLimiter.address);
 
 
 };
