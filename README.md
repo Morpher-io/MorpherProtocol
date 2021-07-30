@@ -171,4 +171,4 @@ The Smart Contracts are deployed on the Ethereum Mainnet and on the Morpher Side
 * MorpherGovernance: [0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762](https://etherscan.io/address/0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762)
 * MorpherAirdrop: [0x6306037eaD1FC236F4aabC8c826F351c9F45d409](https://etherscan.io/address/0x6306037eaD1FC236F4aabC8c826F351c9F45d409)
 * MorpherEscrow: [0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c](https://etherscan.io/address/0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c)
-* MorpherOracle: [0x359fe2aa337b76b7ebec8d950bb8a29515cc34b8](https://etherscan.io/address/0x359fe2aa337b76b7ebec8d950bb8a29515cc34b8)
+* MorpherOracle: [0x73b7631c508db9E389edF6aBb3C4a48da0444553](https://etherscan.io/address/0x73b7631c508db9E389edF6aBb3C4a48da0444553)
