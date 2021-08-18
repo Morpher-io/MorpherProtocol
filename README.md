@@ -7,7 +7,7 @@ Morpher Smart Contracts are a collection of solidity files for on chain transact
 
 ---
 
-Morpher rebuilts financial markets from the ground up on the Ethereum Blockchain. All in the pursuit of the perfect trading experience.
+Morpher rebuilds financial markets from the ground up on the Ethereum Blockchain. All in the pursuit of the perfect trading experience.
 
 [![Image of Morpher](./docs/laptop_phone_shot.3303f142.webp)](https://morpher.com)
 
@@ -172,3 +172,5 @@ The Smart Contracts are deployed on the Ethereum Mainnet and on the Morpher Side
 * MorpherAirdrop: [0x6306037eaD1FC236F4aabC8c826F351c9F45d409](https://etherscan.io/address/0x6306037eaD1FC236F4aabC8c826F351c9F45d409)
 * MorpherEscrow: [0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c](https://etherscan.io/address/0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c)
 * MorpherOracle: [0x73b7631c508db9E389edF6aBb3C4a48da0444553](https://etherscan.io/address/0x73b7631c508db9E389edF6aBb3C4a48da0444553)
+* MorpherMintingLimiter: [0x30D90c8a36FFF52F1C8C05b54d4CE79610431Ec0](https://etherscan.io/address/0x30d90c8a36fff52f1c8c05b54d4ce79610431ec0)
+* MorpherStaking: [0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE](https://etherscan.io/address/0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE)
