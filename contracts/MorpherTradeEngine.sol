@@ -4,6 +4,7 @@ import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./MorpherState.sol";
 import "./IMorpherStaking.sol";
+import "./MorpherMintingLimiter.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -15,6 +16,7 @@ import "./IMorpherStaking.sol";
 contract MorpherTradeEngine is Ownable {
     MorpherState state;
     IMorpherStaking staking;
+    MorpherMintingLimiter mintingLimiter;
     using SafeMath for uint256;
 
 // ----------------------------------------------------------------------------
@@ -123,15 +125,16 @@ contract MorpherTradeEngine is Ownable {
 
     event LinkState(address _address);
     event LinkStaking(address _stakingAddress);
-
+    event LinkMintingLimiter(address _mintingLimiterAddress);
 
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress) public {
         setMorpherState(_stateAddress);
         setMorpherStaking(_stakingContractAddress);
+        setMorpherMintingLimiter(_mintingLimiterAddress);
         transferOwnership(_coldStorageOwnerAddress);
         escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
         deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
@@ -160,6 +163,11 @@ contract MorpherTradeEngine is Ownable {
     function setMorpherStaking(address _stakingAddress) public onlyOwner {
         staking = IMorpherStaking(_stakingAddress);
         emit LinkStaking(_stakingAddress);
+    }
+
+    function setMorpherMintingLimiter(address _mintingLimiterAddress) public onlyOwner {
+        mintingLimiter = MorpherMintingLimiter(_mintingLimiterAddress);
+        emit LinkMintingLimiter(_mintingLimiterAddress);
     }
 
     function getAdministrator() public view returns(address _administrator) {
@@ -520,7 +528,6 @@ contract MorpherTradeEngine is Ownable {
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
         uint256 _positionTimeStampInMs,
-        uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _orderLeverage,
@@ -542,7 +549,7 @@ contract MorpherTradeEngine is Ownable {
 	        _averageLeverage = _orderLeverage;
         }
         if (
-            _liquidationPrice <= _marketPrice
+            getLiquidationPrice(_averagePrice, _averageLeverage, false, _positionTimeStampInMs) <= _marketPrice
             ) {
 	        // Position is worthless
             _shareValue = 0;
@@ -573,7 +580,6 @@ contract MorpherTradeEngine is Ownable {
         uint256 _positionAveragePrice,
         uint256 _positionAverageLeverage,
         uint256 _positionTimeStampInMs,
-        uint256 _liquidationPrice,
         uint256 _marketPrice,
         uint256 _marketSpread,
         uint256 _orderLeverage,
@@ -595,7 +601,7 @@ contract MorpherTradeEngine is Ownable {
 	        _averageLeverage = _orderLeverage;
         }
         if (
-            _marketPrice <= _liquidationPrice
+            _marketPrice <= getLiquidationPrice(_averagePrice, _averageLeverage, true, _positionTimeStampInMs)
             ) {
 	        // Position is worthless
             _shareValue = 0;
@@ -668,8 +674,7 @@ contract MorpherTradeEngine is Ownable {
                 longShareValue(
                     orders[_orderId].marketPrice,
                     orders[_orderId].orderLeverage,
-                    now,
-                    0,
+                    now.mul(1000),
                     orders[_orderId].marketPrice,
                     orders[_orderId].marketSpread,
                     orders[_orderId].orderLeverage,
@@ -716,8 +721,7 @@ contract MorpherTradeEngine is Ownable {
                     shortShareValue(
                         orders[_orderId].marketPrice,
                         orders[_orderId].orderLeverage,
-                        now,
-                        orders[_orderId].marketPrice.mul(100),
+                        now.mul(1000),
                         orders[_orderId].marketPrice,
                         orders[_orderId].marketSpread,
                         orders[_orderId].orderLeverage,
@@ -806,6 +810,7 @@ contract MorpherTradeEngine is Ownable {
             _newMeanEntry = state.getMeanEntryPrice(_userId, _marketId);
 	        _newMeanSpread = state.getMeanEntrySpread(_userId, _marketId);
 	        _newMeanLeverage = state.getMeanEntryLeverage(_userId, _marketId);
+            resetTimestampInOrderToLastUpdated(_orderId);
         }
 
         orders[_orderId].balanceDown = 0;
@@ -818,6 +823,15 @@ contract MorpherTradeEngine is Ownable {
 
         setPositionInState(_orderId);
     }
+
+event ResetTimestampInOrder(bytes32 _orderId, uint oldTimestamp, uint newTimestamp);
+function resetTimestampInOrderToLastUpdated(bytes32 _orderId) internal {
+    address userId = orders[_orderId].userId;
+    bytes32 marketId = orders[_orderId].marketId;
+    uint lastUpdated = state.getLastUpdated(userId, marketId);
+    emit ResetTimestampInOrder(_orderId, orders[_orderId].timeStamp, lastUpdated);
+    orders[_orderId].timeStamp = lastUpdated;
+}
 
 // ----------------------------------------------------------------------------
 // closeShort(bytes32 _orderId)
@@ -834,7 +848,6 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
                 state.getMeanEntryPrice(_userId, _marketId),
                 state.getMeanEntryLeverage(_userId, _marketId),
                 state.getLastUpdated(_userId, _marketId),
-                state.getLiquidationPrice(_userId, _marketId),
                 orders[_orderId].marketPrice,
                 orders[_orderId].marketSpread,
                 state.getMeanEntryLeverage(_userId, _marketId),
@@ -846,7 +859,6 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
                 state.getMeanEntryPrice(_userId, _marketId),
                 state.getMeanEntryLeverage(_userId, _marketId),
                 state.getLastUpdated(_userId, _marketId),
-                state.getLiquidationPrice(_userId, _marketId),
                 orders[_orderId].marketPrice,
                 orders[_orderId].marketSpread,
                 state.getMeanEntryLeverage(_userId, _marketId),
@@ -873,6 +885,11 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
             _newMeanEntry = state.getMeanEntryPrice(_userId, _marketId);
 	        _newMeanSpread = state.getMeanEntrySpread(_userId, _marketId);
 	        _newMeanLeverage = state.getMeanEntryLeverage(_userId, _marketId);
+
+            /**
+             * we need the timestamp of the old order for partial closes, not the new one
+             */
+            resetTimestampInOrderToLastUpdated(_orderId);
         }
 
         orders[_orderId].balanceDown = 0;
@@ -942,23 +959,26 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
     function computeLiquidationPrice(bytes32 _orderId) public returns(uint256 _liquidationPrice) {
         orders[_orderId].newLiquidationPrice = 0;
         if (orders[_orderId].newLongShares > 0) {
-            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, true);
+            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, true, orders[_orderId].timeStamp);
         }
         if (orders[_orderId].newShortShares > 0) {
-            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, false);
+            orders[_orderId].newLiquidationPrice = getLiquidationPrice(orders[_orderId].newMeanEntryPrice, orders[_orderId].newMeanEntryLeverage, false, orders[_orderId].timeStamp);
         }
         return orders[_orderId].newLiquidationPrice;
     }
 
-    function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long) public pure returns (uint256 _liquidiationPrice) {
+    function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256 _liquidationPrice) {
         if (_long == true) {
-            _liquidiationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.sub(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.sub(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _liquidationPrice.add(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
         } else {
-            _liquidiationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.add(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.add(PRECISION)).div(_newMeanEntryLeverage);
+            _liquidationPrice = _liquidationPrice.sub(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
         }
-        return _liquidiationPrice;
+        return _liquidationPrice;
     }
 
+    
 // ----------------------------------------------------------------------------
 // setPositionInState(bytes32 _orderId)
 // Updates the portfolio in Morpher State. Called by closeLong/closeShort/openLong/openShort
@@ -975,7 +995,7 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
             orders[_orderId].balanceUp = 0;
         }
         if (orders[_orderId].balanceUp > 0) {
-            state.mint(orders[_orderId].userId, orders[_orderId].balanceUp);
+            mintingLimiter.mint(orders[_orderId].userId, orders[_orderId].balanceUp);
         }
         if (orders[_orderId].balanceDown > 0) {
             state.burn(orders[_orderId].userId, orders[_orderId].balanceDown);

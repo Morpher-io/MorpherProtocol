@@ -8,8 +8,7 @@ const markets = require("../markets.json");
 module.exports = async function (deployer, network, accounts) {
   const ownerAddress = process.env.MORPHER_OWNER || accounts[0];
 
-  const morpherState = await MorpherState.at("0xb07E7bEC3be6782F2f43bd3F4AbCCAA9B544B934");
-  const morpherToken = await MorpherToken.at("0xe9D5afBae107A92A92cb57397C77154Dbc58CA9d");
+  const morpherState = await MorpherState.at("0x52F74D95185f11a9A4885bFbDA77072Ff3CaaDCF");
 
   /**
    * Only setting the Governance on Mainchain
@@ -18,7 +17,6 @@ module.exports = async function (deployer, network, accounts) {
    
     await deployer.deploy(
       MorpherAccountMigration,
-      morpherToken.address,
       morpherState.address,
       {gas: 8000000}
     );

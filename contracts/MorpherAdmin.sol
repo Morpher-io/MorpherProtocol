@@ -82,9 +82,9 @@ contract MorpherAdmin {
             _positionAveragePrice    = _positionAveragePrice.mul(_nominator).div(_denominator);
             _positionAverageSpread   = _positionAverageSpread.mul(_nominator).div(_denominator);
             if (_positionShortShares > 0) {
-                _liquidationPrice    = tradeEngine.getLiquidationPrice(_positionAveragePrice, _positionAverageLeverage, false);
+                _liquidationPrice    = getLiquidationPriceInternal(false, _address, _marketId);
             } else {
-                _liquidationPrice    = tradeEngine.getLiquidationPrice(_positionAveragePrice, _positionAverageLeverage, true);
+                _liquidationPrice    = getLiquidationPriceInternal(true, _address, _marketId);
             }               
             state.setPosition(_address, _marketId, now, _positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice);   
         }
@@ -118,12 +118,20 @@ contract MorpherAdmin {
             (_positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice) = state.getPosition(_address, _marketId);
             _positionAveragePrice    = _positionAveragePrice.add(_rollUp).sub(_rollDown);
             if (_positionShortShares > 0) {
-                _liquidationPrice    = tradeEngine.getLiquidationPrice(_positionAveragePrice, _positionAverageLeverage, false);
+                _liquidationPrice    = getLiquidationPriceInternal(false, _address, _marketId);
             } else {
-                _liquidationPrice    = tradeEngine.getLiquidationPrice(_positionAveragePrice, _positionAverageLeverage, true);
+                _liquidationPrice    = getLiquidationPriceInternal(true, _address, _marketId);
             }               
             state.setPosition(_address, _marketId, now, _positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice);   
         }
+    }
+
+/**
+ * Stack too deep error
+ */
+    function getLiquidationPriceInternal(bool isLong, address _userAddress, bytes32 _marketId) internal view returns (uint) {
+        ( , , uint price, , uint leverage, ) = state.getPosition(_userAddress, _marketId);
+        return tradeEngine.getLiquidationPrice(price, leverage, isLong, state.getLastUpdated(_userAddress, _marketId));
     }
     
 // ----------------------------------------------------------------------------------

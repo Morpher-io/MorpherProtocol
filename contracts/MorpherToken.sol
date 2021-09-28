@@ -44,7 +44,7 @@ contract MorpherToken is IERC20, Ownable {
     }
 
     modifier canTransfer {
-        require(state.mainChain() == true || state.getCanTransfer(msg.sender), "ERC20: token transfers disabled on sidechain.");
+        require(state.getCanTransfer(msg.sender), "ERC20: token transfers disabled on sidechain.");
         _;
     }
     

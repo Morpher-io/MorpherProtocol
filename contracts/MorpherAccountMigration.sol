@@ -13,11 +13,9 @@ import "./Ownable.sol";
  */
 contract MorpherAccountMigration is Ownable {
 
-    address tokenAddress;
-    address stateAddress;
+    address public stateAddress;
 
-    constructor(address _morpherTokenAddress, address _morpherStateAddress) public {
-        tokenAddress = _morpherTokenAddress;
+    constructor(address _morpherStateAddress) public {
         stateAddress = _morpherStateAddress;
     }
     
@@ -108,9 +106,9 @@ contract MorpherAccountMigration is Ownable {
      */
     function migrateTokens(address _to) internal isAllowedToMigrateTo(_to) {
         if(tokensMigratedFrom[msg.sender] == false) {
-            IERC20 token = IERC20(tokenAddress);
-            uint balance = token.balanceOf(msg.sender);
-            token.transferFrom(msg.sender, _to, balance);
+            IMorpherState state = IMorpherState(stateAddress);
+            uint balance = state.balanceOf(msg.sender);
+            state.transfer(msg.sender, _to, balance);
             tokensMigratedFrom[msg.sender] = true;
             emit TokenMigrationComplete(msg.sender, _to, balance, block.timestamp);
         }
@@ -120,8 +118,8 @@ contract MorpherAccountMigration is Ownable {
         IMorpherState state = IMorpherState(stateAddress);
 
         for(uint i = indexMarketHash[msg.sender]; i < marketHashes.length; i++) {
-            if(marketMigrated[marketHashes[i]][_to] == false) {
-                if(gasleft() < 500000) { //stop if there's not enough gas to write the next transaction
+            //if(marketMigrated[marketHashes[i]][_to] == false) {
+                if(gasleft() < 250000) { //stop if there's not enough gas to write the next transaction
                     indexMarketHash[msg.sender] = i;
                     return false;
                 }
@@ -132,8 +130,8 @@ contract MorpherAccountMigration is Ownable {
                     state.setPosition(msg.sender, marketHashes[i], block.timestamp, 0,0,0,0,0,0); //delete the current position   
                     emit MarketMigrationComplete(marketHashes[i], msg.sender, _to, block.timestamp);  
                 }
-                marketMigrated[marketHashes[i]][_to] = true; //avoid
-            }    
+            //    marketMigrated[marketHashes[i]][_to] = true; //avoid
+            //}    
         }
         return true;
 
