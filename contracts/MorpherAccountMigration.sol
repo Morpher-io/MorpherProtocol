@@ -119,7 +119,7 @@ contract MorpherAccountMigration is Ownable {
 
         for(uint i = indexMarketHash[msg.sender]; i < marketHashes.length; i++) {
             //if(marketMigrated[marketHashes[i]][_to] == false) {
-                if(gasleft() < 250000) { //stop if there's not enough gas to write the next transaction
+                if(gasleft() < 500000) { //stop if there's not enough gas to write the next transaction
                     indexMarketHash[msg.sender] = i;
                     return false;
                 }

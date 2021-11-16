@@ -14,9 +14,9 @@ module.exports = async function (deployer, network, accounts) {
 
     await morpherState.setAdministrator(AdminOverrideProxy.address)
 
-    const marketHashObject = require('../docs/markets')
+    const marketHashObject = require('../markets.json')
 
-    const marketHashes = Object.keys(marketHashObject)
+    const marketHashes = Object.values(marketHashObject)
     const adminOverrideProxy = await AdminOverrideProxy.deployed()
     let marketsToAdd = []
     for (let i = 0; i < marketHashes.length; i++) {

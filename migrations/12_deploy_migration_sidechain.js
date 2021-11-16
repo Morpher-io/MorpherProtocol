@@ -1,14 +1,17 @@
 const MorpherState = artifacts.require("MorpherState");
-const MorpherToken = artifacts.require("MorpherToken");
 const MorpherAccountMigration = artifacts.require("MorpherAccountMigration");
+MorpherAccountMigration.synchronization_timeout = 300; //timeout in seconds
 
 const markets = require("../markets.json");
 
 module.exports = async function (deployer, network, accounts) {
   const ownerAddress = process.env.MORPHER_OWNER || accounts[0];
+  const adminAddress = accounts[1];
+  console.log(ownerAddress, adminAddress);
 
+
+  //const morpherState = await MorpherState.at("0x52F74D95185f11a9A4885bFbDA77072Ff3CaaDCF");
   const morpherState = await MorpherState.deployed();
-  const morpherToken = await MorpherToken.deployed();
 
   /**
    * Only setting the Governance on Mainchain
@@ -17,31 +20,33 @@ module.exports = async function (deployer, network, accounts) {
    
     await deployer.deploy(
       MorpherAccountMigration,
-      morpherToken.address,
       morpherState.address,
-      {gas: 8000000}
+      {gas: 8000000, from: adminAddress}
     );
 
     /**
      * Grant the Migration-Contract access to move funds
      */
-    await morpherState.grantAccess(MorpherAccountMigration.address);
+    console.log("Grating access to " + MorpherAccountMigration.address);
+    await morpherState.grantAccess(MorpherAccountMigration.address, {from: adminAddress});
     
     /**
      * allow the smart contract to move funds
      */
-    await morpherState.enableTransfers(MorpherAccountMigration.address);
+    console.log("Enabling transfers for " + MorpherAccountMigration.address);
+    await morpherState.enableTransfers(MorpherAccountMigration.address, {from: adminAddress});
 
     const morpherAccountMigration = await MorpherAccountMigration.deployed();
     let marketHashesArray = [];
     for (const marketName in markets) {
       marketHashesArray.push(markets[marketName]);
       if(marketHashesArray.length == 100) {
-        await morpherAccountMigration.addMarketHashes(marketHashesArray);
+        console.log("Deploying until " + marketName);
+        await morpherAccountMigration.addMarketHashes(marketHashesArray, {from: adminAddress});
         marketHashesArray = [];
       }
     }
-    await morpherAccountMigration.addMarketHashes(marketHashesArray);
+    await morpherAccountMigration.addMarketHashes(marketHashesArray, {from: adminAddress});
     //test with a single market below:
     //await morpherAccountMigration.addMarketHashes([web3.utils.sha3('CRYPTO_BTC')]);
     //let migrations = 
