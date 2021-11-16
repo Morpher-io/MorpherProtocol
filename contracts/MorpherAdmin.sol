@@ -54,9 +54,9 @@ contract MorpherAdmin {
     }
 
     function migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId) public onlyAdministrator {
-        require(state.getMarketActive(_oldMarketId) == false, "Market must be paused to process stock splits.");
-        require(state.getMarketActive(_newMarketId) == false, "Market must be paused to process stock splits.");
-        // If no _fromIx and _toIx specified, do entire _list
+        require(state.getMarketActive(_oldMarketId) == false, "Market must be paused to process market migration.");
+        require(state.getMarketActive(_newMarketId) == false, "Market must be paused to process market migration.");
+
         uint256 maxMarketAddressIndex = state.getMaxMappingIndex(_oldMarketId);
         address[] memory addresses = new address[](maxMarketAddressIndex);
         for (uint256 i = 0; i <= maxMarketAddressIndex; i++) { 
