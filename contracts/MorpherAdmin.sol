@@ -59,10 +59,10 @@ contract MorpherAdmin {
 
         uint256 maxMarketAddressIndex = state.getMaxMappingIndex(_oldMarketId);
         address[] memory addresses = new address[](maxMarketAddressIndex);
-        for (uint256 i = 0; i <= maxMarketAddressIndex; i++) { 
-            addresses[i] = state.getExposureMappingAddress(_oldMarketId, i); //changing on position delete
+        for (uint256 i = 1; i <= maxMarketAddressIndex; i++) { 
+            addresses[i-1] = state.getExposureMappingAddress(_oldMarketId, i); //changing on position delete
         }
-        for(uint256 i = 0; i <= addresses.length; i++) {
+        for(uint256 i = 0; i < addresses.length; i++) {
             address _address = addresses[i]; //normalize back to 0-based index
             (uint longShares, uint shortShares, uint meanEntryPrice, uint meanEntrySpread, uint meanEntryLeverage, uint liquidationPrice) = state.getPosition(_address, _oldMarketId);
             if(longShares > 0 || shortShares > 0) {
@@ -71,7 +71,7 @@ contract MorpherAdmin {
                 emit AddressPositionMigrationComplete(_address, _oldMarketId, _newMarketId);  
             } 
 
-            if(gasleft() < 500000) { //stop if there's not enough gas to write the next transaction
+            if(gasleft() < 500000 && (i+1) < address.length) { //stop if there's not enough gas to write the next transaction
                 emit AllPositionMigrationIncomplete(_oldMarketId, _newMarketId, i);
                 return;
             }
