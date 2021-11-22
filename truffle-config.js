@@ -1,5 +1,5 @@
 require("dotenv").config();
-let HDWalletProvider = require("truffle-hdwallet-provider");
+let HDWalletProvider = require("@truffle/hdwallet-provider");
 const Web3 = require('web3');
 
 module.exports = {
@@ -12,10 +12,20 @@ module.exports = {
     morpher: {
       provider: () =>
         new HDWalletProvider(
-          process.env.MORPHER_DEPLOYER_KEY,
+          process.env.MORPHER_DEPLOYER_PK,
           "https://sidechain.morpher.com"
         ),
       network_id: "21",
+      timeoutBlocks: 200,
+    },
+    morphertest: {
+      provider: () =>
+        new HDWalletProvider(
+          [process.env.MORPHER_ADMINISTRATOR_KEY],
+          "https://sidechain-test.morpher.com"
+        ),
+      network_id: "21",
+      chainId: 21,
       timeoutBlocks: 200,
     },
     ropsten: {
