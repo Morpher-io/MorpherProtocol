@@ -12,7 +12,7 @@ module.exports = {
     morpher: {
       provider: () =>
         new HDWalletProvider(
-          process.env.MORPHER_DEPLOYER_KEY,
+          process.env.MORPHER_DEPLOYER_PK,
           "https://sidechain.morpher.com"
         ),
       network_id: "21",

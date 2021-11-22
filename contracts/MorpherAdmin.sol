@@ -71,7 +71,7 @@ contract MorpherAdmin {
                 emit AddressPositionMigrationComplete(_address, _oldMarketId, _newMarketId);  
             } 
 
-            if(gasleft() < 500000 && (i+1) < address.length) { //stop if there's not enough gas to write the next transaction
+            if(gasleft() < 500000 && (i+1) < addresses.length) { //stop if there's not enough gas to write the next transaction
                 emit AllPositionMigrationIncomplete(_oldMarketId, _newMarketId, i);
                 return;
             }
