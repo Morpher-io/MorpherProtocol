@@ -112,3 +112,65 @@ contract('MorpherStaking: Administrative Actions', (accounts) => {
     });
 
 });
+
+
+contract('MorpherStaking: Interest Rate Actions', (accounts) => {
+    const [deployer, account1, account2] = accounts;
+    it('has a default interest rate', async() => {
+        const staking = await MorpherStaking.deployed();
+        const interestRate = await staking.interestRate();
+        assert.equal(interestRate.toString(), '15000');
+    })
+    it('add Interest Rate', async () => {
+
+        const staking = await MorpherStaking.deployed();
+        const result = await staking.addInterestRate('30000', Math.round((Date.now() / 1000) + (60*60*24)));
+        await truffleAssert.eventEmitted(result, "InterestRateAdded")
+    });
+
+    it('add Interest Rate with a past validFrom rate fails', async () => {
+        const staking = await MorpherStaking.deployed();
+        await truffleAssert.fails(staking.addInterestRate('50000', Math.round(Date.now() / 1000)), truffleAssert.ErrorType.REVERT, 'MorpherStaking: Interest Rate Valid From must be later than last interestRate');
+        
+    });
+
+    it('change interest rate', async () => {
+        const staking = await MorpherStaking.deployed();
+        const result = await staking.changeInterestRateValue(0, 20000);
+        await truffleAssert.eventEmitted(result, "InterestRateRateChanged");
+        const interestRateAfterChange = await staking.interestRate();
+        assert.equal(interestRateAfterChange.toString(), '20000');
+        await staking.changeInterestRateValue(0, 15000);
+
+    });
+
+    it('deactivate/activate Interest Rate', async () => {
+        const staking = await MorpherStaking.deployed();
+        const result = await staking.changeInterestRateActive(0, false);
+        await truffleAssert.eventEmitted(result, "InterestRateActiveChanged");
+        const interestRateAfterChange = await staking.interestRates(0);
+        assert.equal(interestRateAfterChange.active, false);
+        await staking.changeInterestRateActive(0, true);
+    });
+
+    it('is possible to change the valid From date of interest rates', async() =>{
+        const staking = await MorpherStaking.deployed();
+        
+        const firstInterestRate = await staking.interestRates(0);
+        const result = await staking.changeInterestRateValidFrom(1, Math.round((Date.now()/1000) - ((Date.now() / 1000) - firstInterestRate.validFrom.toNumber())/2)); //set back the valid from to halfway in the past, so the average right now should be (15000+30000)/2=22500
+        await truffleAssert.eventEmitted(result, "InterestRateValidFromChanged");
+    })
+
+    it('position interest rate for past position', async () => {
+        const staking = await MorpherStaking.deployed();
+        const firstInterestRate = await staking.interestRates(0);
+        const result = await staking.getInterestRate(firstInterestRate.validFrom); //get the interest rate from a position opened at the creation date of the first interest rate
+        //it should be a weighted average of 15000 and 30000, which in this case is 50:50 with a little rounding error
+        if(result.toString() == '22499') {
+            assert.equal(result.toString(), '22499');
+        } else {
+            assert.equal(result.toString(), '22500');
+        }
+    });
+
+});
