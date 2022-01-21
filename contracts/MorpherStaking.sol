@@ -71,6 +71,7 @@ contract MorpherStaking is Ownable {
         emit SetLockupPeriod(lockupPeriod);
         emit SetMinimumStake(minimumStake);
         addInterestRate(15000,1617094819); //setting the initial interest rate to the trade engine deployed timestamp
+        lastReward = block.timestamp;
         // missing: transferOwnership to Governance once deployed
     }
 
