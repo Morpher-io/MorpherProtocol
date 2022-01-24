@@ -1,5 +1,6 @@
 const MorpherToken = artifacts.require("MorpherToken");
 const MorpherStaking = artifacts.require("MorpherStaking");
+const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
 
 const truffleAssert = require('truffle-assertions');
 const BN = require("bn.js");
@@ -144,15 +145,6 @@ contract('MorpherStaking: Interest Rate Actions', (accounts) => {
 
     });
 
-    it('deactivate/activate Interest Rate', async () => {
-        const staking = await MorpherStaking.deployed();
-        const result = await staking.changeInterestRateActive(0, false);
-        await truffleAssert.eventEmitted(result, "InterestRateActiveChanged");
-        const interestRateAfterChange = await staking.interestRates(0);
-        assert.equal(interestRateAfterChange.active, false);
-        await staking.changeInterestRateActive(0, true);
-    });
-
     it('is possible to change the valid From date of interest rates', async() =>{
         const staking = await MorpherStaking.deployed();
         
@@ -174,3 +166,35 @@ contract('MorpherStaking: Interest Rate Actions', (accounts) => {
     });
 
 });
+
+contract('MorpherStaking: Interest Rate calculations', (accounts) => {
+    it('margin calculation works correctly - single interest rate', async () => {
+        let morpherTradeEngine = await MorpherTradeEngine.deployed();
+        let createdTimestamp = Date.now() - 2592000000; //today  - 30 days
+        //30 days should yield interest = price * (leverage - 1) * (days + 1) * 0.000015 percent
+        //30000000000 * (200000000 - 100000000) * ( (2592000 / 86400) + 1) * (15000 / 100000000) / 100000000 percent = 13950000 is the interest on the exsting position 
+
+        assert('13950000', (await morpherTradeEngine.calculateMarginInterest(roundToInteger(300), 200000000, createdTimestamp)).toString(), 'Margin interest calculation doesnt work');
+    })
+
+    it('margin calculation works correctly - multiple interest rates', async () => {
+        let morpherTradeEngine = await MorpherTradeEngine.deployed();
+        let createdTimestamp = Date.now() - 2592000000; //today  - 30 days
+        const staking = await MorpherStaking.deployed();
+        const result = await staking.addInterestRate('30000', Math.round(createdTimestamp/1000) + 24*60*60); //adding another interest rate after the positionTimestamp should average the position interest rate
+        let interestRate = await staking.getInterestRate(createdTimestamp);
+        assert.isBelow(15000, interestRate.toNumber());
+        let expectedResult = roundToInteger(300) * (200000000 - 100000000) * (Math.round(2592000000/86400) + 1) * interestRate / 100000000 / 100000000;
+        //30 days should yield interest = price * (leverage - 1) * (days + 1) * 0.000015 percent
+        //30000000000 * (200000000 - 100000000) * ( (2592000 / 86400) + 1) * (15000 / 100000000) / 100000000 percent = 13950000 is the interest on the exsting position 
+
+        assert(expectedResult, (await morpherTradeEngine.calculateMarginInterest(roundToInteger(300), 200000000, createdTimestamp)).toString(), 'Margin interest calculation doesnt work');
+    })
+
+});
+
+
+
+function roundToInteger(price) {
+    return Math.round(price * Math.pow(10, 8));
+}

@@ -28,7 +28,6 @@ contract MorpherStaking is Ownable {
     struct InterestRate {
         uint256 validFrom;
         uint256 rate;
-        bool active;
     }
 
     mapping(uint256 => InterestRate) public interestRates;
@@ -47,7 +46,6 @@ contract MorpherStaking is Ownable {
 // ----------------------------------------------------------------------------
     event SetInterestRate(uint256 newInterestRate);
     event InterestRateAdded(uint256 interestRate, uint256 validFromTimestamp);
-    event InterestRateActiveChanged(uint256 interestRateIndex, bool active);
     event InterestRateRateChanged(uint256 interstRateIndex, uint256 oldvalue, uint256 newValue);
     event InterestRateValidFromChanged(uint256 interstRateIndex, uint256 oldvalue, uint256 newValue);
     event SetLockupPeriod(uint256 newLockupPeriod);
@@ -174,7 +172,7 @@ contract MorpherStaking is Ownable {
     function interestRate() public view returns (uint256) {
         //start with the last one, as its most likely the last active one, no need to run through the whole map
         for(uint256 i = numInterestRates - 1; i >= 0; i--) {
-            if(interestRates[i].validFrom <= block.timestamp && interestRates[i].active) {
+            if(interestRates[i].validFrom <= block.timestamp) {
                 return interestRates[i].rate;
             }
         }
@@ -186,14 +184,8 @@ contract MorpherStaking is Ownable {
 
         interestRates[numInterestRates].validFrom = _validFrom;
         interestRates[numInterestRates].rate = _rate;
-        interestRates[numInterestRates].active = true;
         numInterestRates++;
         emit InterestRateAdded(_rate, _validFrom);
-    }
-
-    function changeInterestRateActive(uint _numInterestRate, bool _setActive) public onlyStakingAdmin {
-        interestRates[_numInterestRate].active = _setActive;
-        emit InterestRateActiveChanged(_numInterestRate, _setActive);
     }
 
     function changeInterestRateValue(uint256 _numInterestRate, uint256 _rate) public onlyStakingAdmin {
