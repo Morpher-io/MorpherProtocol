@@ -181,7 +181,7 @@ contract MorpherStaking is Ownable {
     function addInterestRate(uint _rate, uint _validFrom) public onlyStakingAdmin {
         require(numInterestRates == 0 || interestRates[numInterestRates-1].validFrom < _validFrom, "MorpherStaking: Interest Rate Valid From must be later than last interestRate");
         //omitting rate sanity checks here. It should always be smaller than 100% (100000000) but I'll leave that to the common sense of the admin.
-
+        updatePoolShareValue();
         interestRates[numInterestRates].validFrom = _validFrom;
         interestRates[numInterestRates].rate = _rate;
         numInterestRates++;
@@ -190,6 +190,7 @@ contract MorpherStaking is Ownable {
 
     function changeInterestRateValue(uint256 _numInterestRate, uint256 _rate) public onlyStakingAdmin {
         emit InterestRateRateChanged(_numInterestRate, interestRates[_numInterestRate].rate, _rate);
+        updatePoolShareValue();
         interestRates[_numInterestRate].rate = _rate;
     }
     function changeInterestRateValidFrom(uint256 _numInterestRate, uint256 _validFrom) public onlyStakingAdmin {
@@ -201,6 +202,7 @@ contract MorpherStaking is Ownable {
             (_numInterestRate > 0 && _numInterestRate < numInterestRates-1 && interestRates[_numInterestRate - 1].validFrom < _validFrom && interestRates[_numInterestRate + 1].validFrom > _validFrom),
             "MorpherStaking: validFrom cannot be smaller than previous Interest Rate or larger than next Interest Rate"
             );
+        updatePoolShareValue();
         interestRates[_numInterestRate].validFrom = _validFrom;
     }
 
