@@ -169,6 +169,9 @@ contract MorpherTradeEngine is Ownable {
         mintingLimiter = MorpherMintingLimiter(_mintingLimiterAddress);
         emit LinkMintingLimiter(_mintingLimiterAddress);
     }
+    function getMorpherMintingLimiter() public view returns(address) {
+        return address(mintingLimiter);
+    }
 
     function getAdministrator() public view returns(address _administrator) {
         return state.getAdministrator();
