@@ -5,6 +5,7 @@ import "./SafeMath.sol";
 import "./MorpherState.sol";
 import "./IMorpherStaking.sol";
 import "./MorpherMintingLimiter.sol";
+import "./MorpherUserBlocking.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -17,6 +18,7 @@ contract MorpherTradeEngine is Ownable {
     MorpherState state;
     IMorpherStaking staking;
     MorpherMintingLimiter mintingLimiter;
+    MorpherUserBlocking userBlocking;
     using SafeMath for uint256;
 
 // ----------------------------------------------------------------------------
@@ -126,18 +128,20 @@ contract MorpherTradeEngine is Ownable {
     event LinkState(address _address);
     event LinkStaking(address _stakingAddress);
     event LinkMintingLimiter(address _mintingLimiterAddress);
+    event LinkMorpherUserBlocking(address _address);
 
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress, address _userBlockingAddress) public {
         setMorpherState(_stateAddress);
         setMorpherStaking(_stakingContractAddress);
         setMorpherMintingLimiter(_mintingLimiterAddress);
-        transferOwnership(_coldStorageOwnerAddress);
         escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
         deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
+        setUserBlockingAddress(_userBlockingAddress);
+        transferOwnership(_coldStorageOwnerAddress);
     }
 
     modifier onlyOracle {
@@ -168,6 +172,11 @@ contract MorpherTradeEngine is Ownable {
     function setMorpherMintingLimiter(address _mintingLimiterAddress) public onlyOwner {
         mintingLimiter = MorpherMintingLimiter(_mintingLimiterAddress);
         emit LinkMintingLimiter(_mintingLimiterAddress);
+    }
+
+    function setUserBlockingAddress(address _userBlockingAddress) public onlyOwner {
+        userBlocking = MorpherUserBlocking(_userBlockingAddress);
+        emit LinkMorpherUserBlocking(_userBlockingAddress);
     }
 
     function getAdministrator() public view returns(address _administrator) {
@@ -251,6 +260,7 @@ contract MorpherTradeEngine is Ownable {
          * The user can't partially close a position and open another one with MPH
          */
         if(_openMPHTokenAmount > 0) {
+
             if(_tradeDirection) {
                 //long
                 require(_closeSharesAmount == state.getShortShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
@@ -464,6 +474,8 @@ contract MorpherTradeEngine is Ownable {
         // Check if previous position on that market was liquidated
         if (_liquidationTimestamp > state.getLastUpdated(orders[_orderId].userId, orders[_orderId].marketId)) {
             liquidate(_orderId);
+        } else {
+            require(!userBlocking.userIsBlocked(orders[_orderId].userId), "MorpherTradeEngine: User is blocked from Trading");
         }
     
 

@@ -213,8 +213,8 @@ contract('MorpherTradeEngine cannot close with MPH', (accounts) => {
         await morpherState.setPosition(account1, BTC, 0, 0, 5, roundToInteger(40), 0, 100000000, liquidationPrice, { from: account0 });
 
         //(_marketId, _closeSharesAmount, _openMPHAmount, _tradeDirection, _orderLeverage, _onlyIfPriceAbove, _onlyIfPriceBelow, _goodUntil, _goodFrom)
-        truffleAssertions.fails(
-            morpherOracle.createOrder(BTC, 0, roundToInteger(150), true, 100000000, 0 ,0 ,0 ,0, { from: account1, value: 301000000000000 }),
+        await truffleAssertions.fails(
+            morpherOracle.createOrder(BTC, 0, roundToInteger(150), true, 100000000, 0 ,0 ,0 ,0, { from: account1 }),
             truffleAssertions.ErrorType.REVERT,
             "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction"
         );
@@ -596,8 +596,8 @@ contract('MorpherTradeEngine: partial closing tests', (accounts) => {
 
         assert.equal(userBalance, startingBalance.add(new BN(roundToInteger(40 * 50))));
 
-        morpherState.enableTransfers(account1);
-        morpherToken.transfer(account0, roundToInteger(40*50), {from: account1}); //reset to startingBalance
+        await morpherState.enableTransfers(account1);
+        await morpherToken.transfer(account0, roundToInteger(40*50), {from: account1}); //reset to startingBalance
 
     });
 
