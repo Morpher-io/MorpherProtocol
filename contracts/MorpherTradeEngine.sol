@@ -133,7 +133,7 @@ contract MorpherTradeEngine is Ownable {
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, address payable _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress, address _userBlockingAddress)) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address payable _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress, address _userBlockingAddress) public {
         setMorpherState(_stateAddress);
         setMorpherStaking(_stakingContractAddress);
         setMorpherMintingLimiter(_mintingLimiterAddress);
