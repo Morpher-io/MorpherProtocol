@@ -3,6 +3,7 @@ pragma solidity 0.5.16;
 import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./IMorpherState.sol";
+import "./MorpherUserBlocking.sol";
 
 // ----------------------------------------------------------------------------------
 // Staking Morpher Token generates interest
@@ -14,6 +15,8 @@ import "./IMorpherState.sol";
 contract MorpherStaking is Ownable {
     using SafeMath for uint256;
     IMorpherState state;
+    
+    MorpherUserBlocking userBlocking;
 
     uint256 constant PRECISION = 10**8;
     uint256 constant INTERVAL  = 1 days;
@@ -52,6 +55,7 @@ contract MorpherStaking is Ownable {
     event SetMinimumStake(uint256 newMinimumStake);
     event LinkState(address stateAddress);
     event SetStakingAdmin(address stakingAdmin);
+    event SetMorpherUserBlocking(address userBlockingAddress);
     
     event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
     event StakingRewardsMinted(uint256 indexed lastReward, uint256 delta);
@@ -62,12 +66,18 @@ contract MorpherStaking is Ownable {
         require(msg.sender == stakingAdmin, "MorpherStaking: can only be called by Staking Administrator.");
         _;
     }
+
+    modifier userNotBlocked {
+        require(!userBlocking.userIsBlocked(msg.sender), "MorpherStaking: User is blocked");
+        _;
+    }
     
-    constructor(address _morpherState, address _stakingAdmin) public {
+    constructor(address _morpherState, address _stakingAdmin, address _userBlockingAddress) public {
         setStakingAdmin(_stakingAdmin);
         setMorpherStateAddress(_morpherState);
         emit SetLockupPeriod(lockupPeriod);
         emit SetMinimumStake(minimumStake);
+        setMorpherUserBlocking(_userBlockingAddress);
         addInterestRate(15000,1617094819); //setting the initial interest rate to the trade engine deployed timestamp
         lastReward = block.timestamp;
         // missing: transferOwnership to Governance once deployed
@@ -110,7 +120,7 @@ contract MorpherStaking is Ownable {
 // and the _amount is transferred to the staking contract
 // ----------------------------------------------------------------------------
 
-    function stake(uint256 _amount) public returns (uint256 _poolShares) {
+    function stake(uint256 _amount) public userNotBlocked returns (uint256 _poolShares) {
         require(state.balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
         _poolShares = _amount.div(poolShareValue);
@@ -129,7 +139,7 @@ contract MorpherStaking is Ownable {
 // Pool Shares get deleted and the user receives their MPH plus interest
 // ----------------------------------------------------------------------------
 
-    function unstake(uint256 _numOfShares) public returns (uint256 _amount) {
+    function unstake(uint256 _numOfShares) public userNotBlocked returns (uint256 _amount) {
         (uint256 _numOfExistingShares, , , , , ) = state.getPosition(msg.sender, marketIdStakingMPH);
         require(_numOfShares <= _numOfExistingShares, "MorpherStaking: insufficient pool shares");
 
@@ -156,6 +166,11 @@ contract MorpherStaking is Ownable {
     function setMorpherStateAddress(address _stateAddress) public onlyOwner {
         state = IMorpherState(_stateAddress);
         emit LinkState(_stateAddress);
+    }
+
+    function setMorpherUserBlocking(address _userBlockingAddress) public onlyOwner {
+        userBlocking = MorpherUserBlocking(_userBlockingAddress);
+        emit SetMorpherUserBlocking(_userBlockingAddress);
     }
 
 

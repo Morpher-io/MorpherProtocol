@@ -2,6 +2,7 @@ const MorpherState = artifacts.require("MorpherState");
 const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
 const MorpherStaking = artifacts.require("MorpherStaking");
 const MorpherMintingLimiter = artifacts.require("MorpherMintingLimiter");
+const MorpherUserBlocking = artifacts.require("MorpherUserBlocking");
 
 module.exports = async function(deployer, network, accounts) {
     const ownerAddress = process.env.MORPHER_OWNER || accounts[0];
@@ -10,13 +11,14 @@ module.exports = async function(deployer, network, accounts) {
     const timelockPeriodMinting = process.env.MINTING_TIME_LOCK_PERIOD || 0;
 
     const morpherState = await MorpherState.deployed();
+    const morpherUserBlocking = await MorpherUserBlocking.deployed();
     let deployedTimestamp = 1613399217;
     if(network == "local" || network == "test") {
         deployedTimestamp = Math.round(Date.now() / 1000) - (60*60*24*30*5); //settings this for testing 5 months back
     }
     await deployer.deploy(MorpherMintingLimiter, morpherState.address, mintLimitPerUser, mintLimitDaily, timelockPeriodMinting);
     const morpherMintingLimiter = await MorpherMintingLimiter.deployed();
-    await deployer.deploy(MorpherTradeEngine, morpherState.address, ownerAddress, MorpherStaking.address, true, deployedTimestamp, morpherMintingLimiter.address);
+    await deployer.deploy(MorpherTradeEngine, morpherState.address, ownerAddress, MorpherStaking.address, true, deployedTimestamp, morpherMintingLimiter.address, morpherUserBlocking.address);
 
     const tradeEngine = await MorpherTradeEngine.deployed();
     await morpherMintingLimiter.setTradeEngineAddress(tradeEngine.address);
