@@ -3,7 +3,7 @@ pragma solidity 0.5.16;
 import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./MorpherState.sol";
-import "./IMorpherStaking.sol";
+import "./MorpherStaking.sol";
 import "./MorpherMintingLimiter.sol";
 import "./MorpherUserBlocking.sol";
 
@@ -16,7 +16,7 @@ import "./MorpherUserBlocking.sol";
 
 contract MorpherTradeEngine is Ownable {
     MorpherState state;
-    IMorpherStaking staking;
+    MorpherStaking staking;
     MorpherMintingLimiter mintingLimiter;
     MorpherUserBlocking userBlocking;
     using SafeMath for uint256;
@@ -133,8 +133,7 @@ contract MorpherTradeEngine is Ownable {
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
-
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress, address _userBlockingAddress) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address payable _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress, address _userBlockingAddress)) public {
         setMorpherState(_stateAddress);
         setMorpherStaking(_stakingContractAddress);
         setMorpherMintingLimiter(_mintingLimiterAddress);
@@ -164,14 +163,17 @@ contract MorpherTradeEngine is Ownable {
         emit LinkState(_stateAddress);
     }
 
-    function setMorpherStaking(address _stakingAddress) public onlyOwner {
-        staking = IMorpherStaking(_stakingAddress);
+    function setMorpherStaking(address payable _stakingAddress) public onlyOwner {
+        staking = MorpherStaking(_stakingAddress);
         emit LinkStaking(_stakingAddress);
     }
 
     function setMorpherMintingLimiter(address _mintingLimiterAddress) public onlyOwner {
         mintingLimiter = MorpherMintingLimiter(_mintingLimiterAddress);
         emit LinkMintingLimiter(_mintingLimiterAddress);
+    }
+    function getMorpherMintingLimiter() public view returns(address) {
+        return address(mintingLimiter);
     }
 
     function setUserBlockingAddress(address _userBlockingAddress) public onlyOwner {
@@ -651,7 +653,7 @@ contract MorpherTradeEngine is Ownable {
         }
         _marginInterest = _averagePrice.mul(_averageLeverage.sub(PRECISION));
         _marginInterest = _marginInterest.mul((now.sub(_positionTimeStampInMs.div(1000)).div(86400)).add(1));
-        _marginInterest = _marginInterest.mul(staking.interestRate()).div(PRECISION).div(PRECISION);
+        _marginInterest = _marginInterest.mul(staking.getInterestRate(_positionTimeStampInMs.div(1000))).div(PRECISION).div(PRECISION);
         return _marginInterest;
     }
 

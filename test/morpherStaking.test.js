@@ -1,5 +1,6 @@
 const MorpherToken = artifacts.require("MorpherToken");
 const MorpherStaking = artifacts.require("MorpherStaking");
+const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
 
 const truffleAssert = require('truffle-assertions');
 const BN = require("bn.js");
@@ -16,7 +17,7 @@ contract('MorpherStaking: increase/decrease staked amount', (accounts) => {
         await token.transfer(account1, web3.utils.toWei('1000000', 'ether'), { from: deployer }); //fill up some tokens
         let result = await staking.stake(web3.utils.toWei('100000', 'ether'), { from: account1 });
         await truffleAssert.eventEmitted(result, 'Staked', (ev) => {
-            return ev.userAddress === account1 && ev.amount.toString() === '100000000000000000000000' && ev.poolShares.toString() === '1000000000000000';
+            return ev.userAddress === account1 && ev.amount.toString() === '100000000000000000000000'; //poolshares cannot be easily defined, as they change with the rounding errors of the days * interestRate passed
         });
 
     });
@@ -66,7 +67,7 @@ contract('MorpherStaking: increase/decrease staked amount', (accounts) => {
         let result = await staking.setMinimumStake(100);
         await truffleAssert.eventEmitted(result, 'SetMinimumStake');
 
-        await truffleAssert.fails(staking.stake(99, { from: account1 }), truffleAssert.ErrorType.REVERT, 'MorpherStaking: stake amount lower than minimum stake');
+        await truffleAssert.fails(staking.stake(95, { from: account1 }), truffleAssert.ErrorType.REVERT, 'MorpherStaking: stake amount lower than minimum stake');
     });
 
 });
@@ -78,9 +79,9 @@ contract('MorpherStaking: Administrative Actions', (accounts) => {
         const staking = await MorpherStaking.deployed();
         const stakingAdmin = await staking.stakingAdmin();
         await staking.setStakingAdmin(account1);
-        let result = await staking.setInterestRate(20000, { from: account1 });
-        await truffleAssert.eventEmitted(result, 'SetInterestRate');
-        await truffleAssert.fails(staking.setInterestRate(20000, { from: account2 }), truffleAssert.ErrorType.REVERT, 'MorpherStaking: can only be called by Staking Administrator.');
+        let result = await staking.setMinimumStake(web3.utils.toWei('1','ether'), { from: account1 });
+        await truffleAssert.eventEmitted(result, 'SetMinimumStake');
+        await truffleAssert.fails(staking.setInterestRate(web3.utils.toWei('100','ether'), { from: account2 }), truffleAssert.ErrorType.REVERT, 'MorpherStaking: can only be called by Staking Administrator.');
     });
 
     it('moving staking admin can only be done by owner', async () => {
@@ -112,3 +113,88 @@ contract('MorpherStaking: Administrative Actions', (accounts) => {
     });
 
 });
+
+
+contract('MorpherStaking: Interest Rate Actions', (accounts) => {
+    const [deployer, account1, account2] = accounts;
+    it('has a default interest rate', async() => {
+        const staking = await MorpherStaking.deployed();
+        const interestRate = await staking.interestRate();
+        assert.equal(interestRate.toString(), '15000');
+    })
+    it('add Interest Rate', async () => {
+
+        const staking = await MorpherStaking.deployed();
+        const result = await staking.addInterestRate('30000', Math.round((Date.now() / 1000) + (60*60*24)));
+        await truffleAssert.eventEmitted(result, "InterestRateAdded")
+    });
+
+    it('add Interest Rate with a past validFrom rate fails', async () => {
+        const staking = await MorpherStaking.deployed();
+        await truffleAssert.fails(staking.addInterestRate('50000', Math.round(Date.now() / 1000)), truffleAssert.ErrorType.REVERT, 'MorpherStaking: Interest Rate Valid From must be later than last interestRate');
+        
+    });
+
+    it('change interest rate', async () => {
+        const staking = await MorpherStaking.deployed();
+        const result = await staking.changeInterestRateValue(0, 20000);
+        await truffleAssert.eventEmitted(result, "InterestRateRateChanged");
+        const interestRateAfterChange = await staking.interestRate();
+        assert.equal(interestRateAfterChange.toString(), '20000');
+        await staking.changeInterestRateValue(0, 15000);
+
+    });
+
+    it('is possible to change the valid From date of interest rates', async() =>{
+        const staking = await MorpherStaking.deployed();
+        
+        const firstInterestRate = await staking.interestRates(0);
+        const result = await staking.changeInterestRateValidFrom(1, Math.round((Date.now()/1000) - ((Date.now() / 1000) - firstInterestRate.validFrom.toNumber())/2)); //set back the valid from to halfway in the past, so the average right now should be (15000+30000)/2=22500
+        await truffleAssert.eventEmitted(result, "InterestRateValidFromChanged");
+    })
+
+    it('position interest rate for past position', async () => {
+        const staking = await MorpherStaking.deployed();
+        const firstInterestRate = await staking.interestRates(0);
+        const result = await staking.getInterestRate(firstInterestRate.validFrom); //get the interest rate from a position opened at the creation date of the first interest rate
+        //it should be a weighted average of 15000 and 30000, which in this case is 50:50 with a little rounding error
+        if(result.toString() == '22499') {
+            assert.equal(result.toString(), '22499');
+        } else {
+            assert.equal(result.toString(), '22500');
+        }
+    });
+
+});
+
+contract('MorpherStaking: Interest Rate calculations', (accounts) => {
+    it('margin calculation works correctly - single interest rate', async () => {
+        let morpherTradeEngine = await MorpherTradeEngine.deployed();
+        let createdTimestamp = Date.now() - 2592000000; //today  - 30 days
+        //30 days should yield interest = price * (leverage - 1) * (days + 1) * 0.000015 percent
+        //30000000000 * (200000000 - 100000000) * ( (2592000 / 86400) + 1) * (15000 / 100000000) / 100000000 percent = 13950000 is the interest on the exsting position 
+
+        assert('13950000', (await morpherTradeEngine.calculateMarginInterest(roundToInteger(300), 200000000, createdTimestamp)).toString(), 'Margin interest calculation doesnt work');
+    })
+
+    it('margin calculation works correctly - multiple interest rates', async () => {
+        let morpherTradeEngine = await MorpherTradeEngine.deployed();
+        let createdTimestamp = Date.now() - 2592000000; //today  - 30 days
+        const staking = await MorpherStaking.deployed();
+        const result = await staking.addInterestRate('30000', Math.round(createdTimestamp/1000) + 24*60*60); //adding another interest rate after the positionTimestamp should average the position interest rate
+        let interestRate = await staking.getInterestRate(createdTimestamp);
+        assert.isBelow(15000, interestRate.toNumber());
+        let expectedResult = roundToInteger(300) * (200000000 - 100000000) * (Math.round(2592000000/86400) + 1) * interestRate / 100000000 / 100000000;
+        //30 days should yield interest = price * (leverage - 1) * (days + 1) * 0.000015 percent
+        //30000000000 * (200000000 - 100000000) * ( (2592000 / 86400) + 1) * (15000 / 100000000) / 100000000 percent = 13950000 is the interest on the exsting position 
+
+        assert(expectedResult, (await morpherTradeEngine.calculateMarginInterest(roundToInteger(300), 200000000, createdTimestamp)).toString(), 'Margin interest calculation doesnt work');
+    })
+
+});
+
+
+
+function roundToInteger(price) {
+    return Math.round(price * Math.pow(10, 8));
+}
