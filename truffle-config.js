@@ -21,12 +21,12 @@ module.exports = {
     morphertest: {
       provider: () =>
         new HDWalletProvider(
-          [process.env.MORPHER_ADMINISTRATOR_KEY],
-          "https://sidechain-test.morpher.com"
+          [process.env.MORPHER_DEPLOYER_PK, process.env.MORPHER_ADMINISTRATOR_KEY],
+          "wss://sidechain-test-ws.morpher.com:8546"
         ),
       network_id: "21",
       chainId: 21,
-      timeoutBlocks: 200,
+      //timeoutBlocks: 200,
     },
     ropsten: {
       provider: () =>
