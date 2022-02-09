@@ -23,6 +23,10 @@ contract MorpherAdmin {
         uint256 _orderLeverage
         );
 
+ event AddressPositionMigrationComplete(address _owner, bytes32 _oldMarketId, bytes32 _newMarketId);
+ event AllPositionMigrationsComplete(bytes32 _oldMarketId, bytes32 _newMarketId);
+ event AllPositionMigrationIncomplete(bytes32 _oldMarketId, bytes32 _newMarketId, uint _maxIx);
+
 // ----------------------------------------------------------------------------
 // Precision of prices and leverage
 // ----------------------------------------------------------------------------
@@ -48,6 +52,34 @@ contract MorpherAdmin {
     function setMorpherTradeEngine(address _tradeEngine) public onlyAdministrator {
         tradeEngine = MorpherTradeEngine(_tradeEngine);
     }
+
+    function migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId) public onlyAdministrator {
+        require(state.getMarketActive(_oldMarketId) == false, "Market must be paused to process market migration.");
+        require(state.getMarketActive(_newMarketId) == false, "Market must be paused to process market migration.");
+
+        uint256 maxMarketAddressIndex = state.getMaxMappingIndex(_oldMarketId);
+        address[] memory addresses = new address[](maxMarketAddressIndex);
+        for (uint256 i = 1; i <= maxMarketAddressIndex; i++) { 
+            addresses[i-1] = state.getExposureMappingAddress(_oldMarketId, i); //changing on position delete
+        }
+        for(uint256 i = 0; i < addresses.length; i++) {
+            address _address = addresses[i]; //normalize back to 0-based index
+            (uint longShares, uint shortShares, uint meanEntryPrice, uint meanEntrySpread, uint meanEntryLeverage, uint liquidationPrice) = state.getPosition(_address, _oldMarketId);
+            if(longShares > 0 || shortShares > 0) {
+                state.setPosition(_address, _newMarketId, block.timestamp, longShares, shortShares, meanEntryPrice, meanEntrySpread, meanEntryLeverage, liquidationPrice); //create a new position for the new market with the same parameters
+                state.setPosition(_address, _oldMarketId, block.timestamp, 0,0,0,0,0,0); //delete the current position   
+                emit AddressPositionMigrationComplete(_address, _oldMarketId, _newMarketId);  
+            } 
+
+            if(gasleft() < 500000 && (i+1) < addresses.length) { //stop if there's not enough gas to write the next transaction
+                emit AllPositionMigrationIncomplete(_oldMarketId, _newMarketId, i);
+                return;
+            }
+        }
+
+        emit AllPositionMigrationsComplete(_oldMarketId, _newMarketId);
+    }
+
 
 // ----------------------------------------------------------------------------------
 // stockSplits(bytes32 _marketId, uint256 _fromIx, uint256 _toIx, uint256 _nominator, uint256 _denominator)
