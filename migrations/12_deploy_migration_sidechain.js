@@ -47,6 +47,7 @@ module.exports = async function (deployer, network, accounts) {
       }
     }
     await morpherAccountMigration.addMarketHashes(marketHashesArray, {from: adminAddress});
+    await morpherAccountMigration.addMarketHashes(["0x9a31fdde7a3b1444b1befb10735dcc3b72cbd9dd604d2ff45144352bf0f359a6"], {from: adminAddress}); //STAKING_MPH
     //test with a single market below:
     //await morpherAccountMigration.addMarketHashes([web3.utils.sha3('CRYPTO_BTC')]);
     //let migrations = 
