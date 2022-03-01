@@ -23,12 +23,17 @@ contract MorpherUserBlocking {
         _;
     }
 
+    modifier onlyAllowedUsers() {
+        require(msg.sender == state.getAdministrator() || msg.sender == allowedToAddBlockedUsersAddress, "UserBlocking: Only White-Listed Users can call this function");
+        _;
+    }
+
     function setAllowedToAddBlockedUsersAddress(address _newAddress) public onlyAdministrator {
         emit ChangedAddressAllowedToAddBlockedUsersAddress(allowedToAddBlockedUsersAddress, _newAddress);
         allowedToAddBlockedUsersAddress = _newAddress;
     }
 
-    function setUserBlocked(address _user, bool _isBlocked) public onlyAdministrator {
+    function setUserBlocked(address _user, bool _isBlocked) public onlyAllowedUsers {
         emit ChangeUserBlocked(_user, userIsBlocked[_user], _isBlocked);
         userIsBlocked[_user] = _isBlocked;
     }
