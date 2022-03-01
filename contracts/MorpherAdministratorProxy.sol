@@ -1,12 +1,13 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
 
-import "./Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MorpherAdministratorProxy is Ownable {
 
     address public morpherStateAddress;
 
-    constructor(address _morpherAdministrator, address _morpherStateAddress) public {
+    constructor(address _morpherAdministrator, address _morpherStateAddress) {
         transferOwnership(_morpherAdministrator);
         morpherStateAddress = _morpherStateAddress;
     }
@@ -19,8 +20,11 @@ contract MorpherAdministratorProxy is Ownable {
         }
     }
 
-    function () external payable onlyOwner {
-        (bool success, ) = morpherStateAddress.call.value(msg.value)(msg.data);
+    fallback() external payable onlyOwner {
+        (bool success, ) = morpherStateAddress.call{value: msg.value}(msg.data);
         require(success, "MorpherAdministratorProxy: Failed to forward call");
+    }
+    receive() external payable onlyOwner {
+        revert("MorpherAdministratorProxy: No ETH transfers supported");
     }
 }

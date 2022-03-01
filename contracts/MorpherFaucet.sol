@@ -1,7 +1,7 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./Ownable.sol";
-import "./SafeMath.sol";
 import "./MorpherToken.sol";
 
 // ----------------------------------------------------------------------------------
@@ -10,7 +10,6 @@ import "./MorpherToken.sol";
 // ----------------------------------------------------------------------------------
 
 contract MorpherFaucet is Ownable {
-    using SafeMath for uint256;
 
     MorpherToken morpherToken;
 
@@ -19,7 +18,7 @@ contract MorpherFaucet is Ownable {
     event MorpherFaucetTopUp(address indexed _receiver, uint _amount);
     event MorpherFaucetFillUpAmountChanged(uint _oldAmount, uint _newAmount);
 
-    constructor(address payable _morpherToken, address _coldStorageOwnerAddress, uint _fillUpAmount) public {
+    constructor(address payable _morpherToken, address _coldStorageOwnerAddress, uint _fillUpAmount) {
         morpherToken = MorpherToken(_morpherToken);
         transferOwnership(_coldStorageOwnerAddress);
         setFillUpAmount(_fillUpAmount);
@@ -40,11 +39,14 @@ contract MorpherFaucet is Ownable {
      */
     function topUpToken() public {
         require(morpherToken.balanceOf(msg.sender) < fillUpAmount, "FILLUP_AMOUNT_REACHED");
-        morpherToken.transfer(msg.sender, fillUpAmount.sub(morpherToken.balanceOf(msg.sender)));
-        emit MorpherFaucetTopUp(msg.sender, fillUpAmount.sub(morpherToken.balanceOf(msg.sender)));
+        morpherToken.transfer(msg.sender, fillUpAmount - morpherToken.balanceOf(msg.sender));
+        emit MorpherFaucetTopUp(msg.sender, fillUpAmount - morpherToken.balanceOf(msg.sender));
     }
 
-    function () external payable {
+    fallback() external payable {
+        revert("MorpherFaucet: you can't deposit Ether here");
+    }
+    receive() external payable {
         revert("MorpherFaucet: you can't deposit Ether here");
     }
 

@@ -1,4 +1,5 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
 
 import "./MorpherState.sol";
 
@@ -9,7 +10,7 @@ contract MorpherUserBlocking {
 
     event ChangeUserBlocked(address _user, bool _oldIsBlocked, bool _newIsBlocked);
 
-    constructor(address _state) public {
+    constructor(address _state) {
         state = MorpherState(_state);
     }
 

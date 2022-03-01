@@ -1,6 +1,5 @@
 require("dotenv").config();
 let HDWalletProvider = require("@truffle/hdwallet-provider");
-const Web3 = require('web3');
 
 module.exports = {
   networks: {
@@ -8,12 +7,13 @@ module.exports = {
       host: "127.0.0.1",
       port: 8545,
       network_id: "*",
+      websockets: true
     },
     morpher: {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_PK,
-          "https://sidechain.morpher.com"
+          "wss://sidechain-ws.morpher.com:8546"
         ),
       network_id: "21",
       timeoutBlocks: 200,
@@ -21,7 +21,7 @@ module.exports = {
     morphertest: {
       provider: () =>
         new HDWalletProvider(
-          [process.env.MORPHER_DEPLOYER_PK, process.env.MORPHER_ADMINISTRATOR_KEY],
+          [process.env.MORPHER_DEPLOYER_PK, process.env.MORPHER_ADMINISTRATOR_KEY, process.env.SIDECHAIN_OPERATOR_KEY],
           "wss://sidechain-test-ws.morpher.com:8546"
         ),
       network_id: "21",
@@ -31,8 +31,8 @@ module.exports = {
     ropsten: {
       provider: () =>
         new HDWalletProvider(
-          process.env.MORPHER_DEPLOYER_KEY,
-          new Web3.providers.WebsocketProvider("wss://ropsten.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
+          [process.env.MORPHER_DEPLOYER_PK, process.env.MORPHER_ADMINISTRATOR_KEY],
+          "wss://ropsten.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '3',
       gasPrice: 15000000000,
@@ -41,7 +41,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_PK,
-          new Web3.providers.WebsocketProvider("wss://mainnet.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
+          "wss://mainnet.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '1',
       gasPrice: 150000000000,
@@ -50,7 +50,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_PK,
-          new Web3.providers.WebsocketProvider("wss://kovan.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
+         "wss://kovan.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '*',
       gasPrice: 10000000000,
@@ -58,7 +58,7 @@ module.exports = {
   },
   compilers: {
     solc: {
-      version: "0.5.16",
+      version: "0.8.10",
       settings: {
         optimizer: {
           enabled: true,

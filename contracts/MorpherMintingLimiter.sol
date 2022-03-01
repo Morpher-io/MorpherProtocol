@@ -1,11 +1,11 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
 
 import "./MorpherState.sol";
 import "./MorpherTradeEngine.sol";
-import "./SafeMath.sol";
+
 
 contract MorpherMintingLimiter {
-    using SafeMath for uint256; 
 
     uint256 public mintingLimitPerUser;
     uint256 public mintingLimitDaily;
@@ -37,7 +37,7 @@ contract MorpherMintingLimiter {
         _;
     }
 
-    constructor(address _stateAddress, uint256 _mintingLimitPerUser, uint256 _mintingLimitDaily, uint256 _timeLockingPeriodInSeconds) public {
+    constructor(address _stateAddress, uint256 _mintingLimitPerUser, uint256 _mintingLimitDaily, uint256 _timeLockingPeriodInSeconds) {
         state = MorpherState(_stateAddress);
         mintingLimitPerUser = _mintingLimitPerUser;
         mintingLimitDaily = _mintingLimitDaily;
@@ -66,11 +66,11 @@ contract MorpherMintingLimiter {
 
     function mint(address _user, uint256 _tokenAmount) public onlyTradeEngine {
         uint256 mintingDay = block.timestamp / 1 days;
-        if((mintingLimitDaily == 0 || dailyMintedTokens[mintingDay].add(_tokenAmount) <= mintingLimitDaily) && (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser )) {
+        if((mintingLimitDaily == 0 || dailyMintedTokens[mintingDay] + (_tokenAmount) <= mintingLimitDaily) && (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser )) {
             state.mint(_user, _tokenAmount);
-            dailyMintedTokens[mintingDay] = dailyMintedTokens[mintingDay].add(_tokenAmount);
+            dailyMintedTokens[mintingDay] = dailyMintedTokens[mintingDay] + (_tokenAmount);
         } else {
-            escrowedTokens[_user] = escrowedTokens[_user].add(_tokenAmount);
+            escrowedTokens[_user] = escrowedTokens[_user] + (_tokenAmount);
             lockedUntil[_user] = block.timestamp + timeLockingPeriod;
             emit MintingEscrowed(_user, _tokenAmount);
         }
@@ -85,13 +85,13 @@ contract MorpherMintingLimiter {
     }
 
     function adminApprovedMint(address _user, uint256 _tokenAmount) public onlyAdministrator {
-        escrowedTokens[_user] = escrowedTokens[_user].sub(_tokenAmount);
+        escrowedTokens[_user] = escrowedTokens[_user] - (_tokenAmount);
         state.mint(_user, _tokenAmount);
         emit EscrowReleased(_user, _tokenAmount);
     }
 
     function adminDisapproveMint(address _user, uint256 _tokenAmount) public onlyAdministrator {
-        escrowedTokens[_user] = escrowedTokens[_user].sub(_tokenAmount);
+        escrowedTokens[_user] = escrowedTokens[_user] - (_tokenAmount);
         emit MintingDenied(_user, _tokenAmount);
     }
 

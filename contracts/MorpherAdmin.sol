@@ -1,6 +1,6 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
 
-import "./SafeMath.sol";
 import "./MorpherState.sol";
 import "./MorpherTradeEngine.sol";
 
@@ -11,7 +11,6 @@ import "./MorpherTradeEngine.sol";
 contract MorpherAdmin {
     MorpherState state;
     MorpherTradeEngine tradeEngine;
-    using SafeMath for uint256;
 
     event AdminLiquidationOrderCreated(
         bytes32 indexed _orderId,
@@ -36,7 +35,7 @@ contract MorpherAdmin {
         _;
     }
     
-    constructor(address _stateAddress, address _tradeEngine) public {
+    constructor(address _stateAddress, address _tradeEngine) {
         state = MorpherState(_stateAddress);
         tradeEngine = MorpherTradeEngine(_tradeEngine);
     }
@@ -109,16 +108,16 @@ contract MorpherAdmin {
              // Write back to state
             _address = state.getExposureMappingAddress(_marketId, i);
             (_positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice) = state.getPosition(_address, _marketId);
-            _positionLongShares      = _positionLongShares.mul(_denominator).div(_nominator);
-            _positionShortShares     = _positionShortShares.mul(_denominator).div(_nominator);
-            _positionAveragePrice    = _positionAveragePrice.mul(_nominator).div(_denominator);
-            _positionAverageSpread   = _positionAverageSpread.mul(_nominator).div(_denominator);
+            _positionLongShares      = _positionLongShares * _denominator / _nominator ;
+            _positionShortShares     = _positionShortShares * _denominator / _nominator;
+            _positionAveragePrice    = _positionAveragePrice * _nominator / _denominator;
+            _positionAverageSpread   = _positionAverageSpread * _nominator / _denominator;
             if (_positionShortShares > 0) {
                 _liquidationPrice    = getLiquidationPriceInternal(false, _address, _marketId);
             } else {
                 _liquidationPrice    = getLiquidationPriceInternal(true, _address, _marketId);
             }               
-            state.setPosition(_address, _marketId, now, _positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice);   
+            state.setPosition(_address, _marketId, block.timestamp, _positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice);   
         }
     }
 
@@ -148,13 +147,13 @@ contract MorpherAdmin {
         for (uint256 i = _fromIx; i <= _toIx; i++) {
             _address = state.getExposureMappingAddress(_marketId, i);
             (_positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice) = state.getPosition(_address, _marketId);
-            _positionAveragePrice    = _positionAveragePrice.add(_rollUp).sub(_rollDown);
+            _positionAveragePrice    = _positionAveragePrice + _rollUp - _rollDown;
             if (_positionShortShares > 0) {
                 _liquidationPrice    = getLiquidationPriceInternal(false, _address, _marketId);
             } else {
                 _liquidationPrice    = getLiquidationPriceInternal(true, _address, _marketId);
             }               
-            state.setPosition(_address, _marketId, now, _positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice);   
+            state.setPosition(_address, _marketId, block.timestamp, _positionLongShares, _positionShortShares, _positionAveragePrice, _positionAverageSpread, _positionAverageLeverage, _liquidationPrice);   
         }
     }
 
@@ -214,8 +213,8 @@ contract MorpherAdmin {
     function payOperatingReward() public view {
         if (state.mainChain() == true) {
             uint256 _lastRewardTime = state.lastRewardTime();
-            if (now > _lastRewardTime) {
-                for (uint256 i = 1; i <= now.sub(state.lastRewardTime()).div(86400); i++) {
+            if (block.timestamp > _lastRewardTime) {
+                for (uint256 i = 1; i <= block.timestamp - state.lastRewardTime() / 86400; i++) {
                     state.payOperatingReward;
                 }
             }

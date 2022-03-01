@@ -1,9 +1,9 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./Ownable.sol";
 import "./MorpherTradeEngine.sol";
 import "./MorpherState.sol";
-import "./SafeMath.sol";
 
 // ----------------------------------------------------------------------------------
 // Morpher Oracle contract v 2.0
@@ -18,8 +18,6 @@ contract MorpherOracle is Ownable {
 
     MorpherTradeEngine tradeEngine;
     MorpherState state; // read only, Oracle doesn't need writing access to state
-
-    using SafeMath for uint256;
 
     bool public paused;
     bool public useWhiteList; //always false at the moment
@@ -193,7 +191,7 @@ contract MorpherOracle is Ownable {
         _;
     }
 
-   constructor(address _tradeEngineAddress, address _morpherState, address _callBackAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress, address _previousTradeEngineAddress, address _previousOracleAddress) public {
+   constructor(address _tradeEngineAddress, address _morpherState, address _callBackAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress, address _previousTradeEngineAddress, address _previousOracleAddress) {
         setTradeEngineAddress(_tradeEngineAddress);
         setStateAddress(_morpherState);
         enableCallbackAddress(_callBackAddress);
@@ -335,7 +333,7 @@ contract MorpherOracle is Ownable {
         if(state.getMarketActive(_marketId) == false) {
 
             //price will come from the position where price is stored forever
-            tradeEngine.processOrder(_orderId, tradeEngine.getDeactivatedMarketPrice(_marketId), 0, 0, now.mul(1000));
+            tradeEngine.processOrder(_orderId, tradeEngine.getDeactivatedMarketPrice(_marketId), 0, 0, block.timestamp * (1000));
             
             emit OrderProcessed(
                 _orderId,
@@ -343,7 +341,7 @@ contract MorpherOracle is Ownable {
                 0,
                 0,
                 0,
-                now.mul(1000),
+                block.timestamp * (1000),
                 0,
                 0,
                 0,
@@ -507,10 +505,10 @@ contract MorpherOracle is Ownable {
 // ------------------------------------------------------------------------
     function checkOrderConditions(bytes32 _orderId, uint256 _price) public view returns (bool _conditionsMet) {
         _conditionsMet = true;
-        if (now > getGoodUntil(_orderId) && getGoodUntil(_orderId) > 0) {
+        if (block.timestamp > getGoodUntil(_orderId) && getGoodUntil(_orderId) > 0) {
             _conditionsMet = false;
         }
-        if (now < getGoodFrom(_orderId) && getGoodFrom(_orderId) > 0) {
+        if (block.timestamp < getGoodFrom(_orderId) && getGoodFrom(_orderId) > 0) {
             _conditionsMet = false;
         }
 

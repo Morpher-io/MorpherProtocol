@@ -7,7 +7,7 @@ const CRYPTO_ETH = '0x5376ff169a3705b2003892fe730060ee74ec83e5701da29318221aa782
 
 contract('MorpherState', (accounts) => {
     it('test state changes and state function calls', async () => {
-        const deployerAddress = accounts[0]; const addressAdministrator = accounts[1]; const testAddress2 = accounts[2];
+        const [deployerAddress, addressAdministrator, testAddress2] = accounts;
 
         let morpherState = await MorpherState.deployed();
 
@@ -43,7 +43,7 @@ contract('MorpherState', (accounts) => {
         assert.equal(testAddress2Balance, '2000000');
 
         // Only state operators are allowed to call the Mint function.
-        await truffleAssert.reverts(morpherState.mint(testAddress2, '2000000', { from: testAddress2 }), "Only Platform"); // fails
+        await truffleAssert.reverts(morpherState.mint(testAddress2, '2000000', { from: testAddress2 }), "MorpherState: Only Platform is allowed to execute operation."); // fails
         await morpherState.mint(testAddress2, '3000000', { from: addressAdministrator }); // successful
 
         // Test state pause interaction.

@@ -1,8 +1,8 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./Ownable.sol";
-import "./SafeMath.sol";
-import "./IMorpherState.sol";
+import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
 
 // ----------------------------------------------------------------------------------
@@ -13,8 +13,8 @@ import "./MorpherUserBlocking.sol";
 // ----------------------------------------------------------------------------------
 
 contract MorpherStaking is Ownable {
-    using SafeMath for uint256;
-    IMorpherState state;
+
+    MorpherState state;
     
     MorpherUserBlocking userBlocking;
 
@@ -72,7 +72,7 @@ contract MorpherStaking is Ownable {
         _;
     }
     
-    constructor(address _morpherState, address _stakingAdmin, address _userBlockingAddress) public {
+    constructor(address payable _morpherState, address _stakingAdmin, address payable _userBlockingAddress) {
         setStakingAdmin(_stakingAdmin);
         setMorpherStateAddress(_morpherState);
         emit SetLockupPeriod(lockupPeriod);
@@ -90,10 +90,10 @@ contract MorpherStaking is Ownable {
 // ----------------------------------------------------------------------------
     
     function updatePoolShareValue() public returns (uint256 _newPoolShareValue) {
-        if (now >= lastReward.add(INTERVAL)) {
-            uint256 _numOfIntervals = now.sub(lastReward).div(INTERVAL);
-            poolShareValue = poolShareValue.add(_numOfIntervals.mul(interestRate()));
-            lastReward = lastReward.add(_numOfIntervals.mul(INTERVAL));
+        if (block.timestamp >= lastReward + INTERVAL) {
+            uint256 _numOfIntervals = block.timestamp - lastReward / INTERVAL;
+            poolShareValue = poolShareValue + (_numOfIntervals * interestRate());
+            lastReward = lastReward + (_numOfIntervals * (INTERVAL));
             emit PoolShareValueUpdated(lastReward, poolShareValue);
         }
         mintStakingRewards();
@@ -105,10 +105,10 @@ contract MorpherStaking is Ownable {
 // ----------------------------------------------------------------------------
 
     function mintStakingRewards() private {
-        uint256 _targetBalance = poolShareValue.mul(totalShares);
+        uint256 _targetBalance = poolShareValue * (totalShares);
         if (state.balanceOf(stakingAddress) < _targetBalance) {
             // If there are not enough token held by the contract, mint them
-            uint256 _delta = _targetBalance.sub(state.balanceOf(stakingAddress));
+            uint256 _delta = _targetBalance - (state.balanceOf(stakingAddress));
             state.mint(stakingAddress, _delta);
             emit StakingRewardsMinted(lastReward, _delta);
         }
@@ -123,13 +123,13 @@ contract MorpherStaking is Ownable {
     function stake(uint256 _amount) public userNotBlocked returns (uint256 _poolShares) {
         require(state.balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
-        _poolShares = _amount.div(poolShareValue);
+        _poolShares = _amount / (poolShareValue);
         (uint256 _numOfShares, , , , , ) = state.getPosition(msg.sender, marketIdStakingMPH);
-        require(minimumStake <= _numOfShares.add(_poolShares).mul(poolShareValue), "MorpherStaking: stake amount lower than minimum stake");
-        state.transfer(msg.sender, stakingAddress, _poolShares.mul(poolShareValue));
-        totalShares = totalShares.add(_poolShares);
-        state.setPosition(msg.sender, marketIdStakingMPH, now.add(lockupPeriod), _numOfShares.add(_poolShares), 0, 0, 0, 0, 0);
-        emit Staked(msg.sender, _amount, _poolShares, now.add(lockupPeriod));
+        require(minimumStake <= _numOfShares + (_poolShares) * (poolShareValue), "MorpherStaking: stake amount lower than minimum stake");
+        state.transfer(msg.sender, stakingAddress, _poolShares * (poolShareValue));
+        totalShares = totalShares + (_poolShares);
+        state.setPosition(msg.sender, marketIdStakingMPH, block.timestamp + (lockupPeriod), _numOfShares + (_poolShares), 0, 0, 0, 0, 0);
+        emit Staked(msg.sender, _amount, _poolShares, block.timestamp + (lockupPeriod));
         return _poolShares;
     }
 
@@ -144,11 +144,11 @@ contract MorpherStaking is Ownable {
         require(_numOfShares <= _numOfExistingShares, "MorpherStaking: insufficient pool shares");
 
         uint256 lockedInUntil = state.getLastUpdated(msg.sender, marketIdStakingMPH);
-        require(now >= lockedInUntil, "MorpherStaking: cannot unstake before lockup expiration");
+        require(block.timestamp >= lockedInUntil, "MorpherStaking: cannot unstake before lockup expiration");
         updatePoolShareValue();
-        state.setPosition(msg.sender, marketIdStakingMPH, lockedInUntil, _numOfExistingShares.sub(_numOfShares), 0, 0, 0, 0, 0);
-        totalShares = totalShares.sub(_numOfShares);
-        _amount = _numOfShares.mul(poolShareValue);
+        state.setPosition(msg.sender, marketIdStakingMPH, lockedInUntil, _numOfExistingShares - (_numOfShares), 0, 0, 0, 0, 0);
+        totalShares = totalShares - (_numOfShares);
+        _amount = _numOfShares * (poolShareValue);
         state.transfer(stakingAddress, msg.sender, _amount);
         emit Unstaked(msg.sender, _amount, _numOfShares);
         return _amount;
@@ -163,12 +163,12 @@ contract MorpherStaking is Ownable {
         emit SetStakingAdmin(_address);
     }
 
-    function setMorpherStateAddress(address _stateAddress) public onlyOwner {
-        state = IMorpherState(_stateAddress);
+    function setMorpherStateAddress(address payable _stateAddress) public onlyOwner {
+        state = MorpherState(_stateAddress);
         emit LinkState(_stateAddress);
     }
 
-    function setMorpherUserBlocking(address _userBlockingAddress) public onlyOwner {
+    function setMorpherUserBlocking(address payable _userBlockingAddress) public onlyOwner {
         userBlocking = MorpherUserBlocking(_userBlockingAddress);
         emit SetMorpherUserBlocking(_userBlockingAddress);
     }
@@ -186,11 +186,15 @@ contract MorpherStaking is Ownable {
  */
     function interestRate() public view returns (uint256) {
         //start with the last one, as its most likely the last active one, no need to run through the whole map
+        if(numInterestRates == 0) {
+            return 0;
+        }
         for(uint256 i = numInterestRates - 1; i >= 0; i--) {
             if(interestRates[i].validFrom <= block.timestamp) {
                 return interestRates[i].rate;
             }
         }
+        return 0;
     }
 
     function addInterestRate(uint _rate, uint _validFrom) public onlyStakingAdmin {
@@ -228,7 +232,7 @@ contract MorpherStaking is Ownable {
         for(uint256 i = 0; i < numInterestRates; i++) {
             if(i == numInterestRates-1 || interestRates[i+1].validFrom > block.timestamp) {
                 //reached last interest rate
-                sumInterestRatesWeighted = sumInterestRatesWeighted.add(interestRates[i].rate.mul(block.timestamp - interestRates[i].validFrom));
+                sumInterestRatesWeighted = sumInterestRatesWeighted + (interestRates[i].rate * (block.timestamp - interestRates[i].validFrom));
                 if(startingTimestamp == 0) {
                     startingTimestamp = interestRates[i].validFrom;
                 }
@@ -236,14 +240,14 @@ contract MorpherStaking is Ownable {
             } else {
                 //only take interest rates after the position was created
                 if(interestRates[i+1].validFrom > _positionTimestamp) {
-                    sumInterestRatesWeighted = sumInterestRatesWeighted.add(interestRates[i].rate.mul(interestRates[i+1].validFrom - interestRates[i].validFrom));
+                    sumInterestRatesWeighted = sumInterestRatesWeighted + (interestRates[i].rate * (interestRates[i+1].validFrom - interestRates[i].validFrom));
                     if(interestRates[i].validFrom <= _positionTimestamp) {
                         startingTimestamp = interestRates[i].validFrom;
                     }
                 }
             } 
         }
-        return sumInterestRatesWeighted.div(block.timestamp - startingTimestamp);
+        return sumInterestRatesWeighted / (block.timestamp - startingTimestamp);
 
     }
 
@@ -263,7 +267,7 @@ contract MorpherStaking is Ownable {
 
     function getTotalPooledValue() public view returns (uint256 _totalPooled) {
         // Only accurate if poolShareValue is up to date
-        return poolShareValue.mul(totalShares);
+        return poolShareValue * (totalShares);
     }
 
     function getStake(address _address) public view returns (uint256 _poolShares) {
@@ -276,14 +280,17 @@ contract MorpherStaking is Ownable {
         
         (uint256 _numOfShares, , , , , ) = state.getPosition(_address, marketIdStakingMPH);
 
-        return (_numOfShares.mul(poolShareValue), lastReward);
+        return (_numOfShares * (poolShareValue), lastReward);
     }
     
 // ------------------------------------------------------------------------
 // Don't accept ETH
 // ------------------------------------------------------------------------
 
-    function () external payable {
+    fallback() external payable {
+        revert("MorpherStaking: you can't deposit Ether here");
+    }
+    receive() external payable {
         revert("MorpherStaking: you can't deposit Ether here");
     }
 }

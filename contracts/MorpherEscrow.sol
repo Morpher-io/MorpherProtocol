@@ -1,16 +1,16 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
 
-import "./Ownable.sol";
-import "./SafeMath.sol";
-import "./IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // ----------------------------------------------------------------------------------
 // Escrow contract to safely store and release the token allocated to Morpher at
 // protocol inception
 // ----------------------------------------------------------------------------------
 
+
 contract MorpherEscrow is Ownable{
-    using SafeMath for uint256;
 
     uint256 public lastEscrowTransferTime;
     address public recipient;
@@ -21,10 +21,10 @@ contract MorpherEscrow is Ownable{
 
     event EscrowReleased(uint256 _released, uint256 _leftInEscrow);
 
-    constructor(address _recipientAddress, address _morpherToken, address _coldStorageOwnerAddress) public {
+    constructor(address _recipientAddress, address _morpherToken, address _coldStorageOwnerAddress) {
         setRecipientAddress(_recipientAddress);
         setMorpherTokenAddress(_morpherToken);
-        lastEscrowTransferTime = now;
+        lastEscrowTransferTime = block.timestamp;
         transferOwnership(_coldStorageOwnerAddress);
     }
 
@@ -46,14 +46,14 @@ contract MorpherEscrow is Ownable{
     function releaseFromEscrow() public {
         require(IERC20(morpherToken).balanceOf(address(this)) > 0, "No funds left in escrow.");
         uint256 _releasedAmount;
-        if (now > lastEscrowTransferTime.add(RELEASEPERIOD)) {
+        if (block.timestamp > lastEscrowTransferTime + (RELEASEPERIOD)) {
             if (IERC20(morpherToken).balanceOf(address(this)) > RELEASEAMOUNT) {
                 _releasedAmount = RELEASEAMOUNT;
             } else {
                 _releasedAmount = IERC20(morpherToken).balanceOf(address(this));
             }
             IERC20(morpherToken).transfer(recipient, _releasedAmount);
-            lastEscrowTransferTime = lastEscrowTransferTime.add(RELEASEPERIOD);
+            lastEscrowTransferTime = lastEscrowTransferTime + (RELEASEPERIOD);
             emit EscrowReleased(_releasedAmount, IERC20(morpherToken).balanceOf(address(this)));
         }
     }

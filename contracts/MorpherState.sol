@@ -1,8 +1,10 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import "./Ownable.sol";
-import "./SafeMath.sol";
-import "./IMorpherToken.sol";
+
+import "./MorpherToken.sol";
 
 // ----------------------------------------------------------------------------------
 // Data and token balance storage of the Morpher platform
@@ -10,8 +12,8 @@ import "./IMorpherToken.sol";
 // by an elected platform administrator (see MorpherGovernance) to perform protocol updates.
 // ----------------------------------------------------------------------------------
 
-contract MorpherState is Ownable {
-    using SafeMath for uint256;
+contract MorpherState is Ownable, Initializable  {
+
 
     bool public mainChain;
     uint256 public totalSupply;
@@ -30,7 +32,7 @@ contract MorpherState is Ownable {
     address public oracleContract;
     address public sideChainOperator;
     address public morpherBridge;
-    address public morpherToken;
+    address payable public morpherToken;
 
     uint256 public rewardBasisPoints;
     uint256 public lastRewardTime;
@@ -206,10 +208,10 @@ contract MorpherState is Ownable {
         _;
     }
 
-    constructor(bool _mainChain, address _sideChainOperator, address _morpherTreasury) public {
+    function initialize(bool _mainChain, address _sideChainOperator, address _morpherTreasury) public initializer {
         // @Deployer: Transfer State Ownership to cold storage address after deploying protocol
         mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
-        setLastRewardTime(now);
+        setLastRewardTime(block.timestamp);
         uint256 _sideChainMint = 575000000 * 10**(DECIMALS);
         uint256 _mainChainMint = 425000000 * 10**(DECIMALS);
         
@@ -287,7 +289,7 @@ contract MorpherState is Ownable {
 
     function setTokenSentToLinkedChain(address _address, uint256 _token) public onlyBridge {
         tokenSentToLinkedChain[_address] = _token;
-        tokenSentToLinkedChainTime[_address] = now;
+        tokenSentToLinkedChainTime[_address] = block.timestamp;
         emit TokenSentToLinkedChain(_address, _token, tokenSentToLinkedChain[_address], getBalanceHash(_address, tokenSentToLinkedChain[_address]));
     }
 
@@ -300,17 +302,17 @@ contract MorpherState is Ownable {
     }
 
     function add24HoursWithdrawn(uint256 _amount) public onlyBridge {
-        last24HoursAmountWithdrawn = last24HoursAmountWithdrawn.add(_amount);
+        last24HoursAmountWithdrawn = last24HoursAmountWithdrawn + (_amount);
         emit RollingWithdrawnAmountUpdated(last24HoursAmountWithdrawn, lastWithdrawLimitReductionTime);
     }
 
     function update24HoursWithdrawLimit(uint256 _amount) public onlyBridge {
         if (last24HoursAmountWithdrawn > _amount) {
-            last24HoursAmountWithdrawn = last24HoursAmountWithdrawn.sub(_amount);
+            last24HoursAmountWithdrawn = last24HoursAmountWithdrawn - (_amount);
         } else {
             last24HoursAmountWithdrawn = 0;
         }
-        lastWithdrawLimitReductionTime = now;
+        lastWithdrawLimitReductionTime = block.timestamp;
         emit RollingWithdrawnAmountUpdated(last24HoursAmountWithdrawn, lastWithdrawLimitReductionTime);
     }
 
@@ -432,29 +434,29 @@ contract MorpherState is Ownable {
 
     function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused {
         require(balances[_from] >= _token, "MorpherState: Not enough token.");
-        balances[_from] = balances[_from].sub(_token);
-        balances[_to] = balances[_to].add(_token);
-        IMorpherToken(morpherToken).emitTransfer(_from, _to, _token);
+        balances[_from] = balances[_from] - (_token);
+        balances[_to] = balances[_to] + (_token);
+        MorpherToken(morpherToken).emitTransfer(_from, _to, _token);
         emit Transfer(_from, _to, _token);
         emit SetBalance(_from, balances[_from], getBalanceHash(_from, balances[_from]));
         emit SetBalance(_to, balances[_to], getBalanceHash(_to, balances[_to]));
     }
 
     function mint(address _address, uint256 _token) public onlyPlatform notPaused {
-        balances[_address] = balances[_address].add(_token);
-        totalToken = totalToken.add(_token);
+        balances[_address] = balances[_address] + (_token);
+        totalToken = totalToken + (_token);
         updateTotalSupply();
-        IMorpherToken(morpherToken).emitTransfer(address(0), _address, _token);
+        MorpherToken(morpherToken).emitTransfer(address(0), _address, _token);
         emit Mint(_address, _token, totalToken);
         emit SetBalance(_address, balances[_address], getBalanceHash(_address, balances[_address]));
     }
 
     function burn(address _address, uint256 _token) public onlyPlatform notPaused {
         require(balances[_address] >= _token, "MorpherState: Not enough token.");
-        balances[_address] = balances[_address].sub(_token);
-        totalToken = totalToken.sub(_token);
+        balances[_address] = balances[_address] - (_token);
+        totalToken = totalToken - (_token);
         updateTotalSupply();
-        IMorpherToken(morpherToken).emitTransfer(_address, address(0), _token);
+        MorpherToken(morpherToken).emitTransfer(_address, address(0), _token);
         emit Burn(_address, _token, totalToken);
         emit SetBalance(_address, balances[_address], getBalanceHash(_address, balances[_address]));
     }
@@ -463,7 +465,7 @@ contract MorpherState is Ownable {
     // Setter/Getter functions for balance and token functions (ERC20)
     // ----------------------------------------------------------------------------
     function updateTotalSupply() private {
-        totalSupply = totalToken.add(totalInPositions).add(totalOnOtherChain);
+        totalSupply = totalToken + (totalInPositions) + (totalOnOtherChain);
         emit NewTotalSupply(totalSupply);
     }
 
@@ -523,7 +525,7 @@ contract MorpherState is Ownable {
         return oracleContract;
     }
 
-    function setTokenContract(address _newTokenContract) public onlyGovernance {
+    function setTokenContract(address payable _newTokenContract) public onlyGovernance {
         morpherToken = _newTokenContract;
         emit TokenChange(_newTokenContract);
     }
@@ -609,7 +611,7 @@ contract MorpherState is Ownable {
 
     function setSideChainMerkleRoot(bytes32 _sideChainMerkleRoot) public onlyBridge {
         sideChainMerkleRoot = _sideChainMerkleRoot;
-        sideChainMerkleRootWrittenAtTime = now;
+        sideChainMerkleRootWrittenAtTime = block.timestamp;
         payOperatingReward();
         emit SideChainMerkleRootUpdate(_sideChainMerkleRoot);
     }
@@ -770,7 +772,7 @@ contract MorpherState is Ownable {
         // Address must not be already recored
         uint256 _myExposureIndex = getExposureMappingIndex(_symbol, _address);
         if (_myExposureIndex == 0) {
-            uint256 _maxMappingIndex = getMaxMappingIndex(_symbol).add(1);
+            uint256 _maxMappingIndex = getMaxMappingIndex(_symbol) + (1);
             setMaxMappingIndex(_symbol, _maxMappingIndex);
             setExposureMapping(_symbol, _address, _maxMappingIndex);
         }
@@ -795,7 +797,7 @@ contract MorpherState is Ownable {
             setExposureMappingIndex(_symbol, _address, 0);
             // Shouldn't happen, but check that not empty
             if (_lastIndex > 0) {
-                setMaxMappingIndex(_symbol, _lastIndex.sub(1));
+                setMaxMappingIndex(_symbol, _lastIndex - (1));
             }
         }
     }
@@ -808,9 +810,9 @@ contract MorpherState is Ownable {
     // ----------------------------------------------------------------------------
 
     function payOperatingReward() public onlyMainChain {
-        if (now > lastRewardTime.add(REWARDPERIOD)) {
-            uint256 _reward = totalSupply.mul(rewardBasisPoints).div(PRECISION);
-            setLastRewardTime(lastRewardTime.add(REWARDPERIOD));
+        if (block.timestamp > lastRewardTime + (REWARDPERIOD)) {
+            uint256 _reward = totalSupply * (rewardBasisPoints) / (PRECISION);
+            setLastRewardTime(lastRewardTime + (REWARDPERIOD));
             mint(morpherRewards, _reward);
             emit OperatingRewardMinted(morpherRewards, _reward);
         }

@@ -1,4 +1,6 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
+import "@openzeppelin/contracts/access/Ownable.sol";
 // ------------------------------------------------------------------------
 // Morpher Governance (MAIN CHAIN ONLY)
 //
@@ -18,13 +20,10 @@ pragma solidity 0.5.16;
 // Governance is expected to become more sophisticated in the future
 // ------------------------------------------------------------------------
 
-import "./Ownable.sol";
-import "./SafeMath.sol";
 import "./MorpherState.sol";
 
 contract MorpherGovernance is Ownable {
 
-    using SafeMath for uint256;
     MorpherState state;
     
     event BecomeValidator(address indexed _sender, uint256 indexed _myValidatorIndex);
@@ -49,7 +48,7 @@ contract MorpherGovernance is Ownable {
     mapping(address => address) private administratorVote;
     mapping(address => uint256) private countVotes;
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress) {
         setMorpherState(_stateAddress);
         transferOwnership(_coldStorageOwnerAddress);        
     }
@@ -102,15 +101,15 @@ contract MorpherGovernance is Ownable {
     function becomeValidator() public {
         // To become a validator you have to lock up 10m * (number of validators + 1) Morpher Token in escrow
         // After a warmup period of 7 days the new validator can vote on Oracle contract and protocol Administrator
-        uint256 _requiredAmount = MINVALIDATORLOCKUP.mul(numberOfValidators.add(1));
+        uint256 _requiredAmount = MINVALIDATORLOCKUP * (numberOfValidators + 1);
         require(state.balanceOf(msg.sender) >= _requiredAmount, "MorpherGovernance: Insufficient balance to become Validator.");
         require(isValidator(msg.sender) == false, "MorpherGovernance: Address is already Validator.");
         require(numberOfValidators <= MAXVALIDATORS, "MorpherGovernance: number of Validators can not exceed Max Validators.");
         state.transfer(msg.sender, address(this), _requiredAmount);
-        numberOfValidators = numberOfValidators.add(1);
+        numberOfValidators = numberOfValidators + 1;
         validatorIndex[msg.sender] = numberOfValidators;
-        validatorJoinedAtTime[msg.sender] = now;
-        lastValidatorJoined = now;
+        validatorJoinedAtTime[msg.sender] = block.timestamp;
+        lastValidatorJoined = block.timestamp;
         validatorAddress[numberOfValidators] = msg.sender;
         emit BecomeValidator(msg.sender, numberOfValidators);
     }
@@ -126,14 +125,14 @@ contract MorpherGovernance is Ownable {
         // Burning prevents vote delay attacks: validators stepping down and re-joining could
         // delay votes for VALIDATORWARMUPPERIOD.
         uint256 _myValidatorIndex = validatorIndex[msg.sender];
-        require(state.balanceOf(address(this)) >= MINVALIDATORLOCKUP.mul(numberOfValidators), "MorpherGovernance: Escrow does not have enough funds. Should not happen.");
+        require(state.balanceOf(address(this)) >= MINVALIDATORLOCKUP * (numberOfValidators), "MorpherGovernance: Escrow does not have enough funds. Should not happen.");
         // Stepping down as validator potentially releases token to the other validatorAddresses
         for (uint256 i = _myValidatorIndex; i < numberOfValidators; i++) {
             validatorAddress[i] = validatorAddress[i+1];
             validatorIndex[validatorAddress[i]] = i;
             // Release 9.9m of token to every validator moving up, burn 0.1m token
-            state.transfer(address(this), validatorAddress[i], MINVALIDATORLOCKUP.div(100).mul(99));
-            state.burn(address(this), MINVALIDATORLOCKUP.div(100));
+            state.transfer(address(this), validatorAddress[i], MINVALIDATORLOCKUP / 100 * (99));
+            state.burn(address(this), MINVALIDATORLOCKUP / 100);
         }
         // Release 99% of escrow token of validator dropping out, burn 1%
         validatorAddress[numberOfValidators] = address(0);
@@ -141,17 +140,17 @@ contract MorpherGovernance is Ownable {
         validatorJoinedAtTime[msg.sender] = 0;
         oracleVote[msg.sender] = address(0);
         administratorVote[msg.sender] = address(0);
-        numberOfValidators = numberOfValidators.sub(1);
+        numberOfValidators = numberOfValidators - 1;
         countOracleVote();
         countAdministratorVote();
-        state.transfer(address(this), msg.sender, MINVALIDATORLOCKUP.mul(_myValidatorIndex).div(100).mul(99));
-        state.burn(address(this), MINVALIDATORLOCKUP.mul(_myValidatorIndex).div(100));
+        state.transfer(address(this), msg.sender, MINVALIDATORLOCKUP * (_myValidatorIndex) / 100 * (99));
+        state.burn(address(this), MINVALIDATORLOCKUP * (_myValidatorIndex) / 100);
         emit StepDownAsValidator(msg.sender, validatorIndex[msg.sender]);
     }
 
     function voteOracle(address _oracleAddress) public onlyValidator {
-        require(validatorJoinedAtTime[msg.sender].add(VALIDATORWARMUPPERIOD) < now, "MorpherGovernance: Validator was just appointed and is not eligible to vote yet.");
-        require(lastValidatorJoined.add(VALIDATORWARMUPPERIOD) < now, "MorpherGovernance: New validator joined the board recently, please wait for the end of the warm up period.");
+        require(validatorJoinedAtTime[msg.sender] + VALIDATORWARMUPPERIOD < block.timestamp, "MorpherGovernance: Validator was just appointed and is not eligible to vote yet.");
+        require(lastValidatorJoined + VALIDATORWARMUPPERIOD < block.timestamp, "MorpherGovernance: New validator joined the board recently, please wait for the end of the warm up period.");
         oracleVote[msg.sender] = _oracleAddress;
         // Count Oracle Votes
         (address _votedOracleAddress, uint256 _votes) = countOracleVote();
@@ -159,8 +158,8 @@ contract MorpherGovernance is Ownable {
     }
 
     function voteAdministrator(address _administratorAddress) public onlyValidator {
-        require(validatorJoinedAtTime[msg.sender].add(VALIDATORWARMUPPERIOD) < now, "MorpherGovernance: Validator was just appointed and is not eligible to vote yet.");
-        require(lastValidatorJoined.add(VALIDATORWARMUPPERIOD) < now, "MorpherGovernance: New validator joined the board recently, please wait for the end of the warm up period.");
+        require(validatorJoinedAtTime[msg.sender] + VALIDATORWARMUPPERIOD < block.timestamp, "MorpherGovernance: Validator was just appointed and is not eligible to vote yet.");
+        require(lastValidatorJoined + VALIDATORWARMUPPERIOD < block.timestamp, "MorpherGovernance: New validator joined the board recently, please wait for the end of the warm up period.");
         administratorVote[msg.sender] = _administratorAddress;
         // Count Administrator Votes
         (address _appointedAdministrator, uint256 _votes) = countAdministratorVote();
@@ -177,7 +176,7 @@ contract MorpherGovernance is Ownable {
             }
         }
         // Evaluate: Simple majority of Validators resets oracleAddress
-        if (_votes > numberOfValidators.div(2)) {
+        if (_votes > numberOfValidators / 2) {
             setOracle(_votedOracleAddress);
         }
         for (uint256 i = 1; i <= numberOfValidators; i++) {

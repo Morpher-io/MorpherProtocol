@@ -1,8 +1,8 @@
-pragma solidity 0.5.16;
+//SPDX-License-Identifier: GPLv3
+pragma solidity 0.8.10;
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./IERC20.sol";
-import "./Ownable.sol";
-import "./SafeMath.sol";
 import "./MorpherState.sol";
 
 /**
@@ -32,7 +32,6 @@ import "./MorpherState.sol";
 contract MorpherToken is IERC20, Ownable {
 
     MorpherState state;
-    using SafeMath for uint256;
 
     string public constant name     = "Morpher";
     string public constant symbol   = "MPH";
@@ -53,7 +52,7 @@ contract MorpherToken is IERC20, Ownable {
     // ------------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------------
-    constructor(address _stateAddress, address _coldStorageOwnerAddress) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress) {
         setMorpherState(_stateAddress);
         transferOwnership(_coldStorageOwnerAddress);
     }
@@ -128,7 +127,7 @@ contract MorpherToken is IERC20, Ownable {
      */
     function transferFrom(address _sender, address _recipient, uint256 amount) public returns (bool) {
         _transfer(_sender, _recipient, amount);
-        _approve(_sender, msg.sender, state.getAllowance(_sender, msg.sender).sub(amount, "ERC20: transfer amount exceeds allowance"));
+        _approve(_sender, msg.sender, state.getAllowance(_sender, msg.sender) - (amount));
         return true;
     }
 
@@ -145,7 +144,7 @@ contract MorpherToken is IERC20, Ownable {
      * - `_spender` cannot be the zero address.
      */
     function increaseAllowance(address _spender, uint256 _addedValue) public returns (bool) {
-        _approve(msg.sender, _spender, state.getAllowance(msg.sender, _spender).add(_addedValue));
+        _approve(msg.sender, _spender, state.getAllowance(msg.sender, _spender) + (_addedValue));
         return true;
     }
 
@@ -164,7 +163,7 @@ contract MorpherToken is IERC20, Ownable {
      * `subtractedValue`.
      */
     function decreaseAllowance(address _spender, uint256 _subtractedValue) public returns (bool) {
-        _approve(msg.sender, _spender,  state.getAllowance(msg.sender, _spender).sub(_subtractedValue, "ERC20: decreased allowance below zero"));
+        _approve(msg.sender, _spender,  state.getAllowance(msg.sender, _spender) - (_subtractedValue));
         return true;
     }
 
@@ -241,7 +240,10 @@ contract MorpherToken is IERC20, Ownable {
     // ------------------------------------------------------------------------
     // Don't accept ETH
     // ------------------------------------------------------------------------
-    function () external payable {
+    fallback () external payable {
+        revert("ERC20: You can't deposit Ether here");
+    }
+    receive () external payable {
         revert("ERC20: You can't deposit Ether here");
     }
 }
