@@ -1,9 +1,7 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity 0.8.10;
-import "@openzeppelin/contracts/access/Ownable.sol";
+pragma solidity 0.8.11;
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
-
 import "./MorpherToken.sol";
 
 // ----------------------------------------------------------------------------------
@@ -12,19 +10,7 @@ import "./MorpherToken.sol";
 // by an elected platform administrator (see MorpherGovernance) to perform protocol updates.
 // ----------------------------------------------------------------------------------
 
-contract MorpherState is Ownable, Initializable  {
-
-
-    bool public mainChain;
-    uint256 public totalSupply;
-    uint256 public totalToken;
-    uint256 public totalInPositions;
-    uint256 public totalOnOtherChain;
-    uint256 public maximumLeverage = 10**9; // Leverage precision is 1e8, maximum leverage set to 10 initially
-    uint256 constant PRECISION = 10**8;
-    uint256 constant DECIMALS = 18;
-    uint256 constant REWARDPERIOD = 1 days;
-    bool public paused = false;
+contract MorpherState is Initializable, OwnableUpgradeable  {
 
     address public morpherGovernance;
     address public morpherRewards;
@@ -32,6 +18,18 @@ contract MorpherState is Ownable, Initializable  {
     address public oracleContract;
     address public sideChainOperator;
     address public morpherBridge;
+    bool public mainChain;
+    uint256 public totalSupply;
+    uint256 public totalToken;
+    uint256 public totalInPositions;
+    uint256 public totalOnOtherChain;
+    uint256 public maximumLeverage; // Leverage precision is 1e8, maximum leverage set to 10 initially
+    uint256 public constant PRECISION = 10**8;
+    uint256 public constant DECIMALS = 18;
+    uint256 public constant REWARDPERIOD = 1 days;
+    bool public paused;
+
+    
     address payable public morpherToken;
 
     uint256 public rewardBasisPoints;
@@ -41,7 +39,7 @@ contract MorpherState is Ownable, Initializable  {
     uint256 public sideChainMerkleRootWrittenAtTime;
 
     // Set initial withdraw limit from sidechain to 20m token or 2% of initial supply
-    uint256 public mainChainWithdrawLimit24 = 2 * 10**25;
+    uint256 public mainChainWithdrawLimit24;
 
     mapping(address => bool) private stateAccess;
     mapping(address => bool) private transferAllowed;
@@ -92,7 +90,7 @@ contract MorpherState is Ownable, Initializable  {
     uint256 public lastWithdrawLimitReductionTime;
     uint256 public last24HoursAmountWithdrawn;
     uint256 public withdrawLimit24Hours;
-    uint256 public inactivityPeriod = 3 days;
+    uint256 public inactivityPeriod;
     uint256 public transferNonce;
     bool public fastTransfersEnabled;
 
@@ -209,12 +207,13 @@ contract MorpherState is Ownable, Initializable  {
     }
 
     function initialize(bool _mainChain, address _sideChainOperator, address _morpherTreasury) public initializer {
+        OwnableUpgradeable.__Ownable_init();
         // @Deployer: Transfer State Ownership to cold storage address after deploying protocol
         mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
         setLastRewardTime(block.timestamp);
         uint256 _sideChainMint = 575000000 * 10**(DECIMALS);
         uint256 _mainChainMint = 425000000 * 10**(DECIMALS);
-        
+
         administrator = owner(); //first set the owner as administrator
         morpherGovernance = owner(); //first set the owner as governance
         
@@ -240,6 +239,15 @@ contract MorpherState is Ownable, Initializable  {
         setMainChainWithdrawLimit(totalSupply / 50);
         setSideChainOperator(_sideChainOperator);
         denyAccess(owner());
+
+        maximumLeverage = 10*PRECISION; // Leverage precision is 1e8, maximum leverage set to 10 initially
+        paused = false;
+        mainChainWithdrawLimit24 = 2 * 10**25;   
+        inactivityPeriod = 3 days;
+    }
+
+    function someNewFunction() public view returns(string memory) {
+        return "hello proxy";
     }
 
     // ----------------------------------------------------------------------------

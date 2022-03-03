@@ -2,6 +2,7 @@ require("dotenv").config();
 let HDWalletProvider = require("@truffle/hdwallet-provider");
 
 module.exports = {
+  contracts_directory: './contracts/',
   networks: {
     local: {
       host: "127.0.0.1",
@@ -58,7 +59,7 @@ module.exports = {
   },
   compilers: {
     solc: {
-      version: "0.8.10",
+      version: "0.8.11",
       settings: {
         optimizer: {
           enabled: true,

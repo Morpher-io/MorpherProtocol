@@ -7,7 +7,7 @@
 // 72 hours positions and balaces from side chain can be transferred to main chain.
 // ------------------------------------------------------------------------
 //SPDX-License-Identifier: GPLv3
-pragma solidity 0.8.10;
+pragma solidity 0.8.11;
 
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
