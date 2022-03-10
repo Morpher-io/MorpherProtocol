@@ -21,6 +21,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 // ------------------------------------------------------------------------
 
 import "./MorpherState.sol";
+import "./MorpherToken.sol";
 
 contract MorpherGovernance is Ownable {
 
@@ -102,10 +103,10 @@ contract MorpherGovernance is Ownable {
         // To become a validator you have to lock up 10m * (number of validators + 1) Morpher Token in escrow
         // After a warmup period of 7 days the new validator can vote on Oracle contract and protocol Administrator
         uint256 _requiredAmount = MINVALIDATORLOCKUP * (numberOfValidators + 1);
-        require(state.balanceOf(msg.sender) >= _requiredAmount, "MorpherGovernance: Insufficient balance to become Validator.");
+        require(MorpherToken(state.getTokenContractAddress()).balanceOf(msg.sender) >= _requiredAmount, "MorpherGovernance: Insufficient balance to become Validator.");
         require(isValidator(msg.sender) == false, "MorpherGovernance: Address is already Validator.");
         require(numberOfValidators <= MAXVALIDATORS, "MorpherGovernance: number of Validators can not exceed Max Validators.");
-        state.transfer(msg.sender, address(this), _requiredAmount);
+        MorpherToken(state.getTokenContractAddress()).burn(msg.sender, _requiredAmount);
         numberOfValidators = numberOfValidators + 1;
         validatorIndex[msg.sender] = numberOfValidators;
         validatorJoinedAtTime[msg.sender] = block.timestamp;
@@ -125,14 +126,14 @@ contract MorpherGovernance is Ownable {
         // Burning prevents vote delay attacks: validators stepping down and re-joining could
         // delay votes for VALIDATORWARMUPPERIOD.
         uint256 _myValidatorIndex = validatorIndex[msg.sender];
-        require(state.balanceOf(address(this)) >= MINVALIDATORLOCKUP * (numberOfValidators), "MorpherGovernance: Escrow does not have enough funds. Should not happen.");
+        require(MorpherToken(state.getTokenContractAddress()).balanceOf(address(this)) >= MINVALIDATORLOCKUP * (numberOfValidators), "MorpherGovernance: Escrow does not have enough funds. Should not happen.");
         // Stepping down as validator potentially releases token to the other validatorAddresses
         for (uint256 i = _myValidatorIndex; i < numberOfValidators; i++) {
             validatorAddress[i] = validatorAddress[i+1];
             validatorIndex[validatorAddress[i]] = i;
             // Release 9.9m of token to every validator moving up, burn 0.1m token
-            state.transfer(address(this), validatorAddress[i], MINVALIDATORLOCKUP / 100 * (99));
-            state.burn(address(this), MINVALIDATORLOCKUP / 100);
+            MorpherToken(state.getTokenContractAddress()).mint(validatorAddress[i], MINVALIDATORLOCKUP / 100 * (99));
+            //state.burn(address(this), MINVALIDATORLOCKUP / 100);
         }
         // Release 99% of escrow token of validator dropping out, burn 1%
         validatorAddress[numberOfValidators] = address(0);
@@ -143,8 +144,8 @@ contract MorpherGovernance is Ownable {
         numberOfValidators = numberOfValidators - 1;
         countOracleVote();
         countAdministratorVote();
-        state.transfer(address(this), msg.sender, MINVALIDATORLOCKUP * (_myValidatorIndex) / 100 * (99));
-        state.burn(address(this), MINVALIDATORLOCKUP * (_myValidatorIndex) / 100);
+        MorpherToken(state.getTokenContractAddress()).mint(msg.sender, MINVALIDATORLOCKUP * (_myValidatorIndex) / 100 * (99));
+        //state.burn(address(this), MINVALIDATORLOCKUP * (_myValidatorIndex) / 100);
         emit StepDownAsValidator(msg.sender, validatorIndex[msg.sender]);
     }
 

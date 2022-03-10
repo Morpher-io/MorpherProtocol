@@ -220,11 +220,11 @@ contract MorpherBridge is Ownable {
     // ------------------------------------------------------------------------
     function transferToSideChain(uint256 _tokens) public userNotBlocked {
         require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
-        require(state.balanceOf(msg.sender) >= _tokens, "MorpherBridge: Insufficient balance.");
+        require(MorpherToken(state.getTokenContractAddress()).balanceOf(msg.sender) >= _tokens, "MorpherBridge: Insufficient balance.");
         verifyUpdateDailyLimit(_tokens);
         verifyUpdateMonthlyLimit(_tokens);
         verifyUpdateYearlyLimit(_tokens);
-        state.burn(msg.sender, _tokens);
+        MorpherToken(state.getTokenContractAddress()).burn(msg.sender, _tokens);
         uint256 _newTokenSentToLinkedChain = getTokenSentToLinkedChain(msg.sender) + _tokens;
         uint256 _transferNonce = state.getBridgeNonce();
         uint256 _timeStamp = block.timestamp;
@@ -281,7 +281,7 @@ contract MorpherBridge is Ownable {
     function _chainTransfer(address _address, uint256 _tokenClaimed, uint256 _numOfToken) private {
         state.setTokenClaimedOnThisChain(_address, _tokenClaimed + _numOfToken);
         state.add24HoursWithdrawn(_numOfToken);
-        state.mint(_address, _numOfToken);
+        MorpherToken(state.getTokenContractAddress()).mint(_address, _numOfToken);
     }
         
     // ------------------------------------------------------------------------
@@ -304,7 +304,7 @@ contract MorpherBridge is Ownable {
         uint256 _claimAmount = _tokenSentToLinkedChain - _wrongSideChainBalance;
         state.setTokenSentToLinkedChain(msg.sender, _tokenSentToLinkedChain - _claimAmount);
         state.add24HoursWithdrawn(_claimAmount);
-        state.mint(msg.sender, _claimAmount);
+        MorpherToken(state.getTokenContractAddress()).mint(msg.sender, _claimAmount);
         emit ClaimFailedTransferToSidechain(msg.sender, _claimAmount);
     }
 

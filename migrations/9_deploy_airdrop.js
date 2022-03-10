@@ -11,10 +11,10 @@ module.exports = async function (deployer, network, accounts) {
    */
   if (network !== "mainchain" && network !== 'kovan') {
     const morpherToken = await MorpherToken.deployed();
-    const morpherState = await MorpherState.deployed();
+    //const morpherState = await MorpherState.deployed();
     
     await deployer.deploy(MorpherAirdrop, airdropAdminAddress, morpherToken.address, ownerAddress);
 
-    await morpherState.enableTransfers(MorpherAirdrop.address);
+    //await morpherState.enableTransfers(MorpherAirdrop.address);
   }
 };

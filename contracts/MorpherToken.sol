@@ -1,249 +1,142 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity 0.8.11;
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./MorpherState.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
+import "./MorpherAccessControl.sol";
 
-/**
- * @dev Implementation of the {IERC20} interface.
- *
- * This implementation is agnostic to the way tokens are created. This means
- * that a supply mechanism has to be added in a derived contract using {_mint}.
- * For a generic mechanism see {ERC20Mintable}.
- *
- * TIP: For a detailed writeup see our guide
- * https://forum.zeppelin.solutions/t/how-to-implement-erc20-supply-mechanisms/226[How
- * to implement supply mechanisms].
- *
- * We have followed general OpenZeppelin guidelines: functions revert instead
- * of returning `false` on failure. This behavior is nonetheless conventional
- * and does not conflict with the expectations of ERC20 applications.
- *
- * Additionally, an {Approval} event is emitted on calls to {transferFrom}.
- * This allows applications to reconstruct the allowance for all accounts just
- * by listening to said events. Other implementations of the EIP may not emit
- * these events, as it isn't required by the specification.
- *
- * Finally, the non-standard {decreaseAllowance} and {increaseAllowance}
- * functions have been added to mitigate the well-known issues around setting
- * allowances. See {IERC20-approve}.
- */
-contract MorpherToken is IERC20, Ownable {
+contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 
-    MorpherState state;
-
-    string public constant name     = "Morpher";
-    string public constant symbol   = "MPH";
-    uint8  public constant decimals = 18;
+    MorpherAccessControl public morpherAccessControl;
     
-    modifier onlyState {
-        require(msg.sender == address(state), "ERC20: caller must be MorpherState contract.");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    bytes32 public constant TRANSFER_ROLE = keccak256("TRANSFER_ROLE");
+
+    uint256 private _totalTokensOnOtherChain;
+    uint256 private _totalTokensInPositions;
+    bool private _restrictTransfers;
+
+    event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);
+    event SetTotalTokensInPositions(uint256 _oldValue, uint256 _newValue);
+    event SetRestrictTransfers(bool _oldValue, bool _newValue);
+
+    function initialize(address _morpherAccessControl) public initializer {
+        ERC20Upgradeable.__ERC20_init("Morpher", "MPH");
+        morpherAccessControl = MorpherAccessControl(_morpherAccessControl);
+    }
+
+    modifier onlyRole(bytes32 role) {
+        require(morpherAccessControl.hasRole(role, _msgSender()), "MorpherToken: Permission denied.");
         _;
     }
 
-    modifier canTransfer {
-        require(state.getCanTransfer(msg.sender), "ERC20: token transfers disabled on sidechain.");
-        _;
+    // function getMorpherAccessControl() public view returns(address) {
+    //     return address(morpherAccessControl);
+    // }
+
+    function setRestrictTransfers(bool restrictTransfers) public onlyRole(ADMINISTRATOR_ROLE) {
+        emit SetRestrictTransfers(_restrictTransfers, restrictTransfers);
+        _restrictTransfers = restrictTransfers;
     }
+
+    function getRestrictTransfers() public view returns(bool) {
+        return _restrictTransfers;
+    }
+
+    function setTotalTokensOnOtherChain(uint256 totalOnOtherChain) public onlyRole(ADMINISTRATOR_ROLE) {
+        emit SetTotalTokensOnOtherChain(_totalTokensInPositions, totalOnOtherChain);
+        _totalTokensOnOtherChain = totalOnOtherChain;
+    }
+
+    function getTotalTokensOnOtherChain() public view returns(uint256) {
+        return _totalTokensOnOtherChain;
+    }
+
+    function setTotalInPositions(uint256 totalTokensInPositions) public onlyRole(ADMINISTRATOR_ROLE) {
+        emit SetTotalTokensInPositions(_totalTokensInPositions, totalTokensInPositions);
+        _totalTokensInPositions = totalTokensInPositions;
+    }
+
+    function getTotalTokensInPositions() public view returns(uint256) {
+        return _totalTokensInPositions;
+    }
+
+
     
-    event LinkState(address _address);
-
-    // ------------------------------------------------------------------------
-    // Constructor
-    // ------------------------------------------------------------------------
-    constructor(address _stateAddress, address _coldStorageOwnerAddress) {
-        setMorpherState(_stateAddress);
-        transferOwnership(_coldStorageOwnerAddress);
-    }
-
-    // ------------------------------------------------------------------------
-    // Links Token Contract with State
-    // ------------------------------------------------------------------------
-    function setMorpherState(address _stateAddress) public onlyOwner {
-        state = MorpherState(_stateAddress);
-        emit LinkState(_stateAddress);
-    }
-
     /**
      * @dev See {IERC20-totalSupply}.
      */
-    function totalSupply() public view returns (uint256) {
-        return state.totalSupply();
+    function totalSupply() public view virtual override returns (uint256) {
+        return super.totalSupply() + _totalTokensOnOtherChain + _totalTokensInPositions;
     }
 
-    /**
-     * @dev See {IERC20-balanceOf}.
-     */
-    function balanceOf(address _account) public view returns (uint256) {
-        return state.balanceOf(_account);
-    }
 
     /**
-     * @dev See {IERC20-transfer}.
+     * @dev Creates `amount` new tokens for `to`.
+     *
+     * See {ERC20-_mint}.
      *
      * Requirements:
      *
-     * - `recipient` cannot be the zero address.
-     * - the caller must have a balance of at least `amount`.
-     * 
-     * Emits a {Transfer} event via emitTransfer called by MorpherState
+     * - the caller must have the `MINTER_ROLE`.
      */
-    function transfer(address _recipient, uint256 _amount) public returns (bool) {
-        _transfer(msg.sender, _recipient, _amount);
-        return true;
-    }
-
-   /**
-     * @dev See {IERC20-allowance}.
-     */
-    function allowance(address _owner, address _spender) public view returns (uint256) {
-        return state.getAllowance(_owner, _spender);
+    function mint(address to, uint256 amount) public virtual {
+        require(morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()), "MorpherToken: must have minter role to mint");
+        _mint(to, amount);
     }
 
     /**
-     * @dev See {IERC20-approve}.
+     * @dev Burns `amount` of tokens for `from`.
+     *
+     * See {ERC20-_burn}.
      *
      * Requirements:
      *
-     * - `spender` cannot be the zero address.
+     * - the caller must have the `BURNER_ROLE`.
      */
-    function approve(address _spender, uint256 _amount) public returns (bool) {
-        _approve(msg.sender, _spender, _amount);
-        return true;
+    function burn(address from, uint256 amount) public virtual {
+        require(morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()), "MorpherToken: must have burner role to burn");
+        _burn(from, amount);
     }
 
     /**
-     * @dev See {IERC20-transferFrom}.
+     * @dev Pauses all token transfers.
      *
-     * Emits an {Approval} event indicating the updated allowance. This is not
-     * required by the EIP. See the note at the beginning of {ERC20};
+     * See {ERC20Pausable} and {Pausable-_pause}.
      *
      * Requirements:
-     * - `_sender` and `_recipient` cannot be the zero address.
-     * - `_sender` must have a balance of at least `amount`.
-     * - the caller must have allowance for `_sender`'s tokens of at least
-     * `amount`.
+     *
+     * - the caller must have the `PAUSER_ROLE`.
      */
-    function transferFrom(address _sender, address _recipient, uint256 amount) public returns (bool) {
-        _transfer(_sender, _recipient, amount);
-        _approve(_sender, msg.sender, state.getAllowance(_sender, msg.sender) - (amount));
-        return true;
+    function pause() public virtual {
+        require(morpherAccessControl.hasRole(PAUSER_ROLE, _msgSender()), "MorpherToken: must have pauser role to pause");
+        _pause();
     }
 
     /**
-     * @dev Atomically increases the allowance granted to `spender` by the caller.
+     * @dev Unpauses all token transfers.
      *
-     * This is an alternative to {approve} that can be used as a mitigation for
-     * problems described in {IERC20-approve}.
-     *
-     * Emits an {Approval} event indicating the updated allowance.
+     * See {ERC20Pausable} and {Pausable-_unpause}.
      *
      * Requirements:
      *
-     * - `_spender` cannot be the zero address.
+     * - the caller must have the `PAUSER_ROLE`.
      */
-    function increaseAllowance(address _spender, uint256 _addedValue) public returns (bool) {
-        _approve(msg.sender, _spender, state.getAllowance(msg.sender, _spender) + (_addedValue));
-        return true;
+    function unpause() public virtual {
+        require(morpherAccessControl.hasRole(PAUSER_ROLE, _msgSender()), "MorpherToken: must have pauser role to unpause");
+        _unpause();
     }
 
-    /**
-     * @dev Atomically decreases the allowance granted to `spender` by the caller.
-     *
-     * This is an alternative to {approve} that can be used as a mitigation for
-     * problems described in {IERC20-approve}.
-     *
-     * Emits an {Approval} event indicating the updated allowance.
-     *
-     * Requirements:
-     *
-     * - `spender` cannot be the zero address.
-     * - `spender` must have allowance for the caller of at least
-     * `subtractedValue`.
-     */
-    function decreaseAllowance(address _spender, uint256 _subtractedValue) public returns (bool) {
-        _approve(msg.sender, _spender,  state.getAllowance(msg.sender, _spender) - (_subtractedValue));
-        return true;
-    }
-
-    /**
-     * @dev Caller destroys `_amount` tokens permanently
-     *
-     * Emits a {Transfer} event to zero address called by MorpherState via emitTransfer.
-     *
-     * Requirements:
-     *
-     * - Caller must have token balance of at least `_amount`
-     * 
-     */
-     function burn(uint256 _amount) public returns (bool) {
-        state.burn(msg.sender, _amount);
-        return true;
-    }
-
-    /**
-     * @dev Emits a {Transfer} event
-     *
-     * MorpherState emits a {Transfer} event.
-     *
-     * Requirements:
-     *
-     * - Caller must be MorpherState
-     * 
-     */
-     function emitTransfer(address _from, address _to, uint256 _amount) public onlyState {
-        emit Transfer(_from, _to, _amount);
-    }
-
-     /**
-     * @dev Moves tokens `_amount` from `sender` to `_recipient`.
-     *
-     * This is internal function is equivalent to {transfer}, and can be used to
-     * e.g. implement automatic token fees, slashing mechanisms, etc.
-     *
-     * Emits a {Transfer} event via emitTransfer called by MorpherState
-     *
-     * Requirements:
-     *
-     * - `_sender` cannot be the zero address.
-     * - `_recipient` cannot be the zero address.
-     * - `_sender` must have a balance of at least `_amount`.
-     */
-    function _transfer(address _sender, address _recipient, uint256 _amount) canTransfer internal {
-        require(_sender != address(0), "ERC20: transfer from the zero address");
-        require(_recipient != address(0), "ERC20: transfer to the zero address");
-        require(state.balanceOf(_sender) >= _amount, "ERC20: transfer amount exceeds balance");
-        state.transfer(_sender, _recipient, _amount);
-    }
-
-    /**
-     * @dev Sets `_amount` as the allowance of `spender` over the `owner`s tokens.
-     *
-     * This is internal function is equivalent to `approve`, and can be used to
-     * e.g. set automatic allowances for certain subsystems, etc.
-     *
-     * Emits an {Approval} event.
-     *
-     * Requirements:
-     *
-     * - `owner` cannot be the zero address.
-     * - `spender` cannot be the zero address.
-     */
-    function _approve(address _owner, address _spender, uint256 _amount) internal {
-        require(_owner != address(0), "ERC20: approve from the zero address");
-        require(_spender != address(0), "ERC20: approve to the zero address");
-        state.setAllowance(_owner, _spender, _amount);
-        emit Approval(_owner, _spender, _amount);
-    }
-
-    // ------------------------------------------------------------------------
-    // Don't accept ETH
-    // ------------------------------------------------------------------------
-    fallback () external payable {
-        revert("ERC20: You can't deposit Ether here");
-    }
-    receive () external payable {
-        revert("ERC20: You can't deposit Ether here");
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual override(ERC20Upgradeable, ERC20PausableUpgradeable) {
+        require(!_restrictTransfers || morpherAccessControl.hasRole(TRANSFER_ROLE, _msgSender()) || morpherAccessControl.hasRole(TRANSFER_ROLE, from), "MorpherToken: Transfer denied");
+        super._beforeTokenTransfer(from, to, amount);
     }
 }
+

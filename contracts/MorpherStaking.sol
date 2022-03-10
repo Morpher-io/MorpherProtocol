@@ -1,9 +1,11 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity 0.8.11;
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
+import "./MorpherToken.sol";
 
 // ----------------------------------------------------------------------------------
 // Staking Morpher Token generates interest
@@ -12,7 +14,7 @@ import "./MorpherUserBlocking.sol";
 // There is a lockup after staking or topping up (30 days) and a minimum stake (100k MPH)
 // ----------------------------------------------------------------------------------
 
-contract MorpherStaking is Ownable {
+contract MorpherStaking is Initializable, OwnableUpgradeable {
 
     MorpherState state;
     
@@ -24,7 +26,7 @@ contract MorpherStaking is Ownable {
     //mapping(address => uint256) private poolShares;
     //mapping(address => uint256) private lockup;
 
-    uint256 public poolShareValue = PRECISION;
+    uint256 public poolShareValue;
     uint256 public lastReward;
     uint256 public totalShares;
     //uint256 public interestRate = 15000; // 0.015% per day initially, diminishing returns over time
@@ -36,13 +38,13 @@ contract MorpherStaking is Ownable {
     mapping(uint256 => InterestRate) public interestRates;
     uint256 public numInterestRates;
 
-    uint256 public lockupPeriod = 30 days; // to prevent tactical staking and ensure smooth governance
-    uint256 public minimumStake = 10**23; // 100k MPH minimum
+    uint256 public lockupPeriod; // to prevent tactical staking and ensure smooth governance
+    uint256 public minimumStake; // 100k MPH minimum
 
     address public stakingAdmin;
 
-    address public stakingAddress = 0x2222222222222222222222222222222222222222;
-    bytes32 public marketIdStakingMPH = 0x9a31fdde7a3b1444b1befb10735dcc3b72cbd9dd604d2ff45144352bf0f359a6; //STAKING_MPH
+    address public stakingAddress;
+    bytes32 public marketIdStakingMPH; //STAKING_MPH
 
 // ----------------------------------------------------------------------------
 // Events
@@ -72,7 +74,7 @@ contract MorpherStaking is Ownable {
         _;
     }
     
-    constructor(address payable _morpherState, address _stakingAdmin, address payable _userBlockingAddress) {
+    function initialize(address payable _morpherState, address _stakingAdmin, address payable _userBlockingAddress) public initializer {
         setStakingAdmin(_stakingAdmin);
         setMorpherStateAddress(_morpherState);
         emit SetLockupPeriod(lockupPeriod);
@@ -80,6 +82,11 @@ contract MorpherStaking is Ownable {
         setMorpherUserBlocking(_userBlockingAddress);
         addInterestRate(15000,1617094819); //setting the initial interest rate to the trade engine deployed timestamp
         lastReward = block.timestamp;
+        lockupPeriod = 30 days; // to prevent tactical staking and ensure smooth governance
+        minimumStake = 10**23; // 100k MPH minimum
+        stakingAddress = 0x2222222222222222222222222222222222222222;
+        marketIdStakingMPH = 0x9a31fdde7a3b1444b1befb10735dcc3b72cbd9dd604d2ff45144352bf0f359a6; //STAKING_MPH
+        poolShareValue = PRECISION;
         // missing: transferOwnership to Governance once deployed
     }
 
@@ -96,7 +103,7 @@ contract MorpherStaking is Ownable {
             lastReward = lastReward + (_numOfIntervals * (INTERVAL));
             emit PoolShareValueUpdated(lastReward, poolShareValue);
         }
-        mintStakingRewards();
+        //mintStakingRewards(); //burning/minting does not influence this
         return poolShareValue;        
     }
 
@@ -106,10 +113,10 @@ contract MorpherStaking is Ownable {
 
     function mintStakingRewards() private {
         uint256 _targetBalance = poolShareValue * (totalShares);
-        if (state.balanceOf(stakingAddress) < _targetBalance) {
+        if (MorpherToken(state.getTokenContractAddress()).balanceOf(stakingAddress) < _targetBalance) {
             // If there are not enough token held by the contract, mint them
-            uint256 _delta = _targetBalance - (state.balanceOf(stakingAddress));
-            state.mint(stakingAddress, _delta);
+            uint256 _delta = _targetBalance - (MorpherToken(state.getTokenContractAddress()).balanceOf(stakingAddress));
+            MorpherToken(state.getTokenContractAddress()).mint(stakingAddress, _delta);
             emit StakingRewardsMinted(lastReward, _delta);
         }
     }
@@ -121,12 +128,12 @@ contract MorpherStaking is Ownable {
 // ----------------------------------------------------------------------------
 
     function stake(uint256 _amount) public userNotBlocked returns (uint256 _poolShares) {
-        require(state.balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
+        require(MorpherToken(state.getTokenContractAddress()).balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
         _poolShares = _amount / (poolShareValue);
         (uint256 _numOfShares, , , , , ) = state.getPosition(msg.sender, marketIdStakingMPH);
         require(minimumStake <= _numOfShares + (_poolShares) * (poolShareValue), "MorpherStaking: stake amount lower than minimum stake");
-        state.transfer(msg.sender, stakingAddress, _poolShares * (poolShareValue));
+        MorpherToken(state.getTokenContractAddress()).burn(msg.sender, _poolShares * (poolShareValue));
         totalShares = totalShares + (_poolShares);
         state.setPosition(msg.sender, marketIdStakingMPH, block.timestamp + (lockupPeriod), _numOfShares + (_poolShares), 0, 0, 0, 0, 0);
         emit Staked(msg.sender, _amount, _poolShares, block.timestamp + (lockupPeriod));
@@ -149,7 +156,7 @@ contract MorpherStaking is Ownable {
         state.setPosition(msg.sender, marketIdStakingMPH, lockedInUntil, _numOfExistingShares - (_numOfShares), 0, 0, 0, 0, 0);
         totalShares = totalShares - (_numOfShares);
         _amount = _numOfShares * (poolShareValue);
-        state.transfer(stakingAddress, msg.sender, _amount);
+        MorpherToken(state.getTokenContractAddress()).mint(msg.sender, _amount);
         emit Unstaked(msg.sender, _amount, _numOfShares);
         return _amount;
     }

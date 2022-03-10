@@ -3,9 +3,10 @@ pragma solidity 0.8.11;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./MorpherState.sol";
+import "./MorpherToken.sol";
 import "./MorpherStaking.sol";
-import "./MorpherMintingLimiter.sol";
 import "./MorpherUserBlocking.sol";
+import "./MorpherMintingLimiter.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -16,9 +17,10 @@ import "./MorpherUserBlocking.sol";
 
 contract MorpherTradeEngine is Ownable {
     MorpherState state;
+    MorpherToken token;
     MorpherStaking staking;
-    MorpherMintingLimiter mintingLimiter;
     MorpherUserBlocking userBlocking;
+    MorpherMintingLimiter mintingLimiter;
 
 // ----------------------------------------------------------------------------
 // Precision of prices and leverage
@@ -140,6 +142,7 @@ contract MorpherTradeEngine is Ownable {
         deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
         setUserBlockingAddress(_userBlockingAddress);
         transferOwnership(_coldStorageOwnerAddress);
+        token = MorpherToken(state.getTokenContractAddress());
     }
 
     modifier onlyOracle {
@@ -194,13 +197,13 @@ contract MorpherTradeEngine is Ownable {
             //checks effects interaction
             uint256 paybackAmount = orders[_orderId].orderEscrowAmount;
             orders[_orderId].orderEscrowAmount = 0;
-            state.transfer(escrowOpenOrderAddress, orders[_orderId].userId, paybackAmount);
+            token.mint(orders[_orderId].userId, paybackAmount);
         }
     }
 
     function buildupEscrow(bytes32 _orderId, uint256 _amountInMPH) private {
         if(escrowOpenOrderEnabled && _amountInMPH > 0) {
-            state.transfer(orders[_orderId].userId, escrowOpenOrderAddress, _amountInMPH);
+            token.burn(orders[_orderId].userId, _amountInMPH);
             orders[_orderId].orderEscrowAmount = _amountInMPH;
         }
     }
@@ -997,7 +1000,7 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
 // Updates the portfolio in Morpher State. Called by closeLong/closeShort/openLong/openShort
 // ----------------------------------------------------------------------------
     function setPositionInState(bytes32 _orderId) private {
-        require(state.balanceOf(orders[_orderId].userId) + (orders[_orderId].balanceUp) >= orders[_orderId].balanceDown, "MorpherTradeEngine: insufficient funds.");
+        require(token.balanceOf(orders[_orderId].userId) + (orders[_orderId].balanceUp) >= orders[_orderId].balanceDown, "MorpherTradeEngine: insufficient funds.");
         computeLiquidationPrice(_orderId);
         // Net balanceUp and balanceDown
         if (orders[_orderId].balanceUp > orders[_orderId].balanceDown) {
@@ -1008,10 +1011,10 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
             orders[_orderId].balanceUp = 0;
         }
         if (orders[_orderId].balanceUp > 0) {
-            mintingLimiter.mint(orders[_orderId].userId, orders[_orderId].balanceUp);
+            token.mint(orders[_orderId].userId, orders[_orderId].balanceUp);
         }
         if (orders[_orderId].balanceDown > 0) {
-            state.burn(orders[_orderId].userId, orders[_orderId].balanceDown);
+            token.burn(orders[_orderId].userId, orders[_orderId].balanceDown);
         }
         state.setPosition(
             orders[_orderId].userId,

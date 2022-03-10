@@ -186,10 +186,10 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
         _;
     }
 
-    modifier canTransfer {
-        require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
-        _;
-    }
+    // modifier canTransfer {
+    //     require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
+    //     _;
+    // }
 
     modifier onlyBridge {
         require(msg.sender == getMorpherBridge(), "MorpherState: Caller is not the Bridge. Aborting.");
@@ -211,8 +211,6 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
         // @Deployer: Transfer State Ownership to cold storage address after deploying protocol
         mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
         setLastRewardTime(block.timestamp);
-        uint256 _sideChainMint = 575000000 * 10**(DECIMALS);
-        uint256 _mainChainMint = 425000000 * 10**(DECIMALS);
 
         administrator = owner(); //first set the owner as administrator
         morpherGovernance = owner(); //first set the owner as governance
@@ -220,19 +218,12 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
         grantAccess(owner());
         setSideChainOperator(owner());
         if (mainChain == false) { // Create token only on sidechain
-            balances[owner()] = _sideChainMint; // Create airdrop and team token on sidechain
-            totalToken = _sideChainMint;
-            emit Mint(owner(), balanceOf(owner()), _sideChainMint);
+
             setRewardBasisPoints(0); // Reward is minted on mainchain
             setRewardAddress(address(0));
-            setTotalOnOtherChain(_mainChainMint);
         } else {
-            balances[owner()] = _mainChainMint; // Create treasury and investor token on mainchain
-            totalToken = _mainChainMint;
-            emit Mint(owner(), balanceOf(owner()), _mainChainMint);
             setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
             setRewardAddress(_morpherTreasury);
-            setTotalOnOtherChain(_sideChainMint);
         }
         fastTransfersEnabled = true;
         setNumberOfRequestsLimit(3);
@@ -244,10 +235,6 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
         paused = false;
         mainChainWithdrawLimit24 = 2 * 10**25;   
         inactivityPeriod = 3 days;
-    }
-
-    function someNewFunction() public view returns(string memory) {
-        return "hello proxy";
     }
 
     // ----------------------------------------------------------------------------
@@ -419,90 +406,6 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     }
 
     // ----------------------------------------------------------------------------
-    // Setter/Getter functions for addresses that can transfer tokens (sidechain only)
-    // ----------------------------------------------------------------------------
-
-    function enableTransfers(address _address) public onlyAdministrator {
-        transferAllowed[_address] = true;
-        emit TransfersEnabled(_address);
-    }
-
-    function disableTransfers(address _address) public onlyAdministrator {
-        transferAllowed[_address] = false;
-        emit TransfersDisabled(_address);
-    }
-
-    function getCanTransfer(address _address) public view returns(bool _hasAccess) {
-        return mainChain || transferAllowed[_address];
-    }
-
-    // ----------------------------------------------------------------------------
-    // Minting/burning/transfer of token
-    // ----------------------------------------------------------------------------
-
-    function transfer(address _from, address _to, uint256 _token) public onlyPlatform notPaused {
-        require(balances[_from] >= _token, "MorpherState: Not enough token.");
-        balances[_from] = balances[_from] - (_token);
-        balances[_to] = balances[_to] + (_token);
-        MorpherToken(morpherToken).emitTransfer(_from, _to, _token);
-        emit Transfer(_from, _to, _token);
-        emit SetBalance(_from, balances[_from], getBalanceHash(_from, balances[_from]));
-        emit SetBalance(_to, balances[_to], getBalanceHash(_to, balances[_to]));
-    }
-
-    function mint(address _address, uint256 _token) public onlyPlatform notPaused {
-        balances[_address] = balances[_address] + (_token);
-        totalToken = totalToken + (_token);
-        updateTotalSupply();
-        MorpherToken(morpherToken).emitTransfer(address(0), _address, _token);
-        emit Mint(_address, _token, totalToken);
-        emit SetBalance(_address, balances[_address], getBalanceHash(_address, balances[_address]));
-    }
-
-    function burn(address _address, uint256 _token) public onlyPlatform notPaused {
-        require(balances[_address] >= _token, "MorpherState: Not enough token.");
-        balances[_address] = balances[_address] - (_token);
-        totalToken = totalToken - (_token);
-        updateTotalSupply();
-        MorpherToken(morpherToken).emitTransfer(_address, address(0), _token);
-        emit Burn(_address, _token, totalToken);
-        emit SetBalance(_address, balances[_address], getBalanceHash(_address, balances[_address]));
-    }
-
-    // ----------------------------------------------------------------------------
-    // Setter/Getter functions for balance and token functions (ERC20)
-    // ----------------------------------------------------------------------------
-    function updateTotalSupply() private {
-        totalSupply = totalToken + (totalInPositions) + (totalOnOtherChain);
-        emit NewTotalSupply(totalSupply);
-    }
-
-    function setTotalInPositions(uint256 _totalInPositions) public onlyAdministrator {
-        totalInPositions = _totalInPositions;
-        updateTotalSupply();
-        emit NewTotalInPositions(_totalInPositions);
-    }
-
-    function setTotalOnOtherChain(uint256 _newTotalOnOtherChain) public onlySideChainOperator {
-        totalOnOtherChain = _newTotalOnOtherChain;
-        updateTotalSupply();
-        emit NewTotalOnOtherChain(_newTotalOnOtherChain);
-    }
-
-    function balanceOf(address _tokenOwner) public view returns (uint256 balance) {
-        return balances[_tokenOwner];
-    }
-
-    function setAllowance(address _from, address _spender, uint256 _tokens) public onlyPlatform {
-        allowed[_from][_spender] = _tokens;
-        emit SetAllowance(_from, _spender, _tokens);
-    }
-
-    function getAllowance(address _tokenOwner, address spender) public view returns (uint256 remaining) {
-        return allowed[_tokenOwner][spender];
-    }
-
-    // ----------------------------------------------------------------------------
     // Setter/Getter functions for platform roles
     // ----------------------------------------------------------------------------
 
@@ -538,7 +441,7 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
         emit TokenChange(_newTokenContract);
     }
 
-    function getTokenContract() public view returns(address) {
+    function getTokenContractAddress() public view returns(address) {
         return morpherToken;
     }
 
@@ -821,7 +724,7 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
         if (block.timestamp > lastRewardTime + (REWARDPERIOD)) {
             uint256 _reward = totalSupply * (rewardBasisPoints) / (PRECISION);
             setLastRewardTime(lastRewardTime + (REWARDPERIOD));
-            mint(morpherRewards, _reward);
+            MorpherToken(getTokenContractAddress()).mint(morpherRewards, _reward);
             emit OperatingRewardMinted(morpherRewards, _reward);
         }
     }
