@@ -1,11 +1,14 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity 0.8.11;
 
+import "./MorpherAccessControl.sol";
 import "./MorpherState.sol";
 import "./MorpherTradeEngine.sol";
 
 
 contract MorpherMintingLimiter {
+
+    bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 
     uint256 public mintingLimitPerUser;
     uint256 public mintingLimitDaily;
@@ -28,12 +31,12 @@ contract MorpherMintingLimiter {
     event DailyMintedTokensReset();
 
     modifier onlyTradeEngine() {
-        require(msg.sender == tradeEngineAddress, "MorpherMintingLimiter: Only Trade Engine is allowed to call this function");
+        require(msg.sender == state.morpherTradeEngineAddress(), "MorpherMintingLimiter: Only Trade Engine is allowed to call this function");
         _;
     }
 
     modifier onlyAdministrator() {
-        require(msg.sender == state.getAdministrator(), "MorpherMintingLimiter: Only Administrator can call this function");
+        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(ADMINISTRATOR_ROLE, msg.sender), "MorpherMintingLimiter: Only Administrator can call this function");
         _;
     }
 
@@ -67,7 +70,7 @@ contract MorpherMintingLimiter {
     function mint(address _user, uint256 _tokenAmount) public onlyTradeEngine {
         uint256 mintingDay = block.timestamp / 1 days;
         if((mintingLimitDaily == 0 || dailyMintedTokens[mintingDay] + (_tokenAmount) <= mintingLimitDaily) && (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser )) {
-            MorpherToken(state.getTokenContractAddress()).mint(_user, _tokenAmount);
+            MorpherToken(state.morpherTokenAddress()).mint(_user, _tokenAmount);
             dailyMintedTokens[mintingDay] = dailyMintedTokens[mintingDay] + (_tokenAmount);
         } else {
             escrowedTokens[_user] = escrowedTokens[_user] + (_tokenAmount);
@@ -80,13 +83,13 @@ contract MorpherMintingLimiter {
         require(lockedUntil[_user] <= block.timestamp, "MorpherMintingLimiter: Funds are still time locked");
         uint256 sendAmount = escrowedTokens[_user];
         escrowedTokens[_user] = 0;
-        MorpherToken(state.getTokenContractAddress()).mint(_user, sendAmount);
+        MorpherToken(state.morpherTokenAddress()).mint(_user, sendAmount);
         emit EscrowReleased(_user, sendAmount);
     }
 
     function adminApprovedMint(address _user, uint256 _tokenAmount) public onlyAdministrator {
         escrowedTokens[_user] = escrowedTokens[_user] - (_tokenAmount);
-        MorpherToken(state.getTokenContractAddress()).mint(_user, _tokenAmount);
+        MorpherToken(state.morpherTokenAddress()).mint(_user, _tokenAmount);
         emit EscrowReleased(_user, _tokenAmount);
     }
 

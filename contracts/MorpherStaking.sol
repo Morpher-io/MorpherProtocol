@@ -46,6 +46,12 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
     address public stakingAddress;
     bytes32 public marketIdStakingMPH; //STAKING_MPH
 
+    struct PoolShares {
+        uint256 numPoolShares;
+        uint256 lockedUntil;
+    }
+    mapping(address => PoolShares) public poolShares;
+
 // ----------------------------------------------------------------------------
 // Events
 // ----------------------------------------------------------------------------
@@ -111,15 +117,15 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
 // Staking rewards are minted if necessary
 // ----------------------------------------------------------------------------
 
-    function mintStakingRewards() private {
-        uint256 _targetBalance = poolShareValue * (totalShares);
-        if (MorpherToken(state.getTokenContractAddress()).balanceOf(stakingAddress) < _targetBalance) {
-            // If there are not enough token held by the contract, mint them
-            uint256 _delta = _targetBalance - (MorpherToken(state.getTokenContractAddress()).balanceOf(stakingAddress));
-            MorpherToken(state.getTokenContractAddress()).mint(stakingAddress, _delta);
-            emit StakingRewardsMinted(lastReward, _delta);
-        }
-    }
+    // function mintStakingRewards() private {
+    //     uint256 _targetBalance = poolShareValue * (totalShares);
+    //     if (MorpherToken(state.morpherTokenAddress()).balanceOf(stakingAddress) < _targetBalance) {
+    //         // If there are not enough token held by the contract, mint them
+    //         uint256 _delta = _targetBalance - (MorpherToken(state.morpherTokenAddress()).balanceOf(stakingAddress));
+    //         MorpherToken(state.morpherTokenAddress()).mint(stakingAddress, _delta);
+    //         emit StakingRewardsMinted(lastReward, _delta);
+    //     }
+    // }
 
 // ----------------------------------------------------------------------------
 // stake(uint256 _amount)
@@ -128,14 +134,15 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
 // ----------------------------------------------------------------------------
 
     function stake(uint256 _amount) public userNotBlocked returns (uint256 _poolShares) {
-        require(MorpherToken(state.getTokenContractAddress()).balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
+        require(MorpherToken(state.morpherTokenAddress()).balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
         _poolShares = _amount / (poolShareValue);
-        (uint256 _numOfShares, , , , , ) = state.getPosition(msg.sender, marketIdStakingMPH);
-        require(minimumStake <= _numOfShares + (_poolShares) * (poolShareValue), "MorpherStaking: stake amount lower than minimum stake");
-        MorpherToken(state.getTokenContractAddress()).burn(msg.sender, _poolShares * (poolShareValue));
+        uint _numOfShares = poolShares[msg.sender].numPoolShares;
+        require(minimumStake <= _numOfShares + _poolShares * poolShareValue, "MorpherStaking: stake amount lower than minimum stake");
+        MorpherToken(state.morpherTokenAddress()).burn(msg.sender, _poolShares * (poolShareValue));
         totalShares = totalShares + (_poolShares);
-        state.setPosition(msg.sender, marketIdStakingMPH, block.timestamp + (lockupPeriod), _numOfShares + (_poolShares), 0, 0, 0, 0, 0);
+        poolShares[msg.sender].numPoolShares = _numOfShares + _poolShares;
+        poolShares[msg.sender].lockedUntil = block.timestamp + lockupPeriod;
         emit Staked(msg.sender, _amount, _poolShares, block.timestamp + (lockupPeriod));
         return _poolShares;
     }
@@ -147,16 +154,16 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
 // ----------------------------------------------------------------------------
 
     function unstake(uint256 _numOfShares) public userNotBlocked returns (uint256 _amount) {
-        (uint256 _numOfExistingShares, , , , , ) = state.getPosition(msg.sender, marketIdStakingMPH);
+        uint256 _numOfExistingShares = poolShares[msg.sender].numPoolShares;
         require(_numOfShares <= _numOfExistingShares, "MorpherStaking: insufficient pool shares");
 
-        uint256 lockedInUntil = state.getLastUpdated(msg.sender, marketIdStakingMPH);
+        uint256 lockedInUntil = poolShares[msg.sender].lockedUntil;
         require(block.timestamp >= lockedInUntil, "MorpherStaking: cannot unstake before lockup expiration");
         updatePoolShareValue();
-        state.setPosition(msg.sender, marketIdStakingMPH, lockedInUntil, _numOfExistingShares - (_numOfShares), 0, 0, 0, 0, 0);
-        totalShares = totalShares - (_numOfShares);
-        _amount = _numOfShares * (poolShareValue);
-        MorpherToken(state.getTokenContractAddress()).mint(msg.sender, _amount);
+        poolShares[msg.sender].numPoolShares = poolShares[msg.sender].numPoolShares - _numOfShares;
+        totalShares = totalShares - _numOfShares;
+        _amount = _numOfShares * poolShareValue;
+        MorpherToken(state.morpherTokenAddress()).mint(msg.sender, _amount);
         emit Unstaked(msg.sender, _amount, _numOfShares);
         return _amount;
     }
@@ -278,16 +285,13 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
     }
 
     function getStake(address _address) public view returns (uint256 _poolShares) {
-        (uint256 _numOfShares, , , , , ) = state.getPosition(_address, marketIdStakingMPH);
-        return _numOfShares;
+        return poolShares[_address].numPoolShares;
     }
 
     function getStakeValue(address _address) public view returns(uint256 _value, uint256 _lastUpdate) {
         // Only accurate if poolShareValue is up to date
-        
-        (uint256 _numOfShares, , , , , ) = state.getPosition(_address, marketIdStakingMPH);
-
-        return (_numOfShares * (poolShareValue), lastReward);
+        updatePoolShareValue();
+        return (getStake(_address) * (poolShareValue), lastReward);
     }
     
 // ------------------------------------------------------------------------

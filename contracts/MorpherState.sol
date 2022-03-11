@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity 0.8.11;
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "./MorpherToken.sol";
 
 // ----------------------------------------------------------------------------------
@@ -10,7 +10,7 @@ import "./MorpherToken.sol";
 // by an elected platform administrator (see MorpherGovernance) to perform protocol updates.
 // ----------------------------------------------------------------------------------
 
-contract MorpherState is Initializable, OwnableUpgradeable  {
+contract MorpherState is Initializable, ContextUpgradeable  {
 
     address public morpherAccessControlAddress;
     address public morpherAirdropAddress;
@@ -19,11 +19,14 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     address public morpherGovernanceAddress;
     address public morpherMintingLimiterAddress;
     address public morpherOracleAddress;
-    address public morpherStakingAddress;
+    address payable public morpherStakingAddress;
     address public morpherTokenAddress;
     address public morpherTradeEngineAddress;
     address public morpherUserBlockingAddress;
 
+    /**
+     * Roles known to State
+     */
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     bytes32 public constant PLATFORM_ROLE = keccak256("PLATFORM_ROLE");
@@ -36,9 +39,6 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     uint256 public constant DECIMALS = 18;
     uint256 public constant REWARDPERIOD = 1 days;
 
-    
-    address payable public morpherTokenAddress;
-
     uint256 public rewardBasisPoints;
     uint256 public lastRewardTime;
 
@@ -47,10 +47,6 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
 
     // Set initial withdraw limit from sidechain to 20m token or 2% of initial supply
     uint256 public mainChainWithdrawLimit24;
-
-    mapping(address => bool) private stateAccess;
-
-    mapping(address => mapping(address => uint256)) private allowed;
 
     mapping(bytes32 => bool) private marketActive;
 
@@ -82,16 +78,13 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     // ----------------------------------------------------------------------------
     // Events
     // ----------------------------------------------------------------------------
-    event StateAccessGranted(address indexed whiteList, uint256 indexed blockNumber);
-    event StateAccessDenied(address indexed blackList, uint256 indexed blockNumber);
     event OperatingRewardMinted(address indexed recipient, uint256 amount);
 
     event RewardsChange(address indexed rewardsAddress, uint256 indexed rewardsBasisPoints);
     event LastRewardTime(uint256 indexed rewardsTime);
     event GovernanceChange(address indexed governanceAddress);
     event TokenChange(address indexed tokenAddress);
-    event AdministratorChange(address indexed administratorAddress);
-    event OracleChange(address indexed oracleContract);
+   
     event MaximumLeverageChange(uint256 maxLeverage);
     event MarketActivated(bytes32 indexed activateMarket);
     event MarketDeActivated(bytes32 indexed deActivateMarket);
@@ -118,24 +111,29 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     event SetBalance(address indexed account, uint256 balance, bytes32 indexed balanceHash);
     event TokenTransferredToOtherChain(address indexed account, uint256 tokenTransferredToOtherChain, bytes32 indexed transferHash);
 
-    modifier onlyPlatform {
-        require(stateAccess[msg.sender] == true, "MorpherState: Only Platform is allowed to execute operation.");
-        _;
-    }
-
-    modifier onlyGovernance {
-        require(msg.sender == getGovernance(), "MorpherState: Calling contract not the Governance Contract. Aborting.");
-        _;
-    }
-
-
-    // modifier canTransfer {
-    //     require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
+    // modifier onlyPlatform {
+    //     require(stateAccess[msg.sender] == true, "MorpherState: Only Platform is allowed to execute operation.");
     //     _;
     // }
 
+    modifier onlyRole(bytes32 role) {
+        require(MorpherAccessControl(morpherAccessControlAddress).hasRole(role, _msgSender()), "MorpherTradeEngine: Permission denied.");
+        _;
+    }
+
+    // modifier onlyGovernance {
+    //     require(msg.sender == getGovernance(), "MorpherState: Calling contract not the Governance Contract. Aborting.");
+    //     _;
+    // }
+
+
+    // // modifier canTransfer {
+    // //     require(getCanTransfer(msg.sender), "MorpherState: Caller may not transfer token. Aborting.");
+    // //     _;
+    // // }
+
     modifier onlyBridge {
-        require(msg.sender == getMorpherBridge(), "MorpherState: Caller is not the Bridge. Aborting.");
+        require(msg.sender == morpherBridgeAddress, "MorpherState: Caller is not the Bridge. Aborting.");
         _;
     }
 
@@ -144,36 +142,34 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
         _;
     }
 
-    modifier onlySideChain {
-        require(mainChain == false, "MorpherState: Can only be called on mainchain.");
-        _;
-    }
+    // modifier onlySideChain {
+    //     require(mainChain == false, "MorpherState: Can only be called on mainchain.");
+    //     _;
+    // }
+
+    bool mainChain;
 
     function initialize(bool _mainChain, address _sideChainOperator, address _morpherTreasury, address _morpherAccessControlAddress) public initializer {
-        OwnableUpgradeable.__Ownable_init();
+        ContextUpgradeable.__Context_init();
         
         morpherAccessControlAddress = _morpherAccessControlAddress;
+        mainChain = _mainChain;
         
         setLastRewardTime(block.timestamp);
        
-        grantAccess(owner());
-        setSideChainOperator(owner());
+        setSideChainOperator(_msgSender());
         if (mainChain == false) { // Create token only on sidechain
-
             setRewardBasisPoints(0); // Reward is minted on mainchain
             setRewardAddress(address(0));
         } else {
-            setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
+            setRewardBasisPoints(PRECISION); // 15000 / PRECISION = 0.00015
             setRewardAddress(_morpherTreasury);
         }
         fastTransfersEnabled = true;
-        setNumberOfRequestsLimit(3);
         //setMainChainWithdrawLimit(totalSupply / 50); @todo: transfer to Token
         setSideChainOperator(_sideChainOperator);
-        denyAccess(owner());
 
         maximumLeverage = 10*PRECISION; // Leverage precision is 1e8, maximum leverage set to 10 initially
-        paused = false;
         mainChainWithdrawLimit24 = 2 * 10**25;   
         inactivityPeriod = 3 days;
     }
@@ -181,35 +177,6 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     // ----------------------------------------------------------------------------
     // Setter/Getter functions for market wise exposure
     // ----------------------------------------------------------------------------
-
-    function getMaxMappingIndex(bytes32 _marketId) public view returns(uint256 _maxMappingIndex) {
-        return exposureByMarket[_marketId].maxMappingIndex;
-    }
-
-    function getExposureMappingIndex(bytes32 _marketId, address _address) public view returns(uint256 _mappingIndex) {
-        return exposureByMarket[_marketId].index[_address];
-    }
-
-    function getExposureMappingAddress(bytes32 _marketId, uint256 _mappingIndex) public view returns(address _address) {
-        return exposureByMarket[_marketId].addy[_mappingIndex];
-    }
-
-    function setMaxMappingIndex(bytes32 _marketId, uint256 _maxMappingIndex) public onlyRole(PLATFORM_ROLE) {
-        exposureByMarket[_marketId].maxMappingIndex = _maxMappingIndex;
-    }
-
-    function setExposureMapping(bytes32 _marketId, address _address, uint256 _index) public onlyRole(PLATFORM_ROLE) {
-        setExposureMappingIndex(_marketId, _address, _index);
-        setExposureMappingAddress(_marketId, _address, _index);
-    }
-
-    function setExposureMappingIndex(bytes32 _marketId, address _address, uint256 _index) public onlyRole(PLATFORM_ROLE) {
-        exposureByMarket[_marketId].index[_address] = _index;
-    }
-
-    function setExposureMappingAddress(bytes32 _marketId, address _address, uint256 _index) public onlyRole(PLATFORM_ROLE) {
-        exposureByMarket[_marketId].addy[_index] = _address;
-    }
 
     // ----------------------------------------------------------------------------
     // Setter/Getter functions for bridge variables
@@ -285,6 +252,10 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     function getPositionClaimedOnMainChain(bytes32 _positionHash) public view returns (bool _alreadyClaimed) {
         return positionClaimedOnMainChain[_positionHash];
     }
+    
+    function getBalanceHash(address _address, uint256 _balance) public pure returns (bytes32 _hash) {
+        return keccak256(abi.encodePacked(_address, _balance));
+    }
 
     // ----------------------------------------------------------------------------
     // Setter/Getter functions for spam protection
@@ -346,7 +317,7 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
     }
 
     event SetMorpherStakingAddress(address _oldAddress, address _newAddress);
-    function setMorpherStaking(address _morpherStakingAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+    function setMorpherStaking(address payable _morpherStakingAddress) public onlyRole(ADMINISTRATOR_ROLE) {
         emit SetMorpherStakingAddress(morpherStakingAddress, _morpherStakingAddress);
         morpherStakingAddress = _morpherStakingAddress;
     }
@@ -468,9 +439,9 @@ contract MorpherState is Initializable, OwnableUpgradeable  {
 
     function payOperatingReward() public onlyMainChain {
         if (block.timestamp > lastRewardTime + (REWARDPERIOD)) {
-            uint256 _reward = totalSupply * (rewardBasisPoints) / (PRECISION);
+            uint256 _reward = MorpherToken(morpherTokenAddress).totalSupply() * (rewardBasisPoints) / (PRECISION);
             setLastRewardTime(lastRewardTime + (REWARDPERIOD));
-            MorpherToken(getTokenContractAddress()).mint(morpherRewards, _reward);
+            MorpherToken(morpherTokenAddress).mint(morpherRewards, _reward);
             emit OperatingRewardMinted(morpherRewards, _reward);
         }
     }
