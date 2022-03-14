@@ -208,14 +208,14 @@ contract MorpherAdmin {
 // payOperatingReward()
 // Calls paying of operating reward in state
 // ----------------------------------------------------------------------------------
-    function payOperatingReward() public view {
-        uint256 _lastRewardTime = state.lastRewardTime();
-        if (block.timestamp > _lastRewardTime) {
-            for (uint256 i = 1; i <= block.timestamp - state.lastRewardTime() / 86400; i++) {
-                state.payOperatingReward();
-            }
-        } 
-    }
+    // function payOperatingReward() public view {
+    //     uint256 _lastRewardTime = state.lastRewardTime();
+    //     if (block.timestamp > _lastRewardTime) {
+    //         for (uint256 i = 1; i <= block.timestamp - state.lastRewardTime() / 86400; i++) {
+    //             state.payOperatingReward();
+    //         }
+    //     } 
+    // }
 
 // ----------------------------------------------------------------------------------
 // stockDividends()

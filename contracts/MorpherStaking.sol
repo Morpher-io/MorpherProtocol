@@ -290,7 +290,6 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
 
     function getStakeValue(address _address) public view returns(uint256 _value, uint256 _lastUpdate) {
         // Only accurate if poolShareValue is up to date
-        updatePoolShareValue();
         return (getStake(_address) * (poolShareValue), lastReward);
     }
     

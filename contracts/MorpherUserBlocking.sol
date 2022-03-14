@@ -17,7 +17,7 @@ contract MorpherUserBlocking is Initializable {
     event ChangeUserBlocked(address _user, bool _oldIsBlocked, bool _newIsBlocked);
     event ChangedAddressAllowedToAddBlockedUsersAddress(address _oldAddress, address _newAddress);
 
-    function initialize(address _state, address _allowedToAddBlockedUsersAddress) public initializer {
+    function initialize(address _state) public initializer {
         state = MorpherState(_state);
     }
 

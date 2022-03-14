@@ -11,14 +11,16 @@ pragma solidity 0.8.11;
 
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "./MorpherAccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "./MorpherTradeEngine.sol";
 
-contract MorpherBridge is Ownable {
+contract MorpherBridge is Initializable, ContextUpgradeable {
 
     MorpherState state;
     MorpherBridge previousBridge;
-    MorpherUserBlocking userBlocking;
 
     mapping(address => mapping(uint256 => uint256)) public withdrawalPerDay; //[address][day] = withdrawalAmount
     mapping(address => mapping(uint256 => uint256)) public withdrawalPerMonth; //[address][month] = withdrawalAmount
@@ -27,6 +29,12 @@ contract MorpherBridge is Ownable {
     uint256 public withdrawalLimitDaily = 200000 * (10**18); //200k MPH per day
     uint256 public withdrawalLimitMonthly = 1000000 * (10 ** 18); //1M MPH per month
     uint256 public withdrawalLimitYearly = 5000000 * (10 ** 18); //5M MPH per year
+
+    bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    bytes32 public constant SIDECHAINOPERATOR_ROLE = keccak256("SIDECHAINOPERATOR_ROLE");
+
+
+    bool public recoveryEnabled;
 
     event TransferToLinkedChain(
         address indexed from,
@@ -50,15 +58,14 @@ contract MorpherBridge is Ownable {
     event LinkState(address _address);
     event LinkMorpherUserBlocking(address _address);
 
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _previousBridgeAddress, address _userBlockingAddress) {
-        setMorpherState(_stateAddress);
-        previousBridge = MorpherBridge(_previousBridgeAddress);
-        setUserBlockingAddress(_userBlockingAddress);
-        transferOwnership(_coldStorageOwnerAddress);
+    function initialize(address _stateAddress, bool _recoveryEnabled) public initializer {
+        state = MorpherState(_stateAddress);
+        recoveryEnabled = _recoveryEnabled;
+
     }
 
     modifier onlySideChainOperator {
-        require(msg.sender == state.getSideChainOperator(), "MorpherBridge: Function can only be called by Sidechain Operator.");
+        require(_msgSender() == state.getSideChainOperator(), "MorpherBridge: Function can only be called by Sidechain Operator.");
         _;
     }
 
@@ -72,27 +79,27 @@ contract MorpherBridge is Ownable {
         _;
     }
 
-    modifier onlyMainchain {
-        require(state.mainChain() == true, "MorpherBridge: Function can only be executed on Ethereum." );
+    modifier onlyRecoveryEnabled() {
+        require(recoveryEnabled, "MorpherBridge: Recovery functions are not enabled");
         _;
     }
 
     modifier userNotBlocked {
-        require(!userBlocking.userIsBlocked(msg.sender), "MorpherBridge: User is blocked");
+        require(!MorpherUserBlocking(state.morpherUserBlockingAddress()).userIsBlocked(_msgSender()), "MorpherBridge: User is blocked");
+        _;
+    }
+
+    modifier onlyRole(bytes32 role) {
+        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(role, _msgSender()), "MorpherTradeEngine: Permission denied.");
         _;
     }
     
     // ------------------------------------------------------------------------
     // Links Token Contract with State
     // ------------------------------------------------------------------------
-    function setMorpherState(address _stateAddress) public onlyOwner {
+    function setMorpherState(address _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
         state = MorpherState(_stateAddress);
         emit LinkState(_stateAddress);
-    }
-
-    function setUserBlockingAddress(address _userBlockingAddress) public onlyOwner {
-        userBlocking = MorpherUserBlocking(_userBlockingAddress);
-        emit LinkMorpherUserBlocking(_userBlockingAddress);
     }
 
 
@@ -100,35 +107,35 @@ contract MorpherBridge is Ownable {
         state.setInactivityPeriod(_periodInSeconds);
     }
 
-    function disableFastTransfers() public onlyOwner  {
+    function disableFastTransfers() public onlyRole(ADMINISTRATOR_ROLE)  {
         state.disableFastWithdraws();
     }
 
-    function updateSideChainMerkleRoot(bytes32 _rootHash) public onlySideChainOperator {
+    function updateSideChainMerkleRoot(bytes32 _rootHash) public onlyRole(SIDECHAINOPERATOR_ROLE) {
         state.setSideChainMerkleRoot(_rootHash);
         emit SideChainMerkleRootUpdated(_rootHash);
     }
 
-    function resetLast24HoursAmountWithdrawn() public onlySideChainOperator {
+    function resetLast24HoursAmountWithdrawn() public onlyRole(SIDECHAINOPERATOR_ROLE) {
         state.resetLast24HoursAmountWithdrawn();
         emit WithdrawLimitReset();
     }
 
-    function set24HourWithdrawLimit(uint256 _withdrawLimit) public onlySideChainOperator {
+    function set24HourWithdrawLimit(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
         state.set24HourWithdrawLimit(_withdrawLimit);
         emit WithdrawLimitChanged(_withdrawLimit);
     }
 
-    function updateWithdrawLimitDaily(uint256 _withdrawLimit) public onlySideChainOperator {
+    function updateWithdrawLimitDaily(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
         emit WithdrawLimitDailyChanged(withdrawalLimitDaily, _withdrawLimit);
         withdrawalLimitDaily = _withdrawLimit;
     }
 
-    function updateWithdrawLimitMonthly(uint256 _withdrawLimit) public onlySideChainOperator {
+    function updateWithdrawLimitMonthly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
         emit WithdrawLimitMonthlyChanged(withdrawalLimitMonthly, _withdrawLimit);
         withdrawalLimitMonthly = _withdrawLimit;
     }
-    function updateWithdrawLimitYearly(uint256 _withdrawLimit) public onlySideChainOperator {
+    function updateWithdrawLimitYearly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
         emit WithdrawLimitYearlyChanged(withdrawalLimitYearly, _withdrawLimit);
         withdrawalLimitYearly = _withdrawLimit;
     }
@@ -166,28 +173,28 @@ contract MorpherBridge is Ownable {
     }
 
     function isNotDailyLimitExceeding(uint256 _amount) public view returns(bool) {
-        return (getWithdrawalPerDay(msg.sender) + _amount <= withdrawalLimitDaily);
+        return (getWithdrawalPerDay(_msgSender()) + _amount <= withdrawalLimitDaily);
     }
     function isNotMonthlyLimitExceeding(uint256 _amount) public view returns(bool) {
-        return (getWithdrawalPerMonth(msg.sender) + _amount <= withdrawalLimitMonthly);
+        return (getWithdrawalPerMonth(_msgSender()) + _amount <= withdrawalLimitMonthly);
     }
     function isNotYearlyLimitExceeding(uint256 _amount) public view returns(bool) {
-        return (getWithdrawalPerYear(msg.sender) + _amount <= withdrawalLimitYearly);
+        return (getWithdrawalPerYear(_msgSender()) + _amount <= withdrawalLimitYearly);
     }
 
     function verifyUpdateDailyLimit(uint256 _amount) public {
         require(isNotDailyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds daily limit");
-        withdrawalPerDay[msg.sender][block.timestamp / 1 days] = getWithdrawalPerDay(msg.sender) + _amount;
+        withdrawalPerDay[_msgSender()][block.timestamp / 1 days] = getWithdrawalPerDay(_msgSender()) + _amount;
     }
 
     function verifyUpdateMonthlyLimit(uint256 _amount) public {
         require(isNotMonthlyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds monthly limit");
-        withdrawalPerMonth[msg.sender][block.timestamp / 30 days] = getWithdrawalPerMonth(msg.sender) + _amount;
+        withdrawalPerMonth[_msgSender()][block.timestamp / 30 days] = getWithdrawalPerMonth(_msgSender()) + _amount;
     }
 
     function verifyUpdateYearlyLimit(uint256 _amount) public {
         require(isNotYearlyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds yearly limit");
-        withdrawalPerYear[msg.sender][block.timestamp / 365 days] = getWithdrawalPerYear(msg.sender) + _amount;
+        withdrawalPerYear[_msgSender()][block.timestamp / 365 days] = getWithdrawalPerYear(_msgSender()) + _amount;
     }
 
     function getWithdrawalPerDay(address _user) public view returns(uint) {
@@ -220,25 +227,25 @@ contract MorpherBridge is Ownable {
     // ------------------------------------------------------------------------
     function transferToSideChain(uint256 _tokens) public userNotBlocked {
         require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
-        require(MorpherToken(state.getTokenContractAddress()).balanceOf(msg.sender) >= _tokens, "MorpherBridge: Insufficient balance.");
+        require(MorpherToken(state.morpherTokenAddress()).balanceOf(_msgSender()) >= _tokens, "MorpherBridge: Insufficient balance.");
         verifyUpdateDailyLimit(_tokens);
         verifyUpdateMonthlyLimit(_tokens);
         verifyUpdateYearlyLimit(_tokens);
-        MorpherToken(state.getTokenContractAddress()).burn(msg.sender, _tokens);
-        uint256 _newTokenSentToLinkedChain = getTokenSentToLinkedChain(msg.sender) + _tokens;
+        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
+        uint256 _newTokenSentToLinkedChain = getTokenSentToLinkedChain(_msgSender()) + _tokens;
         uint256 _transferNonce = state.getBridgeNonce();
         uint256 _timeStamp = block.timestamp;
         bytes32 _transferHash = keccak256(
             abi.encodePacked(
-                msg.sender,
+                _msgSender(),
                 _tokens,
                 _newTokenSentToLinkedChain,
                 _timeStamp,
                 _transferNonce
             )
         );
-        state.setTokenSentToLinkedChain(msg.sender, _newTokenSentToLinkedChain);
-        emit TransferToLinkedChain(msg.sender, _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _transferHash);
+        state.setTokenSentToLinkedChain(_msgSender(), _newTokenSentToLinkedChain);
+        emit TransferToLinkedChain(_msgSender(), _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _transferHash);
     }
 
     // ------------------------------------------------------------------------
@@ -246,7 +253,7 @@ contract MorpherBridge is Ownable {
     // The sidechain operator can credit users with token they burend on the sidechain. Transfers
     // happen immediately. To be removed after Beta.
     // ------------------------------------------------------------------------
-    function fastTransferFromSideChain(address _address, uint256 _numOfToken, uint256 _tokenBurnedOnLinkedChain, bytes32 _sidechainTransactionHash) public onlySideChainOperator fastTransfers {
+    function fastTransferFromSideChain(address _address, uint256 _numOfToken, uint256 _tokenBurnedOnLinkedChain, bytes32 _sidechainTransactionHash) public onlyRole(SIDECHAINOPERATOR_ROLE) fastTransfers {
         uint256 _tokenClaimed = state.getTokenClaimedOnThisChain(_address);
         require(verifyWithdrawOk(_numOfToken), "MorpherBridge: Withdraw amount exceeds permitted 24 hour limit. Please try again in a few hours.");
         require(_tokenClaimed + _numOfToken <= _tokenBurnedOnLinkedChain, "MorpherBridge: Token amount exceeds token deleted on linked chain.");
@@ -261,16 +268,16 @@ contract MorpherBridge is Ownable {
     // the difference (or less) can be claimed on the main chain.
     // ------------------------------------------------------------------------
     function trustlessTransferFromLinkedChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof) public userNotBlocked {
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, _claimLimit));
-        uint256 _tokenClaimed = state.getTokenClaimedOnThisChain(msg.sender);        
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
+        uint256 _tokenClaimed = state.getTokenClaimedOnThisChain(_msgSender());        
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         require(verifyWithdrawOk(_numOfToken), "MorpherBridge: Withdraw amount exceeds permitted 24 hour limit. Please try again in a few hours.");
         verifyUpdateDailyLimit(_numOfToken);
         verifyUpdateMonthlyLimit(_numOfToken);
         verifyUpdateYearlyLimit(_numOfToken);
         require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain.");     
-        _chainTransfer(msg.sender, _tokenClaimed, _numOfToken);   
-        emit TrustlessWithdrawFromSideChain(msg.sender, _numOfToken);
+        _chainTransfer(_msgSender(), _tokenClaimed, _numOfToken);   
+        emit TrustlessWithdrawFromSideChain(_msgSender(), _numOfToken);
     }
     
     // ------------------------------------------------------------------------
@@ -281,7 +288,7 @@ contract MorpherBridge is Ownable {
     function _chainTransfer(address _address, uint256 _tokenClaimed, uint256 _numOfToken) private {
         state.setTokenClaimedOnThisChain(_address, _tokenClaimed + _numOfToken);
         state.add24HoursWithdrawn(_numOfToken);
-        MorpherToken(state.getTokenContractAddress()).mint(_address, _numOfToken);
+        MorpherToken(state.morpherTokenAddress()).mint(_address, _numOfToken);
     }
         
     // ------------------------------------------------------------------------
@@ -291,9 +298,9 @@ contract MorpherBridge is Ownable {
     // side chain balance is less than the number of token sent from main chain.
     // ------------------------------------------------------------------------
     function claimFailedTransferToSidechain(uint256 _wrongSideChainBalance, bytes32[] memory _proof) public userNotBlocked {
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, _wrongSideChainBalance));
-        uint256 _tokenSentToLinkedChain = getTokenSentToLinkedChain(msg.sender);
-        uint256 _tokenSentToLinkedChainTime = getTokenSentToLinkedChainTime(msg.sender);
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _wrongSideChainBalance));
+        uint256 _tokenSentToLinkedChain = getTokenSentToLinkedChain(_msgSender());
+        uint256 _tokenSentToLinkedChainTime = getTokenSentToLinkedChainTime(_msgSender());
         uint256 _inactivityPeriod = state.inactivityPeriod();
         
         require(block.timestamp > _tokenSentToLinkedChainTime + _inactivityPeriod, "MorpherBridge: Failed deposits can only be claimed after inactivity period.");
@@ -302,10 +309,10 @@ contract MorpherBridge is Ownable {
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Enter total amount of deposits on side chain.");
         
         uint256 _claimAmount = _tokenSentToLinkedChain - _wrongSideChainBalance;
-        state.setTokenSentToLinkedChain(msg.sender, _tokenSentToLinkedChain - _claimAmount);
+        state.setTokenSentToLinkedChain(_msgSender(), _tokenSentToLinkedChain - _claimAmount);
         state.add24HoursWithdrawn(_claimAmount);
-        MorpherToken(state.getTokenContractAddress()).mint(msg.sender, _claimAmount);
-        emit ClaimFailedTransferToSidechain(msg.sender, _claimAmount);
+        MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), _claimAmount);
+        emit ClaimFailedTransferToSidechain(_msgSender(), _claimAmount);
     }
 
     // ------------------------------------------------------------------------
@@ -325,13 +332,13 @@ contract MorpherBridge is Ownable {
         uint256 _meanEntrySpread,
         uint256 _meanEntryLeverage,
         uint256 _liquidationPrice
-        ) public sideChainInactive userNotBlocked onlyMainchain {
-        require(_leaf == state.getPositionHash(msg.sender, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice), "MorpherBridge: leaf does not equal position hash.");
+        ) public sideChainInactive userNotBlocked onlyRecoveryEnabled {
+        require(_leaf == MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(_msgSender(), _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice), "MorpherBridge: leaf does not equal position hash.");
         require(state.getPositionClaimedOnMainChain(_leaf) == false, "MorpherBridge: Position already transferred.");
         require(mProof(_proof,_leaf) == true, "MorpherBridge: Merkle proof failed.");
         state.setPositionClaimedOnMainChain(_leaf);
-        state.setPosition(msg.sender, _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice);
-        emit PositionRecoveryFromSideChain(msg.sender, _leaf);
+        MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(_msgSender(), _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice);
+        emit PositionRecoveryFromSideChain(_msgSender(), _leaf);
         // Remark: After resuming operations side chain operator has 72 hours to sync and eliminate transferred positions on side chain to avoid double spend
     }
 
@@ -341,15 +348,15 @@ contract MorpherBridge is Ownable {
     // After 72 hours of no update of the side chain merkle root users can withdraw their last recorded
     // token balance from side chain to main chain.
     // ------------------------------------------------------------------------
-    function recoverTokenFromSideChain(bytes32[] memory _proof, bytes32 _leaf, uint256 _balance) public sideChainInactive userNotBlocked onlyMainchain {
+    function recoverTokenFromSideChain(bytes32[] memory _proof, bytes32 _leaf, uint256 _balance) public sideChainInactive userNotBlocked onlyRecoveryEnabled {
         // Require side chain root hash not set on Mainchain for more than 72 hours (=3 days)
-        require(_leaf == state.getBalanceHash(msg.sender, _balance), "MorpherBridge: Wrong balance.");
+        require(_leaf == state.getBalanceHash(_msgSender(), _balance), "MorpherBridge: Wrong balance.");
         require(state.getPositionClaimedOnMainChain(_leaf) == false, "MorpherBridge: Token already transferred.");
         require(mProof(_proof,_leaf) == true, "MorpherBridge: Merkle proof failed.");
         require(verifyWithdrawOk(_balance), "MorpherBridge: Withdraw amount exceeds permitted 24 hour limit.");
         state.setPositionClaimedOnMainChain(_leaf);
-        _chainTransfer(msg.sender, state.getTokenClaimedOnThisChain(msg.sender), _balance);
-        emit TokenRecoveryFromSideChain(msg.sender, _leaf);
+        _chainTransfer(_msgSender(), state.getTokenClaimedOnThisChain(_msgSender()), _balance);
+        emit TokenRecoveryFromSideChain(_msgSender(), _leaf);
         // Remark: Side chain operator must adjust side chain balances for token recoveries before restarting operations to avoid double spend
     }
 
@@ -358,6 +365,6 @@ contract MorpherBridge is Ownable {
     // Computes merkle proof against the root hash of the sidechain stored in Morpher state
     // ------------------------------------------------------------------------
     function mProof(bytes32[] memory _proof, bytes32 _leaf) public view returns(bool _isTrue) {
-        return MerkleProof.verify(_proof, state.getSideChainMerkleRoot(), _leaf);
+        return MerkleProofUpgradeable.verify(_proof, state.getSideChainMerkleRoot(), _leaf);
     }
 }

@@ -1,9 +1,14 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity 0.8.11;
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./MorpherTradeEngine.sol";
 import "./MorpherState.sol";
+import "./MorpherAccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+
 
 // ----------------------------------------------------------------------------------
 // Morpher Oracle contract v 2.0
@@ -14,12 +19,10 @@ import "./MorpherState.sol";
 // creating their order.
 // ----------------------------------------------------------------------------------
 
-contract MorpherOracle is Ownable {
+contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable {
 
-    MorpherTradeEngine tradeEngine;
     MorpherState state; // read only, Oracle doesn't need writing access to state
 
-    bool public paused;
     bool public useWhiteList; //always false at the moment
 
     uint256 public gasForCallback;
@@ -36,10 +39,12 @@ contract MorpherOracle is Ownable {
 
     mapping(bytes32 => bool) public orderCancellationRequested;
 
-    mapping(bytes32 => address) public orderIdTradeEngineAddress;
-    address public previousTradeEngineAddress;
-    address public skipPreviousTradeEngineAddress; //skips a trade engine address, e.g. typos
-    address public previousOracleAddress;
+    /**
+     * ROLES KNOWN TO ORACLE
+     */
+    bytes32 constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    bytes32 constant ORACLEOPERATOR_ROLE = keccak256("ORACLEOPERATOR_ROLE"); //used for callbacks from API
+    bytes32 constant PAUSER_ROLE = keccak256("PAUSER_ROLE"); //can pause oracle
 
 // ----------------------------------------------------------------------------------
 // Events
@@ -172,51 +177,32 @@ contract MorpherOracle is Ownable {
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
 
-    event FallbackOracleUpdated(address _oldFallbackOracle, address _newFallbackOracle);
-    event FallbackTradeEngineUpdated(address _oldFallbackTradeEngine, address _newFallbackTradeEngine);
-    event UpdateSkipPreviousTradeEngineAddress(address _oldAddress, address _newAddress);
-
-    modifier onlyOracleOperator {
-        require(isCallbackAddress(msg.sender), "MorpherOracle: Only the oracle operator can call this function.");
+    modifier onlyRole(bytes32 role) {
+        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(role, _msgSender()), "MorpherOracle: Permission denied.");
         _;
     }
 
-    modifier onlyAdministrator {
-        require(msg.sender == state.getAdministrator(), "Function can only be called by the Administrator.");
-        _;
-    }
+   function initialize(address _morpherState, address payable _gasCollectionAddress, uint256 _gasForCallback) public initializer{
+        ContextUpgradeable.__Context_init();
+        PausableUpgradeable.__Pausable_init();
 
-    modifier notPaused {
-        require(paused == false, "MorpherOracle: Oracle paused, aborting");
-        _;
-    }
-
-   constructor(address _tradeEngineAddress, address _morpherState, address _callBackAddress, address payable _gasCollectionAddress, uint256 _gasForCallback, address _coldStorageOwnerAddress, address _previousTradeEngineAddress, address _previousOracleAddress) {
-        setTradeEngineAddress(_tradeEngineAddress);
-        setStateAddress(_morpherState);
-        enableCallbackAddress(_callBackAddress);
+        state = MorpherState(_morpherState);
+        
         setCallbackCollectionAddress(_gasCollectionAddress);
         setGasForCallback(_gasForCallback);
-        transferOwnership(_coldStorageOwnerAddress);
-        previousTradeEngineAddress = _previousTradeEngineAddress; //that is the address before updating the trade engine. Can set to 0x0000 if a completely new deployment happens. It is only valid when mid-term updating the tradeengine
-        previousOracleAddress = _previousOracleAddress; //if we are updating the oracle, then this is the previous oracle address. Can be set to 0x00 if a completely new deployment happens.
     }
 
 // ----------------------------------------------------------------------------------
 // Setter/getter functions for trade engine address, oracle operator (callback) address,
 // and prepaid gas limit for callback function
 // ----------------------------------------------------------------------------------
-    function setTradeEngineAddress(address _address) public onlyOwner {
-        tradeEngine = MorpherTradeEngine(_address);
-        emit LinkTradeEngine(_address);
-    }
 
-    function setStateAddress(address _address) public onlyOwner {
+    function setStateAddress(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
         state = MorpherState(_address);
         emit LinkMorpherState(_address);
     }
 
-    function overrideGasForCallback(uint256 _gasForCallback) public onlyOwner {
+    function overrideGasForCallback(uint256 _gasForCallback) public onlyRole(ADMINISTRATOR_ROLE) {
         gasForCallback = _gasForCallback;
         emit SetGasForCallback(_gasForCallback);
     }
@@ -226,53 +212,9 @@ contract MorpherOracle is Ownable {
         emit SetGasForCallback(_gasForCallback);
     }
 
-    function enableCallbackAddress(address _address) public onlyOwner {
-        callBackAddress[_address] = true;
-        emit CallbackAddressEnabled(_address);
-    }
-
-    function disableCallbackAddress(address _address) public onlyOwner {
-        callBackAddress[_address] = false;
-        emit CallbackAddressDisabled(_address);
-    }
-
-    function isCallbackAddress(address _address) public view returns (bool _isCallBackAddress) {
-        return callBackAddress[_address];
-    }
-
-    function setCallbackCollectionAddress(address payable _address) public onlyOwner {
+    function setCallbackCollectionAddress(address payable _address) public onlyRole(ADMINISTRATOR_ROLE) {
         callBackCollectionAddress = _address;
         emit CallBackCollectionAddressChange(_address);
-    }
-
-    function getAdministrator() public view returns(address _administrator) {
-        return state.getAdministrator();
-    }
-
-// ----------------------------------------------------------------------------------
-// Oracle Owner can use a whitelist and authorize individual addresses
-// ----------------------------------------------------------------------------------
-    function setUseWhiteList(bool _useWhiteList) public onlyOracleOperator {
-        require(false, "MorpherOracle: Cannot use this functionality in the oracle at the moment");
-        useWhiteList = _useWhiteList;
-        emit SetUseWhiteList(_useWhiteList);
-    }
-
-    function setWhiteList(address _whiteList) public onlyOracleOperator {
-        whiteList[_whiteList] = true;
-        emit AddressWhiteListed(_whiteList);
-    }
-
-    function setBlackList(address _blackList) public onlyOracleOperator {
-        whiteList[_blackList] = false;
-        emit AddressBlackListed(_blackList);
-    }
-
-    function isWhiteListed(address _address) public view returns (bool _whiteListed) {
-        if (useWhiteList == false ||  whiteList[_address] == true) {
-            _whiteListed = true;
-        }
-        return(_whiteListed);
     }
 
 // ----------------------------------------------------------------------------------
@@ -291,7 +233,7 @@ contract MorpherOracle is Ownable {
         uint256 _onlyIfPriceAbove,
         uint256 _goodFrom,
         uint256 _goodUntil
-    ) public onlyOracleOperator {
+    ) public onlyRole(ORACLEOPERATOR_ROLE) {
         emit OrderFailed(
             _orderId,
             _address,
@@ -320,24 +262,22 @@ contract MorpherOracle is Ownable {
         uint256 _onlyIfPriceBelow,
         uint256 _goodUntil,
         uint256 _goodFrom
-        ) public payable notPaused returns (bytes32 _orderId) {
-        require(isWhiteListed(msg.sender),"MorpherOracle: Address not eligible to create an order.");
+        ) public payable whenNotPaused returns (bytes32 _orderId) {
         if (gasForCallback > 0) {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
             callBackCollectionAddress.transfer(msg.value);
         }
-        _orderId = tradeEngine.requestOrderId(msg.sender, _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage);
-        orderIdTradeEngineAddress[_orderId] = address(tradeEngine);
+        _orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(_msgSender(), _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage);
 
         //if the market was deactivated, and the trader didn't fail yet, then we got an orderId to close the position with a locked in price
         if(state.getMarketActive(_marketId) == false) {
 
             //price will come from the position where price is stored forever
-            tradeEngine.processOrder(_orderId, tradeEngine.getDeactivatedMarketPrice(_marketId), 0, 0, block.timestamp * (1000));
+            MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(_orderId, MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(_marketId), 0, 0, block.timestamp * (1000));
             
             emit OrderProcessed(
                 _orderId,
-                tradeEngine.getDeactivatedMarketPrice(_marketId),
+                MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(_marketId),
                 0,
                 0,
                 0,
@@ -356,7 +296,7 @@ contract MorpherOracle is Ownable {
             goodUntil[_orderId]  = _goodUntil;
             emit OrderCreated(
                 _orderId,
-                msg.sender,
+                _msgSender(),
                 _marketId,
                 _closeSharesAmount,
                 _openMPHTokenAmount,
@@ -372,64 +312,29 @@ contract MorpherOracle is Ownable {
         return _orderId;
     }
 
-    function getTradeEngineFromOrderId(bytes32 _orderId) public view returns (address) {
-        //get the current trade engine
-        if(orderIdTradeEngineAddress[_orderId] != address(0)){
-            return orderIdTradeEngineAddress[_orderId];
-        }
-
-        if(previousOracleAddress != address(0)) {
-            MorpherOracle _oracle = MorpherOracle(previousOracleAddress);
-            address _previousTradeEngine = _oracle.getTradeEngineFromOrderId(_orderId);
-            if(_previousTradeEngine != skipPreviousTradeEngineAddress) { //fixing a typo
-                return _previousTradeEngine;
-            }
-        }
-
-        //nothing in there, take the previous tradeEngine then.
-        return previousTradeEngineAddress;
-    }
-
-    function updateSkipTradeEngineAddress(address _skipTradeEngineAddress) public onlyAdministrator {
-        emit UpdateSkipPreviousTradeEngineAddress(skipPreviousTradeEngineAddress, _skipTradeEngineAddress);
-        skipPreviousTradeEngineAddress = _skipTradeEngineAddress;
-    }
-
-
-    function updateFallbackTradeEngineAddress(address _tradeEngineFallbackAddress) public onlyAdministrator {
-        emit FallbackTradeEngineUpdated(previousTradeEngineAddress, _tradeEngineFallbackAddress);
-        previousTradeEngineAddress = _tradeEngineFallbackAddress;
-    }
-
-
-    function updateFallbackOracleAddress(address _oracleFallbackAddress) public onlyAdministrator {
-        emit FallbackOracleUpdated(previousOracleAddress, _oracleFallbackAddress);
-        previousOracleAddress = _oracleFallbackAddress;
-    }
-
     function initiateCancelOrder(bytes32 _orderId) public {
-        MorpherTradeEngine _tradeEngine = MorpherTradeEngine(getTradeEngineFromOrderId(_orderId));
+        MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
         require(orderCancellationRequested[_orderId] == false, "MorpherOracle: Order was already canceled.");
         (address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
-        require(userId == msg.sender, "MorpherOracle: Only the user can request an order cancellation.");
+        require(userId == _msgSender(), "MorpherOracle: Only the user can request an order cancellation.");
         orderCancellationRequested[_orderId] = true;
-        emit OrderCancellationRequestedEvent(_orderId, msg.sender);
-
+        emit OrderCancellationRequestedEvent(_orderId, _msgSender());
     }
+
     // ----------------------------------------------------------------------------------
     // cancelOrder(bytes32  _orderId)
     // User or Administrator can cancel their own orders before the _callback has been executed
     // ----------------------------------------------------------------------------------
-    function cancelOrder(bytes32 _orderId) public onlyOracleOperator {
+    function cancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
         require(orderCancellationRequested[_orderId] == true, "MorpherOracle: Order-Cancellation was not requested.");
-        MorpherTradeEngine _tradeEngine = MorpherTradeEngine(getTradeEngineFromOrderId(_orderId));
+        MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
         (address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
         _tradeEngine.cancelOrder(_orderId, userId);
         clearOrderConditions(_orderId);
         emit OrderCancelled(
             _orderId,
             userId,
-            msg.sender
+            _msgSender()
             );
     }
     
@@ -437,66 +342,16 @@ contract MorpherOracle is Ownable {
     // adminCancelOrder(bytes32  _orderId)
     // Administrator can cancel before the _callback has been executed to provide an updateOrder functionality
     // ----------------------------------------------------------------------------------
-    function adminCancelOrder(bytes32 _orderId) public onlyOracleOperator {
-        MorpherTradeEngine _tradeEngine = MorpherTradeEngine(getTradeEngineFromOrderId(_orderId));
+    function adminCancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
+        MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
         (address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
         _tradeEngine.cancelOrder(_orderId, userId);
         clearOrderConditions(_orderId);
         emit AdminOrderCancelled(
             _orderId,
             userId,
-            msg.sender
+            _msgSender()
             );
-    }
-
-    function getGoodUntil(bytes32 _orderId) public view returns(uint) {
-        if(goodUntil[_orderId] > 0) {
-            return goodUntil[_orderId];
-        }
-
-        //just return the old one
-        if(previousOracleAddress != address(0)) {
-            MorpherOracle _oldOracle = MorpherOracle(previousOracleAddress);
-            return _oldOracle.goodUntil(_orderId);
-        }
-
-        return 0;
-    }
-    function getGoodFrom(bytes32 _orderId) public view returns(uint) {
-        if(goodFrom[_orderId] > 0) {
-            return goodFrom[_orderId];
-        }
-
-        //just return the old one
-        if(previousOracleAddress != address(0)) {
-            MorpherOracle _oldOracle = MorpherOracle(previousOracleAddress);
-            return _oldOracle.goodFrom(_orderId);
-        }
-        return 0;
-    }
-    function getPriceAbove(bytes32 _orderId) public view returns(uint) {
-        if(priceAbove[_orderId] > 0) {
-            return priceAbove[_orderId];
-        }
-
-        //just return the old one
-        if(previousOracleAddress != address(0)) {
-            MorpherOracle _oldOracle = MorpherOracle(previousOracleAddress);
-            return _oldOracle.priceAbove(_orderId);
-        }
-        return 0;
-    }
-    function getPriceBelow(bytes32 _orderId) public view returns(uint) {
-        if(priceBelow[_orderId] > 0) {
-            return priceBelow[_orderId];
-        }
-
-        //just return the old one
-        if(previousOracleAddress != address(0)) {
-            MorpherOracle _oldOracle = MorpherOracle(previousOracleAddress);
-            return _oldOracle.priceBelow(_orderId);
-        }
-        return 0;
     }
 
 // ------------------------------------------------------------------------
@@ -505,22 +360,22 @@ contract MorpherOracle is Ownable {
 // ------------------------------------------------------------------------
     function checkOrderConditions(bytes32 _orderId, uint256 _price) public view returns (bool _conditionsMet) {
         _conditionsMet = true;
-        if (block.timestamp > getGoodUntil(_orderId) && getGoodUntil(_orderId) > 0) {
+        if (block.timestamp > goodUntil[_orderId] && goodUntil[_orderId] > 0) {
             _conditionsMet = false;
         }
-        if (block.timestamp < getGoodFrom(_orderId) && getGoodFrom(_orderId) > 0) {
+        if (block.timestamp < goodFrom[_orderId] && goodFrom[_orderId] > 0) {
             _conditionsMet = false;
         }
 
-        if(getPriceAbove(_orderId) > 0 && getPriceBelow(_orderId) > 0) {
-            if(_price < getPriceAbove(_orderId) && _price > getPriceBelow(_orderId)) {
+        if(priceAbove[_orderId] > 0 && priceBelow[_orderId] > 0) {
+            if(_price < priceAbove[_orderId] && _price > priceBelow[_orderId]) {
                 _conditionsMet = false;
             }
         } else {
-            if (_price < getPriceAbove(_orderId) && getPriceAbove(_orderId) > 0) {
+            if (_price < priceAbove[_orderId] && priceAbove[_orderId] > 0) {
                 _conditionsMet = false;
             }
-            if (_price > getPriceBelow(_orderId) && getPriceBelow(_orderId) > 0) {
+            if (_price > priceBelow[_orderId] && priceBelow[_orderId] > 0) {
                 _conditionsMet = false;
             }
         }
@@ -538,17 +393,12 @@ contract MorpherOracle is Ownable {
         goodUntil[_orderId]  = 0;
     }
 
-// ----------------------------------------------------------------------------------
-// Pausing/unpausing the Oracle contract
-// ----------------------------------------------------------------------------------
-    function pauseOracle() public onlyOwner {
-        paused = true;
-        emit OraclePaused(true);
+    function pause() public virtual onlyRole(PAUSER_ROLE) {
+        _pause();
     }
 
-    function unpauseOracle() public onlyOwner {
-        paused = false;
-        emit OraclePaused(false);
+    function unpause() public virtual onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 
 // ----------------------------------------------------------------------------------
@@ -559,14 +409,13 @@ contract MorpherOracle is Ownable {
     function createLiquidationOrder(
         address _address,
         bytes32 _marketId
-        ) public notPaused onlyOracleOperator payable returns (bytes32 _orderId) {
+        ) public whenNotPaused onlyRole(ORACLEOPERATOR_ROLE) payable returns (bytes32 _orderId) {
         if (gasForCallback > 0) {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
             callBackCollectionAddress.transfer(msg.value);
         }
-        _orderId = tradeEngine.requestOrderId(_address, _marketId, 0, 0, true, 10**8);
-        orderIdTradeEngineAddress[_orderId] = address(tradeEngine);
-        emit LiquidationOrderCreated(_orderId, msg.sender, _address, _marketId);
+        _orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(_address, _marketId, 0, 0, true, 10**8);
+        emit LiquidationOrderCreated(_orderId, _msgSender(), _address, _marketId);
         return _orderId;
     }
 
@@ -583,19 +432,11 @@ contract MorpherOracle is Ownable {
         uint256 _liquidationTimestamp,
         uint256 _timeStamp,
         uint256 _gasForNextCallback
-        ) public onlyOracleOperator notPaused returns (uint256 _newLongShares, uint256 _newShortShares, uint256 _newMeanEntry, uint256 _newMeanSpread, uint256 _newMeanLeverage, uint256 _liquidationPrice)  {
+        ) public onlyRole(ORACLEOPERATOR_ROLE) whenNotPaused returns (uint256 _newLongShares, uint256 _newShortShares, uint256 _newMeanEntry, uint256 _newMeanSpread, uint256 _newMeanLeverage, uint256 _liquidationPrice)  {
         
         require(checkOrderConditions(_orderId, _price), 'MorpherOracle Error: Order Conditions are not met');
        
-       MorpherTradeEngine _tradeEngine = MorpherTradeEngine(getTradeEngineFromOrderId(_orderId));
-        (
-            _newLongShares,
-            _newShortShares,
-            _newMeanEntry,
-            _newMeanSpread,
-            _newMeanLeverage,
-            _liquidationPrice
-        ) = _tradeEngine.processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
+       MorpherTradeEngine.position memory createdPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
         
         clearOrderConditions(_orderId);
         emit OrderProcessed(
@@ -605,15 +446,15 @@ contract MorpherOracle is Ownable {
             _spread,
             _liquidationTimestamp,
             _timeStamp,
-            _newLongShares,
-            _newShortShares,
-            _newMeanEntry,
-            _newMeanSpread,
-            _newMeanLeverage,
-            _liquidationPrice
+            createdPosition.longShares,
+            createdPosition.shortShares,
+            createdPosition.meanEntryPrice,
+            createdPosition.meanEntrySpread,
+            createdPosition.meanEntryLeverage,
+            createdPosition.liquidationPrice
             );
         setGasForCallback(_gasForNextCallback);
-        return (_newLongShares, _newShortShares, _newMeanEntry, _newMeanSpread, _newMeanLeverage, _liquidationPrice);
+        return (createdPosition.longShares, createdPosition.shortShares, createdPosition.meanEntryPrice, createdPosition.meanEntrySpread, createdPosition.meanEntryLeverage, createdPosition.liquidationPrice);
     }
 
 // ----------------------------------------------------------------------------------
@@ -622,14 +463,14 @@ contract MorpherOracle is Ownable {
 // ----------------------------------------------------------------------------------
 
     uint delistMarketFromIx = 0;
-    function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyAdministrator {
+    function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyRole(ADMINISTRATOR_ROLE) {
         require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
         // If no _fromIx and _toIx specified, do entire _list
         if (_startFromScratch) {
             delistMarketFromIx = 0;
         }
         
-        uint _toIx = state.getMaxMappingIndex(_marketId);
+        uint _toIx = MorpherTradeEngine(state.morpherTradeEngineAddress()).getMaxMappingIndex(_marketId);
         
         address _address;
         for (uint256 i = delistMarketFromIx; i <= _toIx; i++) {
@@ -639,25 +480,13 @@ contract MorpherOracle is Ownable {
                 return;
             } 
             
-            _address = state.getExposureMappingAddress(_marketId, i);
+            _address = MorpherTradeEngine(state.morpherTradeEngineAddress()).getExposureMappingAddress(_marketId, i);
             adminLiquidationOrder(_address, _marketId);
             
         }
         emit DelistMarketComplete(_marketId);
     }
 
-    /**
-     * Course of action would be:
-     * 1. de-activate market through state
-     * 2. set the Deactivated Market Price
-     * 3. let users still close their positions
-     */
-    function setDeactivatedMarketPrice(bytes32 _marketId, uint256 _price) public onlyAdministrator {
-        //todo updateable tradeEngine
-        tradeEngine.setDeactivatedMarketPrice(_marketId, _price);
-        emit LockedPriceForClosingPositions(_marketId, _price);
-
-    }
 
 // ----------------------------------------------------------------------------------
 // adminLiquidationOrder(address _address, bytes32 _marketId)
@@ -666,27 +495,20 @@ contract MorpherOracle is Ownable {
     function adminLiquidationOrder(
         address _address,
         bytes32 _marketId
-        ) public onlyAdministrator returns (bytes32 _orderId) {
-            uint256 _positionLongShares = state.getLongShares(_address, _marketId);
-            uint256 _positionShortShares = state.getShortShares(_address, _marketId);
-            if (_positionLongShares > 0) {
-                _orderId = tradeEngine.requestOrderId(_address, _marketId, _positionLongShares, 0, false, 10**8);
-                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, _positionLongShares, 0, false, 10**8);
+        ) public onlyRole(ADMINISTRATOR_ROLE) returns (bytes32 _orderId) {
+            MorpherTradeEngine.position memory position = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(_address, _marketId);
+            
+            if (position.longShares > 0) {
+                _orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(_address, _marketId, position.longShares, 0, false, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, position.longShares, 0, false, 10**8);
             }
-            if (_positionShortShares > 0) {
-                _orderId = tradeEngine.requestOrderId(_address, _marketId, _positionShortShares, 0, true, 10**8);
-                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, _positionShortShares, 0, true, 10**8);
+            if (position.shortShares > 0) {
+                _orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(_address, _marketId, position.shortShares, 0, true, 10**8);
+                emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, position.shortShares, 0, true, 10**8);
             }
-            orderIdTradeEngineAddress[_orderId] = address(tradeEngine);
             return _orderId;
     }
     
-// ----------------------------------------------------------------------------------
-// Auxiliary function to hash a string market name i.e.
-// "CRYPTO_BTC" => 0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf9;
-// ----------------------------------------------------------------------------------
-    function stringToHash(string memory _source) public pure returns (bytes32 _result) {
-        return keccak256(abi.encodePacked(_source));
-    }
+
 }
 
