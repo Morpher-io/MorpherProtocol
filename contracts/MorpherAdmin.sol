@@ -91,12 +91,7 @@ contract MorpherAdmin {
         if (_toIx == 0) {
             _toIx = MorpherTradeEngine(state.morpherTradeEngineAddress()).getMaxMappingIndex(_marketId);
         }
-        uint256 _positionLongShares;
-        uint256 _positionShortShares;
-        uint256 _positionAveragePrice;
-        uint256 _positionAverageSpread;
-        uint256 _positionAverageLeverage;
-        uint256 _liquidationPrice;
+       
         address _address;
         
         for (uint256 i = _fromIx; i <= _toIx; i++) {
@@ -109,11 +104,8 @@ contract MorpherAdmin {
             position.shortShares     = position.shortShares * _denominator / _nominator;
             position.meanEntryPrice    = position.meanEntryPrice * _nominator / _denominator;
             position.meanEntrySpread   = position.meanEntrySpread * _nominator / _denominator;
-            if (_positionShortShares > 0) {
-                position.liquidationPrice    = getLiquidationPriceInternal(false, _address, _marketId);
-            } else {
-                position.liquidationPrice    = getLiquidationPriceInternal(true, _address, _marketId);
-            }               
+            position.liquidationPrice    = getLiquidationPriceInternal(_address, _marketId);
+                    
             MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(_address, _marketId, block.timestamp, position.longShares, position.shortShares, position.meanEntryPrice, position.meanEntrySpread, position.meanEntryLeverage, position.liquidationPrice);   
         }
     }
@@ -133,23 +125,14 @@ contract MorpherAdmin {
         if (_toIx == 0) {
             _toIx = MorpherTradeEngine(state.morpherTradeEngineAddress()).getMaxMappingIndex(_marketId);
         }
-        uint256 _positionLongShares;
-        uint256 _positionShortShares;
-        uint256 _positionAveragePrice;
-        uint256 _positionAverageSpread;
-        uint256 _positionAverageLeverage;
-        uint256 _liquidationPrice;
+       
         address _address;
         
         for (uint256 i = _fromIx; i <= _toIx; i++) {
             _address = MorpherTradeEngine(state.morpherTradeEngineAddress()).getExposureMappingAddress(_marketId, i);
             MorpherTradeEngine.position memory position = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(_address, _marketId);
             position.meanEntryPrice    = position.meanEntryPrice + _rollUp - _rollDown;
-            if (_positionShortShares > 0) {
-                position.liquidationPrice    = getLiquidationPriceInternal(false, _address, _marketId);
-            } else {
-                position.liquidationPrice    = getLiquidationPriceInternal(true, _address, _marketId);
-            }               
+            position.liquidationPrice    = getLiquidationPriceInternal(_address, _marketId);   
             MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(_address, _marketId, block.timestamp, position.longShares, position.shortShares, position.meanEntryPrice, position.meanEntrySpread, position.meanEntryLeverage, position.liquidationPrice);   
         }
     }
@@ -157,7 +140,7 @@ contract MorpherAdmin {
 /**
  * Stack too deep error
  */
-    function getLiquidationPriceInternal(bool isLong, address _userAddress, bytes32 _marketId) internal view returns (uint) {
+    function getLiquidationPriceInternal(address _userAddress, bytes32 _marketId) internal view returns (uint) {
         MorpherTradeEngine.position memory position = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(_userAddress, _marketId);
         return MorpherTradeEngine(state.morpherTradeEngineAddress()).getLiquidationPrice(position.meanEntryPrice, position.meanEntryLeverage, position.longShares > position.shortShares, position.lastUpdated);
     }

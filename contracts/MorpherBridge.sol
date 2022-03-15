@@ -56,7 +56,6 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     event WithdrawLimitMonthlyChanged(uint256 _oldLimit, uint256 _newLimit);
     event WithdrawLimitYearlyChanged(uint256 _oldLimit, uint256 _newLimit);
     event LinkState(address _address);
-    event LinkMorpherUserBlocking(address _address);
 
     function initialize(address _stateAddress, bool _recoveryEnabled) public initializer {
         state = MorpherState(_stateAddress);

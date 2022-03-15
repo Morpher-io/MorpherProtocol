@@ -432,11 +432,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
         uint256 _liquidationTimestamp,
         uint256 _timeStamp,
         uint256 _gasForNextCallback
-        ) public onlyRole(ORACLEOPERATOR_ROLE) whenNotPaused returns (uint256 _newLongShares, uint256 _newShortShares, uint256 _newMeanEntry, uint256 _newMeanSpread, uint256 _newMeanLeverage, uint256 _liquidationPrice)  {
+        ) public onlyRole(ORACLEOPERATOR_ROLE) whenNotPaused returns (MorpherTradeEngine.position memory createdPosition)  {
         
         require(checkOrderConditions(_orderId, _price), 'MorpherOracle Error: Order Conditions are not met');
        
-       MorpherTradeEngine.position memory createdPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
+       createdPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(_orderId, _price, _spread, _liquidationTimestamp, _timeStamp);
         
         clearOrderConditions(_orderId);
         emit OrderProcessed(
@@ -454,7 +454,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
             createdPosition.liquidationPrice
             );
         setGasForCallback(_gasForNextCallback);
-        return (createdPosition.longShares, createdPosition.shortShares, createdPosition.meanEntryPrice, createdPosition.meanEntrySpread, createdPosition.meanEntryLeverage, createdPosition.liquidationPrice);
+        return createdPosition;
     }
 
 // ----------------------------------------------------------------------------------
