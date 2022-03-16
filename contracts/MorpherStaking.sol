@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity 0.8.11;
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
@@ -14,14 +14,15 @@ import "./MorpherToken.sol";
 // There is a lockup after staking or topping up (30 days) and a minimum stake (100k MPH)
 // ----------------------------------------------------------------------------------
 
-contract MorpherStaking is Initializable, OwnableUpgradeable {
+contract MorpherStaking is Initializable, ContextUpgradeable {
 
     MorpherState state;
-    
-    MorpherUserBlocking userBlocking;
 
     uint256 constant PRECISION = 10**8;
     uint256 constant INTERVAL  = 1 days;
+
+    bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    bytes32 constant public STAKINGADMIN_ROLE = keccak256("STAKINGADMIN_ROLE");
 
     //mapping(address => uint256) private poolShares;
     //mapping(address => uint256) private lockup;
@@ -40,8 +41,6 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
 
     uint256 public lockupPeriod; // to prevent tactical staking and ensure smooth governance
     uint256 public minimumStake; // 100k MPH minimum
-
-    address public stakingAdmin;
 
     address public stakingAddress;
     bytes32 public marketIdStakingMPH; //STAKING_MPH
@@ -62,30 +61,29 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
     event SetLockupPeriod(uint256 newLockupPeriod);
     event SetMinimumStake(uint256 newMinimumStake);
     event LinkState(address stateAddress);
-    event SetStakingAdmin(address stakingAdmin);
-    event SetMorpherUserBlocking(address userBlockingAddress);
     
     event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
     event StakingRewardsMinted(uint256 indexed lastReward, uint256 delta);
     event Staked(address indexed userAddress, uint256 indexed amount, uint256 poolShares, uint256 lockedUntil);
     event Unstaked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);
     
-    modifier onlyStakingAdmin {
-        require(msg.sender == stakingAdmin, "MorpherStaking: can only be called by Staking Administrator.");
+    
+    modifier onlyRole(bytes32 role) {
+        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(role, _msgSender()), "MorpherToken: Permission denied.");
         _;
     }
 
     modifier userNotBlocked {
-        require(!userBlocking.userIsBlocked(msg.sender), "MorpherStaking: User is blocked");
+        require(!MorpherUserBlocking(state.morpherUserBlockingAddress()).userIsBlocked(msg.sender), "MorpherStaking: User is blocked");
         _;
     }
     
-    function initialize(address payable _morpherState, address _stakingAdmin, address payable _userBlockingAddress) public initializer {
-        setStakingAdmin(_stakingAdmin);
+    function initialize(address payable _morpherState) public initializer {
+        ContextUpgradeable.__Context_init();
+
         setMorpherStateAddress(_morpherState);
         emit SetLockupPeriod(lockupPeriod);
         emit SetMinimumStake(minimumStake);
-        setMorpherUserBlocking(_userBlockingAddress);
         addInterestRate(15000,1617094819); //setting the initial interest rate to the trade engine deployed timestamp
         lastReward = block.timestamp;
         lockupPeriod = 30 days; // to prevent tactical staking and ensure smooth governance
@@ -172,26 +170,15 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
 // Administrative functions
 // ----------------------------------------------------------------------------
 
-    function setStakingAdmin(address _address) public onlyOwner {
-        stakingAdmin = _address;
-        emit SetStakingAdmin(_address);
-    }
-
-    function setMorpherStateAddress(address payable _stateAddress) public onlyOwner {
+    function setMorpherStateAddress(address payable _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
         state = MorpherState(_stateAddress);
         emit LinkState(_stateAddress);
     }
 
-    function setMorpherUserBlocking(address payable _userBlockingAddress) public onlyOwner {
-        userBlocking = MorpherUserBlocking(_userBlockingAddress);
-        emit SetMorpherUserBlocking(_userBlockingAddress);
-    }
-
-
     /**
     Interest rate
      */
-    function setInterestRate(uint256 _interestRate) public onlyStakingAdmin {
+    function setInterestRate(uint256 _interestRate) public onlyRole(STAKINGADMIN_ROLE) {
         addInterestRate(_interestRate, block.timestamp);
     }
 
@@ -211,7 +198,7 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
         return 0;
     }
 
-    function addInterestRate(uint _rate, uint _validFrom) public onlyStakingAdmin {
+    function addInterestRate(uint _rate, uint _validFrom) public onlyRole(STAKINGADMIN_ROLE) {
         require(numInterestRates == 0 || interestRates[numInterestRates-1].validFrom < _validFrom, "MorpherStaking: Interest Rate Valid From must be later than last interestRate");
         //omitting rate sanity checks here. It should always be smaller than 100% (100000000) but I'll leave that to the common sense of the admin.
         updatePoolShareValue();
@@ -221,12 +208,12 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
         emit InterestRateAdded(_rate, _validFrom);
     }
 
-    function changeInterestRateValue(uint256 _numInterestRate, uint256 _rate) public onlyStakingAdmin {
+    function changeInterestRateValue(uint256 _numInterestRate, uint256 _rate) public onlyRole(STAKINGADMIN_ROLE) {
         emit InterestRateRateChanged(_numInterestRate, interestRates[_numInterestRate].rate, _rate);
         updatePoolShareValue();
         interestRates[_numInterestRate].rate = _rate;
     }
-    function changeInterestRateValidFrom(uint256 _numInterestRate, uint256 _validFrom) public onlyStakingAdmin {
+    function changeInterestRateValidFrom(uint256 _numInterestRate, uint256 _validFrom) public onlyRole(STAKINGADMIN_ROLE) {
         emit InterestRateValidFromChanged(_numInterestRate, interestRates[_numInterestRate].validFrom, _validFrom);
         require(numInterestRates > _numInterestRate, "MorpherStaking: Interest Rate Does not exist!");
         require(
@@ -265,12 +252,12 @@ contract MorpherStaking is Initializable, OwnableUpgradeable {
 
     }
 
-    function setLockupPeriodRate(uint256 _lockupPeriod) public onlyStakingAdmin {
+    function setLockupPeriodRate(uint256 _lockupPeriod) public onlyRole(STAKINGADMIN_ROLE) {
         lockupPeriod = _lockupPeriod;
         emit SetLockupPeriod(_lockupPeriod);
     }
     
-    function setMinimumStake(uint256 _minimumStake) public onlyStakingAdmin {
+    function setMinimumStake(uint256 _minimumStake) public onlyRole(STAKINGADMIN_ROLE) {
         minimumStake = _minimumStake;
         emit SetMinimumStake(_minimumStake);
     }

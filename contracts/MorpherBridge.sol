@@ -22,19 +22,44 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     MorpherState state;
     MorpherBridge previousBridge;
 
-    mapping(address => mapping(uint256 => uint256)) public withdrawalPerDay; //[address][day] = withdrawalAmount
-    mapping(address => mapping(uint256 => uint256)) public withdrawalPerMonth; //[address][month] = withdrawalAmount
-    mapping(address => mapping(uint256 => uint256)) public withdrawalPerYear; //[address][year] = withdrawalAmount
+    uint256 public withdrawalLimitPerUserDaily; //200k MPH per day
+    uint256 public withdrawalLimitPerUserMonthly; //1M MPH per month
+    uint256 public withdrawalLimitPerUserYearly; //5M MPH per year
 
-    uint256 public withdrawalLimitDaily = 200000 * (10**18); //200k MPH per day
-    uint256 public withdrawalLimitMonthly = 1000000 * (10 ** 18); //1M MPH per month
-    uint256 public withdrawalLimitYearly = 5000000 * (10 ** 18); //5M MPH per year
+    uint256 public withdrawalLimitGlobalDaily; 
+    uint256 public withdrawalLimitGlobalMonthly;
+    uint256 public withdrawalLimitGlobalYearly;
+    
+    mapping(address => mapping(uint256 => uint256)) public withdrawalPerUserPerDay; //[address][day] = withdrawalAmount
+    mapping(address => mapping(uint256 => uint256)) public withdrawalPerUserPerMonth; //[address][month] = withdrawalAmount
+    mapping(address => mapping(uint256 => uint256)) public withdrawalPerUserPerYear; //[address][year] = withdrawalAmount
+
+    mapping(uint256 => uint256) public withdrawalsGlobalDaily;
+    mapping(uint256 => uint256) public withdrawalsGlobalMonthly;
+    mapping(uint256 => uint256) public withdrawalsGlobalYearly;
 
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant SIDECHAINOPERATOR_ROLE = keccak256("SIDECHAINOPERATOR_ROLE");
 
+    struct WithdrawalDataStruct {
+        bytes32 merkleRoot;
+        uint256 lastUpdatedAt;
+    }
 
+    WithdrawalDataStruct public withdrawalData;
+
+    uint256 public inactivityPeriod;
     bool public recoveryEnabled;
+    mapping(bytes32 => bool) public claimFromInactivity;
+
+    struct TokensTransferredStruct {
+        uint256 amount;
+        uint256 lastTransferAt;
+    }
+    mapping(address => TokensTransferredStruct) public tokenSentToLinkedChain;
+    mapping(address => TokensTransferredStruct) public tokenClaimedOnThisChain;
+
+    uint256 public bridgeNonce;
 
     event TransferToLinkedChain(
         address indexed from,
@@ -52,29 +77,30 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     event SideChainMerkleRootUpdated(bytes32 _rootHash);
     event WithdrawLimitReset();
     event WithdrawLimitChanged(uint256 _withdrawLimit);
-    event WithdrawLimitDailyChanged(uint256 _oldLimit, uint256 _newLimit);
-    event WithdrawLimitMonthlyChanged(uint256 _oldLimit, uint256 _newLimit);
-    event WithdrawLimitYearlyChanged(uint256 _oldLimit, uint256 _newLimit);
+    event WithdrawLimitDailyPerUserChanged(uint256 _oldLimit, uint256 _newLimit);
+    event WithdrawLimitMonthlyPerUserChanged(uint256 _oldLimit, uint256 _newLimit);
+    event WithdrawLimitYearlyPerUserChanged(uint256 _oldLimit, uint256 _newLimit);
+    event WithdrawLimitDailyGlobalChanged(uint256 _oldLimit, uint256 _newLimit);
+    event WithdrawLimitMonthlyGlobalChanged(uint256 _oldLimit, uint256 _newLimit);
+    event WithdrawLimitYearlyGlobalChanged(uint256 _oldLimit, uint256 _newLimit);
     event LinkState(address _address);
 
     function initialize(address _stateAddress, bool _recoveryEnabled) public initializer {
         state = MorpherState(_stateAddress);
         recoveryEnabled = _recoveryEnabled;
+        withdrawalLimitPerUserDaily = 200000 * (10**18); //200k MPH per day
+        withdrawalLimitPerUserMonthly = 1000000 * (10 ** 18); //1M MPH per month
+        withdrawalLimitPerUserYearly = 5000000 * (10 ** 18); //5M MPH per year
 
-    }
-
-    modifier onlySideChainOperator {
-        require(_msgSender() == state.getSideChainOperator(), "MorpherBridge: Function can only be called by Sidechain Operator.");
-        _;
+        //TODO: Adjust limits globally
+        withdrawalLimitGlobalDaily = 200000 * (10**18); //200k MPH per day
+        withdrawalLimitGlobalMonthly = 1000000 * (10 ** 18); //1M MPH per month
+        withdrawalLimitGlobalYearly = 5000000 * (10 ** 18); //5M MPH per year
+        inactivityPeriod = 3 days;
     }
 
     modifier sideChainInactive {
-        require(block.timestamp - state.inactivityPeriod() > state.getSideChainMerkleRootWrittenAtTime(), "MorpherBridge: Function can only be called if sidechain is inactive.");
-        _;
-    }
-    
-    modifier fastTransfers {
-        require(state.fastTransfersEnabled() == true, "MorpherBridge: Fast transfers have been disabled permanently.");
+        require(block.timestamp - inactivityPeriod > withdrawalData.lastUpdatedAt, "MorpherBridge: Function can only be called if sidechain is inactive.");
         _;
     }
 
@@ -102,137 +128,100 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     }
 
 
-    function setInactivityPeriod(uint256 _periodInSeconds) private {
-        state.setInactivityPeriod(_periodInSeconds);
-    }
-
-    function disableFastTransfers() public onlyRole(ADMINISTRATOR_ROLE)  {
-        state.disableFastWithdraws();
+    function setInactivityPeriod(uint256 _periodInSeconds) public onlyRole(ADMINISTRATOR_ROLE) {
+        inactivityPeriod = _periodInSeconds;
     }
 
     function updateSideChainMerkleRoot(bytes32 _rootHash) public onlyRole(SIDECHAINOPERATOR_ROLE) {
-        state.setSideChainMerkleRoot(_rootHash);
+        withdrawalData.merkleRoot = _rootHash;
+        withdrawalData.lastUpdatedAt = block.timestamp;
         emit SideChainMerkleRootUpdated(_rootHash);
     }
 
-    function resetLast24HoursAmountWithdrawn() public onlyRole(SIDECHAINOPERATOR_ROLE) {
-        state.resetLast24HoursAmountWithdrawn();
-        emit WithdrawLimitReset();
+    function updateWithdrawLimitPerUserDaily(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+        emit WithdrawLimitDailyPerUserChanged(withdrawalLimitPerUserDaily, _withdrawLimit);
+        withdrawalLimitPerUserDaily = _withdrawLimit;
     }
 
-    function set24HourWithdrawLimit(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
-        state.set24HourWithdrawLimit(_withdrawLimit);
-        emit WithdrawLimitChanged(_withdrawLimit);
+    function updateWithdrawLimitPerUserMonthly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+        emit WithdrawLimitMonthlyPerUserChanged(withdrawalLimitPerUserMonthly, _withdrawLimit);
+        withdrawalLimitPerUserMonthly = _withdrawLimit;
+    }
+    function updateWithdrawLimitPerUserYearly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+        emit WithdrawLimitYearlyPerUserChanged(withdrawalLimitPerUserYearly, _withdrawLimit);
+        withdrawalLimitPerUserYearly = _withdrawLimit;
     }
 
-    function updateWithdrawLimitDaily(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
-        emit WithdrawLimitDailyChanged(withdrawalLimitDaily, _withdrawLimit);
-        withdrawalLimitDaily = _withdrawLimit;
+    function updateWithdrawLimitGlobalDaily(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+        emit WithdrawLimitDailyGlobalChanged(withdrawalLimitGlobalDaily, _withdrawLimit);
+        withdrawalLimitGlobalDaily = _withdrawLimit;
     }
 
-    function updateWithdrawLimitMonthly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
-        emit WithdrawLimitMonthlyChanged(withdrawalLimitMonthly, _withdrawLimit);
-        withdrawalLimitMonthly = _withdrawLimit;
+    function updateWithdrawLimitGlobalMonthly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+        emit WithdrawLimitMonthlyGlobalChanged(withdrawalLimitGlobalMonthly, _withdrawLimit);
+        withdrawalLimitGlobalMonthly = _withdrawLimit;
     }
-    function updateWithdrawLimitYearly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
-        emit WithdrawLimitYearlyChanged(withdrawalLimitYearly, _withdrawLimit);
-        withdrawalLimitYearly = _withdrawLimit;
-    }
-
-    function getTokenSentToLinkedChain(address _address) public view returns (uint256 _token) {
-        return state.getTokenSentToLinkedChain(_address);
+    function updateWithdrawLimitGlobalYearly(uint256 _withdrawLimit) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+        emit WithdrawLimitYearlyGlobalChanged(withdrawalLimitGlobalYearly, _withdrawLimit);
+        withdrawalLimitGlobalYearly = _withdrawLimit;
     }
 
-    function getTokenClaimedOnThisChain(address _address) public view returns (uint256 _token)  {
-        return state.getTokenClaimedOnThisChain(_address);
-    }
-
-    function getTokenSentToLinkedChainTime(address _address) public view returns (uint256 _time)  {
-        return state.getTokenSentToLinkedChainTime(_address);
-    }
-
-    // ------------------------------------------------------------------------
-    // verifyWithdrawOk(uint256 _amount)
-    // Checks if creating _amount token on main chain does not violate the 24 hour transfer limit
-    // ------------------------------------------------------------------------
-    function verifyWithdrawOk(uint256 _amount) public returns (bool _authorized) {
-        uint256 _lastWithdrawLimitReductionTime = state.lastWithdrawLimitReductionTime();
-        uint256 _withdrawLimit24Hours = state.withdrawLimit24Hours();
-        
-        if (block.timestamp > _lastWithdrawLimitReductionTime) {
-            uint256 _timePassed = block.timestamp - _lastWithdrawLimitReductionTime;
-            state.update24HoursWithdrawLimit(_timePassed * _withdrawLimit24Hours / 1 days);
-        }
-        
-        if (state.last24HoursAmountWithdrawn() + _amount <= _withdrawLimit24Hours) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 
     function isNotDailyLimitExceeding(uint256 _amount) public view returns(bool) {
-        return (getWithdrawalPerDay(_msgSender()) + _amount <= withdrawalLimitDaily);
+        return (
+            (withdrawalPerUserPerDay[_msgSender()][block.timestamp / 1 days] + _amount <= withdrawalLimitPerUserDaily) && 
+            (withdrawalsGlobalDaily[block.timestamp / 1 days] + _amount <= withdrawalLimitGlobalDaily)
+        );
     }
     function isNotMonthlyLimitExceeding(uint256 _amount) public view returns(bool) {
-        return (getWithdrawalPerMonth(_msgSender()) + _amount <= withdrawalLimitMonthly);
+        return (
+            (withdrawalPerUserPerMonth[_msgSender()][block.timestamp / 30 days] + _amount <= withdrawalLimitPerUserMonthly) &&
+            (withdrawalsGlobalMonthly[block.timestamp / 30 days] + _amount <= withdrawalLimitGlobalMonthly)
+        );
     }
     function isNotYearlyLimitExceeding(uint256 _amount) public view returns(bool) {
-        return (getWithdrawalPerYear(_msgSender()) + _amount <= withdrawalLimitYearly);
+        return (
+            (withdrawalPerUserPerYear[_msgSender()][block.timestamp / 365 days] + _amount <= withdrawalLimitPerUserYearly) &&
+            (withdrawalsGlobalYearly[block.timestamp / 365 days] + _amount <= withdrawalLimitGlobalYearly)
+        );
     }
 
     function verifyUpdateDailyLimit(uint256 _amount) public {
         require(isNotDailyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds daily limit");
-        withdrawalPerDay[_msgSender()][block.timestamp / 1 days] = getWithdrawalPerDay(_msgSender()) + _amount;
+        withdrawalPerUserPerDay[_msgSender()][block.timestamp / 1 days] += _amount;
+        withdrawalsGlobalDaily[block.timestamp / 1 days] += _amount;
     }
 
     function verifyUpdateMonthlyLimit(uint256 _amount) public {
         require(isNotMonthlyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds monthly limit");
-        withdrawalPerMonth[_msgSender()][block.timestamp / 30 days] = getWithdrawalPerMonth(_msgSender()) + _amount;
+        withdrawalPerUserPerMonth[_msgSender()][block.timestamp / 30 days] += _amount;
+        withdrawalsGlobalMonthly[block.timestamp / 30 days] += _amount;
     }
 
     function verifyUpdateYearlyLimit(uint256 _amount) public {
         require(isNotYearlyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds yearly limit");
-        withdrawalPerYear[_msgSender()][block.timestamp / 365 days] = getWithdrawalPerYear(_msgSender()) + _amount;
+        withdrawalPerUserPerYear[_msgSender()][block.timestamp / 365 days] += _amount;
+        withdrawalsGlobalYearly[block.timestamp / 365 days] += _amount;
     }
 
-    function getWithdrawalPerDay(address _user) public view returns(uint) {
-         if(address(previousBridge) != address(0) && withdrawalPerDay[_user][block.timestamp / 1 days] == 0) {
-           return previousBridge.withdrawalPerDay(_user, block.timestamp / 1 days); //if bridge is re-deployed this needs to change to previousBridge.getWithdrawalPerDay
-        }
-        return withdrawalPerDay[_user][block.timestamp / 1 days];
-    }
-    function getWithdrawalPerMonth(address _user) public view returns(uint) {
-         if(address(previousBridge) != address(0) && withdrawalPerMonth[_user][block.timestamp / 30 days] == 0) {
-            return previousBridge.withdrawalPerMonth(_user, block.timestamp / 30 days); //if bridge is re-deployed this needs to change to previousBridge.getWithdrawalPerDay
-        }
-        return withdrawalPerMonth[_user][block.timestamp / 30 days];
-    }
-    function getWithdrawalPerYear(address _user) public view returns(uint) {
-         if(address(previousBridge) != address(0) && withdrawalPerYear[_user][block.timestamp / 365 days] == 0) {
-            return previousBridge.withdrawalPerYear(_user, block.timestamp / 365 days); //if bridge is re-deployed this needs to change to previousBridge.getWithdrawalPerDay
-        }
-        return withdrawalPerYear[_user][block.timestamp / 365 days];
-    }
-
-    // ------------------------------------------------------------------------
-    // transferToSideChain(uint256 _tokens)
-    // Transfer token to Morpher's side chain to trade without fees and near instant
-    // settlement.
-    // - Owner's account must have sufficient balance to transfer
-    // - 0 value transfers are not supported
-    // Token are burned on the main chain and are created and credited to msg.sender
-    //  on the side chain
-    // ------------------------------------------------------------------------
-    function transferToSideChain(uint256 _tokens) public userNotBlocked {
+    
+    /**
+    * stageTokensForTransfer [chain A] => claimTokens [chain B]
+    *     former: transferToSideChain(uint256 _tokens)
+    * 
+    * Tokens are burned on chain A and then, after the merkle root is written, 
+    * can be credited on chain B through claimStagedTokens(...) below
+    *
+    */
+    function stageTokensForTransfer(uint256 _tokens) public userNotBlocked {
         require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
         require(MorpherToken(state.morpherTokenAddress()).balanceOf(_msgSender()) >= _tokens, "MorpherBridge: Insufficient balance.");
         verifyUpdateDailyLimit(_tokens);
         verifyUpdateMonthlyLimit(_tokens);
         verifyUpdateYearlyLimit(_tokens);
         MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
-        uint256 _newTokenSentToLinkedChain = getTokenSentToLinkedChain(_msgSender()) + _tokens;
-        uint256 _transferNonce = state.getBridgeNonce();
+        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()].amount + _tokens;
+        uint256 _transferNonce = getAndIncreaseBridgeNonce();
         uint256 _timeStamp = block.timestamp;
         bytes32 _transferHash = keccak256(
             abi.encodePacked(
@@ -243,38 +232,27 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
                 _transferNonce
             )
         );
-        state.setTokenSentToLinkedChain(_msgSender(), _newTokenSentToLinkedChain);
+        tokenSentToLinkedChain[_msgSender()].amount =  _newTokenSentToLinkedChain;
+        tokenSentToLinkedChain[_msgSender()].lastTransferAt = block.timestamp;
         emit TransferToLinkedChain(_msgSender(), _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _transferHash);
-    }
-
-    // ------------------------------------------------------------------------
-    // fastTransferFromSideChain(uint256 _numOfToken, uint256 _tokenBurnedOnLinkedChain, bytes32[] memory _proof)
-    // The sidechain operator can credit users with token they burend on the sidechain. Transfers
-    // happen immediately. To be removed after Beta.
-    // ------------------------------------------------------------------------
-    function fastTransferFromSideChain(address _address, uint256 _numOfToken, uint256 _tokenBurnedOnLinkedChain, bytes32 _sidechainTransactionHash) public onlyRole(SIDECHAINOPERATOR_ROLE) fastTransfers {
-        uint256 _tokenClaimed = state.getTokenClaimedOnThisChain(_address);
-        require(verifyWithdrawOk(_numOfToken), "MorpherBridge: Withdraw amount exceeds permitted 24 hour limit. Please try again in a few hours.");
-        require(_tokenClaimed + _numOfToken <= _tokenBurnedOnLinkedChain, "MorpherBridge: Token amount exceeds token deleted on linked chain.");
-        _chainTransfer(_address, _tokenClaimed, _numOfToken);
-        emit OperatorChainTransfer(_address, _numOfToken, _sidechainTransactionHash);
     }
     
     // ------------------------------------------------------------------------
-    // trustlessTransferFromSideChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof)
+    // claimStagedTokens(...) former: trustlessTransferFromSideChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof)
     // Performs a merkle proof on the number of token that have been burned by the user on the side chain.
     // If the number of token claimed on the main chain is less than the number of burned token on the side chain
     // the difference (or less) can be claimed on the main chain.
     // ------------------------------------------------------------------------
-    function trustlessTransferFromLinkedChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof) public userNotBlocked {
+    function claimStagedTokens(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof) public userNotBlocked {
         bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
-        uint256 _tokenClaimed = state.getTokenClaimedOnThisChain(_msgSender());        
+        uint256 _tokenClaimed = tokenClaimedOnThisChain[_msgSender()].amount;  
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
-        require(verifyWithdrawOk(_numOfToken), "MorpherBridge: Withdraw amount exceeds permitted 24 hour limit. Please try again in a few hours.");
+        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
+
         verifyUpdateDailyLimit(_numOfToken);
         verifyUpdateMonthlyLimit(_numOfToken);
-        verifyUpdateYearlyLimit(_numOfToken);
-        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain.");     
+        verifyUpdateYearlyLimit(_numOfToken);        
+
         _chainTransfer(_msgSender(), _tokenClaimed, _numOfToken);   
         emit TrustlessWithdrawFromSideChain(_msgSender(), _numOfToken);
     }
@@ -285,8 +263,8 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // linked chain has been proven before 
     // ------------------------------------------------------------------------
     function _chainTransfer(address _address, uint256 _tokenClaimed, uint256 _numOfToken) private {
-        state.setTokenClaimedOnThisChain(_address, _tokenClaimed + _numOfToken);
-        state.add24HoursWithdrawn(_numOfToken);
+        tokenClaimedOnThisChain[_address].amount = _tokenClaimed + _numOfToken;
+        tokenClaimedOnThisChain[_address].lastTransferAt = block.timestamp;
         MorpherToken(state.morpherTokenAddress()).mint(_address, _numOfToken);
     }
         
@@ -298,29 +276,28 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // ------------------------------------------------------------------------
     function claimFailedTransferToSidechain(uint256 _wrongSideChainBalance, bytes32[] memory _proof) public userNotBlocked {
         bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _wrongSideChainBalance));
-        uint256 _tokenSentToLinkedChain = getTokenSentToLinkedChain(_msgSender());
-        uint256 _tokenSentToLinkedChainTime = getTokenSentToLinkedChainTime(_msgSender());
-        uint256 _inactivityPeriod = state.inactivityPeriod();
-        
-        require(block.timestamp > _tokenSentToLinkedChainTime + _inactivityPeriod, "MorpherBridge: Failed deposits can only be claimed after inactivity period.");
-        require(_wrongSideChainBalance < _tokenSentToLinkedChain, "MorpherBridge: Other chain credit is greater equal to wrongSideChainBalance.");
-        require(verifyWithdrawOk(_tokenSentToLinkedChain - _wrongSideChainBalance), "MorpherBridge: Claim amount exceeds permitted 24 hour limit.");
+        require(block.timestamp > tokenSentToLinkedChain[_msgSender()].lastTransferAt + inactivityPeriod, "MorpherBridge: Failed deposits can only be claimed after inactivity period.");
+        require(_wrongSideChainBalance < tokenSentToLinkedChain[_msgSender()].amount, "MorpherBridge: Other chain credit is greater equal to wrongSideChainBalance.");
+       
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Enter total amount of deposits on side chain.");
-        
-        uint256 _claimAmount = _tokenSentToLinkedChain - _wrongSideChainBalance;
-        state.setTokenSentToLinkedChain(_msgSender(), _tokenSentToLinkedChain - _claimAmount);
-        state.add24HoursWithdrawn(_claimAmount);
+ 
+        uint256 _claimAmount = tokenSentToLinkedChain[_msgSender()].amount - _wrongSideChainBalance;
+        tokenSentToLinkedChain[_msgSender()].amount -=  _claimAmount;
+        tokenSentToLinkedChain[_msgSender()].lastTransferAt = block.timestamp;
+        verifyUpdateDailyLimit(_claimAmount);
+        verifyUpdateMonthlyLimit(_claimAmount);
+        verifyUpdateYearlyLimit(_claimAmount);         
         MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), _claimAmount);
         emit ClaimFailedTransferToSidechain(_msgSender(), _claimAmount);
     }
 
     // ------------------------------------------------------------------------
-    // recoverPositionFromSideChain(bytes32[] memory _proof, bytes32 _leaf, bytes32 _marketId, uint256 _timeStamp, uint256 _longShares, uint256 _shortShares, uint256 _meanEntryPrice, uint256 _meanEntrySpread, uint256 _meanEntryLeverage)
+    // recoverPositionFromInactivity former recoverPositionFromSideChain(bytes32[] memory _proof, bytes32 _leaf, bytes32 _marketId, uint256 _timeStamp, uint256 _longShares, uint256 _shortShares, uint256 _meanEntryPrice, uint256 _meanEntrySpread, uint256 _meanEntryLeverage)
     // Failsafe against side chain operator becoming inactive or withholding Times (Time withhold attack).
     // After 72 hours of no update of the side chain merkle root users can withdraw their last recorded
     // positions from side chain to main chain. Overwrites eventually existing position on main chain.
     // ------------------------------------------------------------------------
-    function recoverPositionFromSideChain(
+    function recoverPositionFromInactivity(
         bytes32[] memory _proof,
         bytes32 _leaf,
         bytes32 _marketId,
@@ -333,28 +310,33 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         uint256 _liquidationPrice
         ) public sideChainInactive userNotBlocked onlyRecoveryEnabled {
         require(_leaf == MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(_msgSender(), _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice), "MorpherBridge: leaf does not equal position hash.");
-        require(state.getPositionClaimedOnMainChain(_leaf) == false, "MorpherBridge: Position already transferred.");
+        require(claimFromInactivity[_leaf] == false, "MorpherBridge: Position already transferred.");
         require(mProof(_proof,_leaf) == true, "MorpherBridge: Merkle proof failed.");
-        state.setPositionClaimedOnMainChain(_leaf);
+        claimFromInactivity[_leaf] = true;
+        //todo: double positions clashing? 
         MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(_msgSender(), _marketId, _timeStamp, _longShares, _shortShares, _meanEntryPrice, _meanEntrySpread, _meanEntryLeverage, _liquidationPrice);
         emit PositionRecoveryFromSideChain(_msgSender(), _leaf);
         // Remark: After resuming operations side chain operator has 72 hours to sync and eliminate transferred positions on side chain to avoid double spend
     }
 
     // ------------------------------------------------------------------------
-    // recoverTokenFromSideChain(bytes32[] memory _proof, bytes32 _leaf, bytes32 _marketId, uint256 _timeStamp, uint256 _longShares, uint256 _shortShares, uint256 _meanEntryPrice, uint256 _meanEntrySpread, uint256 _meanEntryLeverage)
+    // recoverTokenFromInactivity - former recoverTokenFromSideChain(bytes32[] memory _proof, bytes32 _leaf, uint256 _balance)
     // Failsafe against side chain operator becoming inactive or withholding times (time withhold attack).
     // After 72 hours of no update of the side chain merkle root users can withdraw their last recorded
     // token balance from side chain to main chain.
     // ------------------------------------------------------------------------
-    function recoverTokenFromSideChain(bytes32[] memory _proof, bytes32 _leaf, uint256 _balance) public sideChainInactive userNotBlocked onlyRecoveryEnabled {
+    function recoverTokenFromInactivity(bytes32[] memory _proof, bytes32 _leaf, uint256 _balance) public sideChainInactive userNotBlocked onlyRecoveryEnabled {
         // Require side chain root hash not set on Mainchain for more than 72 hours (=3 days)
-        require(_leaf == state.getBalanceHash(_msgSender(), _balance), "MorpherBridge: Wrong balance.");
-        require(state.getPositionClaimedOnMainChain(_leaf) == false, "MorpherBridge: Token already transferred.");
+        require(_leaf == getBalanceHash(_msgSender(), _balance), "MorpherBridge: Wrong balance.");
+        require(claimFromInactivity[_leaf] == false, "MorpherBridge: Token already transferred.");
         require(mProof(_proof,_leaf) == true, "MorpherBridge: Merkle proof failed.");
-        require(verifyWithdrawOk(_balance), "MorpherBridge: Withdraw amount exceeds permitted 24 hour limit.");
-        state.setPositionClaimedOnMainChain(_leaf);
-        _chainTransfer(_msgSender(), state.getTokenClaimedOnThisChain(_msgSender()), _balance);
+        claimFromInactivity[_leaf] = true;
+
+        verifyUpdateDailyLimit(_balance);
+        verifyUpdateMonthlyLimit(_balance);
+        verifyUpdateYearlyLimit(_balance); 
+        
+        _chainTransfer(_msgSender(), tokenClaimedOnThisChain[_msgSender()].amount, _balance);
         emit TokenRecoveryFromSideChain(_msgSender(), _leaf);
         // Remark: Side chain operator must adjust side chain balances for token recoveries before restarting operations to avoid double spend
     }
@@ -364,6 +346,15 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // Computes merkle proof against the root hash of the sidechain stored in Morpher state
     // ------------------------------------------------------------------------
     function mProof(bytes32[] memory _proof, bytes32 _leaf) public view returns(bool _isTrue) {
-        return MerkleProofUpgradeable.verify(_proof, state.getSideChainMerkleRoot(), _leaf);
+        return MerkleProofUpgradeable.verify(_proof, withdrawalData.merkleRoot, _leaf);
+    }
+
+    function getBalanceHash(address _address, uint256 _balance) public pure returns (bytes32 _hash) {
+        return keccak256(abi.encodePacked(_address, _balance));
+    }
+
+    function getAndIncreaseBridgeNonce() internal returns (uint256) {
+        bridgeNonce++;
+        return bridgeNonce;
     }
 }

@@ -20,7 +20,6 @@ import "./MorpherAccessControl.sol";
 
 contract MorpherTradeEngine is Initializable, ContextUpgradeable {
     MorpherState public morpherState;
-    MorpherAccessControl public morpherAccessControl;
 
     /**
      * Known Roles to Trade Engine
@@ -194,14 +193,13 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
     function initialize(address _stateAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public initializer {
         ContextUpgradeable.__Context_init();
 
-        morpherAccessControl = MorpherAccessControl(MorpherState(_stateAddress).morpherAccessControlAddress()); //needed for initial setting of permissions
-        setMorpherState(_stateAddress);
+        morpherState = MorpherState(_stateAddress);
         escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
         deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
     }
 
     modifier onlyRole(bytes32 role) {
-        require(morpherAccessControl.hasRole(role, _msgSender()), "MorpherTradeEngine: Permission denied.");
+        require(MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()), "MorpherTradeEngine: Permission denied.");
         _;
     }
 
@@ -505,7 +503,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 // Users or Administrator can delete pending orders before the callback went through
 // ----------------------------------------------------------------------------
     function cancelOrder(bytes32 _orderId, address _address) public onlyRole(ORACLE_ROLE) {
-        require(_address == orders[_orderId].userId || morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _address), "MorpherTradeEngine: only Administrator or user can cancel an order.");
+        require(_address == orders[_orderId].userId || MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(ADMINISTRATOR_ROLE, _address), "MorpherTradeEngine: only Administrator or user can cancel an order.");
         require(orders[_orderId].userId != address(0), "MorpherTradeEngine: unable to process, order does not exist.");
 
         /**
