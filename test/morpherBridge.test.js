@@ -252,7 +252,7 @@ contract('MorpherBridge: trustlessTransferFromLinkedChain tests', (accounts) => 
 
         const proofForAddr1 = merkleTree.getHexProof(web3.utils.soliditySha3(addr1, web3.utils.toWei("20", "ether")));
 
-        let result = await morpherBridge.trustlessTransferFromLinkedChain(web3.utils.toWei("20", "ether"), web3.utils.toWei("20", "ether"), proofForAddr1, { from: addr1 });
+        let result = await morpherBridge.claimStagedTokens(web3.utils.toWei("20", "ether"), web3.utils.toWei("20", "ether"), proofForAddr1, { from: addr1 });
         await truffleAssert.eventEmitted(result, "TrustlessWithdrawFromSideChain");
 
         const addr1BalanceAfterClaim = await morpherToken.balanceOf(addr1);
