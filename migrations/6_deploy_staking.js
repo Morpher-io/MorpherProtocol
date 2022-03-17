@@ -1,6 +1,5 @@
 const MorpherState = artifacts.require("MorpherState");
 const MorpherStaking = artifacts.require("MorpherStaking");
-const MorpherUserBlocking = artifacts.require("MorpherUserBlocking");
 const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 const MorpherToken = artifacts.require("MorpherToken");
 
@@ -24,9 +23,6 @@ module.exports = async function (deployer, network, accounts) {
       throw e;
     }
     
-    const ownerAddress = process.env.MORPHER_OWNER || accounts[0];
-
-    const morpherUserBlocking = await MorpherUserBlocking.deployed();
     const morpherState = await MorpherState.deployed();
     await deployProxy(
       MorpherStaking,
@@ -49,6 +45,8 @@ module.exports = async function (deployer, network, accounts) {
       await morpherStaking.STAKINGADMIN_ROLE(),
       accounts[0]
     );
+    await morpherStaking.addInterestRate(15000,1617094819); //setting the initial interest rate to the trade engine deployed timestamp
+
     await morpherAccessControl.grantRole(
       await morpherToken.BURNER_ROLE(),
       morpherStaking.address

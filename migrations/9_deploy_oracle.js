@@ -1,6 +1,9 @@
 const MorpherState = artifacts.require("MorpherState");
 const MorpherOracle = artifacts.require("MorpherOracle");
 const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
+const MorpherAccessControl = artifacts.require("MorpherAccessControl");
+
+const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
 module.exports = async function (deployer, network, accounts) {
 
@@ -71,7 +74,7 @@ module.exports = async function (deployer, network, accounts) {
      */
     await morpherAccessControl.grantRole(
       await morpherTradeEngine.ORACLE_ROLE(),
-      callbackAddress3
+      morpherOracle.address
     );
     
 

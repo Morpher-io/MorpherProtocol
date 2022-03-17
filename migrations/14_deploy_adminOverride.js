@@ -1,5 +1,6 @@
 const AdminOverrideProxy = artifacts.require('MorpherAdministratorProxy.sol')
 const MorpherState = artifacts.require('MorpherState')
+const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 
 module.exports = async function (deployer, network, accounts) {
   const morpherState = await MorpherState.deployed();

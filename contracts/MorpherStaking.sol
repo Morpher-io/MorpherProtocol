@@ -78,19 +78,19 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         _;
     }
     
-    function initialize(address payable _morpherState) public initializer {
+    function initialize(address _morpherState) public initializer {
         ContextUpgradeable.__Context_init();
 
-        setMorpherStateAddress(_morpherState);
-        emit SetLockupPeriod(lockupPeriod);
-        emit SetMinimumStake(minimumStake);
-        addInterestRate(15000,1617094819); //setting the initial interest rate to the trade engine deployed timestamp
+        state = MorpherState(_morpherState);
+        
         lastReward = block.timestamp;
         lockupPeriod = 30 days; // to prevent tactical staking and ensure smooth governance
         minimumStake = 10**23; // 100k MPH minimum
         stakingAddress = 0x2222222222222222222222222222222222222222;
         marketIdStakingMPH = 0x9a31fdde7a3b1444b1befb10735dcc3b72cbd9dd604d2ff45144352bf0f359a6; //STAKING_MPH
         poolShareValue = PRECISION;
+        emit SetLockupPeriod(lockupPeriod);
+        emit SetMinimumStake(minimumStake);
         // missing: transferOwnership to Governance once deployed
     }
 
@@ -170,7 +170,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
 // Administrative functions
 // ----------------------------------------------------------------------------
 
-    function setMorpherStateAddress(address payable _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+    function setMorpherStateAddress(address _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
         state = MorpherState(_stateAddress);
         emit LinkState(_stateAddress);
     }
@@ -278,16 +278,5 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     function getStakeValue(address _address) public view returns(uint256 _value, uint256 _lastUpdate) {
         // Only accurate if poolShareValue is up to date
         return (getStake(_address) * (poolShareValue), lastReward);
-    }
-    
-// ------------------------------------------------------------------------
-// Don't accept ETH
-// ------------------------------------------------------------------------
-
-    fallback() external payable {
-        revert("MorpherStaking: you can't deposit Ether here");
-    }
-    receive() external payable {
-        revert("MorpherStaking: you can't deposit Ether here");
     }
 }

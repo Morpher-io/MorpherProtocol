@@ -3,6 +3,9 @@ const MorpherTradeEngine = artifacts.require("MorpherTradeEngine");
 const MorpherToken = artifacts.require("MorpherToken");
 const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 
+const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
+
+
 module.exports = async function (deployer, network, accounts) {
 
   try {
@@ -14,7 +17,7 @@ module.exports = async function (deployer, network, accounts) {
   } catch (e) {
     if (
       e.message !=
-      "MorpherToken has not been deployed to detected network (network/artifact mismatch)"
+      "MorpherTradeEngine has not been deployed to detected network (network/artifact mismatch)"
     ) {
       throw e;
     }

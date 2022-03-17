@@ -1,6 +1,8 @@
 const MorpherState = artifacts.require("MorpherState");
 const MorpherBridge = artifacts.require("MorpherBridge");
-const MorpherUserBlocking = artifacts.require("MorpherUserBlocking");
+const MorpherToken = artifacts.require("MorpherToken");
+const MorpherAccessControl = artifacts.require("MorpherAccessControl");
+const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
 module.exports = async function(deployer, network, accounts) {
 
@@ -29,9 +31,10 @@ module.exports = async function(deployer, network, accounts) {
         await morpherState.setMorpherBridge(morpherBridge.address);
 
         const morpherToken = await MorpherToken.deployed();
+        const morpherAccessControl = await MorpherAccessControl.deployed();
     
         await morpherAccessControl.grantRole(
-          await morpherToken.PAUSER_ROLE(),
+          await morpherToken.BURNER_ROLE(),
           morpherBridge.address
         );
     

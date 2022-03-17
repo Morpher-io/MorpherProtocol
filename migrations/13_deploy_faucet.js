@@ -19,11 +19,6 @@ module.exports = async function (deployer, network, accounts) {
       ownerAddress,
       web3.utils.toWei('100','ether')
     );
-
-    /**
-     * Grant the Token access
-     */
-    await morpherState.grantAccess(MorpherFaucet.address);
     
     //await morpherState.enableTransfers(MorpherFaucet.address);
 

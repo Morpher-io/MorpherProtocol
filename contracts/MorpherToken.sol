@@ -135,7 +135,13 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
         address to,
         uint256 amount
     ) internal virtual override(ERC20Upgradeable, ERC20PausableUpgradeable) {
-        require(!_restrictTransfers || morpherAccessControl.hasRole(TRANSFER_ROLE, _msgSender()) || morpherAccessControl.hasRole(TRANSFER_ROLE, from), "MorpherToken: Transfer denied");
+        require(
+            !_restrictTransfers || 
+            morpherAccessControl.hasRole(TRANSFER_ROLE, _msgSender()) || 
+            morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()) || 
+            morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()) || 
+            morpherAccessControl.hasRole(TRANSFER_ROLE, from)
+            , "MorpherToken: Transfer denied");
         super._beforeTokenTransfer(from, to, amount);
     }
 }

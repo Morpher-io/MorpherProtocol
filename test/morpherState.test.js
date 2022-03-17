@@ -1,21 +1,26 @@
 const MorpherState = artifacts.require("MorpherState");
+const MorpherToken = artifacts.require("MorpherToken");
+const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 
 const truffleAssert = require('truffle-assertions');
 
-const CRYPTO_BTC = '0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf9';
-const CRYPTO_ETH = '0x5376ff169a3705b2003892fe730060ee74ec83e5701da29318221aa782271779';
+const CRYPTO_BTC = web3.utils.sha3("CRYPTO_BTC");
+const CRYPTO_ETH = web3.utils.sha3("CRYPTO_ETH");
+const ADMINISTRATOR_ROLE = web3.utils.sha3("ADMINISTRATOR_ROLE");
+const MINTER_ROLE = web3.utils.sha3("MINTER_ROLE");
+const PAUSER_ROLE = web3.utils.sha3("PAUSER_ROLE");
+const BURNER_ROLE = web3.utils.sha3("BURNER_ROLE");
 
 contract('MorpherState', (accounts) => {
     it('test state changes and state function calls', async () => {
         const [deployerAddress, addressAdministrator, testAddress2] = accounts;
 
         let morpherState = await MorpherState.deployed();
+        let morpherAccessControl = await MorpherAccessControl.deployed();
+        let morpherToken = await MorpherToken.deployed();
 
         // Grant state access to deployer and set testAddress1 as admin.
-        await morpherState.grantAccess(deployerAddress, { from: deployerAddress });
-        await morpherState.grantAccess(addressAdministrator, { from: deployerAddress });
-        await morpherState.setGovernanceContract(deployerAddress, { from: deployerAddress });
-        await morpherState.setAdministrator(addressAdministrator, { from: deployerAddress });
+        await morpherAccessControl.grantRole(ADMINISTRATOR_ROLE, addressAdministrator);
 
         // Activate the markets and test if function calls were successful.
         await morpherState.activateMarket(CRYPTO_BTC, { from: addressAdministrator });
@@ -33,32 +38,35 @@ contract('MorpherState', (accounts) => {
         const maximumLeverage = (await morpherState.getMaximumLeverage({ from: testAddress2 })).toString();
         assert.equal(maximumLeverage, '500000000');
 
-        // Test correct change of administrator.
-        const administrator = await morpherState.getAdministrator({ from: testAddress2 });
-        assert.equal(administrator, addressAdministrator);
+        await morpherAccessControl.revokeRole(ADMINISTRATOR_ROLE, addressAdministrator);
 
+        await morpherAccessControl.grantRole(MINTER_ROLE, addressAdministrator);
         // Test MorpherToken minting.
-        await morpherState.mint(testAddress2, '2000000', { from: addressAdministrator });
-        let testAddress2Balance = (await morpherState.balanceOf(testAddress2, { from: testAddress2 })).toString();
+
+        await morpherToken.mint(testAddress2, '2000000', { from: addressAdministrator });
+        let testAddress2Balance = (await morpherToken.balanceOf(testAddress2, { from: testAddress2 })).toString();
         assert.equal(testAddress2Balance, '2000000');
 
         // Only state operators are allowed to call the Mint function.
-        await truffleAssert.reverts(morpherState.mint(testAddress2, '2000000', { from: testAddress2 }), "MorpherState: Only Platform is allowed to execute operation."); // fails
+        await truffleAssert.reverts(morpherToken.mint(testAddress2, '2000000', { from: testAddress2 }), "MorpherState: Only Platform is allowed to execute operation."); // fails
         await morpherState.mint(testAddress2, '3000000', { from: addressAdministrator }); // successful
 
         // Test state pause interaction.
-        await truffleAssert.reverts(morpherState.pauseState({ from: testAddress2 }), "Caller is not the Administrator"); // fails
-        await morpherState.pauseState({ from: addressAdministrator });
+        await truffleAssert.reverts(morpherToken.pause({ from: testAddress2 }), "Caller is not the Administrator"); // fails
 
-        await truffleAssert.reverts(morpherState.mint(testAddress2, '1000000', { from: addressAdministrator }), "Contract paused, aborting"); // fails
-        await truffleAssert.reverts(morpherState.unPauseState({ from: testAddress2 }), "Caller is not the Administrator"); // fails
+        await morpherAccessControl.grantRole(PAUSER_ROLE, addressAdministrator);
+        await morpherToken.pause({ from: addressAdministrator });
 
-        await morpherState.unPauseState({ from: addressAdministrator });
+        await truffleAssert.reverts(morpherToken.mint(testAddress2, '1000000', { from: addressAdministrator }), "Contract paused, aborting"); // fails
+        await truffleAssert.reverts(morpherToken.unpause({ from: testAddress2 }), "Caller is not the Administrator"); // fails
+
+        await morpherToken.unpause({ from: addressAdministrator });
 
         // Burn MorpherToken and assert the balances.
-        await truffleAssert.reverts(morpherState.burn(testAddress2, '2000000', { from: testAddress2 }), "Only Platform"); // fails
+        await truffleAssert.reverts(morpherToken.burn(testAddress2, '2000000', { from: testAddress2 }), "Only Platform"); // fails
 
-        await morpherState.burn(testAddress2, '1000000', { from: addressAdministrator });
+        await morpherAccessControl.grantRole(BURNER_ROLE, addressAdministrator);
+        await morpherToken.burn(testAddress2, '1000000', { from: addressAdministrator });
 
         testAddress2Balance = (await morpherState.balanceOf(testAddress2, { from: testAddress2 })).toString();
         assert.equal(testAddress2Balance, '4000000');

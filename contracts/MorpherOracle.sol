@@ -42,9 +42,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
     /**
      * ROLES KNOWN TO ORACLE
      */
-    bytes32 constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
-    bytes32 constant ORACLEOPERATOR_ROLE = keccak256("ORACLEOPERATOR_ROLE"); //used for callbacks from API
-    bytes32 constant PAUSER_ROLE = keccak256("PAUSER_ROLE"); //can pause oracle
+    bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    bytes32 constant public ORACLEOPERATOR_ROLE = keccak256("ORACLEOPERATOR_ROLE"); //used for callbacks from API
+    bytes32 constant public PAUSER_ROLE = keccak256("PAUSER_ROLE"); //can pause oracle
 
 // ----------------------------------------------------------------------------------
 // Events
@@ -462,7 +462,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 // Administrator closes out all existing positions on _marketId market at current prices
 // ----------------------------------------------------------------------------------
 
-    uint delistMarketFromIx = 0;
+    uint delistMarketFromIx;
     function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyRole(ADMINISTRATOR_ROLE) {
         require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
         // If no _fromIx and _toIx specified, do entire _list
