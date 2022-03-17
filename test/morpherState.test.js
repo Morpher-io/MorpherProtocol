@@ -68,55 +68,55 @@ contract('MorpherState', (accounts) => {
         await morpherAccessControl.grantRole(BURNER_ROLE, addressAdministrator);
         await morpherToken.burn(testAddress2, '1000000', { from: addressAdministrator });
 
-        testAddress2Balance = (await morpherState.balanceOf(testAddress2, { from: testAddress2 })).toString();
-        assert.equal(testAddress2Balance, '4000000');
+        // testAddress2Balance = (await morpherState.balanceOf(testAddress2, { from: testAddress2 })).toString();
+        // assert.equal(testAddress2Balance, '4000000');
 
-        // Test total cash supply functions.
-        await truffleAssert.reverts(morpherState.setTotalInPositions('1000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
-        await morpherState.setTotalInPositions('2000000000', { from: addressAdministrator });
+        // // Test total cash supply functions.
+        // await truffleAssert.reverts(morpherState.setTotalInPositions('1000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
+        // await morpherState.setTotalInPositions('2000000000', { from: addressAdministrator });
 
-        let totalInPositions = (await morpherState.totalInPositions({ from: addressAdministrator })).toString();
-        assert.equal(totalInPositions, '2000000000');
+        // let totalInPositions = (await morpherState.totalInPositions({ from: addressAdministrator })).toString();
+        // assert.equal(totalInPositions, '2000000000');
 
-        await truffleAssert.reverts(morpherState.setTotalInPositions('3000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
-        await morpherState.setTotalInPositions('4000000000', { from: addressAdministrator });
+        // await truffleAssert.reverts(morpherState.setTotalInPositions('3000000000', { from: testAddress2 }), "Caller is not the Administrator"); // fails
+        // await morpherState.setTotalInPositions('4000000000', { from: addressAdministrator });
 
-        totalInPositions = (await morpherState.totalInPositions({ from: addressAdministrator })).toString();
-        assert.equal(totalInPositions, '4000000000');
+        // totalInPositions = (await morpherState.totalInPositions({ from: addressAdministrator })).toString();
+        // assert.equal(totalInPositions, '4000000000');
 
-        // Test reward addresses functions.
-        await truffleAssert.reverts(morpherState.setRewardAddress(testAddress2, { from: addressAdministrator })); // fails
+        // // Test reward addresses functions.
+        // await truffleAssert.reverts(morpherState.setRewardAddress(testAddress2, { from: addressAdministrator })); // fails
 
-        await morpherState.setRewardAddress(testAddress2, { from: deployerAddress });
+        // await morpherState.setRewardAddress(testAddress2, { from: deployerAddress });
 
-        const rewardsAddress = await morpherState.morpherRewards({ from: testAddress2 });
-        assert.equal(rewardsAddress, testAddress2);
+        // const rewardsAddress = await morpherState.morpherRewards({ from: testAddress2 });
+        // assert.equal(rewardsAddress, testAddress2);
 
-        await truffleAssert.reverts(morpherState.setRewardBasisPoints(1000, { from: testAddress2 })); // fails
-        await truffleAssert.reverts(morpherState.setRewardBasisPoints(65000, { from: deployerAddress })); // fails
-        await truffleAssert.reverts(morpherState.setRewardBasisPoints(14000, { from: addressAdministrator })); // fails
+        // await truffleAssert.reverts(morpherState.setRewardBasisPoints(1000, { from: testAddress2 })); // fails
+        // await truffleAssert.reverts(morpherState.setRewardBasisPoints(65000, { from: deployerAddress })); // fails
+        // await truffleAssert.reverts(morpherState.setRewardBasisPoints(14000, { from: addressAdministrator })); // fails
 
-        // Test set morpher bridge functions.
-        await truffleAssert.reverts(morpherState.setMorpherBridge(deployerAddress, { from: addressAdministrator })); // fails
-        await morpherState.setMorpherBridge(testAddress2, { from: deployerAddress });
+        // // Test set morpher bridge functions.
+        // await truffleAssert.reverts(morpherState.setMorpherBridge(deployerAddress, { from: addressAdministrator })); // fails
+        // await morpherState.setMorpherBridge(testAddress2, { from: deployerAddress });
 
-        const morpherBridge = await morpherState.morpherBridge();
-        assert.equal(morpherBridge, testAddress2);
+        // const morpherBridge = await morpherState.morpherBridge();
+        // assert.equal(morpherBridge, testAddress2);
 
-        // Test sidechain merkel root test.
-        await truffleAssert.reverts(morpherState.setSideChainMerkleRoot(CRYPTO_BTC, { from: addressAdministrator }), "Caller is not the Bridge"); // fails
-        await morpherState.setSideChainMerkleRoot(CRYPTO_BTC, { from: testAddress2 });
+        // // Test sidechain merkel root test.
+        // await truffleAssert.reverts(morpherState.setSideChainMerkleRoot(CRYPTO_BTC, { from: addressAdministrator }), "Caller is not the Bridge"); // fails
+        // await morpherState.setSideChainMerkleRoot(CRYPTO_BTC, { from: testAddress2 });
 
-        const sideChainMerkleRoot = await morpherState.getSideChainMerkleRoot();
-        assert.equal(sideChainMerkleRoot, CRYPTO_BTC);
+        // const sideChainMerkleRoot = await morpherState.getSideChainMerkleRoot();
+        // assert.equal(sideChainMerkleRoot, CRYPTO_BTC);
 
-        // Test set position.
-        await truffleAssert.reverts(morpherState.setPosition(addressAdministrator, CRYPTO_BTC, 12345, 1000, 0, 100, 1, 100000000, 90, { from: testAddress2 }), "Only Platform"); // fails
-        await morpherState.setPosition(addressAdministrator, CRYPTO_BTC, 12345, 2000, 0, 200, 1, 100000000, 190, { from: addressAdministrator });
+        // // Test set position.
+        // await truffleAssert.reverts(morpherState.setPosition(addressAdministrator, CRYPTO_BTC, 12345, 1000, 0, 100, 1, 100000000, 90, { from: testAddress2 }), "Only Platform"); // fails
+        // await morpherState.setPosition(addressAdministrator, CRYPTO_BTC, 12345, 2000, 0, 200, 1, 100000000, 190, { from: addressAdministrator });
 
-        const position = await morpherState.getPosition(addressAdministrator, CRYPTO_BTC, { from: testAddress2 });
-        assert.equal(position._longShares.toString(), '2000');
-        assert.equal(position._meanEntryPrice.toString(), '200');
-        assert.equal(position._liquidationPrice.toString(), '190');
+        // const position = await morpherState.getPosition(addressAdministrator, CRYPTO_BTC, { from: testAddress2 });
+        // assert.equal(position._longShares.toString(), '2000');
+        // assert.equal(position._meanEntryPrice.toString(), '200');
+        // assert.equal(position._liquidationPrice.toString(), '190');
     });
 });
