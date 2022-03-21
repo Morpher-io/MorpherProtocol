@@ -56,6 +56,6 @@ module.exports = async function (deployer, network, accounts) {
       morpherStaking.address
     );
 
-    morpherState.setMorpherStaking(morpherStaking.address);
+    await morpherState.setMorpherStaking(morpherStaking.address);
   }
 };

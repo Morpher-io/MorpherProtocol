@@ -19,7 +19,7 @@ module.exports = async function (deployer, network, accounts) {
   );
   const morpherMintingLimiter = await MorpherMintingLimiter.deployed();
 
-  morpherState.setMorpherMintingLimiter(morpherMintingLimiter.address);
+  await morpherState.setMorpherMintingLimiter(morpherMintingLimiter.address);
 
   /**
    * Allow the minting limiter to actually mint

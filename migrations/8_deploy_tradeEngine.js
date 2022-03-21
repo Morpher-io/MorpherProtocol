@@ -61,7 +61,7 @@ module.exports = async function (deployer, network, accounts) {
     /**
      * Set the Trade Engine in State
      */
-    morpherState.setMorpherTradeEngine(morpherTradeEngine.address);
+    await morpherState.setMorpherTradeEngine(morpherTradeEngine.address);
   }
   
 };

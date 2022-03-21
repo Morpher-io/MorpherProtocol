@@ -19,6 +19,7 @@ import "./MorpherTradeEngine.sol";
 
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
 
 contract MorpherBridge is Initializable, ContextUpgradeable {
 
@@ -179,40 +180,40 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     }
 
 
-    function isNotDailyLimitExceeding(uint256 _amount) public view returns(bool) {
+    function isNotDailyLimitExceeding(address _usr, uint256 _amount) public view returns(bool) {
         return (
-            (withdrawalPerUserPerDay[_msgSender()][block.timestamp / 1 days] + _amount <= withdrawalLimitPerUserDaily) && 
+            (withdrawalPerUserPerDay[_usr][block.timestamp / 1 days] + _amount <= withdrawalLimitPerUserDaily) && 
             (withdrawalsGlobalDaily[block.timestamp / 1 days] + _amount <= withdrawalLimitGlobalDaily)
         );
     }
-    function isNotMonthlyLimitExceeding(uint256 _amount) public view returns(bool) {
+    function isNotMonthlyLimitExceeding(address _usr, uint256 _amount) public view returns(bool) {
         return (
-            (withdrawalPerUserPerMonth[_msgSender()][block.timestamp / 30 days] + _amount <= withdrawalLimitPerUserMonthly) &&
+            (withdrawalPerUserPerMonth[_usr][block.timestamp / 30 days] + _amount <= withdrawalLimitPerUserMonthly) &&
             (withdrawalsGlobalMonthly[block.timestamp / 30 days] + _amount <= withdrawalLimitGlobalMonthly)
         );
     }
-    function isNotYearlyLimitExceeding(uint256 _amount) public view returns(bool) {
+    function isNotYearlyLimitExceeding(address _usr, uint256 _amount) public view returns(bool) {
         return (
-            (withdrawalPerUserPerYear[_msgSender()][block.timestamp / 365 days] + _amount <= withdrawalLimitPerUserYearly) &&
+            (withdrawalPerUserPerYear[_usr][block.timestamp / 365 days] + _amount <= withdrawalLimitPerUserYearly) &&
             (withdrawalsGlobalYearly[block.timestamp / 365 days] + _amount <= withdrawalLimitGlobalYearly)
         );
     }
 
-    function verifyUpdateDailyLimit(uint256 _amount) public {
-        require(isNotDailyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds daily limit");
-        withdrawalPerUserPerDay[_msgSender()][block.timestamp / 1 days] += _amount;
+    function verifyUpdateDailyLimit(address _usr, uint256 _amount) public {
+        require(isNotDailyLimitExceeding(_usr, _amount), "MorpherBridge: Withdrawal Amount exceeds daily limit");
+        withdrawalPerUserPerDay[_usr][block.timestamp / 1 days] += _amount;
         withdrawalsGlobalDaily[block.timestamp / 1 days] += _amount;
     }
 
-    function verifyUpdateMonthlyLimit(uint256 _amount) public {
-        require(isNotMonthlyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds monthly limit");
-        withdrawalPerUserPerMonth[_msgSender()][block.timestamp / 30 days] += _amount;
+    function verifyUpdateMonthlyLimit(address _usr, uint256 _amount) public {
+        require(isNotMonthlyLimitExceeding(_usr, _amount), "MorpherBridge: Withdrawal Amount exceeds monthly limit");
+        withdrawalPerUserPerMonth[_usr][block.timestamp / 30 days] += _amount;
         withdrawalsGlobalMonthly[block.timestamp / 30 days] += _amount;
     }
 
-    function verifyUpdateYearlyLimit(uint256 _amount) public {
-        require(isNotYearlyLimitExceeding(_amount), "MorpherBridge: Withdrawal Amount exceeds yearly limit");
-        withdrawalPerUserPerYear[_msgSender()][block.timestamp / 365 days] += _amount;
+    function verifyUpdateYearlyLimit(address _usr, uint256 _amount) public {
+        require(isNotYearlyLimitExceeding(_usr, _amount), "MorpherBridge: Withdrawal Amount exceeds yearly limit");
+        withdrawalPerUserPerYear[_usr][block.timestamp / 365 days] += _amount;
         withdrawalsGlobalYearly[block.timestamp / 365 days] += _amount;
     }
 
@@ -228,9 +229,9 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     function stageTokensForTransfer(uint256 _tokens) public userNotBlocked {
         require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
         require(MorpherToken(state.morpherTokenAddress()).balanceOf(_msgSender()) >= _tokens, "MorpherBridge: Insufficient balance.");
-        verifyUpdateDailyLimit(_tokens);
-        verifyUpdateMonthlyLimit(_tokens);
-        verifyUpdateYearlyLimit(_tokens);
+        verifyUpdateDailyLimit(_msgSender(), _tokens);
+        verifyUpdateMonthlyLimit(_msgSender(), _tokens);
+        verifyUpdateYearlyLimit(_msgSender(), _tokens);
         MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
         uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()].amount + _tokens;
         uint256 _transferNonce = getAndIncreaseBridgeNonce();
@@ -261,9 +262,9 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
 
-        verifyUpdateDailyLimit(_numOfToken);
-        verifyUpdateMonthlyLimit(_numOfToken);
-        verifyUpdateYearlyLimit(_numOfToken);        
+        verifyUpdateDailyLimit(_msgSender(), _numOfToken);
+        verifyUpdateMonthlyLimit(_msgSender(), _numOfToken);
+        verifyUpdateYearlyLimit(_msgSender(), _numOfToken);        
 
         _chainTransfer(_msgSender(), _tokenClaimed, _numOfToken);   
         emit TrustlessWithdrawFromSideChain(_msgSender(), _numOfToken);
@@ -275,16 +276,16 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // If the number of token claimed on the main chain is less than the number of burned token on the side chain
     // the difference (or less) can be claimed on the main chain.
     // ------------------------------------------------------------------------
-    function claimStagedTokensConvertAndSend(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof, address _finalOutput) public onlyRole(SIDECHAINOPERATOR_ROLE) userNotBlocked {
+    function claimStagedTokensConvertAndSend(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput) public userNotBlocked {
         // msg.sender must approve this contract
-bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_msgSender()].amount;  
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
 
-        verifyUpdateDailyLimit(_numOfToken);
-        verifyUpdateMonthlyLimit(_numOfToken);
-        verifyUpdateYearlyLimit(_numOfToken);        
+        verifyUpdateDailyLimit(_msgSender(), _numOfToken);
+        verifyUpdateMonthlyLimit(_msgSender(), _numOfToken);
+        verifyUpdateYearlyLimit(_msgSender(), _numOfToken);        
 
         _chainTransfer(address(this), _tokenClaimed, _numOfToken); //instead of transferring it to the user, transfer it to the bridge itself
         emit TrustlessWithdrawFromSideChain(_msgSender(), _numOfToken);
@@ -308,9 +309,62 @@ bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
 
         // The call to `exactInputSingle` executes the swap.
         uint amountOut = swapRouter.exactInputSingle(params);
+        //weth -> eth conversion
+        IWETH9(WETH9).withdraw(amountOut);
+        _finalOutput.transfer(amountOut);
+    }
+    // ------------------------------------------------------------------------
+    // claimStagedTokens(...) former: trustlessTransferFromSideChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof)
+    // Performs a merkle proof on the number of token that have been burned by the user on the side chain.
+    // If the number of token claimed on the main chain is less than the number of burned token on the side chain
+    // the difference (or less) can be claimed on the main chain.
+    // ------------------------------------------------------------------------
+    function claimStagedTokensConvertAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+        // msg.sender must approve this contract
+        updateSideChainMerkleRoot(_rootHash);
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
+        uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
+        require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
+        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
+
+        verifyUpdateDailyLimit(_usrAddr, _numOfToken); //for usrAddr
+        verifyUpdateMonthlyLimit(_usrAddr, _numOfToken);
+        verifyUpdateYearlyLimit(_usrAddr, _numOfToken);        
+
+        _chainTransfer(address(this), _tokenClaimed, _numOfToken); //instead of transferring it to the user, transfer it to the bridge itself
+        emit TrustlessWithdrawFromSideChain(_usrAddr, _numOfToken);
+
+        /**
+         * Transfer the Fee away
+         */
+        MorpherToken(state.morpherTokenAddress()).transferFrom(address(this),feeRecipient, fee);
+        _numOfToken -= fee;
+
+
+        // Transfer the specified amount of DAI to this contract.
+        // Approve the router to spend DAI.
+        TransferHelper.safeApprove(state.morpherTokenAddress(), address(swapRouter), _numOfToken);
+
+        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
+        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
+        ISwapRouter.ExactInputSingleParams memory params =
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: state.morpherTokenAddress(),
+                tokenOut: WETH9,
+                fee: poolFee,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: _numOfToken,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        // The call to `exactInputSingle` executes the swap.
+        uint amountOut = swapRouter.exactInputSingle(params);
 
         //weth -> eth conversion
-        //send eth to _finalOutput (potentially minus a fee?)
+        IWETH9(WETH9).withdraw(amountOut);
+        _finalOutput.transfer(amountOut);
     }
     
     // ------------------------------------------------------------------------
@@ -340,9 +394,9 @@ bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
         uint256 _claimAmount = tokenSentToLinkedChain[_msgSender()].amount - _wrongSideChainBalance;
         tokenSentToLinkedChain[_msgSender()].amount -=  _claimAmount;
         tokenSentToLinkedChain[_msgSender()].lastTransferAt = block.timestamp;
-        verifyUpdateDailyLimit(_claimAmount);
-        verifyUpdateMonthlyLimit(_claimAmount);
-        verifyUpdateYearlyLimit(_claimAmount);         
+        verifyUpdateDailyLimit(_msgSender(), _claimAmount);
+        verifyUpdateMonthlyLimit(_msgSender(), _claimAmount);
+        verifyUpdateYearlyLimit(_msgSender(), _claimAmount);         
         MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), _claimAmount);
         emit ClaimFailedTransferToSidechain(_msgSender(), _claimAmount);
     }
@@ -388,9 +442,9 @@ bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
         require(mProof(_proof,_leaf) == true, "MorpherBridge: Merkle proof failed.");
         claimFromInactivity[_leaf] = true;
 
-        verifyUpdateDailyLimit(_balance);
-        verifyUpdateMonthlyLimit(_balance);
-        verifyUpdateYearlyLimit(_balance); 
+        verifyUpdateDailyLimit(_msgSender(), _balance);
+        verifyUpdateMonthlyLimit(_msgSender(), _balance);
+        verifyUpdateYearlyLimit(_msgSender(), _balance); 
         
         _chainTransfer(_msgSender(), tokenClaimedOnThisChain[_msgSender()].amount, _balance);
         emit TokenRecoveryFromSideChain(_msgSender(), _leaf);

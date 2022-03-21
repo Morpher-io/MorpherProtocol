@@ -4,6 +4,9 @@ const MorpherToken = artifacts.require("MorpherToken");
 const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
+//https://docs.uniswap.org/protocol/reference/deployments
+const swapRouterAddress = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"; 
+
 module.exports = async function(deployer, network, accounts) {
 
     try {
@@ -23,7 +26,7 @@ module.exports = async function(deployer, network, accounts) {
         const morpherState = await MorpherState.deployed();
         const recoveryEnabled = !process.env.SIDECHAIN;
 
-        await deployProxy(MorpherBridge, [morpherState.address, recoveryEnabled], {
+        await deployProxy(MorpherBridge, [morpherState.address, recoveryEnabled, swapRouterAddress], {
           deployer,
         }); // deployer is changed to owner later
     

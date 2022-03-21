@@ -21,16 +21,12 @@ module.exports = async function (deployer, network, accounts) {
       throw e;
     }
     
-    let deployedTimestamp = 1613399217;
     const callbackAddress1 = process.env.CALLBACK_ADDRESS_1 || accounts[0];
     const callbackAddress2 = process.env.CALLBACK_ADDRESS_2;
     const callbackAddress3 = process.env.CALLBACK_ADDRESS_3;
    
     const gasCollectionAddress = process.env.GAS_COLLECTION || accounts[0];
   
-    if (network == "test") {
-      deployedTimestamp = Math.round(Date.now() / 1000) - 60 * 60 * 24 * 30 * 5; //settings this for testing 5 months back
-    }
 
     const morpherState = await MorpherState.deployed();
     await deployProxy(
@@ -81,7 +77,7 @@ module.exports = async function (deployer, network, accounts) {
     /**
      * Set the Trade Engine in State
      */
-    morpherState.setMorpherOracle(morpherOracle.address);
+    await morpherState.setMorpherOracle(morpherOracle.address);
   }
 
 };
