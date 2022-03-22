@@ -15,6 +15,7 @@ import "./MorpherAccessControl.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
 import "./MorpherTradeEngine.sol";
 
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
@@ -22,6 +23,9 @@ import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
 
 contract MorpherBridge is Initializable, ContextUpgradeable {
+
+    using ECDSAUpgradeable for bytes32;
+
 
     MorpherState state;
     MorpherBridge previousBridge;
@@ -68,7 +72,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         uint256 amount;
         uint256 lastTransferAt;
     }
-    mapping(address => TokensTransferredStruct) public tokenSentToLinkedChain;
+    mapping(address => mapping(uint => TokensTransferredStruct)) public tokenSentToLinkedChain;
     mapping(address => TokensTransferredStruct) public tokenClaimedOnThisChain;
 
     uint256 public bridgeNonce;
@@ -79,6 +83,18 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         uint256 totalTokenSent,
         uint256 timeStamp,
         uint256 transferNonce,
+        uint256 targetChainId,
+        bytes32 indexed transferHash
+    );
+    event TransferToLinkedChainAndWithdrawTo(
+        address indexed from,
+        uint256 tokens,
+        uint256 totalTokenSent,
+        uint256 timeStamp,
+        uint256 transferNonce,
+        uint256 targetChainId,
+        address destinationAddress,
+        bytes userSigature,
         bytes32 indexed transferHash
     );
     event TrustlessWithdrawFromSideChain(address indexed from, uint256 tokens);
@@ -226,14 +242,14 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     * can be credited on chain B through claimStagedTokens(...) below
     *
     */
-    function stageTokensForTransfer(uint256 _tokens) public userNotBlocked {
+    function stageTokensForTransfer(uint256 _tokens, uint _targetChainId) public userNotBlocked {
         require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
         require(MorpherToken(state.morpherTokenAddress()).balanceOf(_msgSender()) >= _tokens, "MorpherBridge: Insufficient balance.");
         verifyUpdateDailyLimit(_msgSender(), _tokens);
         verifyUpdateMonthlyLimit(_msgSender(), _tokens);
         verifyUpdateYearlyLimit(_msgSender(), _tokens);
         MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
-        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()].amount + _tokens;
+        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + _tokens;
         uint256 _transferNonce = getAndIncreaseBridgeNonce();
         uint256 _timeStamp = block.timestamp;
         bytes32 _transferHash = keccak256(
@@ -242,12 +258,46 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
                 _tokens,
                 _newTokenSentToLinkedChain,
                 _timeStamp,
+                _targetChainId,
                 _transferNonce
             )
         );
-        tokenSentToLinkedChain[_msgSender()].amount =  _newTokenSentToLinkedChain;
-        tokenSentToLinkedChain[_msgSender()].lastTransferAt = block.timestamp;
-        emit TransferToLinkedChain(_msgSender(), _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _transferHash);
+        tokenSentToLinkedChain[_msgSender()][_targetChainId].amount =  _newTokenSentToLinkedChain;
+        tokenSentToLinkedChain[_msgSender()][_targetChainId].lastTransferAt = block.timestamp;
+        emit TransferToLinkedChain(_msgSender(), _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _targetChainId, _transferHash);
+    }
+    
+    /**
+    * stageTokensForTransfer [chain A] => claimTokens [chain B]
+    *     former: transferToSideChain(uint256 _tokens)
+    * 
+    * Tokens are burned on chain A and then, after the merkle root is written, 
+    * can be credited on chain B through claimStagedTokens(...) below
+    *
+    */
+    function stageTokensForTransfer(uint256 _tokens, uint _targetChainId, address _autoWithdrawalAddressTo, bytes memory _signature) public userNotBlocked {
+        require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
+        require(MorpherToken(state.morpherTokenAddress()).balanceOf(_msgSender()) >= _tokens, "MorpherBridge: Insufficient balance.");
+        verifyUpdateDailyLimit(_msgSender(), _tokens);
+        verifyUpdateMonthlyLimit(_msgSender(), _tokens);
+        verifyUpdateYearlyLimit(_msgSender(), _tokens);
+        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
+        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + _tokens;
+        uint256 _transferNonce = getAndIncreaseBridgeNonce();
+        uint256 _timeStamp = block.timestamp;
+        bytes32 _transferHash = keccak256(
+            abi.encodePacked(
+                _msgSender(),
+                _tokens,
+                _newTokenSentToLinkedChain,
+                _timeStamp,
+                _targetChainId,
+                _transferNonce
+            )
+        );
+        tokenSentToLinkedChain[_msgSender()][_targetChainId].amount =  _newTokenSentToLinkedChain;
+        tokenSentToLinkedChain[_msgSender()][_targetChainId].lastTransferAt = block.timestamp;
+        emit TransferToLinkedChainAndWithdrawTo(_msgSender(), _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _targetChainId, _autoWithdrawalAddressTo, _signature, _transferHash);
     }
     
     // ------------------------------------------------------------------------
@@ -257,7 +307,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // the difference (or less) can be claimed on the main chain.
     // ------------------------------------------------------------------------
     function claimStagedTokens(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof) public userNotBlocked {
-        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit, block.chainid));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_msgSender()].amount;  
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
@@ -278,7 +328,8 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // ------------------------------------------------------------------------
     function claimStagedTokensConvertAndSend(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput) public userNotBlocked {
         // msg.sender must approve this contract
-        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
+        
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit, block.chainid));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_msgSender()].amount;  
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
@@ -319,10 +370,11 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // If the number of token claimed on the main chain is less than the number of burned token on the side chain
     // the difference (or less) can be claimed on the main chain.
     // ------------------------------------------------------------------------
-    function claimStagedTokensConvertAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash) public onlyRole(SIDECHAINOPERATOR_ROLE) {
+    function claimStagedTokensConvertAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) {
         // msg.sender must approve this contract
+        require(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid)).recover(_userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
         updateSideChainMerkleRoot(_rootHash);
-        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit));
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit, block.chainid));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
@@ -384,16 +436,16 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // they can reclaim the token on the main chain by submitting the proof that their
     // side chain balance is less than the number of token sent from main chain.
     // ------------------------------------------------------------------------
-    function claimFailedTransferToSidechain(uint256 _wrongSideChainBalance, bytes32[] memory _proof) public userNotBlocked {
+    function claimFailedTransferToSidechain(uint256 _wrongSideChainBalance, bytes32[] memory _proof, uint256 _targetChainId) public userNotBlocked {
         bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _wrongSideChainBalance));
-        require(block.timestamp > tokenSentToLinkedChain[_msgSender()].lastTransferAt + inactivityPeriod, "MorpherBridge: Failed deposits can only be claimed after inactivity period.");
-        require(_wrongSideChainBalance < tokenSentToLinkedChain[_msgSender()].amount, "MorpherBridge: Other chain credit is greater equal to wrongSideChainBalance.");
+        require(block.timestamp > tokenSentToLinkedChain[_msgSender()][_targetChainId].lastTransferAt + inactivityPeriod, "MorpherBridge: Failed deposits can only be claimed after inactivity period.");
+        require(_wrongSideChainBalance < tokenSentToLinkedChain[_msgSender()][_targetChainId].amount, "MorpherBridge: Other chain credit is greater equal to wrongSideChainBalance.");
        
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Enter total amount of deposits on side chain.");
  
-        uint256 _claimAmount = tokenSentToLinkedChain[_msgSender()].amount - _wrongSideChainBalance;
-        tokenSentToLinkedChain[_msgSender()].amount -=  _claimAmount;
-        tokenSentToLinkedChain[_msgSender()].lastTransferAt = block.timestamp;
+        uint256 _claimAmount = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount - _wrongSideChainBalance;
+        tokenSentToLinkedChain[_msgSender()][_targetChainId].amount -=  _claimAmount;
+        tokenSentToLinkedChain[_msgSender()][_targetChainId].lastTransferAt = block.timestamp;
         verifyUpdateDailyLimit(_msgSender(), _claimAmount);
         verifyUpdateMonthlyLimit(_msgSender(), _claimAmount);
         verifyUpdateYearlyLimit(_msgSender(), _claimAmount);         
