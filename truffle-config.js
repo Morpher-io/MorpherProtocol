@@ -8,7 +8,7 @@ module.exports = {
       host: "127.0.0.1",
       port: 8545,
       network_id: "*",
-      websockets: true
+      //websockets: true
     },
     morpher: {
       provider: () =>
@@ -71,5 +71,9 @@ module.exports = {
   mocha: {
     enableTimeouts: false,
     before_timeout: 120000 // Here is 2min but can be whatever timeout is suitable for you.
+  },
+  plugins: ['truffle-plugin-verify'],
+  api_keys: {
+    etherscan: process.env.ETHERSCAN_API_KEY
   }
 };
