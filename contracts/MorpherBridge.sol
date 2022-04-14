@@ -246,12 +246,17 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     *
     */
     function stageTokensForTransfer(uint256 _tokens, uint _targetChainId) public userNotBlocked {
-        require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
-        require(MorpherToken(state.morpherTokenAddress()).balanceOf(_msgSender()) >= _tokens, "MorpherBridge: Insufficient balance.");
         verifyUpdateDailyLimit(_msgSender(), _tokens);
         verifyUpdateMonthlyLimit(_msgSender(), _tokens);
         verifyUpdateYearlyLimit(_msgSender(), _tokens);
+        uint withdrawalCost = 100 ether;
+        
+        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), withdrawalCost); //BURN 100 MPH as a Withdrawal Fee
+
+        _tokens -= withdrawalCost;
         MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
+
+
         uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + _tokens;
         uint256 _transferNonce = getAndIncreaseBridgeNonce();
         uint256 _timeStamp = block.timestamp;
@@ -279,11 +284,12 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     *
     */
     function stageTokensForTransfer(uint256 _tokens, uint _targetChainId, address _autoWithdrawalAddressTo, bytes memory _signature) public userNotBlocked {
-        require(_tokens >= 0, "MorpherBridge: Amount of tokens must be positive.");
-        require(MorpherToken(state.morpherTokenAddress()).balanceOf(_msgSender()) >= _tokens, "MorpherBridge: Insufficient balance.");
         verifyUpdateDailyLimit(_msgSender(), _tokens);
         verifyUpdateMonthlyLimit(_msgSender(), _tokens);
         verifyUpdateYearlyLimit(_msgSender(), _tokens);
+        
+        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), 100 ether); //BURN 100 MPH as a Withdrawal Fee
+        
         MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
         uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + _tokens;
         uint256 _transferNonce = getAndIncreaseBridgeNonce();

@@ -22,7 +22,7 @@ module.exports = {
     morphertest: {
       provider: () =>
         new HDWalletProvider(
-          [process.env.MORPHER_DEPLOYER_PK, process.env.MORPHER_ADMINISTRATOR_KEY, process.env.SIDECHAIN_OPERATOR_KEY],
+          [process.env.MORPHER_DEPLOYER_PK],
           "wss://sidechain-test-ws.morpher.com:8546"
         ),
       network_id: "21",
