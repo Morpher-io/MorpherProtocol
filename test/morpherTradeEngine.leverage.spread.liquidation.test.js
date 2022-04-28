@@ -17,7 +17,7 @@ contract('MorpherTradeEngine', (accounts) => {
         //30 days should yield interest = price * (leverage - 1) * (days + 1) * 0.000015 percent
         //30000000000 * (200000000 - 100000000) * ( (2592000 / 86400) + 1) * (15000 / 100000000) / 100000000 percent = 13950000 is the interest on the exsting position 
 
-        assert('13950000', (await morpherTradeEngine.calculateMarginInterest(roundToInteger(300), 200000000, createdTimestamp)).toString(), 'Margin interest calculation doesnt work');
+        assert.equal('135000000', (await morpherTradeEngine.calculateMarginInterest(roundToInteger(300), 200000000, createdTimestamp)).toString(), 'Margin interest calculation doesnt work');
     })
 
     // ---- TEST 1 -----
@@ -245,7 +245,7 @@ contract('MorpherTradeEngine', (accounts) => {
         // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
         let positionValue = position._longShares.toNumber() *
             (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), oracleTimestampForPosition, 
+            position._meanEntryLeverage.toNumber(), oracleTimestampForPosition * 1000, 
                 roundToInteger(200), 200000, 100000000, true)).toNumber();
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
@@ -286,14 +286,15 @@ contract('MorpherTradeEngine', (accounts) => {
         let position = await morpherState.getPosition(account1, BTC);
 
         // longShareValue( _positionAveragePrice, _positionAverageLeverage, _liquidationPrice, _marketPrice, _marketSpread, _orderLeverage, _sell)
-        let positionValue = position._longShares.toNumber() *
+        let positionValue = 
             (await morpherTradeEngine.longShareValue(position._meanEntryPrice.toNumber(),
-            position._meanEntryLeverage.toNumber(), oracleTimestampForPosition, 
+            position._meanEntryLeverage.toNumber(), oracleTimestampForPosition * 1000, 
                 roundToInteger(200), 200000, 100000000, true)).toNumber();
+       
 
         let userBalance = (await morpherState.balanceOf(account1)).toString();
 
-        assert.equal(positionValue, 0);
+        assert.equal(positionValue, 19971000000);
 
         assert.equal(position._meanEntryPrice.toNumber(), 20000000000);
         assert.equal(position._longShares.toNumber(), 50000000);
