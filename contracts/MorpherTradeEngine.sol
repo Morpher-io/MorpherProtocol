@@ -640,7 +640,7 @@ contract MorpherTradeEngine is Ownable {
         }
         return _shareValue;
     }
-
+    
 // ----------------------------------------------------------------------------
 // calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStamp)
 // Calculates the interest for leveraged positions
@@ -984,10 +984,10 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
     function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256 _liquidationPrice) {
         if (_long == true) {
             _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.sub(PRECISION)).div(_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice.add(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
+            _liquidationPrice = _liquidationPrice.add(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs).mul(PRECISION).div(_newMeanEntryLeverage));
         } else {
             _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.add(PRECISION)).div(_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice.sub(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
+            _liquidationPrice = _liquidationPrice.sub(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs).mul(PRECISION).div(_newMeanEntryLeverage));
         }
         return _liquidationPrice;
     }
