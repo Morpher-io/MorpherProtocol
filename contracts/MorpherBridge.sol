@@ -246,6 +246,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     *
     */
     function stageTokensForTransfer(uint256 _tokens, uint _targetChainId) public userNotBlocked {
+        
         verifyUpdateDailyLimit(_msgSender(), _tokens);
         verifyUpdateMonthlyLimit(_msgSender(), _tokens);
         verifyUpdateYearlyLimit(_msgSender(), _tokens);
@@ -253,17 +254,17 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         
         MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), withdrawalCost); //BURN 100 MPH as a Withdrawal Fee
 
-        _tokens -= withdrawalCost;
-        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
+        uint tokensToWithdraw = _tokens - withdrawalCost;
+        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), tokensToWithdraw);
 
 
-        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + _tokens;
+        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + tokensToWithdraw;
         uint256 _transferNonce = getAndIncreaseBridgeNonce();
         uint256 _timeStamp = block.timestamp;
         bytes32 _transferHash = keccak256(
             abi.encodePacked(
                 _msgSender(),
-                _tokens,
+                tokensToWithdraw,
                 _newTokenSentToLinkedChain,
                 _timeStamp,
                 _targetChainId,
@@ -272,7 +273,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         );
         tokenSentToLinkedChain[_msgSender()][_targetChainId].amount =  _newTokenSentToLinkedChain;
         tokenSentToLinkedChain[_msgSender()][_targetChainId].lastTransferAt = block.timestamp;
-        emit TransferToLinkedChain(_msgSender(), _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _targetChainId, _transferHash);
+        emit TransferToLinkedChain(_msgSender(), tokensToWithdraw, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _targetChainId, _transferHash);
     }
     
     /**
@@ -288,16 +289,19 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         verifyUpdateMonthlyLimit(_msgSender(), _tokens);
         verifyUpdateYearlyLimit(_msgSender(), _tokens);
         
-        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), 100 ether); //BURN 100 MPH as a Withdrawal Fee
+        uint withdrawalCost = 100 ether;
         
-        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), _tokens);
-        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + _tokens;
+        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), withdrawalCost); //BURN 100 MPH as a Withdrawal Fee
+
+        uint tokensToWithdraw = _tokens - withdrawalCost;
+        MorpherToken(state.morpherTokenAddress()).burn(_msgSender(), tokensToWithdraw);
+        uint256 _newTokenSentToLinkedChain = tokenSentToLinkedChain[_msgSender()][_targetChainId].amount + tokensToWithdraw;
         uint256 _transferNonce = getAndIncreaseBridgeNonce();
         uint256 _timeStamp = block.timestamp;
         bytes32 _transferHash = keccak256(
             abi.encodePacked(
                 _msgSender(),
-                _tokens,
+                tokensToWithdraw,
                 _newTokenSentToLinkedChain,
                 _timeStamp,
                 _targetChainId,
@@ -306,7 +310,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         );
         tokenSentToLinkedChain[_msgSender()][_targetChainId].amount =  _newTokenSentToLinkedChain;
         tokenSentToLinkedChain[_msgSender()][_targetChainId].lastTransferAt = block.timestamp;
-        emit TransferToLinkedChainAndWithdrawTo(_msgSender(), _tokens, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _targetChainId, _autoWithdrawalAddressTo, _signature, _transferHash);
+        emit TransferToLinkedChainAndWithdrawTo(_msgSender(), tokensToWithdraw, _newTokenSentToLinkedChain, _timeStamp, _transferNonce, _targetChainId, _autoWithdrawalAddressTo, _signature, _transferHash);
     }
     
     // ------------------------------------------------------------------------

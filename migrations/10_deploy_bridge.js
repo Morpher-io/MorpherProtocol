@@ -11,7 +11,7 @@ module.exports = async function(deployer, network, accounts) {
 
     try {
         const morpherBridge = await MorpherBridge.deployed();
-    
+   
         await upgradeProxy(morpherBridge.address, MorpherBridge, {
           deployer,
         });
