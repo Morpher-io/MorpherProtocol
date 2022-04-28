@@ -966,10 +966,10 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
     function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256 _liquidationPrice) {
         if (_long == true) {
             _liquidationPrice = _newMeanEntryPrice * (_newMeanEntryLeverage - (PRECISION)) / (_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice + (calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
+            _liquidationPrice = _liquidationPrice + (calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION / _newMeanEntryLeverage);
         } else {
             _liquidationPrice = _newMeanEntryPrice * (_newMeanEntryLeverage + (PRECISION)) / (_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice - (calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
+            _liquidationPrice = _liquidationPrice - (calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION / _newMeanEntryLeverage);
         }
         return _liquidationPrice;
     }
