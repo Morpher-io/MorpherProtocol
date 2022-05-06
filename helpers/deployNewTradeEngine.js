@@ -6,7 +6,7 @@ const MorpherMintingLimiter = artifacts.require("MorpherMintingLimiter");
 module.exports = async function (callback) {
   const addressesAndRoles = require("../docs/addressesAndRoles.json");
   console.log("Deploying a new TradeEngine with Truffle Dashboard...");
-  const chain = "sidechainDev";
+  const chain = "sidechain";
 
   const [, contracts, roles] = Object.values(addressesAndRoles[chain]);
 
@@ -37,12 +37,12 @@ module.exports = async function (callback) {
   console.log("✅ Set new Trade Engine in Oracle");
 
   if (chain != "sidechainDev") {
-    const morpherMintingLimiter = await MorpherMintingLimiter.at(
-      contracts.MorpherMintingLimiter.address
-    );
-    await morpherMintingLimiter.setTradeEngineAddress(newTradeEngine.address); //on dev not necessary
+    // const morpherMintingLimiter = await MorpherMintingLimiter.at(
+    //   contracts.MorpherMintingLimiter.address
+    // );
+    // await morpherMintingLimiter.setTradeEngineAddress(newTradeEngine.address); //on dev not necessary
     await newTradeEngine.setMorpherMintingLimiter(
-      contract.MorpherMintingLimiter.address
+      contracts.MorpherMintingLimiter.address
     );
 
     console.log("✅ Removing minting limiter from old tradeEngine");
@@ -62,6 +62,14 @@ module.exports = async function (callback) {
    * 4. Grant Transfers for new Trade Engine
    */
   await waitForAccount(roles.administrator);
+
+  if (chain != "sidechainDev") {
+    const morpherMintingLimiter = await MorpherMintingLimiter.at(contracts.MorpherMintingLimiter.address);
+    await morpherMintingLimiter.setTradeEngineAddress(newTradeEngine.address); //on dev not necessary
+    // await newTradeEngine.setMorpherMintingLimiter(
+    //   contract.MorpherMintingLimiter.address
+    // );
+  }
 
   const morpherState = await MorpherState.at(contracts.MorpherState.address);
   await morpherState.grantAccess(newTradeEngine.address, {
