@@ -90,21 +90,11 @@ contract MorpherState is Initializable, ContextUpgradeable  {
 
     bool mainChain;
 
-    function initialize(bool _mainChain, address _morpherTreasury, address _morpherAccessControlAddress) public initializer {
+    function initialize(bool _mainChain, address _morpherAccessControlAddress) public initializer {
         ContextUpgradeable.__Context_init();
         
         morpherAccessControlAddress = _morpherAccessControlAddress;
         mainChain = _mainChain;
-        
-        setLastRewardTime(block.timestamp);
-       
-        if (mainChain == false) { // Create token only on sidechain
-            setRewardBasisPoints(0); // Reward is minted on mainchain
-            setRewardAddress(address(0));
-        } else {
-            setRewardBasisPoints(15000); // 15000 / PRECISION = 0.00015
-            setRewardAddress(_morpherTreasury);
-        }
 
         maximumLeverage = 10*PRECISION; // Leverage precision is 1e8, maximum leverage set to 10 initially
     }
@@ -178,29 +168,6 @@ contract MorpherState is Initializable, ContextUpgradeable  {
         morpherUserBlockingAddress = _morpherUserBlockingAddress;
     }
 
-    // ----------------------------------------------------------------------------
-    // Setter/Getter functions for platform operating rewards
-    // ----------------------------------------------------------------------------
-
-    function setRewardAddress(address _newRewardsAddress) public onlyRole(GOVERNANCE_ROLE) {
-        morpherRewards = _newRewardsAddress;
-        emit RewardsChange(_newRewardsAddress, rewardBasisPoints);
-    }
-
-    function setRewardBasisPoints(uint256 _newRewardBasisPoints) public onlyRole(GOVERNANCE_ROLE) {
-        if (mainChain == true) {
-            require(_newRewardBasisPoints <= 15000, "MorpherState: Reward basis points need to be less or equal to 15000.");
-        } else {
-            require(_newRewardBasisPoints == 0, "MorpherState: Reward basis points can only be set on Ethereum.");
-        }
-        rewardBasisPoints = _newRewardBasisPoints;
-        emit RewardsChange(morpherRewards, _newRewardBasisPoints);
-    }
-
-    function setLastRewardTime(uint256 _lastRewardTime) private {
-        lastRewardTime = _lastRewardTime;
-        emit LastRewardTime(_lastRewardTime);
-    }
 
     // ----------------------------------------------------------------------------
     // Setter/Getter functions for platform administration
@@ -231,12 +198,4 @@ contract MorpherState is Initializable, ContextUpgradeable  {
     }
 
     
-    function payOperatingReward() public onlyMainChain {
-        if (block.timestamp > lastRewardTime + (REWARDPERIOD)) {
-            uint256 _reward = MorpherToken(morpherTokenAddress).totalSupply() * (rewardBasisPoints) / (PRECISION);
-            setLastRewardTime(lastRewardTime + (REWARDPERIOD));
-            MorpherToken(morpherTokenAddress).mint(morpherRewards, _reward);
-            emit OperatingRewardMinted(morpherRewards, _reward);
-        }
-    }
 }

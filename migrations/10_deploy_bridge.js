@@ -24,7 +24,7 @@ module.exports = async function(deployer, network, accounts) {
         }
 
         const morpherState = await MorpherState.deployed();
-        const recoveryEnabled = !process.env.SIDECHAIN;
+        const recoveryEnabled = false; //!process.env.SIDECHAIN;
 
         await deployProxy(MorpherBridge, [morpherState.address, recoveryEnabled, swapRouterAddress], {
           deployer,

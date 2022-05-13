@@ -5,7 +5,7 @@ const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 module.exports = async function (deployer, network, accounts) {
   const morpherState = await MorpherState.deployed();
 
-  if (network !== "mainchain") {
+  if (network !== "mainchain" && false) {
     await deployer.deploy(
       AdminOverrideProxy,
       accounts[0],

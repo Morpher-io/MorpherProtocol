@@ -14,6 +14,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant TRANSFER_ROLE = keccak256("TRANSFER_ROLE");
+    bytes32 public constant TRANSFERBLOCKED_ROLE = keccak256("TRANSFERBLOCKED_ROLE");
 
     uint256 private _totalTokensOnOtherChain;
     uint256 private _totalTokensInPositions;
@@ -142,6 +143,9 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
             morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()) || 
             morpherAccessControl.hasRole(TRANSFER_ROLE, from)
             , "MorpherToken: Transfer denied");
+
+        require(!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, _msgSender()), "MorpherToken: Transfer for User is blocked.");
+
         super._beforeTokenTransfer(from, to, amount);
     }
 }

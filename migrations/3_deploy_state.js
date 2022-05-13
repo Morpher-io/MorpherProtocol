@@ -3,9 +3,9 @@ const MorpherState = artifacts.require("MorpherState");
 const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 
 module.exports = async function (deployer, network, accounts) {
-  const treasuryAddress = process.env.MORPHER_TREASURY || accounts[0];
-  const sidechainOperatorAddress =
-    process.env.SIDECHAIN_OPERATOR || accounts[0];
+  //const treasuryAddress = process.env.MORPHER_TREASURY || accounts[0];
+  // const sidechainOperatorAddress =
+  //   process.env.SIDECHAIN_OPERATOR || accounts[0];
 
   let isMainChain = !process.env.SIDECHAIN || true;
 
@@ -31,7 +31,7 @@ module.exports = async function (deployer, network, accounts) {
     }
     await deployProxy(
       MorpherState,
-      [isMainChain, treasuryAddress, morpherAccessControl.address],
+      [isMainChain, morpherAccessControl.address],
       { deployer }
     ); // deployer is changed to owner later
     

@@ -9,7 +9,7 @@ module.exports = async function (deployer, network, accounts) {
   /**
    * only on sidechain
    */
-  if (network !== "mainchain" && network !== 'kovan') {
+  if (process.env.DEPLOY_AIRDROP == true) {
     const morpherToken = await MorpherToken.deployed();
     //const morpherState = await MorpherState.deployed();
     

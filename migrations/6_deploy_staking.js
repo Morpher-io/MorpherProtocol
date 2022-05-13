@@ -46,6 +46,7 @@ module.exports = async function (deployer, network, accounts) {
       accounts[0]
     );
     await morpherStaking.addInterestRate(15000,1617094819); //setting the initial interest rate to the trade engine deployed timestamp
+    await morpherStaking.addInterestRate(30000,1644491427); //setting the initial interest rate to the trade engine deployed timestamp
 
     await morpherAccessControl.grantRole(
       await morpherToken.BURNER_ROLE(),

@@ -18,6 +18,16 @@ module.exports = {
         ),
       network_id: "21",
       timeoutBlocks: 200,
+      blockscoutUrl: "https://blockscout-prod-164690568.eu-central-1.elb.amazonaws.com"
+    },
+    polygon: {
+     
+        host: "https://rpc-mainnet.matic.network",
+        port: 8545,
+        network_id: "*",
+        //websockets: true
+      network_id: "137",
+      timeoutBlocks: 200
     },
     morphertest: {
       provider: () =>
@@ -73,8 +83,9 @@ module.exports = {
     enableTimeouts: false,
     before_timeout: 120000 // Here is 2min but can be whatever timeout is suitable for you.
   },
-  plugins: ['truffle-plugin-verify'],
+  plugins: ['truffle-plugin-verify','truffle-plugin-blockscout-verify'],
   api_keys: {
-    etherscan: process.env.ETHERSCAN_API_KEY
+    etherscan: process.env.ETHERSCAN_API_KEY,
+    polygonscan: process.env.POLYGONSCAN_API_KEY
   }
 };
