@@ -15,6 +15,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant TRANSFER_ROLE = keccak256("TRANSFER_ROLE");
     bytes32 public constant TRANSFERBLOCKED_ROLE = keccak256("TRANSFERBLOCKED_ROLE");
+    bytes32 public constant POLYGONMINTER_ROLE = keccak256("POLYGONMINTER_ROLE");
 
     uint256 private _totalTokensOnOtherChain;
     uint256 private _totalTokensInPositions;
@@ -72,6 +73,15 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
      */
     function totalSupply() public view virtual override returns (uint256) {
         return super.totalSupply() + _totalTokensOnOtherChain + _totalTokensInPositions;
+    }
+
+    function deposit(address user, bytes calldata depositData) external onlyRole(POLYGONMINTER_ROLE) {
+        uint256 amount = abi.decode(depositData, (uint256));
+        _mint(user, amount);
+    }
+
+    function withdraw(uint256 amount) external onlyRole(POLYGONMINTER_ROLE) {
+        _burn(msg.sender, amount);
     }
 
 
