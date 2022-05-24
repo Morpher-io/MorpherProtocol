@@ -15,6 +15,12 @@ module.exports = async function (deployer, network, accounts) {
     await upgradeProxy(morpherState.address, MorpherState, { deployer });
   } catch (e) {
     const morpherAccessControl = await MorpherAccessControl.deployed();
+    if (process.env.MORPHER_ADMINISTRATOR) {
+      await morpherAccessControl.grantRole(
+        web3.utils.sha3("ADMINISTRATOR_ROLE"),
+        process.env.MORPHER_ADMINISTRATOR
+      );
+    }
     await morpherAccessControl.grantRole(
       web3.utils.sha3("ADMINISTRATOR_ROLE"),
       accounts[0]
@@ -34,6 +40,5 @@ module.exports = async function (deployer, network, accounts) {
       [isMainChain, morpherAccessControl.address],
       { deployer }
     ); // deployer is changed to owner later
-    
   }
 };
