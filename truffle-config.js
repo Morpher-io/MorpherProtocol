@@ -30,13 +30,10 @@ module.exports = {
       timeoutBlocks: 200
     },
     morphertest: {
-      provider: () =>
-        new HDWalletProvider(
-          [process.env.MORPHER_DEPLOYER_PK],
-          "https://sidechain-test.morpher.com"
-        ),
-      network_id: "21",
-      chainId: 21,
+      host: "sidechain-dev.morpher.com",
+      port: "8545",
+      network_id: "210",
+      chainId: 210,
       networkCheckTimeout: 5000
       //timeoutBlocks: 200,
     },
@@ -83,6 +80,7 @@ module.exports = {
     enableTimeouts: false,
     before_timeout: 120000 // Here is 2min but can be whatever timeout is suitable for you.
   },
+  blockscoutUrl: 'http://sidechain-dev.morpher.com:8082',
   plugins: ['truffle-plugin-verify','truffle-plugin-blockscout-verify'],
   api_keys: {
     etherscan: process.env.ETHERSCAN_API_KEY,

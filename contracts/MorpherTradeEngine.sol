@@ -966,10 +966,10 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
     function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256 _liquidationPrice) {
         if (_long == true) {
             _liquidationPrice = _newMeanEntryPrice * (_newMeanEntryLeverage - (PRECISION)) / (_newMeanEntryLeverage);
-            _liquidationPrice = (_liquidationPrice + (calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION / _newMeanEntryLeverage)) * PRECISION / _newMeanEntryLeverage;
+            _liquidationPrice = _liquidationPrice + ((calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION) / _newMeanEntryLeverage);
         } else {
             _liquidationPrice = _newMeanEntryPrice * (_newMeanEntryLeverage + (PRECISION)) / (_newMeanEntryLeverage);
-            _liquidationPrice = (_liquidationPrice - (calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION / _newMeanEntryLeverage)) * PRECISION / _newMeanEntryLeverage;
+            _liquidationPrice = _liquidationPrice - ((calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION) / _newMeanEntryLeverage);
         }
         return _liquidationPrice;
     }
@@ -984,10 +984,10 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
         computeLiquidationPrice(_orderId);
         // Net balanceUp and balanceDown
         if (orders[_orderId].modifyPosition.balanceUp > orders[_orderId].modifyPosition.balanceDown) {
-            orders[_orderId].modifyPosition.balanceUp - (orders[_orderId].modifyPosition.balanceDown);
+            orders[_orderId].modifyPosition.balanceUp -= (orders[_orderId].modifyPosition.balanceDown);
             orders[_orderId].modifyPosition.balanceDown = 0;
         } else {
-            orders[_orderId].modifyPosition.balanceDown - (orders[_orderId].modifyPosition.balanceUp);
+            orders[_orderId].modifyPosition.balanceDown -= (orders[_orderId].modifyPosition.balanceUp);
             orders[_orderId].modifyPosition.balanceUp = 0;
         }
         if (orders[_orderId].modifyPosition.balanceUp > 0) {
@@ -996,7 +996,7 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
         if (orders[_orderId].modifyPosition.balanceDown > 0) {
             MorpherToken(morpherState.morpherTokenAddress()).burn(orders[_orderId].userId, orders[_orderId].modifyPosition.balanceDown);
         }
-        setPosition(
+        _setPosition(
             orders[_orderId].userId,
             orders[_orderId].marketId,
             orders[_orderId].timeStamp,
@@ -1033,6 +1033,28 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
         uint256 _meanEntryLeverage,
         uint256 _liquidationPrice
     ) public onlyRole(POSITIONADMIN_ROLE) {
+        _setPosition(_address,
+        _marketId,
+        _timeStamp,
+        _longShares,
+        _shortShares,
+        _meanEntryPrice,
+        _meanEntrySpread,
+        _meanEntryLeverage,
+        _liquidationPrice);
+    }
+
+     function _setPosition(
+        address _address,
+        bytes32 _marketId,
+        uint256 _timeStamp,
+        uint256 _longShares,
+        uint256 _shortShares,
+        uint256 _meanEntryPrice,
+        uint256 _meanEntrySpread,
+        uint256 _meanEntryLeverage,
+        uint256 _liquidationPrice
+    ) internal {
         portfolio[_address][_marketId].lastUpdated = _timeStamp;
         portfolio[_address][_marketId].longShares = _longShares;
         portfolio[_address][_marketId].shortShares = _shortShares;

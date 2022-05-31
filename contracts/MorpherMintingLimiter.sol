@@ -4,6 +4,7 @@ pragma solidity 0.8.11;
 import "./MorpherAccessControl.sol";
 import "./MorpherState.sol";
 import "./MorpherTradeEngine.sol";
+import "./MorpherToken.sol";
 
 
 contract MorpherMintingLimiter {

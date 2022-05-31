@@ -1,4 +1,3 @@
-const MorpherState = artifacts.require("MorpherState");
 const MorpherAirdrop = artifacts.require("MorpherAirdrop");
 const MorpherToken = artifacts.require("MorpherToken");
 
@@ -9,12 +8,12 @@ module.exports = async function (deployer, network, accounts) {
   /**
    * only on sidechain
    */
-  if (process.env.DEPLOY_AIRDROP == true) {
+  //if (process.env.DEPLOY_AIRDROP == true) {
     const morpherToken = await MorpherToken.deployed();
     //const morpherState = await MorpherState.deployed();
     
     await deployer.deploy(MorpherAirdrop, airdropAdminAddress, morpherToken.address, ownerAddress);
 
     //await morpherState.enableTransfers(MorpherAirdrop.address);
-  }
+  //}
 };

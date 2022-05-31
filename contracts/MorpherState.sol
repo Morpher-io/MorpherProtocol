@@ -3,6 +3,7 @@ pragma solidity 0.8.11;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "./MorpherToken.sol";
+import "./MorpherTradeEngine.sol";
 
 // ----------------------------------------------------------------------------------
 // Data and token balance storage of the Morpher platform
@@ -195,6 +196,39 @@ contract MorpherState is Initializable, ContextUpgradeable  {
 
     function getMaximumLeverage() public view returns(uint256 _maxLeverage) {
         return maximumLeverage;
+    }
+
+    /**
+     * Backwards compatibility functions
+     */
+    function getLastUpdated(address _address, bytes32 _marketHash) public view returns(uint) {
+        return MorpherTradeEngine(morpherTradeEngineAddress).getPosition(_address, _marketHash).lastUpdated; 
+    }
+
+    function totalToken() public view returns(uint) {
+        return MorpherToken(morpherTokenAddress).totalSupply();
+    }
+
+       function getPosition(
+        address _address,
+        bytes32 _marketId
+    ) public view returns (
+        uint256 _longShares,
+        uint256 _shortShares,
+        uint256 _meanEntryPrice,
+        uint256 _meanEntrySpread,
+        uint256 _meanEntryLeverage,
+        uint256 _liquidationPrice
+    ) {
+        MorpherTradeEngine.position memory position = MorpherTradeEngine(morpherTradeEngineAddress).getPosition(_address, _marketId);
+        return (
+            position.longShares,
+            position.shortShares,
+            position.meanEntryPrice,
+            position.meanEntrySpread,
+            position.meanEntryLeverage,
+            position.liquidationPrice
+        );
     }
 
     

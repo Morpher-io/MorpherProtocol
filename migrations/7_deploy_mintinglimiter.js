@@ -27,9 +27,6 @@ module.exports = async function (deployer, network, accounts) {
   const morpherAccessControl = await MorpherAccessControl.deployed();
   const morpherToken = await MorpherToken.deployed();
 
-  await morpherAccessControl.grantRole(
-    await morpherToken.MINTER_ROLE(),
-    morpherMintingLimiter.address
-  );
+  await morpherAccessControl.grantRole(await morpherToken.MINTER_ROLE(),morpherMintingLimiter.address);
 
 };
