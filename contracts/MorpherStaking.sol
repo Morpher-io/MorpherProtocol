@@ -248,7 +248,8 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
                 }
             } 
         }
-        return sumInterestRatesWeighted / (block.timestamp - startingTimestamp);
+        uint interestRateInternal = sumInterestRatesWeighted / (block.timestamp - startingTimestamp);
+        return interestRateInternal;
 
     }
 

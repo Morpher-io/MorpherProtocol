@@ -629,13 +629,15 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 // ----------------------------------------------------------------------------
 
 
-    function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStampInMs) public view returns (uint256 _marginInterest) {
+    function calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStampInMs) public view returns (uint256) {
+        uint _marginInterest;
         if (_positionTimeStampInMs / 1000 < deployedTimeStamp) {
             _positionTimeStampInMs = deployedTimeStamp / 1000;
         }
+        uint interestRate = MorpherStaking(morpherState.morpherStakingAddress()).getInterestRate(_positionTimeStampInMs / 1000);
         _marginInterest = _averagePrice * (_averageLeverage - PRECISION);
-        _marginInterest = _marginInterest * (block.timestamp - (_positionTimeStampInMs / 1000) / 86400) + 1;
-        _marginInterest = _marginInterest * MorpherStaking(morpherState.morpherStakingAddress()).getInterestRate(_positionTimeStampInMs / 1000) / PRECISION / PRECISION;
+        _marginInterest = _marginInterest * ((block.timestamp - (_positionTimeStampInMs / 1000)) / 86400) + 1;
+        _marginInterest = ((_marginInterest * interestRate) / PRECISION) / PRECISION;
         return _marginInterest;
     }
 
@@ -963,13 +965,16 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
         return orders[_orderId].modifyPosition.newLiquidationPrice;
     }
 
-    function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256 _liquidationPrice) {
+    function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256) {
+        uint _liquidationPrice;
+        uint marginInterest = calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs);
+        uint adjustedMarginInterest = marginInterest * PRECISION / _newMeanEntryLeverage;
         if (_long == true) {
             _liquidationPrice = _newMeanEntryPrice * (_newMeanEntryLeverage - (PRECISION)) / (_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice + ((calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION) / _newMeanEntryLeverage);
+            _liquidationPrice += adjustedMarginInterest;
         } else {
             _liquidationPrice = _newMeanEntryPrice * (_newMeanEntryLeverage + (PRECISION)) / (_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice - ((calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs) * PRECISION) / _newMeanEntryLeverage);
+            _liquidationPrice -= adjustedMarginInterest;
         }
         return _liquidationPrice;
     }
