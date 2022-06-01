@@ -38,8 +38,8 @@ module.exports = async function (deployer, network, accounts) {
     );
 
     if (
-      process.env.DISABLE_INITIAL_MINT == false ||
-      process.env.DISABLE_INITIAL_MINT === undefined
+      JSON.parse(process.env.DISABLE_INITIAL_MINT) == false ||
+      JSON.parse(process.env.DISABLE_INITIAL_MINT) === undefined
     ) {
       await morpherAccessControl.grantRole(
         await morpherToken.MINTER_ROLE(),

@@ -7,7 +7,7 @@ module.exports = async function (deployer, network, accounts) {
   // const sidechainOperatorAddress =
   //   process.env.SIDECHAIN_OPERATOR || accounts[0];
 
-  let isMainChain = !process.env.SIDECHAIN || true;
+  let isMainChain = !JSON.parse(process.env.SIDECHAIN) || true;
 
   try {
     const morpherState = await MorpherState.deployed();

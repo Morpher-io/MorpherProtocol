@@ -25,7 +25,7 @@ module.exports = async function (deployer, network, accounts) {
     if (network == "test") {
       deployedTimestamp = Math.round(Date.now() / 1000) - 60 * 60 * 24 * 30 * 5; //settings this for testing 5 months back
     }
-    const escrowEnabled = process.env.ESCROW_ENABLED;
+    const escrowEnabled = JSON.parse(process.env.ESCROW_ENABLED);
     const morpherState = await MorpherState.deployed();
     await deployProxy(
       MorpherTradeEngine,
