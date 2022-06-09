@@ -112,6 +112,15 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     event WithdrawLimitYearlyGlobalChanged(uint256 _oldLimit, uint256 _newLimit);
     event LinkState(address _address);
 
+
+    /**
+     * emitted when the withdrawal was a success.
+     * @param _destination: the address that received the amount
+     * @param _amount: the amount of tokens
+     * @param _convertedToGasToken: if it was converted to ETH/MATIC native (=true) or sent as ERC20 token (=false)
+     */
+    event WithdrawalSuccess(address _destination, uint _amount, bool _convertedToGasToken);
+
     function initialize(address _stateAddress, bool _recoveryEnabled, ISwapRouter _swapRouter) public initializer {
         state = MorpherState(_stateAddress);
         recoveryEnabled = _recoveryEnabled;
@@ -377,6 +386,11 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         IWETH9(IPeripheryImmutableState(address(swapRouter)).WETH9()).withdraw(amountOut);
         _finalOutput.transfer(amountOut);
     }
+
+    function getWethWmaticAddress() public view returns (address) {
+        return IPeripheryImmutableState(address(swapRouter)).WETH9();
+    }
+
     // ------------------------------------------------------------------------
     // claimStagedTokens(...) former: trustlessTransferFromSideChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof)
     // Performs a merkle proof on the number of token that have been burned by the user on the side chain.
@@ -435,7 +449,49 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         //weth -> eth conversion
         IWETH9(IPeripheryImmutableState(address(swapRouter)).WETH9()).withdraw(amountOut);
         _finalOutput.transfer(amountOut);
+        emit WithdrawalSuccess(_finalOutput, amountOut, true);
         return amountOut;
+    }
+
+    // ------------------------------------------------------------------------
+    // claimStagedTokens(...) former: trustlessTransferFromSideChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof)
+    // Performs a merkle proof on the number of token that have been burned by the user on the side chain.
+    // If the number of token claimed on the main chain is less than the number of burned token on the side chain
+    // the difference (or less) can be claimed on the main chain.
+    // ------------------------------------------------------------------------
+    function claimStagedTokensAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
+        // msg.sender must approve this contract
+        require(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid)).toEthSignedMessageHash().recover(_userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
+        updateSideChainMerkleRoot(_rootHash);
+        bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
+        uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
+        require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
+        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
+
+        verifyUpdateDailyLimit(_usrAddr, _numOfToken); //for usrAddr
+        verifyUpdateMonthlyLimit(_usrAddr, _numOfToken);
+        verifyUpdateYearlyLimit(_usrAddr, _numOfToken);        
+
+        //mint the tokens
+        tokenClaimedOnThisChain[_usrAddr].amount = _tokenClaimed + _numOfToken;
+        tokenClaimedOnThisChain[_usrAddr].lastTransferAt = block.timestamp;
+        MorpherToken(state.morpherTokenAddress()).mint(address(this), _numOfToken);
+        emit TrustlessWithdrawFromSideChain(_usrAddr, _numOfToken);
+
+        /**
+         * Transfer the Fee away
+         */
+        MorpherToken(state.morpherTokenAddress()).transfer(feeRecipient, fee);
+        
+        
+        uint convertTokens = _numOfToken - fee;
+
+
+        // Transfer the specified amount
+        MorpherToken(state.morpherTokenAddress()).transfer( _finalOutput, convertTokens);
+        
+        emit WithdrawalSuccess(_finalOutput, convertTokens, false);
+        return convertTokens;
     }
     
     // ------------------------------------------------------------------------

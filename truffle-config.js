@@ -64,6 +64,17 @@ module.exports = {
       network_id: '*',
       gasPrice: 10000000000,
     },
+    mumbai: {
+      provider: () =>
+      new HDWalletProvider(
+        process.env.DEPLOYER_PK,
+       "https://matic-testnet-archive-rpc.bwarelabs.com"
+      ),
+      network_id: '*',
+      chainId: '80001',
+      gasPrice: 1500000000,
+      networkCheckTimeout: 15000
+    },
   },
   compilers: {
     solc: {
