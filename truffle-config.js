@@ -30,7 +30,7 @@ module.exports = {
       timeoutBlocks: 200
     },
     morphertest: {
-      host: "sidechain-dev.morpher.com",
+      host: "3.64.223.173",
       port: "8545",
       network_id: "210",
       chainId: 210,

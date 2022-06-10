@@ -293,7 +293,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 
             if(_tradeDirection) {
                 //long
-                require(_closeSharesAmount == portfolio[_address][_marketId].longShares, "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
+                require(_closeSharesAmount == portfolio[_address][_marketId].shortShares, "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
             } else {
                 //short
                 require(_closeSharesAmount == portfolio[_address][_marketId].longShares, "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
