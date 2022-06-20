@@ -8,7 +8,6 @@ const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 const swapRouterAddress = "0xE592427A0AEce92De3Edee1F18E0157C05861564"; 
 
 module.exports = async function(deployer, network, accounts) {
-
     try {
         const morpherBridge = await MorpherBridge.deployed();
    
@@ -44,6 +43,12 @@ module.exports = async function(deployer, network, accounts) {
         await morpherAccessControl.grantRole(
           await morpherToken.MINTER_ROLE(),
           morpherBridge.address
+        );
+
+        const sidechainOperator = process.env.SIDECHAIN_OPERATOR || accounts[0];
+        await morpherAccessControl.grantRole(
+          await morpherBridge.SIDECHAINOPERATOR_ROLE(),
+          sidechainOperator
         );
         
       }
