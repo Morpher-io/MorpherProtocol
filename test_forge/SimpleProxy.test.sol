@@ -7,7 +7,7 @@ import "../contracts/MorpherState.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-contract MorpherAccessControlTest is Test {
+contract SimpleProxy is Test {
     using stdStorage for StdStorage;
 
     MorpherAccessControl private morpherAccessControl;

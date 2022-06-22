@@ -58,8 +58,9 @@ contract('MorpherBridge: change Limits tests', (accounts) => {
     });
 });
 
-contract('MorpherBridge: transferToSidechain tests', (accounts) => {
+contract('MorpherBridge: transferToSidechain tests', (accounts, provider, network) => {
 
+    
     /**
      * tests first if up to 24h withdrawal limit works
      * 
