@@ -508,7 +508,13 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
             }
             return _orderId;
     }
-    
+
+    /**
+     * Deprecated function
+     */
+    function getTradeEngineFromOrderId(uint orderId) public view returns(address) {
+        return state.morpherTradeEngineAddress();
+    }   
 
 }
 
