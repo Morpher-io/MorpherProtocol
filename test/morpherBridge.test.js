@@ -10,17 +10,11 @@ const { keccak256 } = require('ethereumjs-util');
 const { BN } = require("bn.js")
 
 
-describe('MorpherBridge: change Limits tests', () => {
-
-    let accounts;
-
-    before(async function () {
-        accounts = await web3.eth.getAccounts();
-    });
+contract('MorpherBridge: change Limits tests', (accounts) => {
 
     it('is possible to change 24hours limits', async() => {
-        const morpherAccessControl = await MorpherAccessControl.new();
-        const morpherBridge = await MorpherBridge.new({gas: 18000000});
+        const morpherAccessControl = await MorpherAccessControl.deployed();
+        const morpherBridge = await MorpherBridge.deployed();
         await morpherAccessControl.grantRole(await morpherBridge.SIDECHAINOPERATOR_ROLE(), accounts[0]);
         let result = await morpherBridge.updateWithdrawLimitPerUserDaily(web3.utils.toWei('1', 'ether'));
         await truffleAssert.eventEmitted(result, 'WithdrawLimitDailyPerUserChanged');

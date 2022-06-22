@@ -1343,6 +1343,292 @@
           }
         }
       }
+    },
+    "f38bc5b0c6acafec3ce8165365b703ffa8715edc42e7b04df2ca5663a8697f9f": {
+      "address": "0xbEeC90f88358f938446B8386FdD82ebb273f0dc7",
+      "txHash": "0x3624a2b2ea6612c6631088f58fad172883b4a890a5f50371e9cbbf60eaaf1f41",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_uint8",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "morpherState",
+            "type": "t_contract(MorpherState)10652",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:22"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "orderNonce",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:36"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "lastOrderId",
+            "type": "t_bytes32",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:37"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "deployedTimeStamp",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:38"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "escrowOpenOrderEnabled",
+            "type": "t_bool",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:40"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "priceLockDeactivatedMarket",
+            "type": "t_mapping(t_bytes32,t_struct(PriceLock)11094_storage)",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:46"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "orders",
+            "type": "t_mapping(t_bytes32,t_struct(order)11125_storage)",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:83"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "portfolio",
+            "type": "t_mapping(t_address,t_mapping(t_bytes32,t_struct(position)11168_storage))",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:102"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "exposureByMarket",
+            "type": "t_mapping(t_bytes32,t_struct(hasExposure)11186_storage)",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:113"
+          }
+        ],
+        "types": {
+          "t_contract(MorpherState)10652": {
+            "label": "contract MorpherState"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_mapping(t_bytes32,t_struct(PriceLock)11094_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.PriceLock)"
+          },
+          "t_struct(PriceLock)11094_storage": {
+            "label": "struct MorpherTradeEngine.PriceLock",
+            "members": [
+              {
+                "label": "lockedPrice",
+                "type": "t_uint256"
+              }
+            ]
+          },
+          "t_mapping(t_bytes32,t_struct(order)11125_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.order)"
+          },
+          "t_struct(order)11125_storage": {
+            "label": "struct MorpherTradeEngine.order",
+            "members": [
+              {
+                "label": "userId",
+                "type": "t_address"
+              },
+              {
+                "label": "marketId",
+                "type": "t_bytes32"
+              },
+              {
+                "label": "closeSharesAmount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "openMPHTokenAmount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "tradeDirection",
+                "type": "t_bool"
+              },
+              {
+                "label": "liquidationTimestamp",
+                "type": "t_uint256"
+              },
+              {
+                "label": "marketPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "marketSpread",
+                "type": "t_uint256"
+              },
+              {
+                "label": "orderLeverage",
+                "type": "t_uint256"
+              },
+              {
+                "label": "timeStamp",
+                "type": "t_uint256"
+              },
+              {
+                "label": "orderEscrowAmount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "modifyPosition",
+                "type": "t_struct(OrderModifier)11146_storage"
+              }
+            ]
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_struct(OrderModifier)11146_storage": {
+            "label": "struct MorpherTradeEngine.OrderModifier",
+            "members": [
+              {
+                "label": "longSharesOrder",
+                "type": "t_uint256"
+              },
+              {
+                "label": "shortSharesOrder",
+                "type": "t_uint256"
+              },
+              {
+                "label": "balanceDown",
+                "type": "t_uint256"
+              },
+              {
+                "label": "balanceUp",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newLongShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newShortShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newMeanEntryPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newMeanEntrySpread",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newMeanEntryLeverage",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newLiquidationPrice",
+                "type": "t_uint256"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_mapping(t_bytes32,t_struct(position)11168_storage))": {
+            "label": "mapping(address => mapping(bytes32 => struct MorpherTradeEngine.position))"
+          },
+          "t_mapping(t_bytes32,t_struct(position)11168_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.position)"
+          },
+          "t_struct(position)11168_storage": {
+            "label": "struct MorpherTradeEngine.position",
+            "members": [
+              {
+                "label": "lastUpdated",
+                "type": "t_uint256"
+              },
+              {
+                "label": "longShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "shortShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "meanEntryPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "meanEntrySpread",
+                "type": "t_uint256"
+              },
+              {
+                "label": "meanEntryLeverage",
+                "type": "t_uint256"
+              },
+              {
+                "label": "liquidationPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "positionHash",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_mapping(t_bytes32,t_struct(hasExposure)11186_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.hasExposure)"
+          },
+          "t_struct(hasExposure)11186_storage": {
+            "label": "struct MorpherTradeEngine.hasExposure",
+            "members": [
+              {
+                "label": "maxMappingIndex",
+                "type": "t_uint256"
+              },
+              {
+                "label": "index",
+                "type": "t_mapping(t_address,t_uint256)"
+              },
+              {
+                "label": "addy",
+                "type": "t_mapping(t_uint256,t_address)"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          }
+        }
+      }
     }
   }
 }
