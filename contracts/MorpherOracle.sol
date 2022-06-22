@@ -513,6 +513,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
      * Deprecated function
      */
     function getTradeEngineFromOrderId(uint orderId) public view returns(address) {
+        orderId = orderId; //mute the warning
         return state.morpherTradeEngineAddress();
     }   
 

@@ -77,7 +77,7 @@ contract MorpherBridgeTest is BaseSetup {
     }
 
     function testStageClaimTokens() public {
-        morpherBridge.updateWithdrawLimitPerUserDaily(200 ether);
+        morpherBridge.updateWithdrawLimitPerUserDaily(400 ether);
         morpherAccessControl.grantRole(
             morpherToken.TRANSFER_ROLE(),
             address(this)
