@@ -744,7 +744,7 @@
   "sourceMap": "61:493:26:-:0;;;221:45;;;;;;;;;-1:-1:-1;242:5:26;:18;;-1:-1:-1;;;;;;242:18:26;250:10;242:18;;;61:493;;;;;;",
   "deployedSourceMap": "61:493:26:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;383:168;;;;;;:::i;:::-;;:::i;:::-;;111:36;;;;;;;;;451:25:41;;;439:2;424:18;111:36:26;;;;;;;;86:20;;;;;-1:-1:-1;;;;;86:20:26;;;;;;-1:-1:-1;;;;;651:32:41;;;633:51;;621:2;606:18;86:20:26;487:203:41;272:105:26;;;;;;:::i;:::-;;:::i;383:168::-;201:5;;-1:-1:-1;;;;;201:5:26;187:10;:19;183:26;;;520:24:::1;::::0;498:47:::1;::::0;-1:-1:-1;;;498:47:26;;479:11;;-1:-1:-1;;;;;498:21:26;::::1;::::0;::::1;::::0;:47:::1;::::0;::::1;;451:25:41::0;;;439:2;424:18;;305:177;498:47:26::1;;;;;;;;;;;;;;;;;;::::0;::::1;;;;;;;;;;;;::::0;::::1;;;;;;;;;439:112;183:26:::0;383:168;:::o;272:105::-;201:5;;-1:-1:-1;;;;;201:5:26;187:10;:19;183:26;;;335:24:::1;:36:::0;272:105::o;14:286:41:-;73:6;126:2;114:9;105:7;101:23;97:32;94:52;;;142:1;139;132:12;94:52;168:23;;-1:-1:-1;;;;;220:31:41;;210:42;;200:70;;266:1;263;256:12;200:70;289:5;14:286;-1:-1:-1;;;14:286:41:o;695:180::-;754:6;807:2;795:9;786:7;782:23;778:32;775:52;;;823:1;820;813:12;775:52;-1:-1:-1;846:23:41;;695:180;-1:-1:-1;695:180:41:o",
   "source": "//SPDX-License-Identifier: GPLv3\r\npragma solidity 0.8.11;\r\n\r\ncontract Migrations {\r\n  address public owner;\r\n  uint public last_completed_migration;\r\n\r\n  modifier restricted() {\r\n    if (msg.sender == owner) _;\r\n  }\r\n\r\n  constructor() {\r\n    owner = msg.sender;\r\n  }\r\n\r\n  function setCompleted(uint completed) public restricted {\r\n    last_completed_migration = completed;\r\n  }\r\n\r\n  function upgrade(address new_address) public restricted {\r\n    Migrations upgraded = Migrations(new_address);\r\n    upgraded.setCompleted(last_completed_migration);\r\n  }\r\n}\r\n",
-  "sourcePath": "C:\\101Projects\\MorpherProtocol\\contracts\\Migrations.sol",
+  "sourcePath": "/home/thomas/MorpherProtocol/contracts/Migrations.sol",
   "ast": {
     "absolutePath": "project:/contracts/Migrations.sol",
     "exportedSymbols": {
@@ -1429,7 +1429,7 @@
     }
   },
   "schemaVersion": "3.4.7",
-  "updatedAt": "2022-06-22T11:07:30.138Z",
+  "updatedAt": "2022-06-22T11:13:19.636Z",
   "networkType": "ethereum",
   "devdoc": {
     "kind": "dev",
