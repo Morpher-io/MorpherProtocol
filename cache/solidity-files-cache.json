@@ -3,7 +3,7 @@
   "paths": {
     "artifacts": "build/contracts/foundry",
     "sources": "contracts",
-    "tests": "foundry_tests",
+    "tests": "test_forge",
     "scripts": "script",
     "libraries": [
       "installed_contracts"
@@ -836,242 +836,6 @@
       "artifacts": {
         "MorpherUserBlocking": {
           "0.8.11+commit.d7f03943.Linux.gcc": "MorpherUserBlocking.sol/MorpherUserBlocking.json"
-        }
-      }
-    },
-    "foundry_tests/BaseSetup.sol": {
-      "lastModificationDate": 1655889379990,
-      "contentHash": "80f1a9dbba2adbe77f367b3734c51c64",
-      "sourceName": "foundry_tests/BaseSetup.sol",
-      "solcConfig": {
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "metadata": {
-            "bytecodeHash": "ipfs"
-          },
-          "outputSelection": {
-            "*": {
-              "": [
-                "ast"
-              ],
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers"
-              ]
-            }
-          },
-          "evmVersion": "london",
-          "libraries": {}
-        }
-      },
-      "imports": [
-        "contracts/MorpherAccessControl.sol",
-        "contracts/MorpherBridge.sol",
-        "contracts/MorpherMintingLimiter.sol",
-        "contracts/MorpherOracle.sol",
-        "contracts/MorpherStaking.sol",
-        "contracts/MorpherState.sol",
-        "contracts/MorpherToken.sol",
-        "contracts/MorpherTradeEngine.sol",
-        "contracts/MorpherUserBlocking.sol",
-        "installed_contracts/forge-std/lib/ds-test/src/test.sol",
-        "installed_contracts/forge-std/src/Script.sol",
-        "installed_contracts/forge-std/src/Test.sol",
-        "installed_contracts/forge-std/src/Vm.sol",
-        "installed_contracts/forge-std/src/console.sol",
-        "installed_contracts/forge-std/src/console2.sol",
-        "node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlEnumerableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol",
-        "node_modules/@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol"
-      ],
-      "versionRequirement": "=0.8.11",
-      "artifacts": {
-        "BaseSetup": {
-          "0.8.11+commit.d7f03943.Linux.gcc": "BaseSetup.sol/BaseSetup.json"
-        }
-      }
-    },
-    "foundry_tests/MorpherAccessControl.test.sol": {
-      "lastModificationDate": 1655888762871,
-      "contentHash": "35219be70c099ad4fe3cacac99b097c8",
-      "sourceName": "foundry_tests/MorpherAccessControl.test.sol",
-      "solcConfig": {
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "metadata": {
-            "bytecodeHash": "ipfs"
-          },
-          "outputSelection": {
-            "*": {
-              "": [
-                "ast"
-              ],
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers"
-              ]
-            }
-          },
-          "evmVersion": "london",
-          "libraries": {}
-        }
-      },
-      "imports": [
-        "contracts/MorpherAccessControl.sol",
-        "contracts/MorpherMintingLimiter.sol",
-        "contracts/MorpherStaking.sol",
-        "contracts/MorpherState.sol",
-        "contracts/MorpherToken.sol",
-        "contracts/MorpherTradeEngine.sol",
-        "contracts/MorpherUserBlocking.sol",
-        "installed_contracts/forge-std/lib/ds-test/src/test.sol",
-        "installed_contracts/forge-std/src/Script.sol",
-        "installed_contracts/forge-std/src/Test.sol",
-        "installed_contracts/forge-std/src/Vm.sol",
-        "installed_contracts/forge-std/src/console.sol",
-        "installed_contracts/forge-std/src/console2.sol",
-        "node_modules/@openzeppelin/contracts/access/Ownable.sol",
-        "node_modules/@openzeppelin/contracts/interfaces/draft-IERC1822.sol",
-        "node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol",
-        "node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol",
-        "node_modules/@openzeppelin/contracts/proxy/Proxy.sol",
-        "node_modules/@openzeppelin/contracts/proxy/beacon/IBeacon.sol",
-        "node_modules/@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol",
-        "node_modules/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
-        "node_modules/@openzeppelin/contracts/utils/Address.sol",
-        "node_modules/@openzeppelin/contracts/utils/Context.sol",
-        "node_modules/@openzeppelin/contracts/utils/StorageSlot.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlEnumerableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol"
-      ],
-      "versionRequirement": "=0.8.11",
-      "artifacts": {
-        "MorpherAccessControlTest": {
-          "0.8.11+commit.d7f03943.Linux.gcc": "MorpherAccessControl.test.sol/MorpherAccessControlTest.json"
-        }
-      }
-    },
-    "foundry_tests/MorpherAccessControlBase.test.sol": {
-      "lastModificationDate": 1655888716267,
-      "contentHash": "4c8a2e269e25509b73835393917464ba",
-      "sourceName": "foundry_tests/MorpherAccessControlBase.test.sol",
-      "solcConfig": {
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "metadata": {
-            "bytecodeHash": "ipfs"
-          },
-          "outputSelection": {
-            "*": {
-              "": [
-                "ast"
-              ],
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers"
-              ]
-            }
-          },
-          "evmVersion": "london",
-          "libraries": {}
-        }
-      },
-      "imports": [
-        "contracts/MorpherAccessControl.sol",
-        "contracts/MorpherBridge.sol",
-        "contracts/MorpherMintingLimiter.sol",
-        "contracts/MorpherOracle.sol",
-        "contracts/MorpherStaking.sol",
-        "contracts/MorpherState.sol",
-        "contracts/MorpherToken.sol",
-        "contracts/MorpherTradeEngine.sol",
-        "contracts/MorpherUserBlocking.sol",
-        "foundry_tests/BaseSetup.sol",
-        "installed_contracts/forge-std/lib/ds-test/src/test.sol",
-        "installed_contracts/forge-std/src/Script.sol",
-        "installed_contracts/forge-std/src/Test.sol",
-        "installed_contracts/forge-std/src/Vm.sol",
-        "installed_contracts/forge-std/src/console.sol",
-        "installed_contracts/forge-std/src/console2.sol",
-        "node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlEnumerableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol",
-        "node_modules/@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol",
-        "node_modules/@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol",
-        "node_modules/@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol"
-      ],
-      "versionRequirement": "=0.8.11",
-      "artifacts": {
-        "MorpherAccessControlBaseTest": {
-          "0.8.11+commit.d7f03943.Linux.gcc": "MorpherAccessControlBase.test.sol/MorpherAccessControlBaseTest.json"
         }
       }
     },
@@ -2740,6 +2504,242 @@
       "artifacts": {
         "TransferHelper": {
           "0.8.11+commit.d7f03943.Linux.gcc": "TransferHelper.sol/TransferHelper.json"
+        }
+      }
+    },
+    "test_forge/BaseSetup.sol": {
+      "lastModificationDate": 1655889379990,
+      "contentHash": "80f1a9dbba2adbe77f367b3734c51c64",
+      "sourceName": "test_forge/BaseSetup.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs"
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ]
+            }
+          },
+          "evmVersion": "london",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "contracts/MorpherAccessControl.sol",
+        "contracts/MorpherBridge.sol",
+        "contracts/MorpherMintingLimiter.sol",
+        "contracts/MorpherOracle.sol",
+        "contracts/MorpherStaking.sol",
+        "contracts/MorpherState.sol",
+        "contracts/MorpherToken.sol",
+        "contracts/MorpherTradeEngine.sol",
+        "contracts/MorpherUserBlocking.sol",
+        "installed_contracts/forge-std/lib/ds-test/src/test.sol",
+        "installed_contracts/forge-std/src/Script.sol",
+        "installed_contracts/forge-std/src/Test.sol",
+        "installed_contracts/forge-std/src/Vm.sol",
+        "installed_contracts/forge-std/src/console.sol",
+        "installed_contracts/forge-std/src/console2.sol",
+        "node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlEnumerableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol",
+        "node_modules/@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol"
+      ],
+      "versionRequirement": "=0.8.11",
+      "artifacts": {
+        "BaseSetup": {
+          "0.8.11+commit.d7f03943.Linux.gcc": "BaseSetup.sol/BaseSetup.json"
+        }
+      }
+    },
+    "test_forge/MorpherAccessControl.test.sol": {
+      "lastModificationDate": 1655888762871,
+      "contentHash": "35219be70c099ad4fe3cacac99b097c8",
+      "sourceName": "test_forge/MorpherAccessControl.test.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs"
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ]
+            }
+          },
+          "evmVersion": "london",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "contracts/MorpherAccessControl.sol",
+        "contracts/MorpherMintingLimiter.sol",
+        "contracts/MorpherStaking.sol",
+        "contracts/MorpherState.sol",
+        "contracts/MorpherToken.sol",
+        "contracts/MorpherTradeEngine.sol",
+        "contracts/MorpherUserBlocking.sol",
+        "installed_contracts/forge-std/lib/ds-test/src/test.sol",
+        "installed_contracts/forge-std/src/Script.sol",
+        "installed_contracts/forge-std/src/Test.sol",
+        "installed_contracts/forge-std/src/Vm.sol",
+        "installed_contracts/forge-std/src/console.sol",
+        "installed_contracts/forge-std/src/console2.sol",
+        "node_modules/@openzeppelin/contracts/access/Ownable.sol",
+        "node_modules/@openzeppelin/contracts/interfaces/draft-IERC1822.sol",
+        "node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol",
+        "node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol",
+        "node_modules/@openzeppelin/contracts/proxy/Proxy.sol",
+        "node_modules/@openzeppelin/contracts/proxy/beacon/IBeacon.sol",
+        "node_modules/@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol",
+        "node_modules/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+        "node_modules/@openzeppelin/contracts/utils/Address.sol",
+        "node_modules/@openzeppelin/contracts/utils/Context.sol",
+        "node_modules/@openzeppelin/contracts/utils/StorageSlot.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlEnumerableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol"
+      ],
+      "versionRequirement": "=0.8.11",
+      "artifacts": {
+        "MorpherAccessControlTest": {
+          "0.8.11+commit.d7f03943.Linux.gcc": "MorpherAccessControl.test.sol/MorpherAccessControlTest.json"
+        }
+      }
+    },
+    "test_forge/MorpherAccessControlBase.test.sol": {
+      "lastModificationDate": 1655888716267,
+      "contentHash": "4c8a2e269e25509b73835393917464ba",
+      "sourceName": "test_forge/MorpherAccessControlBase.test.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs"
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ]
+            }
+          },
+          "evmVersion": "london",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "contracts/MorpherAccessControl.sol",
+        "contracts/MorpherBridge.sol",
+        "contracts/MorpherMintingLimiter.sol",
+        "contracts/MorpherOracle.sol",
+        "contracts/MorpherStaking.sol",
+        "contracts/MorpherState.sol",
+        "contracts/MorpherToken.sol",
+        "contracts/MorpherTradeEngine.sol",
+        "contracts/MorpherUserBlocking.sol",
+        "installed_contracts/forge-std/lib/ds-test/src/test.sol",
+        "installed_contracts/forge-std/src/Script.sol",
+        "installed_contracts/forge-std/src/Test.sol",
+        "installed_contracts/forge-std/src/Vm.sol",
+        "installed_contracts/forge-std/src/console.sol",
+        "installed_contracts/forge-std/src/console2.sol",
+        "node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlEnumerableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/access/IAccessControlUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol",
+        "node_modules/@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol",
+        "node_modules/@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol",
+        "node_modules/@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol",
+        "test_forge/BaseSetup.sol"
+      ],
+      "versionRequirement": "=0.8.11",
+      "artifacts": {
+        "MorpherAccessControlBaseTest": {
+          "0.8.11+commit.d7f03943.Linux.gcc": "MorpherAccessControlBase.test.sol/MorpherAccessControlBaseTest.json"
         }
       }
     }
