@@ -30,10 +30,13 @@ module.exports = {
       timeoutBlocks: 200
     },
     morphertest: {
-      host: "3.64.223.173",
-      port: "8545",
-      network_id: "210",
-      chainId: 210,
+      provider: () =>
+      new HDWalletProvider(
+        process.env.MORPHER_DEPLOYER_PK,
+        "wss://sidechain-staging.morpher.com:8546"
+      ),
+      network_id: "211",
+      chainId: 211,
       networkCheckTimeout: 5000
       //timeoutBlocks: 200,
     },
