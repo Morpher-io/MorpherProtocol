@@ -213,10 +213,10 @@ contract('MorpherBridge: trustlessTransferFromLinkedChain tests', (accounts) => 
         //setup a merkle tree to test withdrawal
 
         const leaves = [];
-        leaves.push(web3.utils.soliditySha3(addr1, web3.utils.toWei("20", "ether"))); //packaging 20 MPH into a leaf
-        leaves.push(web3.utils.soliditySha3(addr2, web3.utils.toWei("20", "ether"))); //packaging 20 MPH into a leaf
-        leaves.push(web3.utils.soliditySha3(addr3, web3.utils.toWei("20", "ether"))); //packaging 20 MPH into a leaf
-        leaves.push(web3.utils.soliditySha3(addr4, web3.utils.toWei("20", "ether"))); //packaging 20 MPH into a leaf
+        leaves.push(web3.utils.soliditySha3(addr1, web3.utils.toWei("20", "ether"), 1337)); //packaging 20 MPH into a leaf
+        leaves.push(web3.utils.soliditySha3(addr2, web3.utils.toWei("20", "ether"), 1337)); //packaging 20 MPH into a leaf
+        leaves.push(web3.utils.soliditySha3(addr3, web3.utils.toWei("20", "ether"), 1337)); //packaging 20 MPH into a leaf
+        leaves.push(web3.utils.soliditySha3(addr4, web3.utils.toWei("20", "ether"), 1337)); //packaging 20 MPH into a leaf
 
         leaves.sort();
 
