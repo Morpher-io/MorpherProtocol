@@ -66,36 +66,23 @@ contract MorpherBridgeTest is BaseSetup, MorpherBridge {
 		morpherAccessControl.revokeRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
 	}
 
-	// it('is possible to change 30 days limits', async() => {
+    /**
+    *  Idea: User 1 withdraws max, 1 MPH more errors out, user 2 can still withdraw
+    */
+	function testUserLimits() public {
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+		uint withdrawalLimit = morpherBridge.withdrawalLimitPerUserDaily();
+		
+        address user1 = address(0x1);
+        address user2 = address(0x2);
 
-	//     const morpherAccessControl =  MorpherAccessControl.deployed();
-	//     const morpherBridge =  MorpherBridge.deployed();
-	//      morpherAccessControl.grantRole( morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
-	//     let result =  morpherBridge.updateWithdrawLimitPerUserMonthly(1 ether);
-	//      truffleAssert.eventEmitted(result, 'WithdrawLimitMonthlyPerUserChanged');
-	//     let currentLimit =  morpherBridge.withdrawalLimitPerUserMonthly();
-	//     assert.equal(currentLimit.toString(), 1 ether);
+        vm.prank(user1);
+        vm.expectEmit(true, false, false, false);
+        emit TransferToLinkedChain(user1, withdrawalAmount, with, _timeStamp, _transferNonce, _targetChainId, _transferHash)
 
-	//     //set it back
-	//      morpherBridge.updateWithdrawLimitPerUserMonthly(1000000 ether);
-	//      morpherAccessControl.revokeRole( morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
+	}
 
-	// });
-
-	// it('is possible to change 365 days limits', async() => {
-	//     const morpherAccessControl =  MorpherAccessControl.deployed();
-	//     const morpherBridge =  MorpherBridge.deployed();
-	//      morpherAccessControl.grantRole( morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
-	//     let result =  morpherBridge.updateWithdrawLimitPerUserYearly(1 ether);
-	//      truffleAssert.eventEmitted(result, 'WithdrawLimitYearlyPerUserChanged');
-	//     let currentLimit =  morpherBridge.withdrawalLimitPerUserYearly();
-	//     assert.equal(currentLimit.toString(), 1 ether);
-
-	//     //set it back
-	//      morpherBridge.updateWithdrawLimitPerUserYearly(5000000 ether);
-	//      morpherAccessControl.revokeRole( morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
-
-	// });
+	
 
 	function testStageTokens() public {
 		morpherBridge.updateWithdrawLimitPerUserDaily(200 ether);

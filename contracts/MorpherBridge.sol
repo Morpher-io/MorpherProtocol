@@ -122,18 +122,25 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     event WithdrawalSuccess(address _destination, uint _amount, bool _convertedToGasToken);
 
     function initialize(address _stateAddress, bool _recoveryEnabled, ISwapRouter _swapRouter) public initializer {
+        //as of June 14, Martin :
+        //User: daily 200k / monthly 1m / yearly 5m
+        //Global: daily 3m / monthly 10m / yearly 50m
+
         state = MorpherState(_stateAddress);
         recoveryEnabled = _recoveryEnabled;
-        withdrawalLimitPerUserDaily = 200000 * (10**18); //200k MPH per day
-        withdrawalLimitPerUserMonthly = 1000000 * (10 ** 18); //1M MPH per month
-        withdrawalLimitPerUserYearly = 5000000 * (10 ** 18); //5M MPH per year
 
-        //TODO: Adjust limits globally
-        withdrawalLimitGlobalDaily = 200000 * (10**18); //200k MPH per day
-        withdrawalLimitGlobalMonthly = 1000000 * (10 ** 18); //1M MPH per month
-        withdrawalLimitGlobalYearly = 5000000 * (10 ** 18); //5M MPH per year
+        withdrawalLimitPerUserDaily = 200000 ether; //200k MPH per day
+        withdrawalLimitPerUserMonthly = 1000000 ether; //1M MPH per month
+        withdrawalLimitPerUserYearly = 5000000 ether; //5M MPH per year
+
+        withdrawalLimitGlobalDaily = 3000000 ether; //3M MPH per day
+        withdrawalLimitGlobalMonthly = 10000000 ether; //10M MPH per month
+        withdrawalLimitGlobalYearly = 50000000 ether; //50M MPH per year
+
         inactivityPeriod = 3 days;
+
         swapRouter = _swapRouter;
+
     }
 
     modifier sideChainInactive {
