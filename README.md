@@ -1,9 +1,9 @@
 # Introduction
 This is the repository for the core Morpher smart contract components of https://morpher.com
 
-Morpher Smart Contracts are a collection of solidity files for on chain transactions and trustless state recovery from sidechain. 😳
+Morpher Smart Contracts are a collection of solidity files for on-chain transactions and trustless state transfer and recovery from sidechain. 😳
 
-![](https://img.shields.io/david/Morpher-io/MorpherProtocol) ![](https://img.shields.io/github/last-commit/Morpher-io/MorpherProtocol) ![](https://img.shields.io/github/license/Morpher-io/MorpherProtocol)
+![](https://img.shields.io/github/last-commit/Morpher-io/MorpherProtocol) ![](https://img.shields.io/github/license/Morpher-io/MorpherProtocol)
 
 ---
 
@@ -21,51 +21,67 @@ Morpher Smart Contracts are fully and regularly audited. 🙌
 
 # Getting Started
 ## Prerequisites
-* Install Ganache https://www.trufflesuite.com/ganache on your system and run it successfully on port 7545.
 * Install Node.js, Npm and build-essential (Linux and MacOS package to build Web3 C/C++ files) on your computer. 
+* Install Foundry to run the Unit-Tests
+* Install Truffle to run the Migrations/Deployment/Interaction
 * Git clone this repo and `cd` into it.
 
 ## How to run the Tests
+Tests are implemented using [Foundry](https://book.getfoundry.sh). Please install Foundry first.
+
 Run the following commands to start the test suite. 😎
 * `npm install` to install all the truffle/node dependencies.
-* Rename .env.example to .env and input all the required variables. If you're testing locally with Ganache, you only need to input `MORPHER_DEPLOYER` and `MORPHER_DEPLOYER_KEY` which is the first account you see in the Ganache GUI.
-* When everything is configured correctly, run the last command: `./node_modules/truffle/build/cli.bundled.js test --network local
-`
+* _Potentially_ fix the IWETH9.sol compiler pragma (at the time of writing its set to =0.7.6), compiler version is 0.8.11, so, change it to >=0.7.6 in node_modules/@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol
+* Run `forge test` to run the tests
 
-If you want to see exactly what assertions are being made, you can take a look at the `test` folder.
-
-### Example In the Ubuntu Linux terminal:
-
-`curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -`
-
-`sudo apt-get install nodejs build-essential`
-
-`git clone https://github.com/Morpher-io/MorpherProtocol.git`
-
-`cd MorpherProtocol`
-
-`npm install`
-
-`cp .env.example .env`
-
-Then open .env and input Ganache Accounts for MORPHER_DEPLOYER and MORPHER_DEPLOYER_KEY
-
-`./node_modules/truffle/build/cli.bundled.js test --network local`
-
+If you want to see exactly what assertions are being made, you can take a look at the `test_forge` folder.
 
 
 # Smart Contract Components
 
 There are several components playing together, these are here described in more detail in order of their importance.
 
+Also, there are two versions of the Morpher Protocol. One with Proxies, and another, older one, without Proxies. On the Morpher Production Sidechain, as well as the Ethereum Mainchain, both versions are mixed, as the state was previously stored in MorpherState, but the Bridge was updated.
+
+On Development networks, as well as Polygon Production networks, only the new, Proxied version is deployed.
+
+## MorpherAccessControl.sol
+
+This contract was introduced in the proxied contracts to manage access controls to the Morpher Contracts Ecosystem. The roles are defined in the respective Contracts, but can be summarized as follows:
+
+* **MINTER_ROLE**: Is allowed to mint tokens, usually only given to other smart contracts. E.g. TradeEngine can mint, staking can mint, the faucet (on dev only) can mint
+* **BURNER_ROLE**: Same as minterrole, just for burning
+* **PAUSER_ROLE**: Can pause any mint/burn/transfer. Effectively pauses the whole protocol. Is assigned to the owner.
+* **SIDECHAINOPERATOR_ROLE**: Is updating the Merkle Root, as well as triggers withdrawal functionality
+* **ADMINISTRATOR_ROLE**: 
+* ORACLEOPERATOR_ROLE
+* STAKINGADMIN_ROLE
+* GOVERNANCE_ROLE
+* TRANSFER_ROLE
+* ORACLE_ROLE
+* POSITIONADMIN_ROLE
+* USERBLOCKINGADMIN_ROLE
+* POLYGONMINTER_ROLE
+
 ## MorpherState.sol
 
+### Non-Proxy Version
 
 This smart contract is _the brain_ of what happens with users, balances, trading and governance. It is the central point which stores balances for each user. It also stores the addresses of other smart contracts, such as the ERC20 token, the bridge or the governance functionality.
 
+### Proxy Version
+
+It holds a pointer to the other contracts. The State does nothing substantial anymore, all the actual information is stored on the proxied contracts themselves (Tokens in MorpherToken, Positions in TradeEngine, etc...)
+
 ## MorpherToken.sol
 
+### Non-Proxy Version 
+
 It is the ERC20 Compatible token for Morpher. All the balances are stored in MorpherState.sol, it's just the interface.
+
+### Proxy Version
+
+Its an ERC20 Token, that can be Minted
 
 ## MorpherTradeEngine.sol
 

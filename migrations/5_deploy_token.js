@@ -37,33 +37,33 @@ module.exports = async function (deployer, network, accounts) {
       accounts[0]
     );
 
-    if (
-      JSON.parse(process.env.DISABLE_INITIAL_MINT) == false ||
-      JSON.parse(process.env.DISABLE_INITIAL_MINT) === undefined
-    ) {
-      await morpherAccessControl.grantRole(
-        await morpherToken.MINTER_ROLE(),
-        accounts[0]
-      );
-      const _sideChainMint = web3.utils.toWei("575000000", "ether");
-      const _mainChainMint = web3.utils.toWei("425000000", "ether");
-      if (process.env.SIDECHAIN) {
-        await morpherToken.mint(treasuryAddress, _sideChainMint);
-        await morpherToken.setTotalTokensOnOtherChain(_mainChainMint);
-        await morpherToken.setRestrictTransfers(true);
-      } else {
-        await morpherToken.mint(treasuryAddress, _mainChainMint);
-        await morpherToken.setTotalTokensOnOtherChain(_sideChainMint);
-      }
-      await morpherAccessControl.revokeRole(
-        await morpherToken.MINTER_ROLE(),
-        accounts[0]
-      );
-    }
+    // if (
+    //   JSON.parse(process.env.DISABLE_INITIAL_MINT) == false ||
+    //   JSON.parse(process.env.DISABLE_INITIAL_MINT) === undefined
+    // ) {
+    //   await morpherAccessControl.grantRole(
+    //     await morpherToken.MINTER_ROLE(),
+    //     accounts[0]
+    //   );
+    //   const _sideChainMint = web3.utils.toWei("575000000", "ether");
+    //   const _mainChainMint = web3.utils.toWei("425000000", "ether");
+    //   if (process.env.SIDECHAIN) {
+    //     await morpherToken.mint(treasuryAddress, _sideChainMint);
+    //     await morpherToken.setTotalTokensOnOtherChain(_mainChainMint);
+    //     await morpherToken.setRestrictTransfers(true);
+    //   } else {
+    //     await morpherToken.mint(treasuryAddress, _mainChainMint);
+    //     await morpherToken.setTotalTokensOnOtherChain(_sideChainMint);
+    //   }
+    //   await morpherAccessControl.revokeRole(
+    //     await morpherToken.MINTER_ROLE(),
+    //     accounts[0]
+    //   );
+    // }
 
-    /**
-     * configure State
-     */
-    await morpherState.setMorpherToken(MorpherToken.address);
+    // /**
+    //  * configure State
+    //  */
+    // await morpherState.setMorpherToken(MorpherToken.address);
   }
 };

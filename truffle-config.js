@@ -13,12 +13,17 @@ module.exports = {
     morpher: {
       provider: () =>
         new HDWalletProvider(
-          process.env.MORPHER_DEPLOYER_PK,
+          process.env.DEPLOYER_PK,
           "wss://sidechain-ws.morpher.com:8546"
         ),
       network_id: "21",
       timeoutBlocks: 200,
-      blockscoutUrl: "https://blockscout-prod-164690568.eu-central-1.elb.amazonaws.com"
+      blockscoutUrl: "https://blockscout-prod-164690568.eu-central-1.elb.amazonaws.com",
+      verify: {
+        apiUrl: 'https://scan.morpher.com/api',
+        apiKey: '',
+        explorerUrl: 'https://scan.morpher.com/',
+      }
     },
     polygon: {
      
@@ -52,7 +57,7 @@ module.exports = {
     mainnet: {
       provider: () =>
         new HDWalletProvider(
-          process.env.MORPHER_DEPLOYER_PK,
+          process.env.DEPLOYER_PK,
           "wss://mainnet.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '1',
@@ -95,7 +100,7 @@ module.exports = {
     before_timeout: 120000 // Here is 2min but can be whatever timeout is suitable for you.
   },
   blockscoutUrl: 'http://sidechain-dev.morpher.com:8082',
-  plugins: ['truffle-plugin-verify','truffle-plugin-blockscout-verify'],
+  plugins: ['truffle-plugin-verify', 'truffle-plugin-stdjsonin'],
   api_keys: {
     etherscan: process.env.ETHERSCAN_API_KEY,
     polygonscan: process.env.POLYGONSCAN_API_KEY

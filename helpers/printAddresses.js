@@ -13,6 +13,7 @@ const contracts = [
   "MorpherToken",
   "MorpherTradeEngine",
   "MorpherUserBlocking",
+  "MorpherDeprecatedTokenMapper",
 ];
 
 module.exports = async function (callback) {
