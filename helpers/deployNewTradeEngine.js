@@ -32,6 +32,17 @@ module.exports = async function (callback) {
   );
   console.log("New Trade Engine", newTradeEngine.address);
 
+  const morpherState = await MorpherState.at(contracts.MorpherState.address);
+  await morpherState.grantAccess(newTradeEngine.address, {
+    from: roles.owner,
+  });
+  console.log("✅ Granted access for new Trade Engine");
+  await morpherState.enableTransfers(newTradeEngine.address, {
+    from: roles.owner,
+  });
+  console.log("✅ Granted Transfers for new Trade Engine");
+
+
   const morpherOracle = await MorpherOracle.at(contracts.MorpherOracle.address);
   await morpherOracle.setTradeEngineAddress(newTradeEngine.address);
   console.log("✅ Set new Trade Engine in Oracle");
@@ -71,15 +82,6 @@ module.exports = async function (callback) {
     // );
   }
 
-  const morpherState = await MorpherState.at(contracts.MorpherState.address);
-  await morpherState.grantAccess(newTradeEngine.address, {
-    from: roles.administrator,
-  });
-  console.log("✅ Granted access for new Trade Engine");
-  await morpherState.enableTransfers(newTradeEngine.address, {
-    from: roles.administrator,
-  });
-  console.log("✅ Granted Transfers for new Trade Engine");
 
   if (
     addressesAndRoles[chain].contracts.MorpherTradeEngine.oldAddresses ==
