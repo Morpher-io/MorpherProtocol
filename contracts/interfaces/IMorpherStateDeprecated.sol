@@ -6,5 +6,7 @@ interface IMorpherStateDeprecated {
     function transfer(address from, address to, uint amount) external;
     function mint(address to, uint amount) external;
     function burn(address from, uint amount) external;
+    function enableTransfers(address from) external;
+    function grantAccess(address who) external;
 
 }

@@ -66,21 +66,21 @@ contract MorpherBridgeTest is BaseSetup, MorpherBridge {
 		morpherAccessControl.revokeRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
 	}
 
-    /**
-    *  Idea: User 1 withdraws max, 1 MPH more errors out, user 2 can still withdraw
-    */
-	function testUserLimits() public {
-		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
-		uint withdrawalLimit = morpherBridge.withdrawalLimitPerUserDaily();
+    // /**
+    // *  Idea: User 1 withdraws max, 1 MPH more errors out, user 2 can still withdraw
+    // */
+	// function testUserLimits() public {
+	// 	morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+	// 	uint withdrawalLimit = morpherBridge.withdrawalLimitPerUserDaily();
 		
-        address user1 = address(0x1);
-        address user2 = address(0x2);
+    //     address user1 = address(0x1);
+    //     address user2 = address(0x2);
 
-        vm.prank(user1);
-        vm.expectEmit(true, false, false, false);
-        emit TransferToLinkedChain(user1, withdrawalAmount, with, _timeStamp, _transferNonce, _targetChainId, _transferHash)
+    //     vm.prank(user1);
+    //     vm.expectEmit(true, false, false, false);
+    //     emit TransferToLinkedChain(user1, withdrawalAmount, with, _timeStamp, _transferNonce, _targetChainId, _transferHash);
 
-	}
+	// }
 
 	
 
