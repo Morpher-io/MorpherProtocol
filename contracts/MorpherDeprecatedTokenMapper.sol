@@ -28,9 +28,10 @@ contract MorpherDeprecatedTokenMapper is Initializable, ContextUpgradeable {
     }
 
 
-    function transfer(address to, uint amount) public {
+    function transfer(address to, uint amount) public returns(bool) {
         morpherStateDeprecated.burn(msg.sender, amount);
         morpherStateDeprecated.mint(to, amount);
+        return true;
     }
 
     function mint(address to, uint amount) public onlyRole(MINTER_ROLE) {
