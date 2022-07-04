@@ -1,10 +1,5 @@
 require("dotenv").config();
 let HDWalletProvider = require("@truffle/hdwallet-provider");
-<<<<<<< HEAD
-let Web3 = require("web3");
-=======
-const Web3 = require('web3');
->>>>>>> master
 
 module.exports = {
   networks: {
@@ -27,18 +22,18 @@ module.exports = {
     morphertest: {
       provider: () =>
         new HDWalletProvider(
-          [process.env.MORPHER_ADMINISTRATOR_KEY],
-          "https://sidechain-test.morpher.com"
+          [process.env.MORPHER_DEPLOYER_PK, process.env.MORPHER_ADMINISTRATOR_KEY],
+          "wss://sidechain-test-ws.morpher.com:8546"
         ),
       network_id: "21",
       chainId: 21,
-      timeoutBlocks: 200,
+      //timeoutBlocks: 200,
     },
     ropsten: {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_KEY,
-          new Web3.providers.WebsocketProvider("wss://ropsten.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
+          "wss://ropsten.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '3',
       gasPrice: 15000000000,
@@ -47,7 +42,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_PK,
-          new Web3.providers.WebsocketProvider("wss://mainnet.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
+          "wss://mainnet.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '1',
       gasPrice: 150000000000,
@@ -56,7 +51,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           process.env.MORPHER_DEPLOYER_PK,
-          new Web3.providers.WebsocketProvider("wss://kovan.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID)
+          "wss://kovan.infura.io/ws/v3/" + process.env.INFURA_PROJECT_ID
         ),
       network_id: '*',
       gasPrice: 10000000000,

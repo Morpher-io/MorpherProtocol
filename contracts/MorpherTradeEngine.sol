@@ -3,8 +3,9 @@ pragma solidity 0.5.16;
 import "./Ownable.sol";
 import "./SafeMath.sol";
 import "./MorpherState.sol";
-import "./IMorpherStaking.sol";
+import "./MorpherStaking.sol";
 import "./MorpherMintingLimiter.sol";
+import "./MorpherUserBlocking.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -15,8 +16,9 @@ import "./MorpherMintingLimiter.sol";
 
 contract MorpherTradeEngine is Ownable {
     MorpherState state;
-    IMorpherStaking staking;
+    MorpherStaking staking;
     MorpherMintingLimiter mintingLimiter;
+    MorpherUserBlocking userBlocking;
     using SafeMath for uint256;
 
 // ----------------------------------------------------------------------------
@@ -126,18 +128,19 @@ contract MorpherTradeEngine is Ownable {
     event LinkState(address _address);
     event LinkStaking(address _stakingAddress);
     event LinkMintingLimiter(address _mintingLimiterAddress);
+    event LinkMorpherUserBlocking(address _address);
 
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
-
-    constructor(address _stateAddress, address _coldStorageOwnerAddress, address _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress) public {
+    constructor(address _stateAddress, address _coldStorageOwnerAddress, address payable _stakingContractAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride, address _mintingLimiterAddress, address _userBlockingAddress) public {
         setMorpherState(_stateAddress);
         setMorpherStaking(_stakingContractAddress);
         setMorpherMintingLimiter(_mintingLimiterAddress);
-        transferOwnership(_coldStorageOwnerAddress);
         escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
         deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
+        setUserBlockingAddress(_userBlockingAddress);
+        transferOwnership(_coldStorageOwnerAddress);
     }
 
     modifier onlyOracle {
@@ -160,14 +163,22 @@ contract MorpherTradeEngine is Ownable {
         emit LinkState(_stateAddress);
     }
 
-    function setMorpherStaking(address _stakingAddress) public onlyOwner {
-        staking = IMorpherStaking(_stakingAddress);
+    function setMorpherStaking(address payable _stakingAddress) public onlyOwner {
+        staking = MorpherStaking(_stakingAddress);
         emit LinkStaking(_stakingAddress);
     }
 
     function setMorpherMintingLimiter(address _mintingLimiterAddress) public onlyOwner {
         mintingLimiter = MorpherMintingLimiter(_mintingLimiterAddress);
         emit LinkMintingLimiter(_mintingLimiterAddress);
+    }
+    function getMorpherMintingLimiter() public view returns(address) {
+        return address(mintingLimiter);
+    }
+
+    function setUserBlockingAddress(address _userBlockingAddress) public onlyOwner {
+        userBlocking = MorpherUserBlocking(_userBlockingAddress);
+        emit LinkMorpherUserBlocking(_userBlockingAddress);
     }
 
     function getAdministrator() public view returns(address _administrator) {
@@ -251,6 +262,7 @@ contract MorpherTradeEngine is Ownable {
          * The user can't partially close a position and open another one with MPH
          */
         if(_openMPHTokenAmount > 0) {
+
             if(_tradeDirection) {
                 //long
                 require(_closeSharesAmount == state.getShortShares(_address, _marketId), "MorpherTradeEngine: Can't partially close a position and open another one in opposite direction");
@@ -464,6 +476,8 @@ contract MorpherTradeEngine is Ownable {
         // Check if previous position on that market was liquidated
         if (_liquidationTimestamp > state.getLastUpdated(orders[_orderId].userId, orders[_orderId].marketId)) {
             liquidate(_orderId);
+        } else {
+            require(!userBlocking.userIsBlocked(orders[_orderId].userId), "MorpherTradeEngine: User is blocked from Trading");
         }
     
 
@@ -626,7 +640,7 @@ contract MorpherTradeEngine is Ownable {
         }
         return _shareValue;
     }
-
+    
 // ----------------------------------------------------------------------------
 // calculateMarginInterest(uint256 _averagePrice, uint256 _averageLeverage, uint256 _positionTimeStamp)
 // Calculates the interest for leveraged positions
@@ -639,7 +653,7 @@ contract MorpherTradeEngine is Ownable {
         }
         _marginInterest = _averagePrice.mul(_averageLeverage.sub(PRECISION));
         _marginInterest = _marginInterest.mul((now.sub(_positionTimeStampInMs.div(1000)).div(86400)).add(1));
-        _marginInterest = _marginInterest.mul(staking.interestRate()).div(PRECISION).div(PRECISION);
+        _marginInterest = _marginInterest.mul(staking.getInterestRate(_positionTimeStampInMs.div(1000))).div(PRECISION).div(PRECISION);
         return _marginInterest;
     }
 
@@ -970,10 +984,10 @@ function calculateBalanceUp(bytes32 _orderId) private view returns (uint256 _bal
     function getLiquidationPrice(uint256 _newMeanEntryPrice, uint256 _newMeanEntryLeverage, bool _long, uint _positionTimestampInMs) public view returns (uint256 _liquidationPrice) {
         if (_long == true) {
             _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.sub(PRECISION)).div(_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice.add(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
+            _liquidationPrice = _liquidationPrice.add(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs).mul(PRECISION).div(_newMeanEntryLeverage));
         } else {
             _liquidationPrice = _newMeanEntryPrice.mul(_newMeanEntryLeverage.add(PRECISION)).div(_newMeanEntryLeverage);
-            _liquidationPrice = _liquidationPrice.sub(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs));
+            _liquidationPrice = _liquidationPrice.sub(calculateMarginInterest(_newMeanEntryPrice, _newMeanEntryLeverage, _positionTimestampInMs).mul(PRECISION).div(_newMeanEntryLeverage));
         }
         return _liquidationPrice;
     }
