@@ -13,6 +13,25 @@ contract MorpherAdmin {
     MorpherTradeEngine tradeEngine;
     using SafeMath for uint256;
 
+    //this holds a boolean for successful token migration from an address away (source address bound)
+    mapping(address => bool) tokensMigratedFrom;
+
+    //this is the index for running through the market hashes array. So when a migration is incomplete that at the next time it calls "startMigrate" the for-loop won't start from scratch
+    mapping(address => uint) indexMarketHash;
+
+    //this mapping tells you if the migration process has started
+    mapping(address => bool) public sourceAddressMigrationStarted;
+    mapping(address => bool) public sourceAddressMigrationFinished;
+
+    mapping(bytes32 => uint) marketHashId;
+    bytes32[] marketHashes;
+
+    event TokenMigrationComplete(address _from, address _to, uint _amount, uint _timestamp);
+    event MarketMigrationComplete(bytes32 _marketId, address _from, address _to, uint _timestamp);
+
+    event MigrationIncomplete(address _from, address _to, uint _timestamp);
+    event MigrationComplete(address _from, address _to, uint _timestamp);
+
     event AdminLiquidationOrderCreated(
         bytes32 indexed _orderId,
         address indexed _address,
@@ -220,6 +239,54 @@ contract MorpherAdmin {
                 }
             }
         }
+    }
+
+
+    function addMarketHashes(bytes32[] memory _marketHashes) public onlyAdministrator {
+        for(uint i = 0; i < _marketHashes.length; i++) {
+            if(marketHashId[_marketHashes[i]] == 0) {
+                marketHashes.push(_marketHashes[i]);
+                marketHashId[_marketHashes[i]] = marketHashes.length - 1;
+            }
+        }
+    }
+    /**
+     * @notice To migrate the tokens we send it from the msg.sender address to _to and emit an event that TokenMigrationComplete
+     * @dev the "if" is intentional, so that we can re-call the function as many times as we want, but it will only execute one time only
+     */
+    function migrateTokens(address _from, address _to) public onlyAdministrator {
+        if(tokensMigratedFrom[_from] == false) {
+            uint balance = state.balanceOf(_from);
+            state.transfer(_from, _to, balance);
+            tokensMigratedFrom[_from] = true;
+            emit TokenMigrationComplete(_from, _to, balance, block.timestamp);
+        }
+    }
+
+    
+    function migratePositions(address _from, address _to) public onlyAdministrator returns (bool) {
+
+        for(uint i = indexMarketHash[_from]; i < marketHashes.length; i++) {
+            //if(marketMigrated[marketHashes[i]][_to] == false) {
+                if(gasleft() < 500000) { //stop if there's not enough gas to write the next transaction
+                    indexMarketHash[_from] = i;
+                    emit MigrationIncomplete(_from, _to, block.timestamp);
+                    return false;
+                }
+            
+                (uint longShares, uint shortShares, uint meanEntryPrice, uint meanEntrySpread, uint meanEntryLeverage, uint liquidationPrice) = state.getPosition(_from, marketHashes[i]);
+                if(longShares > 0 || shortShares > 0) {
+                    
+                    state.setPosition(_to, marketHashes[i], state.getLastUpdated(_from, marketHashes[i]), longShares, shortShares, meanEntryPrice, meanEntrySpread, meanEntryLeverage, liquidationPrice); //create a new position for the "to" address with the same parameters
+                    state.setPosition(_from, marketHashes[i], block.timestamp, 0,0,0,0,0,0); //delete the current position   
+                    emit MarketMigrationComplete(marketHashes[i], _from, _to, block.timestamp);  
+                }
+            //    marketMigrated[marketHashes[i]][_to] = true; //avoid
+            //}    
+        }
+        emit MigrationComplete(_from, _to, block.timestamp);
+        return true;
+
     }
 
 // ----------------------------------------------------------------------------------

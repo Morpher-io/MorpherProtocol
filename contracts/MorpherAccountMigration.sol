@@ -126,7 +126,8 @@ contract MorpherAccountMigration is Ownable {
             
                 (uint longShares, uint shortShares, uint meanEntryPrice, uint meanEntrySpread, uint meanEntryLeverage, uint liquidationPrice) = state.getPosition(msg.sender, marketHashes[i]);
                 if(longShares > 0 || shortShares > 0) {
-                    state.setPosition(_to, marketHashes[i], block.timestamp, longShares, shortShares, meanEntryPrice, meanEntrySpread, meanEntryLeverage, liquidationPrice); //create a new position for the "to" address with the same parameters
+                    // state.setPosition(_to, marketHashes[i], block.timestamp, longShares, shortShares, meanEntryPrice, meanEntrySpread, meanEntryLeverage, liquidationPrice); //create a new position for the "to" address with the same parameters
+                    state.setPosition(_to, marketHashes[i], state.getLastUpdated(msg.sender, marketHashes[i]), longShares, shortShares, meanEntryPrice, meanEntrySpread, meanEntryLeverage, liquidationPrice); //create a new position for the "to" address with the same parameters
                     state.setPosition(msg.sender, marketHashes[i], block.timestamp, 0,0,0,0,0,0); //delete the current position   
                     emit MarketMigrationComplete(marketHashes[i], msg.sender, _to, block.timestamp);  
                 }
@@ -134,7 +135,6 @@ contract MorpherAccountMigration is Ownable {
             //}    
         }
         return true;
-
     }
 
 }
