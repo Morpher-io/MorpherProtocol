@@ -174,3 +174,20 @@ The Smart Contracts are deployed on the Ethereum Mainnet and on the Morpher Side
 * MorpherOracle: [0x73b7631c508db9E389edF6aBb3C4a48da0444553](https://etherscan.io/address/0x73b7631c508db9E389edF6aBb3C4a48da0444553)
 * MorpherMintingLimiter: [0x30D90c8a36FFF52F1C8C05b54d4CE79610431Ec0](https://etherscan.io/address/0x30d90c8a36fff52f1c8c05b54d4ce79610431ec0)
 * MorpherStaking: [0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE](https://etherscan.io/address/0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE)
+
+## Polygon Deployments
+
+Contracts on Polygon are all Proxied contracts through the OpenZeppelin Transparent Proxy
+
+ℹ️ The code for the contracts is currently residing on the dev-branch, as they greatly diverge from the current master branch.
+
+* MorpherState: [0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e](https://polygonscan.com/address/0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e)
+* MorpherToken: [0x65C9e3289e5949134759119DBc9F862E8d6F2fBE](https://polygonscan.com/token/0x65C9e3289e5949134759119DBc9F862E8d6F2fBE)
+* MorpherTradeEngine: [0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5](https://polygonscan.com/address/0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5)
+* MorpherBridge: [0xE409f27e977E6bC10cc0a064eD3004F78A40A648](https://polygonscan.com/address/0xE409f27e977E6bC10cc0a064eD3004F78A40A648)
+* MorpherOracle: [0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A](https://polygonscan.com/address/0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A)
+* MorpherMintingLimiter: [0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb](https://polygonscan.com/address/0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb)
+* MorpherStaking: [0x0Fc936d3008d08F065BfD37FCAF7aa8515525417](https://polygonscan.com/address/0x0Fc936d3008d08F065BfD37FCAF7aa8515525417)
+* MorpherAccessControl: [0x139950831d8338487db6807c6FdAeD1827726dF2](https://polygonscan.com/address/0x139950831d8338487db6807c6FdAeD1827726dF2) - OpenZeppelin Access Control Structure
+* MorpherUserBlocking: [0x92Ea01229335854000dc648Fcf4Ea2931A78c363](https://polygonscan.com/address/0x92Ea01229335854000dc648Fcf4Ea2931A78c363)
+
