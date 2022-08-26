@@ -65,6 +65,61 @@ For proxied contracts the build-artifacts are stored in the branch, they are not
 3. Select the right network from MetaMask (e.g. Polygon)
 4. Run `truffle exec ./helpers/printAddresses.js --network dashboard`
 
+At the time of writing, these are the addresses for Morpher Sidechain (Chain-ID 21), Mainnet (Chain-ID 1) and Polygon (Chain-ID 137):
+
+```
+ChainID : 21
+MorpherAccessControl : 0xA8aA5aF33D221F9FF7c75f7b0d88FE77EA821a6b
+MorpherAdmin : NO NETWORK DETECTED
+MorpherAdministratorProxy : 0xe45B66cc880976135ebc83f1BEafaDE7BD29358d
+MorpherAirdrop : 0xbfd0aC3188BaEFF8e3fA67124e948674e2C42af4
+MorpherBridge : 0xd4399F4f73A9e84c0A788D582B89F3702b4dA781
+MorpherFaucet : NO NETWORK DETECTED
+MorpherGovernance : NO NETWORK DETECTED
+MorpherMintingLimiter : NO NETWORK DETECTED
+MorpherOracle : NO NETWORK DETECTED
+MorpherStaking : NO NETWORK DETECTED
+MorpherState : 0x47d2B89c88a411Af2f280E7f9e4c580c4E33b118
+MorpherToken : 0x1Ea92E8941cf0FbfD302118AaE7c35F8F29eBb07
+MorpherTradeEngine : NO NETWORK DETECTED
+MorpherUserBlocking : 0x195CaAA6023c03a7C7C1773cA51F95BA8eb4BfF4
+MorpherDeprecatedTokenMapper : NO NETWORK DETECTED
+
+ChainID : 1
+MorpherAccessControl : 0xD6bFA0868A901BE396b9A294dE78441b240a45b8
+MorpherAdmin : NO NETWORK DETECTED
+MorpherAdministratorProxy : NO NETWORK DETECTED
+MorpherAirdrop : NO NETWORK DETECTED
+MorpherBridge : 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5
+MorpherFaucet : NO NETWORK DETECTED
+MorpherGovernance : NO NETWORK DETECTED
+MorpherMintingLimiter : NO NETWORK DETECTED
+MorpherOracle : NO NETWORK DETECTED
+MorpherStaking : NO NETWORK DETECTED
+MorpherState : 0x88A610554eb712DCD91a47108aE59028B3De6614
+MorpherToken : 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb
+MorpherTradeEngine : NO NETWORK DETECTED
+MorpherUserBlocking : 0xB2b8B7b23B1C5F329adf0B4e5cB51c668Aa1cce1
+MorpherDeprecatedTokenMapper : 0x334643882B849A286E01c386C3e033B1b5c75164
+
+ChainID : 137
+MorpherAccessControl : 0x139950831d8338487db6807c6FdAeD1827726dF2
+MorpherAdmin : NO NETWORK DETECTED
+MorpherAdministratorProxy : NO NETWORK DETECTED
+MorpherAirdrop : NO NETWORK DETECTED
+MorpherBridge : 0xE409f27e977E6bC10cc0a064eD3004F78A40A648
+MorpherFaucet : NO NETWORK DETECTED
+MorpherGovernance : NO NETWORK DETECTED
+MorpherMintingLimiter : 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb
+MorpherOracle : 0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A
+MorpherStaking : 0x0Fc936d3008d08F065BfD37FCAF7aa8515525417
+MorpherState : 0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e
+MorpherToken : 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE
+MorpherTradeEngine : 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5
+MorpherUserBlocking : 0x92Ea01229335854000dc648Fcf4Ea2931A78c363
+MorpherDeprecatedTokenMapper : NO NETWORK DETECTED
+```
+
 # Contracts
 
 
