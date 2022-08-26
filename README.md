@@ -13,181 +13,226 @@ Morpher rebuilds financial markets from the ground up on the Ethereum Blockchain
 
 # Audit
 
-Morpher Smart Contracts are fully and regularly audited. 🙌
+The Non-Proxy versions of Morpher Smart Contracts are fully and regularly audited. 🙌
 
  * Audited by Solidified on April 12, 2021. [Full Report](./docs/solidified-audit-12.04.2021.pdf)
  * Audited by Capacity on April 20, 2020. [Full Report](./docs/Capacity-MorpherAudit2Result.pdf)
 
+ # Proxied vs Non-Proxied versions
 
-# Getting Started
-## Prerequisites
-* Install Ganache https://www.trufflesuite.com/ganache on your system and run it successfully on port 7545.
-* Install Node.js, Npm and build-essential (Linux and MacOS package to build Web3 C/C++ files) on your computer. 
-* Git clone this repo and `cd` into it.
+There are two versions of the smart contracts:
 
-## How to run the Tests
-Run the following commands to start the test suite. 😎
-* `npm install` to install all the truffle/node dependencies.
-* Rename .env.example to .env and input all the required variables. If you're testing locally with Ganache, you only need to input `MORPHER_DEPLOYER` and `MORPHER_DEPLOYER_KEY` which is the first account you see in the Ganache GUI.
-* When everything is configured correctly, run the last command: `./node_modules/truffle/build/cli.bundled.js test --network local
-`
+## Non Proxied Contracts
 
-If you want to see exactly what assertions are being made, you can take a look at the `test` folder.
+Initially MorpherProtocol was written in a non-proxy way using Solidity 0.5 and the Eternal Storage Pattern.
 
-### Example In the Ubuntu Linux terminal:
+Contracts are residing on [the nonproxy-master Branch](https://github.com/Morpher-io/MorpherProtocol/tree/unproxied-contracts).
 
-`curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -`
+### Addresses for Non Proxied Contracts
 
-`sudo apt-get install nodejs build-essential`
+Updates are barely possible, that's also why the deployments are not managed through truffle artifacts. Addresses are stored in [addressesAndRoles.json](./docs/addressesAndRoles.json).
 
-`git clone https://github.com/Morpher-io/MorpherProtocol.git`
+## Proxied Contracts
 
-`cd MorpherProtocol`
+Q1/2022 the Contracts were updated to support the following things:
 
-`npm install`
+1. Proxied through transparent proxies for updating the contract logic
+    
+    * No more Eternal Storage Pattern. 
+    * Contract storage is now used directly. 
+    * Lowered Gas costs and made maintenance easier
+    * MorpherState now holds only a Pointer to the Contracts in the Ecosystem, instead of the Storage.
 
-`cp .env.example .env`
+2. Advanced Roles and Access Lists instead of a simple Ownable
 
-Then open .env and input Ganache Accounts for MORPHER_DEPLOYER and MORPHER_DEPLOYER_KEY
+    * Allows for more fine-grained access control
+    * State having Administrators and Owner roles are not managed through [OpenZeppelin Access Control](https://docs.openzeppelin.com/contracts/4.x/access-control)
 
-`./node_modules/truffle/build/cli.bundled.js test --network local`
+3. Usage of Foundry over Truffle for Unit-Testing
 
+    * Usage for Foundry over Truffle for Tests
+    * Still maintain the migration functionality from Truffle
+    * Run Truffle and Foundry in Parallel
 
+The Proxied Contracts can be found in [the proxy-master Branch](https://github.com/Morpher-io/MorpherProtocol/tree/proxied-contracts).
 
-# Smart Contract Components
+### Addresses for Proxied Contracts
 
-There are several components playing together, these are here described in more detail in order of their importance.
+For proxied contracts the build-artifacts are stored in the branch, they are not deleted. There is a helper function called printAddresses in the helpers directory. 
 
-## MorpherState.sol
+1. Switch over to the proxied-contracts branch
+2. Connect Truffle to MetaMask: `truffle dashboard`
+3. Select the right network from MetaMask (e.g. Polygon)
+4. Run `truffle exec ./helpers/printAddresses.js --network dashboard`
 
-
-This smart contract is _the brain_ of what happens with users, balances, trading and governance. It is the central point which stores balances for each user. It also stores the addresses of other smart contracts, such as the ERC20 token, the bridge or the governance functionality.
-
-## MorpherToken.sol
-
-It is the ERC20 Compatible token for Morpher. All the balances are stored in MorpherState.sol, it's just the interface.
-
-## MorpherTradeEngine.sol
-
-This is the contract that processes and stores orders. The orders can only be given by the oracle smart contract. This smart contract is the trusted entity taking prices from outside into the sandboxed blockchain.
-
-
-## MorpherBridge.sol
-
-Morpher Bridge takes care of bridging functionality from Main-Chain to Side-Chain and vice versa. It contains functionality to burn tokens upon deposit on the main-chain and credit (or mint) tokens on the side-chain. It can also take the merkle-proofs from the side-chain and let you withdraw tokens on the main-chain. 
-
-If side chain operator doesn't write a merkle root hash to main chain for more than 72 hours positions and balaces from side chain can be transferred to main chain.
-
-## MorpherGovernance.sol
-
-Every user able and willig to lock up sufficient token can become a validator of the Morpher protocol. Validators function similiar to a board of directors and vote on the protocol Administrator and the Oracle contract.
-
-## MorpherAirdrop.sol
-
-Holds the Airdrop Token balance on contract address. AirdropAdmin can authorize addresses to receive airdrop. Users have to claim their airdrop actively or Admin initiates transfer.
-
-## MorpherEscrow.sol
-
-Escrow contract to safely store and release the token allocated to Morpher at protocol inception.
-
-## MorpherOracle.sol
-
-The oracle initates a new trade by calling trade engine and requesting a new orderId. An event is fired by the contract notifying the oracle operator to query a price/liquidation unchecked for a market/user and return the information via the callback function. Since calling the callback function requires gas, the user must send a fixed amount of Ether when creating their order.
-
-## Important Functionality
-
-MorpherState, by default, doesn't let anyone transfer tokens. This has to be enabled, but is disabled by default. By calling the following functions the access to transfers, minting, burning and creating positions will be enabled:
+At the time of writing, these are the addresses for Morpher Sidechain (Chain-ID 21), Mainnet (Chain-ID 1) and Polygon (Chain-ID 137):
 
 ```
-grantAccess(morpherTokenAddress)
-grantAccess(morpherTradeEngineAddress)
-grantAccess(morpherBridgeAddress)
-grantAccess(morpherGovernanceAddress)
+ChainID : 21
+MorpherAccessControl : 0xA8aA5aF33D221F9FF7c75f7b0d88FE77EA821a6b
+MorpherAdmin : NO NETWORK DETECTED
+MorpherAdministratorProxy : 0xe45B66cc880976135ebc83f1BEafaDE7BD29358d
+MorpherAirdrop : 0xbfd0aC3188BaEFF8e3fA67124e948674e2C42af4
+MorpherBridge : 0xd4399F4f73A9e84c0A788D582B89F3702b4dA781
+MorpherFaucet : NO NETWORK DETECTED
+MorpherGovernance : NO NETWORK DETECTED
+MorpherMintingLimiter : NO NETWORK DETECTED
+MorpherOracle : NO NETWORK DETECTED
+MorpherStaking : NO NETWORK DETECTED
+MorpherState : 0x47d2B89c88a411Af2f280E7f9e4c580c4E33b118
+MorpherToken : 0x1Ea92E8941cf0FbfD302118AaE7c35F8F29eBb07
+MorpherTradeEngine : NO NETWORK DETECTED
+MorpherUserBlocking : 0x195CaAA6023c03a7C7C1773cA51F95BA8eb4BfF4
+MorpherDeprecatedTokenMapper : NO NETWORK DETECTED
+
+ChainID : 1
+MorpherAccessControl : 0xD6bFA0868A901BE396b9A294dE78441b240a45b8
+MorpherAdmin : NO NETWORK DETECTED
+MorpherAdministratorProxy : NO NETWORK DETECTED
+MorpherAirdrop : NO NETWORK DETECTED
+MorpherBridge : 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5
+MorpherFaucet : NO NETWORK DETECTED
+MorpherGovernance : NO NETWORK DETECTED
+MorpherMintingLimiter : NO NETWORK DETECTED
+MorpherOracle : NO NETWORK DETECTED
+MorpherStaking : NO NETWORK DETECTED
+MorpherState : 0x88A610554eb712DCD91a47108aE59028B3De6614
+MorpherToken : 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb
+MorpherTradeEngine : NO NETWORK DETECTED
+MorpherUserBlocking : 0xB2b8B7b23B1C5F329adf0B4e5cB51c668Aa1cce1
+MorpherDeprecatedTokenMapper : 0x334643882B849A286E01c386C3e033B1b5c75164
+
+ChainID : 137
+MorpherAccessControl : 0x139950831d8338487db6807c6FdAeD1827726dF2
+MorpherAdmin : NO NETWORK DETECTED
+MorpherAdministratorProxy : NO NETWORK DETECTED
+MorpherAirdrop : NO NETWORK DETECTED
+MorpherBridge : 0xE409f27e977E6bC10cc0a064eD3004F78A40A648
+MorpherFaucet : NO NETWORK DETECTED
+MorpherGovernance : NO NETWORK DETECTED
+MorpherMintingLimiter : 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb
+MorpherOracle : 0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A
+MorpherStaking : 0x0Fc936d3008d08F065BfD37FCAF7aa8515525417
+MorpherState : 0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e
+MorpherToken : 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE
+MorpherTradeEngine : 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5
+MorpherUserBlocking : 0x92Ea01229335854000dc648Fcf4Ea2931A78c363
+MorpherDeprecatedTokenMapper : NO NETWORK DETECTED
 ```
 
-To let a sidechain operator set the amount of tokens on a sidechain, it has to be set by the owner initially:
-```
-setSideChainOperator(sideChainOperatorAddress)
-```
-
-For sidechain operations (only relevant on sidechain) some transfers need to be enabled:
-```
-enableTransfers(addressOfDeployer)
-enableTransfers(morpherAirdropAddress)
-```
-
-Initially the governance contract did not vote on an administrator or oracle yet. To have an Admin or Oracle until there is a vote in the governance contract two addresses need to be set:
-```
-setGovernanceContract(addressOfDeployer)
-setAdministrator(addressOfDeployer)
-```
-
-To set the protocol contracts in state, the following functions need to be called:
-
-```
-setTokenContract(morpherTokenAddress)
-setMorpherBridge(bridgeAddress)
-setOracleContract(oracleAddress)
-```
-
-To enable "CRYPTO_BTC" and "CRYPTO_ETH" as markets for testing purposes;
-```
-activateMarket(0x0bc89e95f9fdaab7e8a11719155f2fd638cb0f665623f3d12aab71d1a125daf9)
-activateMarket(0x5376ff169a3705b2003892fe730060ee74ec83e5701da29318221aa782271779)
-```
-
-To set the governance properly _on main chain only_:
-```
-setGovernanceContract(morpherGovernanceAddress)
-```
-
-And to transfer the ownership, potentially to a 0x0 address:
-
-```
-transferOwnership(ownerAddress)
-```
-
-# Deployed Contracts
-
-The Smart Contracts are deployed on the Ethereum Mainnet and on the Morpher Sidechain.
-
-## Sidechain Deployments
-
-* MorpherState: [0xB4881186b9E52F8BD6EC5F19708450cE57b24370](https://scan.morpher.com/address/0xb4881186b9e52f8bd6ec5f19708450ce57b24370)
-* MorpherToken: [0xC44628734a9432a3DAA302E11AfbdFa8361424A5](https://scan.morpher.com/address/0xC44628734a9432a3DAA302E11AfbdFa8361424A5)
-* MorpherTradeEngine: [0xA162F61a747663088ef69D3f94db414a71C5DcF7](https://scan.morpher.com/address/0xA162F61a747663088ef69D3f94db414a71C5DcF7)
-* MorpherBridge: [0x01B4854bf6eb61Dac40f2AE1e1c1CD8be3a6BaDf](https://scan.morpher.com/address/0x01B4854bf6eb61Dac40f2AE1e1c1CD8be3a6BaDf)
-* MorpherAirdrop: [0x6306037eaD1FC236F4aabC8c826F351c9F45d409](https://scan.morpher.com/address/0x6306037eaD1FC236F4aabC8c826F351c9F45d409)
-* MorpherEscrow: [0x3CBC7e439FD0A98182622136d38EBa03Aac17A72](https://scan.morpher.com/address/0x3CBC7e439FD0A98182622136d38EBa03Aac17A72)
-* MorpherOracle: [0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb](https://scan.morpher.com/address/0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb)
+# Contracts
 
 
-## Mainchain Deployments
+## Auxiliary Contracts
+MerkleProof.sol: Calculate the Merkle Proof
 
-* MorpherState: [0x1f426C51F0Ef7655A6f4c3Eb58017d2F1c381bfF](https://etherscan.io/address/0x1f426C51F0Ef7655A6f4c3Eb58017d2F1c381bfF)
-* MorpherToken: [0x6369c3DadfC00054A42BA8B2c09c48131dd4Aa38](https://etherscan.io/address/0x6369c3DadfC00054A42BA8B2c09c48131dd4Aa38)
-* MorpherTradeEngine: [0x62e26AB4444E24E42e63A0857bF56Ea1c70AAEc8](https://etherscan.io/address/0x62e26AB4444E24E42e63A0857bF56Ea1c70AAEc8)
-* MorpherBridge: [0xa937787581b17236f3efb2618c38270baac685ba](https://etherscan.io/address/0xa937787581b17236f3efb2618c38270baac685ba)
-* MorpherGovernance: [0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762](https://etherscan.io/address/0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762)
-* MorpherAirdrop: [0x6306037eaD1FC236F4aabC8c826F351c9F45d409](https://etherscan.io/address/0x6306037eaD1FC236F4aabC8c826F351c9F45d409)
-* MorpherEscrow: [0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c](https://etherscan.io/address/0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c)
-* MorpherOracle: [0x73b7631c508db9E389edF6aBb3C4a48da0444553](https://etherscan.io/address/0x73b7631c508db9E389edF6aBb3C4a48da0444553)
-* MorpherMintingLimiter: [0x30D90c8a36FFF52F1C8C05b54d4CE79610431Ec0](https://etherscan.io/address/0x30d90c8a36fff52f1c8c05b54d4ce79610431ec0)
-* MorpherStaking: [0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE](https://etherscan.io/address/0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE)
+* Replaced in Proxy Contracts for the [OpenZeppelin Implementation](https://docs.openzeppelin.com/contracts/4.x/api/utils#MerkleProof)
 
-## Polygon Deployments
+Migrations.sol: Used by Truffle to store migrations on chain
 
-Contracts on Polygon are all Proxied contracts through the OpenZeppelin Transparent Proxy
+Ownable.sol: Ownable functionality
 
-ℹ️ The code for the contracts is currently residing on the dev-branch, as they greatly diverge from the current master branch.
+* Replaced in Proxy Contracts with [OpenZeppelin Access Control](https://docs.openzeppelin.com/contracts/4.x/access-control)
 
-* MorpherState: [0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e](https://polygonscan.com/address/0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e)
-* MorpherToken: [0x65C9e3289e5949134759119DBc9F862E8d6F2fBE](https://polygonscan.com/token/0x65C9e3289e5949134759119DBc9F862E8d6F2fBE)
-* MorpherTradeEngine: [0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5](https://polygonscan.com/address/0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5)
-* MorpherBridge: [0xE409f27e977E6bC10cc0a064eD3004F78A40A648](https://polygonscan.com/address/0xE409f27e977E6bC10cc0a064eD3004F78A40A648)
-* MorpherOracle: [0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A](https://polygonscan.com/address/0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A)
-* MorpherMintingLimiter: [0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb](https://polygonscan.com/address/0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb)
-* MorpherStaking: [0x0Fc936d3008d08F065BfD37FCAF7aa8515525417](https://polygonscan.com/address/0x0Fc936d3008d08F065BfD37FCAF7aa8515525417)
-* MorpherAccessControl: [0x139950831d8338487db6807c6FdAeD1827726dF2](https://polygonscan.com/address/0x139950831d8338487db6807c6FdAeD1827726dF2) - OpenZeppelin Access Control Structure
-* MorpherUserBlocking: [0x92Ea01229335854000dc648Fcf4Ea2931A78c363](https://polygonscan.com/address/0x92Ea01229335854000dc648Fcf4Ea2931A78c363)
+SafeMath.sol: Prevent Integer Overflows/Underflows in Solidity < 0.8
 
+* Removed in Proxied Contracts, since upgraded to Solidity 0.8.x
+
+## Morpher Core Contracts
+
+MorpherAirdrop.sol: Manages the Airdrop functionality. 
+
+* [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherAdmin.sol)
+* [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherAdmin.sol)
+* [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAdmin.sol)
+
+MorpherBridge.sol: Functionality to bridge tokens between chains in a trustless way
+
+* [Sidechain: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherBridge.sol)
+* [Mainchain: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherBridge.sol)
+* [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherBridge.sol)
+
+MorpherOracle.sol: Pricing Oracle Functionality that accepts high frequency price ticks from external trusted data sources
+
+* [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherOracle.sol)
+* [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherOracle.sol)
+* [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherOracle.sol)
+
+MorpherStaking.sol: Staking functionality for MPH
+
+* [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherStaking.sol)
+* [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherStaking.sol)
+* [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherStaking.sol)
+
+MorpherState.sol: Storing Data On Chain using the Eternal Storage Pattern (only non-proxied) or pointers to the contract ecosystem (proxied version)
+
+* [Sidechain: Unproxied Version for Eternal Storage](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherState.sol)
+* [Sidechain: Proxied Version for Address-Pointers - 0x47d2B89c88a411Af2f280E7f9e4c580c4E33b118](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherState.sol)
+* [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherState.sol)
+* [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherState.sol)
+
+MorpherToken.sol: ERC20 Interface for the Morpher Token
+
+* [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherToken.sol)
+* [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherToken.sol)
+* [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherToken.sol)
+
+MorpherTradeEngine.sol: Processing Trades, calculating the position value
+
+* [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherTradeEngine.sol)
+* [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherTradeEngine.sol)
+* [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherTradeEngine.sol)
+
+## Morpher Auxiliary Contracts
+
+MorpherAccessControl.sol: Access Control based on OpenZeppelin Contracts
+
+* [Sidechain: 0xA8aA5aF33D221F9FF7c75f7b0d88FE77EA821a6b](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAccessControl.sol)
+* [Mainchain: 0xD6bFA0868A901BE396b9A294dE78441b240a45b8](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAccessControl.sol)
+* [Polygon: 0x139950831d8338487db6807c6FdAeD1827726dF2](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAccessControl.sol)
+
+MorpherAdmin.sol: Administrative functions, such as stockSplit calculations etc. Can only be called from Administrator roles.
+
+* Can be deployed "ad-hoc"
+
+MorpherAdministratorProxy.sol: A middle-layer between State, to bulk-activate Markets. Used for Mainchain where gas prices skyrocket sometimes.
+
+* Deployed "ad-hoc" if necessary.
+
+MorpherEscrow.sol: Used for token release at protocol inception.
+
+* [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherEscrow.sol)
+* [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherEscrow.sol)
+* Polygon: not deployed
+
+MorpherFaucet.sol: Used as faucet for test-networks and development-networks to get access to MPH without purchasing them.
+
+* Only deployed to test-networks. Sol 0.8 version recommended.
+
+MorpherGovernance.sol: Governance for Mainchain to vote in new Oracles or Administrators 
+
+* No proxied version available, governance will be re-written when necessary
+
+MorpherMintingLimiter.sol: Delays the payout when closing positions when the close amount is above a certain threshold, so it can be investigated for potential platform bugs.
+
+ * [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherMintingLimiter.sol)
+ * [Mainchain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherMintingLimiter.sol)
+ * [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherMintingLimiter.sol)
+
+MorpherUserBlocking.sol: Allows specific users to be blocked from Trading.
+
+ * [Sidechain: Unproxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherUserBlocking.sol)
+ * Mainchain: Not Deployed
+ * [Polygon: Proxied Version](https://github.com/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherUserBlocking.sol)
+
+## Interfaces
+
+Interfaces are only available in the unproxied-contracts.
+
+IERC20.sol: Interface for the ERC20 Token
+
+IMorpherStaking.sol: Interface for the Staking functionality
+
+IMorpherState.sol: Interface for the State functions
+
+IMorpherToken.sol: Interface for the Morpher Token
