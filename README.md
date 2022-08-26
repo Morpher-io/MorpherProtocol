@@ -28,6 +28,8 @@ Initially MorpherProtocol was written in a non-proxy way using Solidity 0.5 and 
 
 Contracts are residing on [the nonproxy-master Branch](/Morpher-io/MorpherProtocol/tree/unproxied-contracts).
 
+### Addresses for Non Proxied Contracts
+
 Updates are barely possible, that's also why the deployments are not managed through truffle artifacts. Addresses are stored in [addressesAndRoles.json](./docs/addressesAndRoles.json).
 
 ## Proxied Contracts
@@ -109,7 +111,8 @@ MorpherStaking.sol: Staking functionality for MPH
 
 MorpherState.sol: Storing Data On Chain using the Eternal Storage Pattern (only non-proxied) or pointers to the contract ecosystem (proxied version)
 
-* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherState.sol)
+* [Sidechain: Unproxied Version for Eternal Storage](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherState.sol)
+* [Sidechain: Proxied Version for Address-Pointers - 0x47d2B89c88a411Af2f280E7f9e4c580c4E33b118](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherState.sol)
 * [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherState.sol)
 * [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherState.sol)
 
@@ -127,25 +130,50 @@ MorpherTradeEngine.sol: Processing Trades, calculating the position value
 
 ## Morpher Auxiliary Contracts
 
+MorpherAccessControl.sol: Access Control based on OpenZeppelin Contracts
+
+* [Sidechain: 0xA8aA5aF33D221F9FF7c75f7b0d88FE77EA821a6b](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAccessControl.sol)
+* [Mainchain: 0xD6bFA0868A901BE396b9A294dE78441b240a45b8](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAccessControl.sol)
+* [Polygon: 0x139950831d8338487db6807c6FdAeD1827726dF2](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAccessControl.sol)
+
 MorpherAdmin.sol: Administrative functions, such as stockSplit calculations etc. Can only be called from Administrator roles.
 
-* [Sidechain: Unproxied Version]:
+* Can be deployed "ad-hoc"
 
 MorpherAdministratorProxy.sol: A middle-layer between State, to bulk-activate Markets. Used for Mainchain where gas prices skyrocket sometimes.
 
+* Deployed "ad-hoc" if necessary.
 
 MorpherEscrow.sol: Used for token release at protocol inception.
 
+* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherEscrow.sol)
+* [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherEscrow.sol)
+* Polygon: not deployed
+
 MorpherFaucet.sol: Used as faucet for test-networks and development-networks to get access to MPH without purchasing them.
+
+* Only deployed to test-networks. Sol 0.8 version recommended.
 
 MorpherGovernance.sol: Governance for Mainchain to vote in new Oracles or Administrators 
 
+* No proxied version available, governance will be re-written when necessary
+
 MorpherMintingLimiter.sol: Delays the payout when closing positions when the close amount is above a certain threshold, so it can be investigated for potential platform bugs.
+
+ * [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherMintingLimiter.sol)
+ * [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherMintingLimiter.sol)
+ * [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherMintingLimiter.sol)
 
 MorpherUserBlocking.sol: Allows specific users to be blocked from Trading.
 
+ * [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherUserBlocking.sol)
+ * Mainchain: Not Deployed
+ * [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherUserBlocking.sol)
 
 ## Interfaces
+
+Interfaces are only available in the unproxied-contracts.
+
 IERC20.sol: Interface for the ERC20 Token
 
 IMorpherStaking.sol: Interface for the Staking functionality
