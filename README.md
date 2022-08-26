@@ -20,11 +20,20 @@ Morpher Smart Contracts are fully and regularly audited. 🙌
 
 
 # Getting Started
+
 ## Prerequisites
 * Install Node.js, Npm and build-essential (Linux and MacOS package to build Web3 C/C++ files) on your computer. 
 * Install Foundry to run the Unit-Tests
 * Install Truffle to run the Migrations/Deployment/Interaction
 * Git clone this repo and `cd` into it.
+
+## Foundry and Truffle in the same projects
+
+We took steps to make truffle and foundry "compatible". Truffle is pulling smart contracts via npm, foundry directly via git submodules.
+
+The namespace for contracts we use is the same. For truffle/npm the openzeppelin contracts are residing in `node_modules/@openzeppelin/contracts`
+
+The github submodule would reside in @openzeppelin/contracts, which, by default, would get installed into the lib folder. But we simply redirect to `node_modules`.
 
 ## How to run the Tests
 Tests are implemented using [Foundry](https://book.getfoundry.sh). Please install Foundry first.
