@@ -52,9 +52,98 @@ Q1/2022 the Contracts were updated to support the following things:
     * Still maintain the migration functionality from Truffle
     * Run Truffle and Foundry in Parallel
 
-The Proxied Contracts can be found in [the proxy-master Branch](/Morpher-io/MorpherProtocol/tree/proxied-contracts)
+The Proxied Contracts can be found in [the proxy-master Branch](/Morpher-io/MorpherProtocol/tree/proxied-contracts).
+
+### Addresses for Proxied Contracts
+
+For proxied contracts the build-artifacts are stored in the branch, they are not deleted. There is a helper function called printAddresses in the helpers directory. 
+
+1. Switch over to the proxied-contracts branch
+2. Connect Truffle to MetaMask: `truffle dashboard`
+3. Select the right network from MetaMask (e.g. Polygon)
+4. Run `truffle exec ./helpers/printAddresses.js --network dashboard`
 
 # Contracts
+
+
+## Auxiliary Contracts
+MerkleProof.sol: Calculate the Merkle Proof
+
+* Replaced in Proxy Contracts for the [OpenZeppelin Implementation](https://docs.openzeppelin.com/contracts/4.x/api/utils#MerkleProof)
+
+Migrations.sol: Used by Truffle to store migrations on chain
+
+Ownable.sol: Ownable functionality
+
+* Replaced in Proxy Contracts with [OpenZeppelin Access Control](https://docs.openzeppelin.com/contracts/4.x/access-control)
+
+SafeMath.sol: Prevent Integer Overflows/Underflows in Solidity < 0.8
+
+* Removed in Proxied Contracts, since upgraded to Solidity 0.8.x
+
+## Morpher Core Contracts
+
+MorpherAirdrop.sol: Manages the Airdrop functionality. 
+
+* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherAdmin.sol)
+* [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherAdmin.sol)
+* [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherAdmin.sol)
+
+MorpherBridge.sol: Functionality to bridge tokens between chains in a trustless way
+
+* [Sidechain: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherBridge.sol)
+* [Mainchain: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherBridge.sol)
+* [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherBridge.sol)
+
+MorpherOracle.sol: Pricing Oracle Functionality that accepts high frequency price ticks from external trusted data sources
+
+* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherOracle.sol)
+* [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherOracle.sol)
+* [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherOracle.sol)
+
+MorpherStaking.sol: Staking functionality for MPH
+
+* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherStaking.sol)
+* [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherStaking.sol)
+* [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherStaking.sol)
+
+MorpherState.sol: Storing Data On Chain using the Eternal Storage Pattern (only non-proxied) or pointers to the contract ecosystem (proxied version)
+
+* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherState.sol)
+* [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherState.sol)
+* [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherState.sol)
+
+MorpherToken.sol: ERC20 Interface for the Morpher Token
+
+* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherToken.sol)
+* [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherToken.sol)
+* [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherToken.sol)
+
+MorpherTradeEngine.sol: Processing Trades, calculating the position value
+
+* [Sidechain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherTradeEngine.sol)
+* [Mainchain: Unproxied Version](/Morpher-io/MorpherProtocol/blob/unproxied-contracts/contracts/MorpherTradeEngine.sol)
+* [Polygon: Proxied Version](/Morpher-io/MorpherProtocol/blob/proxied-contracts/contracts/MorpherTradeEngine.sol)
+
+## Morpher Auxiliary Contracts
+
+MorpherAdmin.sol: Administrative functions, such as stockSplit calculations etc. Can only be called from Administrator roles.
+
+* [Sidechain: Unproxied Version]:
+
+MorpherAdministratorProxy.sol: A middle-layer between State, to bulk-activate Markets. Used for Mainchain where gas prices skyrocket sometimes.
+
+
+MorpherEscrow.sol: Used for token release at protocol inception.
+
+MorpherFaucet.sol: Used as faucet for test-networks and development-networks to get access to MPH without purchasing them.
+
+MorpherGovernance.sol: Governance for Mainchain to vote in new Oracles or Administrators 
+
+MorpherMintingLimiter.sol: Delays the payout when closing positions when the close amount is above a certain threshold, so it can be investigated for potential platform bugs.
+
+MorpherUserBlocking.sol: Allows specific users to be blocked from Trading.
+
 
 ## Interfaces
 IERC20.sol: Interface for the ERC20 Token
@@ -64,39 +153,3 @@ IMorpherStaking.sol: Interface for the Staking functionality
 IMorpherState.sol: Interface for the State functions
 
 IMorpherToken.sol: Interface for the Morpher Token
-
-## Auxiliary Contracts
-MerkleProof.sol: Calculate the Merkle Proof
-
-Migrations.sol: Used by Truffle to store migrations on chain
-
-Ownable.sol: Ownable functionality
-
-SafeMath.sol: Prevent Integer Overflows/Underflows in Solidity < 0.8
-
-## Morpher Core Contracts
-
-MorpherBridge.sol: Functionality to bridge tokens between chains in a trustless way
-
-MorpherOracle.sol: Pricing Oracle Functionality that accepts high frequency price ticks from external trusted data sources
-
-MorpherStaking.sol: Staking functionality for MPH
-
-MorpherState.sol: Storing Data On Chain using the Eternal Storage Pattern (only non-proxied)
-
-MorpherToken.sol: ERC20 Interface for the Morpher Token
-
-MorpherTradeEngine.sol: Processing Trades, calculating the position value
-
-## Morpher Auxiliary Contracts
-
-MorpherAdmin.sol: 
-
-MorpherAdministratorProxy.sol
-MorpherAirdrop.sol
-MorpherEscrow.sol
-MorpherFaucet.sol
-MorpherGovernance.sol
-MorpherMintingLimiter.sol
-MorpherUserBlocking.sol
-
