@@ -26,9 +26,33 @@ There are two versions of the smart contracts:
 
 Initially MorpherProtocol was written in a non-proxy way using Solidity 0.5 and the Eternal Storage Pattern.
 
-Contracts are residing on [the nonproxy-master Branch](/Morpher-io/MorpherProtocol/tree/dev)
+Contracts are residing on [the nonproxy-master Branch](/Morpher-io/MorpherProtocol/tree/unproxied-contracts).
+
+Updates are barely possible, that's also why the deployments are not managed through truffle artifacts. Addresses are stored in [addressesAndRoles.json](./docs/addressesAndRoles.json).
 
 ## Proxied Contracts
+
+Q1/2022 the Contracts were updated to support the following things:
+
+1. Proxied through transparent proxies for updating the contract logic
+    
+    * No more Eternal Storage Pattern. 
+    * Contract storage is now used directly. 
+    * Lowered Gas costs and made maintenance easier
+    * MorpherState now holds only a Pointer to the Contracts in the Ecosystem, instead of the Storage.
+
+2. Advanced Roles and Access Lists instead of a simple Ownable
+
+    * Allows for more fine-grained access control
+    * State having Administrators and Owner roles are not managed through [OpenZeppelin Access Control](https://docs.openzeppelin.com/contracts/4.x/access-control)
+
+3. Usage of Foundry over Truffle for Unit-Testing
+
+    * Usage for Foundry over Truffle for Tests
+    * Still maintain the migration functionality from Truffle
+    * Run Truffle and Foundry in Parallel
+
+The Proxied Contracts can be found in [the proxy-master Branch](/Morpher-io/MorpherProtocol/tree/proxied-contracts)
 
 # Contracts
 
