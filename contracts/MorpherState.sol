@@ -210,8 +210,8 @@ contract MorpherState is Ownable {
         // @Deployer: Transfer State Ownership to cold storage address after deploying protocol
         mainChain = _mainChain; // true for Ethereum, false for Morpher PoA sidechain
         setLastRewardTime(now);
-        uint256 _sideChainMint = 575000000 * 10**(DECIMALS);
-        uint256 _mainChainMint = 425000000 * 10**(DECIMALS);
+        uint256 _sideChainMint = 0; // we're not minting for the pool 575000000 * 10**(DECIMALS);
+        uint256 _mainChainMint = 0; // we're not mingint for the pool 425000000 * 10**(DECIMALS);
         
         administrator = owner(); //first set the owner as administrator
         morpherGovernance = owner(); //first set the owner as governance

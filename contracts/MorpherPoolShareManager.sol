@@ -15,6 +15,8 @@ contract MorpherPoolShareManager {
     uint256 public totalPoolShareTokens;
     uint256 public lastTxCountOracle;
 
+    uint256 public totalBNBInPositions;
+
     constructor(address _state) public {
         state = MorpherState(_state);
     }
@@ -32,6 +34,7 @@ contract MorpherPoolShareManager {
         }
         uint256 paidBNB = _openBNBAmount;
         uint256 totalBNB = getTotalBnb();
+        totalBNBInPositions = totalBNB.add(paidBNB);
         uint256 totalPs = totalPoolShareTokens.add(mintedPoolSharesPerBlock[lastTxCountOracle]).sub(burnedPoolSharesPerBlock[lastTxCountOracle]);
                 //pool shares = (totalPS / totalBNB) * paidBNB
         //@todo check if those assumptions are correct
@@ -64,13 +67,14 @@ contract MorpherPoolShareManager {
 
         // //calulate the BNB and burn the tokens
         uint256 payOutBNB = balancePSOfUser.mul(totalBNB).div(totalPs);
+        totalBNBInPositions = totalBNB.sub(payOutBNB);
         state.burn(_userAddress, balancePSOfUser);
         burnedPoolSharesPerBlock[lastTxCountOracle] = burnedPoolSharesPerBlock[lastTxCountOracle].add(balancePSOfUser);
         return payOutBNB;
     }
 
     function getTotalBnb() public view returns (uint256) {
-        return address(state.getOracleContract()).balance;
+        return totalBNBInPositions; //address(state.getOracleContract()).balance;
     }
 
 
