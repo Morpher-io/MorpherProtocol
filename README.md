@@ -26,7 +26,7 @@ There are two versions of the smart contracts:
 
 Initially MorpherProtocol was written in a non-proxy way using Solidity 0.5 and the Eternal Storage Pattern.
 
-Contracts are residing on [the nonproxy-master Branch](/Morpher-io/MorpherProtocol/tree/unproxied-contracts).
+Contracts are residing on [the nonproxy-master Branch](https://github.com/Morpher-io/MorpherProtocol/tree/unproxied-contracts).
 
 ### Addresses for Non Proxied Contracts
 
