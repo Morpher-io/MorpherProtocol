@@ -165,28 +165,32 @@ transferOwnership(ownerAddress)
 
 # Deployed Contracts
 
-The Smart Contracts are deployed on the Ethereum Mainnet and on the Morpher Sidechain.
+The Smart Contracts are deployed on the Ethereum Mainnet and on the Morpher Sidechain, as well as Polygon.
 
-## Sidechain Deployments
+Mainchain and Sidechain contains a mix of Proxied and non-proxied contracts. To understand which ones are which, please consult the [Master-Branch Readme](https://github.com/Morpher-io/MorpherProtocol) which gives an overview
 
-* MorpherState: [0xB4881186b9E52F8BD6EC5F19708450cE57b24370](https://scan.morpher.com/address/0xb4881186b9e52f8bd6ec5f19708450ce57b24370)
-* MorpherToken: [0xC44628734a9432a3DAA302E11AfbdFa8361424A5](https://scan.morpher.com/address/0xC44628734a9432a3DAA302E11AfbdFa8361424A5)
-* MorpherTradeEngine: [0xA162F61a747663088ef69D3f94db414a71C5DcF7](https://scan.morpher.com/address/0xA162F61a747663088ef69D3f94db414a71C5DcF7)
-* MorpherBridge: [0x01B4854bf6eb61Dac40f2AE1e1c1CD8be3a6BaDf](https://scan.morpher.com/address/0x01B4854bf6eb61Dac40f2AE1e1c1CD8be3a6BaDf)
-* MorpherAirdrop: [0x6306037eaD1FC236F4aabC8c826F351c9F45d409](https://scan.morpher.com/address/0x6306037eaD1FC236F4aabC8c826F351c9F45d409)
-* MorpherEscrow: [0x3CBC7e439FD0A98182622136d38EBa03Aac17A72](https://scan.morpher.com/address/0x3CBC7e439FD0A98182622136d38EBa03Aac17A72)
-* MorpherOracle: [0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb](https://scan.morpher.com/address/0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb)
+Polygon and all Test-Networks contains exclusively the Proxied contracts. Run:
 
+`truffle dashboard` to connect to MetaMask and select the right network. 
+Then run `truffle exec ./helpers/printAddresses.js --network dashboard` to print the addresses.
 
-## Mainchain Deployments
+At the time of writing, these are the addresses for Polygon:
 
-* MorpherState: [0x1f426C51F0Ef7655A6f4c3Eb58017d2F1c381bfF](https://etherscan.io/address/0x1f426C51F0Ef7655A6f4c3Eb58017d2F1c381bfF)
-* MorpherToken: [0x6369c3DadfC00054A42BA8B2c09c48131dd4Aa38](https://etherscan.io/address/0x6369c3DadfC00054A42BA8B2c09c48131dd4Aa38)
-* MorpherTradeEngine: [0x62e26AB4444E24E42e63A0857bF56Ea1c70AAEc8](https://etherscan.io/address/0x62e26AB4444E24E42e63A0857bF56Ea1c70AAEc8)
-* MorpherBridge: [0xa937787581b17236f3efb2618c38270baac685ba](https://etherscan.io/address/0xa937787581b17236f3efb2618c38270baac685ba)
-* MorpherGovernance: [0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762](https://etherscan.io/address/0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762)
-* MorpherAirdrop: [0x6306037eaD1FC236F4aabC8c826F351c9F45d409](https://etherscan.io/address/0x6306037eaD1FC236F4aabC8c826F351c9F45d409)
-* MorpherEscrow: [0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c](https://etherscan.io/address/0x161Ba24A3F9f90b531f6C0a2E0abb392DDBb8f6c)
-* MorpherOracle: [0x73b7631c508db9E389edF6aBb3C4a48da0444553](https://etherscan.io/address/0x73b7631c508db9E389edF6aBb3C4a48da0444553)
-* MorpherMintingLimiter: [0x30D90c8a36FFF52F1C8C05b54d4CE79610431Ec0](https://etherscan.io/address/0x30d90c8a36fff52f1c8c05b54d4ce79610431ec0)
-* MorpherStaking: [0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE](https://etherscan.io/address/0xBaF121D02E6948D3A089F99dDc522eb2A4a1b1fE)
+```
+ChainID : 137
+MorpherAccessControl : 0x139950831d8338487db6807c6FdAeD1827726dF2
+MorpherAdmin : NO NETWORK DETECTED
+MorpherAdministratorProxy : NO NETWORK DETECTED
+MorpherAirdrop : NO NETWORK DETECTED
+MorpherBridge : 0xE409f27e977E6bC10cc0a064eD3004F78A40A648
+MorpherFaucet : NO NETWORK DETECTED
+MorpherGovernance : NO NETWORK DETECTED
+MorpherMintingLimiter : 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb
+MorpherOracle : 0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A
+MorpherStaking : 0x0Fc936d3008d08F065BfD37FCAF7aa8515525417
+MorpherState : 0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e
+MorpherToken : 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE
+MorpherTradeEngine : 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5
+MorpherUserBlocking : 0x92Ea01229335854000dc648Fcf4Ea2931A78c363
+MorpherDeprecatedTokenMapper : NO NETWORK DETECTED
+```
