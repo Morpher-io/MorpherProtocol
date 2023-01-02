@@ -6,16 +6,23 @@ pragma solidity 0.8.11;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 /**
- * The idea here is that a sandwich attack is denied by now allowing transfers of tokens for N blocks
+ * The idea here is that a sandwich attack is denied by not allowing a different tx.gasprice in the same block
  * 
- * It's for very low volume tokens.
+ * Sandwich attachs usually work this way:
  * 
- * It can then only allow 1 transaction per N blocks and deny the rest which makes it unattractive for a sandwich attack.
+ * TX1: Malicious BUY 1000 Token @ 123 price
+ * TX2: Rightfully BUY 1000 Token @ 123 + TX1 slippaged price
+ * TX3: Malicious SELL 1000 Token @ 123 + TX2 slippage buy
+ * 
+ * resulting in a sell at an increased price.
+ * 
+ * The idea is to allow only 1 tx with the same from or to address in the same block to make a transfer
+ * 
+ * It's for small volume tokens only who are suffering from sandwich attacks
  * 
  */
 abstract contract MorpherAntiMEVUpgradeable is ERC20Upgradeable {
-    uint256 nextAllowedBlock;
-    uint256 constant NO_TX_FOR_N_BLOCKS = 2;
+    mapping(uint256 => mapping(address => uint256)) gasPerBlockAddress;
 
 
     function _beforeTokenTransfer(
@@ -23,9 +30,10 @@ abstract contract MorpherAntiMEVUpgradeable is ERC20Upgradeable {
         address to,
         uint256 amount
     ) internal virtual override(ERC20Upgradeable) {
-        require(block.number >= nextAllowedBlock, "MorpherAntiMEV: Transfer denied");
+        require((gasPerBlockAddress[block.number][from] == 0 || gasPerBlockAddress[block.number][from] == tx.gasprice) && (gasPerBlockAddress[block.number][to] == 0 || gasPerBlockAddress[block.number][to] == tx.gasprice), "MorpherAntiMEV: Transfer denied");
 
-        nextAllowedBlock = block.number + NO_TX_FOR_N_BLOCKS;
+        gasPerBlockAddress[block.number][from] = tx.gasprice;
+        gasPerBlockAddress[block.number][to] = tx.gasprice;
 
         super._beforeTokenTransfer(from, to, amount);
     }
