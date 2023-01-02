@@ -8,15 +8,17 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 /**
  * The idea here is that a sandwich attack is denied by not allowing a different tx.gasprice in the same block
  * 
- * Sandwich attachs usually work this way:
+ * Sandwich attacks usually work this way:
  * 
- * TX1: Malicious BUY 1000 Token @ 123 price
- * TX2: Rightfully BUY 1000 Token @ 123 + TX1 slippaged price
- * TX3: Malicious SELL 1000 Token @ 123 + TX2 slippage buy
+ * TX1: Malicious BUY 1000 Token @ 123 price for an examplary address 0x111
+ * TX2: Rightfully BUY 1000 Token @ 123 + TX1 slippaged price 
+ * TX3: Malicious SELL 1000 Token @ 123 + TX2 slippage buy (address 0x111 transfers tokens away again)
  * 
  * resulting in a sell at an increased price.
  * 
  * The idea is to allow only 1 tx with the same from or to address in the same block to make a transfer
+ * 
+ * Since we don't have a tx hash, we need a different way to find out if a tx in the same block is not the same. So we assume the tx.gasprice will be different for different transactions
  * 
  * It's for small volume tokens only who are suffering from sandwich attacks
  * 
