@@ -100,7 +100,7 @@ module.exports = {
     before_timeout: 120000 // Here is 2min but can be whatever timeout is suitable for you.
   },
   blockscoutUrl: 'http://sidechain-dev.morpher.com:8082',
-  plugins: ['truffle-plugin-verify', 'truffle-plugin-stdjsonin'],
+  plugins: ['truffle-plugin-verify'],
   api_keys: {
     etherscan: process.env.ETHERSCAN_API_KEY,
     polygonscan: process.env.POLYGONSCAN_API_KEY
