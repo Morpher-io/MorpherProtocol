@@ -1,13 +1,16 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity 0.8.11;
+pragma solidity 0.8.19;
 
 import "./MorpherTradeEngine.sol";
 import "./MorpherState.sol";
 import "./MorpherAccessControl.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "./interfaces/CallbackableContract.sol";
+import "./DataChainOracle.sol";
+
+import "openzeppelin-contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import "openzeppelin-contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
 
 
 // ----------------------------------------------------------------------------------
@@ -19,7 +22,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 // creating their order.
 // ----------------------------------------------------------------------------------
 
-contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable {
+contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable, CallbackableContract {
 
     MorpherState state; // read only, Oracle doesn't need writing access to state
 
@@ -45,6 +48,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
     bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 constant public ORACLEOPERATOR_ROLE = keccak256("ORACLEOPERATOR_ROLE"); //used for callbacks from API
     bytes32 constant public PAUSER_ROLE = keccak256("PAUSER_ROLE"); //can pause oracle
+
+    DataChainOracle oracle = DataChainOracle(address(0x10));
+    address[] providers = [0xd1000e30f1e178f91c553e4588efcc895456c117, 0xd2000d75ac63215be550292a9f29394d282c816f];
+    uint256 requestIds;
+    mapping(uint256 => bytes32) requestOrder;
 
 // ----------------------------------------------------------------------------------
 // Events
@@ -176,6 +184,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
     event DelistMarketComplete(bytes32 _marketId);
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
+    modifier onlyOracle {
+        require(address(oracle) == _msgSender(), "Only Chain Oracle can call this function");
+        _;
+    }
 
     modifier onlyRole(bytes32 role) {
         require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(role, _msgSender()), "MorpherOracle: Permission denied.");
@@ -294,19 +306,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
             priceBelow[_orderId] = _onlyIfPriceBelow;
             goodFrom[_orderId]   = _goodFrom;
             goodUntil[_orderId]  = _goodUntil;
-            emit OrderCreated(
-                _orderId,
-                _msgSender(),
-                _marketId,
-                _closeSharesAmount,
-                _openMPHTokenAmount,
-                _tradeDirection,
-                _orderLeverage,
-                _onlyIfPriceBelow,
-                _onlyIfPriceAbove,
-                _goodFrom,
-                _goodUntil
-                );
+            uint256 requestPrice = oracle.getTotalPriceForRequestedProviders(providers);
+            require(address(this).balance >= requestPrice, "Not enough funds in Morpher Oracle contract to pay for oracle data");
+            oracle.getOracleData{value:requestPrice}(requestIds, _marketId, providers);
+            requestIds++;
         }
 
         return _orderId;
@@ -420,11 +423,18 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
     }
 
 // ----------------------------------------------------------------------------------
-// __callback(bytes32 _orderId, uint256 _price, uint256 _spread, uint256 _liquidationTimestamp, uint256 _timeStamp)
+// runCallback(bytes32 _orderId, uint256 _price, uint256 _spread, uint256 _liquidationTimestamp, uint256 _timeStamp)
 // Called by the oracle operator. Writes price/spread/liquidiation check to the blockchain.
 // Trade engine processes the order and updates the portfolio in state if successful.
 // ----------------------------------------------------------------------------------
-    function __callback(
+    function __callback(uint256 _requestId, uint256 _price) external onlyOracle whenNotPaused {
+        // price from oracle is fixed point decimal 18, trade engine requires fpd 8
+        _priceForTE = _price / 10000000000;
+        _spread = _priceForTe / 1000;
+        runCallback(requestOrder[_requestId], _priceForTE, _priceForTE, _spread, 0, block.timestamp, gasForCallback);
+    }
+
+    function runCallback(
         bytes32 _orderId,
         uint256 _price,
         uint256 _unadjustedMarketPrice,
@@ -432,7 +442,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
         uint256 _liquidationTimestamp,
         uint256 _timeStamp,
         uint256 _gasForNextCallback
-        ) public onlyRole(ORACLEOPERATOR_ROLE) whenNotPaused returns (MorpherTradeEngine.position memory createdPosition)  {
+        ) private returns (MorpherTradeEngine.position memory createdPosition)  {
         
         require(checkOrderConditions(_orderId, _price), 'MorpherOracle Error: Order Conditions are not met');
        
