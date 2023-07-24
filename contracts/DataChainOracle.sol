@@ -1,11 +1,11 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.19;
+pragma solidity 0.8.11;
 
 
 import "./interfaces/CallbackableContract.sol";
 
-import "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import "./DataProviderCollateralStorage.sol";
 

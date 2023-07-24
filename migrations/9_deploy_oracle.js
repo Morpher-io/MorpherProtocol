@@ -31,7 +31,7 @@ module.exports = async function (deployer, network, accounts) {
     const morpherState = await MorpherState.deployed();
     await deployProxy(
       MorpherOracle,
-      [morpherState.address, gasCollectionAddress, 0],
+      [morpherState.address, gasCollectionAddress, 0, process.env.DATA_PROVIDERS.split(',')],
       {
         deployer,
       }

@@ -36,6 +36,10 @@ module.exports = async function (deployer, network, accounts) {
       morpherBridge.address
     );
     await morpherAccessControl.grantRole(
+      await morpherDeprecatedTokenMapper.MINTER_ROLE(),
+      process.env.DEPLOYER_ADDRESS
+    );
+    await morpherAccessControl.grantRole(
       await morpherDeprecatedTokenMapper.BURNER_ROLE(),
       morpherBridge.address
     );

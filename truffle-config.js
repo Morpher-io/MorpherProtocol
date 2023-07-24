@@ -25,6 +25,16 @@ module.exports = {
         explorerUrl: 'https://scan.morpher.com/',
       }
     },
+    datachain: {
+      provider: () =>
+        new HDWalletProvider(
+          process.env.DEPLOYER_PK,
+          "https://data-chain.morpher.com:8545"
+        ),
+      network_id: "522",
+      timeoutBlocks: 200,
+      blockscoutUrl: "https://data-chain-scan.morpher.com"
+    },
     polygon: {
      
         host: "https://rpc-mainnet.matic.network",

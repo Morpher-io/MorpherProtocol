@@ -20,7 +20,6 @@ import "./MorpherTradeEngine.sol";
 
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 
 contract MorpherBridge is Initializable, ContextUpgradeable {
@@ -348,116 +347,9 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
         _chainTransfer(_msgSender(), _tokenClaimed, _numOfToken);   
         emit TrustlessWithdrawFromSideChain(_msgSender(), _numOfToken);
     }
-    
-    // ------------------------------------------------------------------------
-    // claimStagedTokens(...) former: trustlessTransferFromSideChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof)
-    // Performs a merkle proof on the number of token that have been burned by the user on the side chain.
-    // If the number of token claimed on the main chain is less than the number of burned token on the side chain
-    // the difference (or less) can be claimed on the main chain.
-    // ------------------------------------------------------------------------
-    function claimStagedTokensConvertAndSend(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput) public userNotBlocked {
-        // msg.sender must approve this contract
-        
-        bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit, block.chainid));
-        uint256 _tokenClaimed = tokenClaimedOnThisChain[_msgSender()].amount;  
-        require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
-        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
-
-        verifyUpdateDailyLimit(_msgSender(), _numOfToken);
-        verifyUpdateMonthlyLimit(_msgSender(), _numOfToken);
-        verifyUpdateYearlyLimit(_msgSender(), _numOfToken);        
-
-        _chainTransfer(address(this), _tokenClaimed, _numOfToken); //instead of transferring it to the user, transfer it to the bridge itself
-        emit TrustlessWithdrawFromSideChain(_msgSender(), _numOfToken);
-        // Transfer the specified amount of DAI to this contract.
-        // Approve the router to spend DAI.
-        TransferHelper.safeApprove(state.morpherTokenAddress(), address(swapRouter), _numOfToken);
-
-        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
-        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: state.morpherTokenAddress(),
-                tokenOut: IPeripheryImmutableState(address(swapRouter)).WETH9(),
-                fee: poolFee,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: _numOfToken,
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0
-            });
-
-        // The call to `exactInputSingle` executes the swap.
-        uint amountOut = swapRouter.exactInputSingle(params);
-        //weth -> eth conversion
-        IWETH9(IPeripheryImmutableState(address(swapRouter)).WETH9()).withdraw(amountOut);
-        _finalOutput.transfer(amountOut);
-    }
 
     function getWethWmaticAddress() public view returns (address) {
         return IPeripheryImmutableState(address(swapRouter)).WETH9();
-    }
-
-    // ------------------------------------------------------------------------
-    // claimStagedTokens(...) former: trustlessTransferFromSideChain(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof)
-    // Performs a merkle proof on the number of token that have been burned by the user on the side chain.
-    // If the number of token claimed on the main chain is less than the number of burned token on the side chain
-    // the difference (or less) can be claimed on the main chain.
-    // ------------------------------------------------------------------------
-    function claimStagedTokensConvertAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
-        // msg.sender must approve this contract
-        require(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid)).toEthSignedMessageHash().recover(_userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
-        updateSideChainMerkleRoot(_rootHash);
-        bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
-        uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
-        require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
-        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
-
-        verifyUpdateDailyLimit(_usrAddr, _numOfToken); //for usrAddr
-        verifyUpdateMonthlyLimit(_usrAddr, _numOfToken);
-        verifyUpdateYearlyLimit(_usrAddr, _numOfToken);        
-
-        //mint the tokens
-        tokenClaimedOnThisChain[_usrAddr].amount = _tokenClaimed + _numOfToken;
-        tokenClaimedOnThisChain[_usrAddr].lastTransferAt = block.timestamp;
-        MorpherToken(state.morpherTokenAddress()).mint(address(this), _numOfToken);
-        emit TrustlessWithdrawFromSideChain(_usrAddr, _numOfToken);
-
-        /**
-         * Transfer the Fee away
-         */
-        MorpherToken(state.morpherTokenAddress()).transfer(feeRecipient, fee);
-        
-        
-        uint convertTokens = _numOfToken - fee;
-
-
-        // Transfer the specified amount of DAI to this contract.
-        // Approve the router to spend DAI.
-        TransferHelper.safeApprove(state.morpherTokenAddress(), address(swapRouter), convertTokens);
-
-        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
-        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: state.morpherTokenAddress(),
-                tokenOut: IPeripheryImmutableState(address(swapRouter)).WETH9(),
-                fee: poolFee,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: convertTokens,
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0
-            });
-
-        // The call to `exactInputSingle` executes the swap.
-        uint amountOut = swapRouter.exactInputSingle(params);
-
-        //weth -> eth conversion
-        IWETH9(IPeripheryImmutableState(address(swapRouter)).WETH9()).withdraw(amountOut);
-        _finalOutput.transfer(amountOut);
-        emit WithdrawalSuccess(_finalOutput, amountOut, true);
-        return amountOut;
     }
 
     // ------------------------------------------------------------------------

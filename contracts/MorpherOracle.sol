@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity 0.8.19;
+pragma solidity 0.8.11;
 
 import "./MorpherTradeEngine.sol";
 import "./MorpherState.sol";
@@ -7,10 +7,10 @@ import "./MorpherAccessControl.sol";
 import "./interfaces/CallbackableContract.sol";
 import "./DataChainOracle.sol";
 
-import "openzeppelin-contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
-import "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
-import "openzeppelin-contracts-upgradeable/utils/ContextUpgradeable.sol";
-import "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 
 // ----------------------------------------------------------------------------------
@@ -49,8 +49,8 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
     bytes32 constant public ORACLEOPERATOR_ROLE = keccak256("ORACLEOPERATOR_ROLE"); //used for callbacks from API
     bytes32 constant public PAUSER_ROLE = keccak256("PAUSER_ROLE"); //can pause oracle
 
-    DataChainOracle oracle = DataChainOracle(address(0x10));
-    address[] providers = [0xd1000e30f1e178f91c553e4588efcc895456c117, 0xd2000d75ac63215be550292a9f29394d282c816f];
+    DataChainOracle constant oracle = DataChainOracle(address(0x10));
+    address[] providers;
     uint256 requestIds;
     mapping(uint256 => bytes32) requestOrder;
 
@@ -145,6 +145,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
         uint256 _gasForCallback
         );
 
+    event SetProviders(
+        address[] _providers
+        );
+
     event LinkTradeEngine(
         address _address
         );
@@ -194,7 +198,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
         _;
     }
 
-   function initialize(address _morpherState, address payable _gasCollectionAddress, uint256 _gasForCallback) public initializer{
+   function initialize(address _morpherState, address payable _gasCollectionAddress, uint256 _gasForCallback, address[] calldata _providers) public initializer{
         ContextUpgradeable.__Context_init();
         PausableUpgradeable.__Pausable_init();
 
@@ -202,6 +206,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
         
         setCallbackCollectionAddress(_gasCollectionAddress);
         setGasForCallback(_gasForCallback);
+        setProviders(_providers);
     }
 
 // ----------------------------------------------------------------------------------
@@ -227,6 +232,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
     function setCallbackCollectionAddress(address payable _address) public onlyRole(ADMINISTRATOR_ROLE) {
         callBackCollectionAddress = _address;
         emit CallBackCollectionAddressChange(_address);
+    }
+
+    function setProviders(address[] calldata _providers) private {
+        providers = _providers;
+        emit SetProviders(_providers);
     }
 
 // ----------------------------------------------------------------------------------
@@ -429,8 +439,8 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 // ----------------------------------------------------------------------------------
     function __callback(uint256 _requestId, uint256 _price) external onlyOracle whenNotPaused {
         // price from oracle is fixed point decimal 18, trade engine requires fpd 8
-        _priceForTE = _price / 10000000000;
-        _spread = _priceForTe / 1000;
+        uint _priceForTE = _price / 10000000000;
+        uint _spread = _priceForTE / 1000;
         runCallback(requestOrder[_requestId], _priceForTE, _priceForTE, _spread, 0, block.timestamp, gasForCallback);
     }
 
