@@ -5,6 +5,7 @@ module.exports = async function (deployer, network, accounts) {
 
   try {
     const morpherAccessControl = await MorpherAccessControl.deployed();
+    console.log(morpherAccessControl.address);
     await upgradeProxy(morpherAccessControl.address, MorpherAccessControl, {
       deployer,
     });

@@ -1,0 +1,330 @@
+{
+  "contractName": "IDataChainOracle",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "requestedProviders",
+          "type": "address[]"
+        }
+      ],
+      "name": "getTotalPriceForRequestedProviders",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "identifier",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address[]",
+          "name": "requestedProviders",
+          "type": "address[]"
+        }
+      ],
+      "name": "getOracleData",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    }
+  ],
+  "metadata": "{\"compiler\":{\"version\":\"0.8.11+commit.d7f03943\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requestId\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"identifier\",\"type\":\"bytes32\"},{\"internalType\":\"address[]\",\"name\":\"requestedProviders\",\"type\":\"address[]\"}],\"name\":\"getOracleData\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"requestedProviders\",\"type\":\"address[]\"}],\"name\":\"getTotalPriceForRequestedProviders\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/interfaces/IDataChainOracle.sol\":\"IDataChainOracle\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"project:/contracts/interfaces/IDataChainOracle.sol\":{\"keccak256\":\"0x8ed118882d768a168eb8049dc9c40223ea44a868a7ba27c1b027e9d5de345e6e\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://bdade7969e417119df514e1090aeada9c4d110943e6882c997d643acb93eb5f7\",\"dweb:/ipfs/QmTfFHSversFowVymLds45zEQVr3yc4kPo3CNcC8JMQpHA\"]}},\"version\":1}",
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "immutableReferences": {},
+  "generatedSources": [],
+  "deployedGeneratedSources": [],
+  "sourceMap": "",
+  "deployedSourceMap": "",
+  "source": "//SPDX-License-Identifier: MIT\n\npragma solidity 0.8.11;\n\ninterface IDataChainOracle {\n    function getTotalPriceForRequestedProviders(address[] memory requestedProviders) external view returns(uint);\n    function getOracleData(uint256 requestId, bytes32 identifier, address[] memory requestedProviders) external payable;\n}",
+  "sourcePath": "/Users/thomas/Projects/Morpher/MorpherProtocol/contracts/interfaces/IDataChainOracle.sol",
+  "ast": {
+    "absolutePath": "project:/contracts/interfaces/IDataChainOracle.sol",
+    "exportedSymbols": {
+      "IDataChainOracle": [
+        16002
+      ]
+    },
+    "id": 16003,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 15983,
+        "literals": [
+          "solidity",
+          "0.8",
+          ".11"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "32:23:44"
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "IDataChainOracle",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "id": 16002,
+        "linearizedBaseContracts": [
+          16002
+        ],
+        "name": "IDataChainOracle",
+        "nameLocation": "67:16:44",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "functionSelector": "a48794da",
+            "id": 15991,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "getTotalPriceForRequestedProviders",
+            "nameLocation": "99:34:44",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 15987,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 15986,
+                  "mutability": "mutable",
+                  "name": "requestedProviders",
+                  "nameLocation": "151:18:44",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 15991,
+                  "src": "134:35:44",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_address_$dyn_memory_ptr",
+                    "typeString": "address[]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 15984,
+                      "name": "address",
+                      "nodeType": "ElementaryTypeName",
+                      "src": "134:7:44",
+                      "stateMutability": "nonpayable",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_address",
+                        "typeString": "address"
+                      }
+                    },
+                    "id": 15985,
+                    "nodeType": "ArrayTypeName",
+                    "src": "134:9:44",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
+                      "typeString": "address[]"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "133:37:44"
+            },
+            "returnParameters": {
+              "id": 15990,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 15989,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 15991,
+                  "src": "193:4:44",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 15988,
+                    "name": "uint",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "193:4:44",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "192:6:44"
+            },
+            "scope": 16002,
+            "src": "90:109:44",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "5ba54556",
+            "id": 16001,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "getOracleData",
+            "nameLocation": "213:13:44",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 15999,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 15993,
+                  "mutability": "mutable",
+                  "name": "requestId",
+                  "nameLocation": "235:9:44",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 16001,
+                  "src": "227:17:44",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 15992,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "227:7:44",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 15995,
+                  "mutability": "mutable",
+                  "name": "identifier",
+                  "nameLocation": "254:10:44",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 16001,
+                  "src": "246:18:44",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 15994,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "246:7:44",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 15998,
+                  "mutability": "mutable",
+                  "name": "requestedProviders",
+                  "nameLocation": "283:18:44",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 16001,
+                  "src": "266:35:44",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_address_$dyn_memory_ptr",
+                    "typeString": "address[]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 15996,
+                      "name": "address",
+                      "nodeType": "ElementaryTypeName",
+                      "src": "266:7:44",
+                      "stateMutability": "nonpayable",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_address",
+                        "typeString": "address"
+                      }
+                    },
+                    "id": 15997,
+                    "nodeType": "ArrayTypeName",
+                    "src": "266:9:44",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
+                      "typeString": "address[]"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "226:76:44"
+            },
+            "returnParameters": {
+              "id": 16000,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "319:0:44"
+            },
+            "scope": 16002,
+            "src": "204:116:44",
+            "stateMutability": "payable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 16003,
+        "src": "57:265:44",
+        "usedErrors": []
+      }
+    ],
+    "src": "32:290:44"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.8.11+commit.d7f03943.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.4.11",
+  "updatedAt": "2023-07-28T07:56:02.337Z",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  }
+}

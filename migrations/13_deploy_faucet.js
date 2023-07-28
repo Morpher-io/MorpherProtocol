@@ -11,7 +11,7 @@ module.exports = async function (deployer, network, accounts) {
   /**
    * Only setting the Governance on Mainchain
    */
-  if (network === 'kovan' || network === 'test' || network === 'local') {
+  if (network === 'kovan' || network === 'test' || network === 'local' || network === 'dashboard') {
    
     await deployer.deploy(
       MorpherFaucet,
