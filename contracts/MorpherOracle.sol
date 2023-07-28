@@ -319,6 +319,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
             uint256 requestPrice = oracle.getTotalPriceForRequestedProviders(providers);
             require(address(this).balance >= requestPrice, "Not enough funds in Morpher Oracle contract to pay for oracle data");
             oracle.getOracleData{value:requestPrice}(requestIds, _marketId, providers);
+            requestOrder[requestIds] = _orderId;
             requestIds++;
         }
 

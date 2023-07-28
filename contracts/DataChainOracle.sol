@@ -78,11 +78,11 @@ contract DataChainOracle is PausableUpgradeable {
  * TODO: Error handling for callbacks
  */
 
-    function checkProviderSignature(bytes32 identifier, bytes32 salt, uint8 _v, bytes32 _r, bytes32 _s) external view returns (bool) {
+    function checkProviderSignature(address provider, bytes32 salt, uint8 _v, bytes32 _r, bytes32 _s) external view returns (bool) {
         bytes memory prefix = "\x19Oracle Signed Message:\n64";
-        bytes32 prefixedHashMessage = keccak256(abi.encodePacked(prefix, abi.encodePacked(identifier, salt)));
+        bytes32 prefixedHashMessage = keccak256(abi.encodePacked(prefix, abi.encodePacked(provider, salt)));
         address signer = ecrecover(prefixedHashMessage, _v, _r, _s);
-        return collateralStorage.dataProviderHasEnoughStake(signer);
+        return signer == provider && collateralStorage.dataProviderHasEnoughStake(signer);
     }
 
 
