@@ -442,7 +442,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
         // price from oracle is fixed point decimal 18, trade engine requires fpd 8
         uint _priceForTE = _price / 10000000000;
         uint _spread = _priceForTE / 1000;
-        runCallback(requestOrder[_requestId], _priceForTE, _priceForTE, _spread, 0, block.timestamp, gasForCallback);
+        runCallback(requestOrder[_requestId], _priceForTE, _priceForTE, _spread, 0, block.timestamp * 1000, gasForCallback);
     }
 
     function runCallback(
