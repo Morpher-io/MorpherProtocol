@@ -80,6 +80,31 @@ contract MorpherAdmin {
         emit AllPositionMigrationsComplete(_oldMarketId, _newMarketId);
     }
 
+    event TokenMigrationComplete(address _from, address _to, uint _amount, uint _timestamp);
+    event MarketMigrationComplete(bytes32 _marketId, address _from, address _to, uint _timestamp);
+
+    /**
+     * @notice To migrate the tokens we send it from the msg.sender address to _to and emit an event that TokenMigrationComplete
+     * @dev the "if" is intentional, so that we can re-call the function as many times as we want, but it will only execute one time only
+     */
+    function migrateTokens(address _from, address _to) external onlyAdministrator() {
+        
+        uint balance = state.balanceOf(_from);
+        state.transfer(_from, _to, balance);
+        emit TokenMigrationComplete(_from, _to, balance, block.timestamp);
+    }
+
+    function migratePositions(address _from, address _to, bytes32 marketId) public  onlyAdministrator() returns (bool) {
+        
+        (uint longShares, uint shortShares, uint meanEntryPrice, uint meanEntrySpread, uint meanEntryLeverage, uint liquidationPrice) = state.getPosition(_from, marketId);
+        if(longShares > 0 || shortShares > 0) {
+            state.setPosition(_to, marketId, state.getLastUpdated(_from, marketId), longShares, shortShares, meanEntryPrice, meanEntrySpread, meanEntryLeverage, liquidationPrice); //create a new position for the "to" address with the same parameters
+            state.setPosition(_from, marketId, block.timestamp, 0,0,0,0,0,0); //delete the current position   
+            emit MarketMigrationComplete(marketId, _from, _to, block.timestamp);  
+        }
+        return true;
+    }
+
 
 // ----------------------------------------------------------------------------------
 // stockSplits(bytes32 _marketId, uint256 _fromIx, uint256 _toIx, uint256 _nominator, uint256 _denominator)
