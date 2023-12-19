@@ -2,6 +2,8 @@ const AdminOverrideProxy = artifacts.require("MorpherAdministratorProxy.sol");
 const MorpherState = artifacts.require("MorpherState");
 const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 
+const markets = require("../docs/markets.json");
+
 module.exports = async function (deployer, network, accounts) {
   const morpherState = await MorpherState.deployed();
 
@@ -13,17 +15,17 @@ module.exports = async function (deployer, network, accounts) {
     );
     const morpherAccessControl = await MorpherAccessControl.deployed();
 
-    const marketHashObject = require("../docs/markets");
+    // const marketHashObject = require("../docs/markets");
 
-    const marketHashes = Object.keys(marketHashObject);
+    // const marketHashes = Object.keys(marketHashObject);
     const adminOverrideProxy = await AdminOverrideProxy.deployed();
     await morpherAccessControl.grantRole(
       await morpherState.ADMINISTRATOR_ROLE(),
       adminOverrideProxy.address
     );
     let marketsToAdd = [];
-    for (let i = 0; i < marketHashes.length; i++) {
-      marketsToAdd.push(marketHashes[i]);
+    for (let i = 0; i < markets.length; i++) {
+      marketsToAdd.push(web3.utils.sha3(markets[i].id));
       if (marketsToAdd.length == 20) {
         await adminOverrideProxy.bulkActivateMarkets(marketsToAdd);
         marketsToAdd = [];
