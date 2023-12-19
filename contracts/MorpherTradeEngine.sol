@@ -39,6 +39,13 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 
     bool public escrowOpenOrderEnabled;
 
+    
+    struct InterestRate {
+        uint256 validFrom;
+        uint256 rate;
+    }
+
+
     struct PriceLock {
         uint lockedPrice;
     }
@@ -111,6 +118,11 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
     }
 
     mapping(bytes32 => hasExposure) public exposureByMarket;
+
+    
+    mapping(uint256 => InterestRate) public interestRates;
+    uint256 public numInterestRates;
+
 
 // ----------------------------------------------------------------------------
 // Events
@@ -190,6 +202,9 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
     
     event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
+    event SetLeverageInterestRate(uint256 newInterestRate);
+    event LeverageInterestRateAdded(uint256 interestRate, uint256 validFromTimestamp);
+
     function initialize(address _stateAddress, bool _escrowOpenOrderEnabled, uint256 _deployedTimestampOverride) public initializer {
         ContextUpgradeable.__Context_init();
 
@@ -216,6 +231,66 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 
     function setEscrowOpenOrderEnabled(bool _isEnabled) public onlyRole(ADMINISTRATOR_ROLE) {
         escrowOpenOrderEnabled = _isEnabled;
+    }
+
+    /**
+    Interest rate
+     */
+    function setLeverageInterestRate(uint256 _interestRate) public onlyRole(ADMINISTRATOR_ROLE) {
+        addInterestRate(_interestRate, block.timestamp);
+    }
+
+    /**
+        fallback function in case the old tradeengine asks for the current interest rate
+    */
+    function interestRate() public view returns (uint256) {
+        //start with the last one, as its most likely the last active one, no need to run through the whole map
+        if(numInterestRates == 0) {
+            return 0;
+        }
+        for(uint256 i = numInterestRates - 1; i >= 0; i--) {
+            if(interestRates[i].validFrom <= block.timestamp) {
+                return interestRates[i].rate;
+            }
+        }
+        return 0;
+    }
+
+    function addInterestRate(uint _rate, uint _validFrom) public onlyRole(ADMINISTRATOR_ROLE) {
+        require(numInterestRates == 0 || interestRates[numInterestRates-1].validFrom < _validFrom, "MorpherTradeEngine: Interest Rate Valid From must be later than last interestRate");
+        require(_rate <= 100000000, "MorpherTradeEngine: Interest Rate cannot be larger than 100%");
+        require(_validFrom - 365 days <= block.timestamp, "MorpherTradeEngine: Interest Rate cannot start more than 1 year into the future");
+        //omitting rate sanity checks here. It should always be smaller than 100% (100000000) but I'll leave that to the common sense of the admin.
+        interestRates[numInterestRates].validFrom = _validFrom;
+        interestRates[numInterestRates].rate = _rate;
+        numInterestRates++;
+        emit LeverageInterestRateAdded(_rate, _validFrom);
+    }
+
+     function getInterestRate(uint256 _positionTimestamp) public view returns(uint256) {
+        uint256 sumInterestRatesWeighted = 0;
+        uint256 startingTimestamp = 0;
+        
+        for(uint256 i = 0; i < numInterestRates; i++) {
+            if(i == numInterestRates-1 || interestRates[i+1].validFrom > block.timestamp) {
+                //reached last interest rate
+                sumInterestRatesWeighted = sumInterestRatesWeighted + (interestRates[i].rate * (block.timestamp - interestRates[i].validFrom));
+                if(startingTimestamp == 0) {
+                    startingTimestamp = interestRates[i].validFrom;
+                }
+                break; //in case there are more in the future
+            } else {
+                //only take interest rates after the position was created
+                if(interestRates[i+1].validFrom > _positionTimestamp) {
+                    sumInterestRatesWeighted = sumInterestRatesWeighted + (interestRates[i].rate * (interestRates[i+1].validFrom - interestRates[i].validFrom));
+                    if(interestRates[i].validFrom <= _positionTimestamp) {
+                        startingTimestamp = interestRates[i].validFrom;
+                    }
+                }
+            } 
+        }
+        uint interestRateInternal = sumInterestRatesWeighted / (block.timestamp - startingTimestamp);
+        return interestRateInternal;
     }
     
     function paybackEscrow(bytes32 _orderId) private {
@@ -634,10 +709,9 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
         if (_positionTimeStampInMs / 1000 < deployedTimeStamp) {
             _positionTimeStampInMs = deployedTimeStamp / 1000;
         }
-        uint interestRate = MorpherStaking(morpherState.morpherStakingAddress()).getInterestRate(_positionTimeStampInMs / 1000);
         _marginInterest = _averagePrice * (_averageLeverage - PRECISION);
-        _marginInterest = _marginInterest * ((block.timestamp - (_positionTimeStampInMs / 1000)) / 86400) + 1;
-        _marginInterest = ((_marginInterest * interestRate) / PRECISION) / PRECISION;
+        _marginInterest = _marginInterest * (((block.timestamp - (_positionTimeStampInMs / 1000)) / 86400) + 1);
+        _marginInterest = ((_marginInterest * getInterestRate(_positionTimeStampInMs / 1000)) / PRECISION) / PRECISION;
         return _marginInterest;
     }
 
