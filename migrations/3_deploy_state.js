@@ -13,6 +13,7 @@ module.exports = async function (deployer, network, accounts) {
     const morpherState = await MorpherState.deployed();
 
     await upgradeProxy(morpherState.address, MorpherState, { deployer });
+    
   } catch (e) {
     const morpherAccessControl = await MorpherAccessControl.deployed();
     if (process.env.MORPHER_ADMINISTRATOR) {

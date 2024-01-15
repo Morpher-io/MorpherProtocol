@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity 0.8.11;
+pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
@@ -17,6 +17,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
     bytes32 public constant TRANSFERBLOCKED_ROLE = keccak256("TRANSFERBLOCKED_ROLE");
     bytes32 public constant POLYGONMINTER_ROLE = keccak256("POLYGONMINTER_ROLE");
     bytes32 public constant TOKENUPDATER_ROLE = keccak256("TOKENUPDATER_ROLE");
+    bytes32 private constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     uint256 private _totalTokensOnOtherChain;
     uint256 private _totalTokensInPositions;
@@ -34,6 +36,31 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
     modifier onlyRole(bytes32 role) {
         require(morpherAccessControl.hasRole(role, _msgSender()), "MorpherToken: Permission denied.");
         _;
+    }
+
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public virtual {
+        if (block.timestamp > deadline) {
+            revert ERC2612ExpiredSignature(deadline);
+        }
+
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, _useNonce(owner), deadline));
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, v, r, s);
+        if (signer != owner) {
+            revert ERC2612InvalidSigner(signer, owner);
+        }
+
+        _approve(owner, spender, value);
     }
 
     // function getMorpherAccessControl() public view returns(address) {

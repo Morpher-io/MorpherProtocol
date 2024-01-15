@@ -1,0 +1,1290 @@
+{
+  "contractName": "MessageHashUtils",
+  "abi": [],
+  "metadata": "{\"compiler\":{\"version\":\"0.8.20+commit.a1b79de6\"},\"language\":\"Solidity\",\"output\":{\"abi\":[],\"devdoc\":{\"details\":\"Signature message hash utilities for producing digests to be consumed by {ECDSA} recovery or signing. The library provides methods for generating a hash of a message that conforms to the https://eips.ethereum.org/EIPS/eip-191[ERC-191] and https://eips.ethereum.org/EIPS/eip-712[EIP 712] specifications.\",\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/installed_contracts/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol\":\"MessageHashUtils\"},\"evmVersion\":\"shanghai\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"project:/installed_contracts/openzeppelin-contracts-5/contracts/utils/Strings.sol\":{\"keccak256\":\"0x55f102ea785d8399c0e58d1108e2d289506dde18abc6db1b7f68c1f9f9bc5792\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://6e52e0a7765c943ef14e5bcf11e46e6139fa044be564881378349236bf2e3453\",\"dweb:/ipfs/QmZEeeXoFPW47amyP35gfzomF9DixqqTEPwzBakv6cZw6i\"]},\"project:/installed_contracts/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol\":{\"keccak256\":\"0x3f1998a2904792ff2a576827876638b4917573186537f878d30b23277a3b8d38\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://a8dfb08ed617c9d874de901e44ac8af7af7b13e7c84000a1da3cdaf6004593e8\",\"dweb:/ipfs/QmPX2hZAvCZJCQNSXcWqhxh3xp6UitwESrw3K2u3aYNqiu\"]},\"project:/installed_contracts/openzeppelin-contracts-5/contracts/utils/math/Math.sol\":{\"keccak256\":\"0x90b171995e6eeec03cb9d92d9d7a8b5597a9440f5b7863a145f382cb1999d009\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://d9e1b47ced529b6639fdb2b8fd69f2dc7a0f4e2b9732dd73bdf64838394633e9\",\"dweb:/ipfs/QmQ6MyRBK63Gsz6MCibJ8Ar5XZZ7keX6JkMbJ4m24Pcr4L\"]},\"project:/installed_contracts/openzeppelin-contracts-5/contracts/utils/math/SignedMath.sol\":{\"keccak256\":\"0x5f7e4076e175393767754387c962926577f1660dd9b810187b9002407656be72\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://7d533a1c97cd43a57cd9c465f7ee8dd0e39ae93a8fb8ff8e5303a356b081cdcc\",\"dweb:/ipfs/QmVBEei6aTnvYNZp2CHYVNKyZS4q1KkjANfY39WVXZXVoT\"]}},\"version\":1}",
+  "bytecode": "0x60556032600b8282823980515f1a607314602657634e487b7160e01b5f525f60045260245ffd5b305f52607381538281f3fe730000000000000000000000000000000000000000301460806040525f80fdfea26469706673582212204624b0fac2795901607d8a113e1d36a723746faebac3168874a61aa1d88a643f64736f6c63430008140033",
+  "deployedBytecode": "0x730000000000000000000000000000000000000000301460806040525f80fdfea26469706673582212204624b0fac2795901607d8a113e1d36a723746faebac3168874a61aa1d88a643f64736f6c63430008140033",
+  "immutableReferences": {},
+  "generatedSources": [],
+  "deployedGeneratedSources": [],
+  "sourceMap": "521:3235:66:-:0;;;;;;;;;;;;;;;-1:-1:-1;;;521:3235:66;;;;;;;;;;;;;;;;;",
+  "deployedSourceMap": "521:3235:66:-:0;;;;;;;;",
+  "source": "// SPDX-License-Identifier: MIT\n// OpenZeppelin Contracts (last updated v5.0.0) (utils/cryptography/MessageHashUtils.sol)\n\npragma solidity ^0.8.20;\n\nimport {Strings} from \"../Strings.sol\";\n\n/**\n * @dev Signature message hash utilities for producing digests to be consumed by {ECDSA} recovery or signing.\n *\n * The library provides methods for generating a hash of a message that conforms to the\n * https://eips.ethereum.org/EIPS/eip-191[ERC-191] and https://eips.ethereum.org/EIPS/eip-712[EIP 712]\n * specifications.\n */\nlibrary MessageHashUtils {\n    /**\n     * @dev Returns the keccak256 digest of an ERC-191 signed data with version\n     * `0x45` (`personal_sign` messages).\n     *\n     * The digest is calculated by prefixing a bytes32 `messageHash` with\n     * `\"\\x19Ethereum Signed Message:\\n32\"` and hashing the result. It corresponds with the\n     * hash signed when using the https://eth.wiki/json-rpc/API#eth_sign[`eth_sign`] JSON-RPC method.\n     *\n     * NOTE: The `messageHash` parameter is intended to be the result of hashing a raw message with\n     * keccak256, although any bytes32 value can be safely used because the final digest will\n     * be re-hashed.\n     *\n     * See {ECDSA-recover}.\n     */\n    function toEthSignedMessageHash(bytes32 messageHash) internal pure returns (bytes32 digest) {\n        /// @solidity memory-safe-assembly\n        assembly {\n            mstore(0x00, \"\\x19Ethereum Signed Message:\\n32\") // 32 is the bytes-length of messageHash\n            mstore(0x1c, messageHash) // 0x1c (28) is the length of the prefix\n            digest := keccak256(0x00, 0x3c) // 0x3c is the length of the prefix (0x1c) + messageHash (0x20)\n        }\n    }\n\n    /**\n     * @dev Returns the keccak256 digest of an ERC-191 signed data with version\n     * `0x45` (`personal_sign` messages).\n     *\n     * The digest is calculated by prefixing an arbitrary `message` with\n     * `\"\\x19Ethereum Signed Message:\\n\" + len(message)` and hashing the result. It corresponds with the\n     * hash signed when using the https://eth.wiki/json-rpc/API#eth_sign[`eth_sign`] JSON-RPC method.\n     *\n     * See {ECDSA-recover}.\n     */\n    function toEthSignedMessageHash(bytes memory message) internal pure returns (bytes32) {\n        return\n            keccak256(bytes.concat(\"\\x19Ethereum Signed Message:\\n\", bytes(Strings.toString(message.length)), message));\n    }\n\n    /**\n     * @dev Returns the keccak256 digest of an ERC-191 signed data with version\n     * `0x00` (data with intended validator).\n     *\n     * The digest is calculated by prefixing an arbitrary `data` with `\"\\x19\\x00\"` and the intended\n     * `validator` address. Then hashing the result.\n     *\n     * See {ECDSA-recover}.\n     */\n    function toDataWithIntendedValidatorHash(address validator, bytes memory data) internal pure returns (bytes32) {\n        return keccak256(abi.encodePacked(hex\"19_00\", validator, data));\n    }\n\n    /**\n     * @dev Returns the keccak256 digest of an EIP-712 typed data (ERC-191 version `0x01`).\n     *\n     * The digest is calculated from a `domainSeparator` and a `structHash`, by prefixing them with\n     * `\\x19\\x01` and hashing the result. It corresponds to the hash signed by the\n     * https://eips.ethereum.org/EIPS/eip-712[`eth_signTypedData`] JSON-RPC method as part of EIP-712.\n     *\n     * See {ECDSA-recover}.\n     */\n    function toTypedDataHash(bytes32 domainSeparator, bytes32 structHash) internal pure returns (bytes32 digest) {\n        /// @solidity memory-safe-assembly\n        assembly {\n            let ptr := mload(0x40)\n            mstore(ptr, hex\"19_01\")\n            mstore(add(ptr, 0x02), domainSeparator)\n            mstore(add(ptr, 0x22), structHash)\n            digest := keccak256(ptr, 0x42)\n        }\n    }\n}\n",
+  "sourcePath": "/Users/thomas/Projects/Morpher/MorpherProtocol/installed_contracts/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol",
+  "ast": {
+    "absolutePath": "project:/installed_contracts/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol",
+    "exportedSymbols": {
+      "MessageHashUtils": [
+        19881
+      ],
+      "Strings": [
+        19580
+      ]
+    },
+    "id": 19882,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 19809,
+        "literals": [
+          "solidity",
+          "^",
+          "0.8",
+          ".20"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "123:24:66"
+      },
+      {
+        "absolutePath": "project:/installed_contracts/openzeppelin-contracts-5/contracts/utils/Strings.sol",
+        "file": "../Strings.sol",
+        "id": 19811,
+        "nameLocation": "-1:-1:-1",
+        "nodeType": "ImportDirective",
+        "scope": 19882,
+        "sourceUnit": 19581,
+        "src": "149:39:66",
+        "symbolAliases": [
+          {
+            "foreign": {
+              "id": 19810,
+              "name": "Strings",
+              "nodeType": "Identifier",
+              "overloadedDeclarations": [],
+              "referencedDeclaration": 19580,
+              "src": "157:7:66",
+              "typeDescriptions": {}
+            },
+            "nameLocation": "-1:-1:-1"
+          }
+        ],
+        "unitAlias": ""
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "MessageHashUtils",
+        "contractDependencies": [],
+        "contractKind": "library",
+        "documentation": {
+          "id": 19812,
+          "nodeType": "StructuredDocumentation",
+          "src": "190:330:66",
+          "text": " @dev Signature message hash utilities for producing digests to be consumed by {ECDSA} recovery or signing.\n The library provides methods for generating a hash of a message that conforms to the\n https://eips.ethereum.org/EIPS/eip-191[ERC-191] and https://eips.ethereum.org/EIPS/eip-712[EIP 712]\n specifications."
+        },
+        "fullyImplemented": true,
+        "id": 19881,
+        "linearizedBaseContracts": [
+          19881
+        ],
+        "name": "MessageHashUtils",
+        "nameLocation": "529:16:66",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "body": {
+              "id": 19821,
+              "nodeType": "Block",
+              "src": "1314:368:66",
+              "statements": [
+                {
+                  "AST": {
+                    "nodeType": "YulBlock",
+                    "src": "1376:300:66",
+                    "statements": [
+                      {
+                        "expression": {
+                          "arguments": [
+                            {
+                              "kind": "number",
+                              "nodeType": "YulLiteral",
+                              "src": "1397:4:66",
+                              "type": "",
+                              "value": "0x00"
+                            },
+                            {
+                              "hexValue": "19457468657265756d205369676e6564204d6573736167653a0a3332",
+                              "kind": "string",
+                              "nodeType": "YulLiteral",
+                              "src": "1403:34:66",
+                              "type": "",
+                              "value": "\u0019Ethereum Signed Message:\n32"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "mstore",
+                            "nodeType": "YulIdentifier",
+                            "src": "1390:6:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "1390:48:66"
+                        },
+                        "nodeType": "YulExpressionStatement",
+                        "src": "1390:48:66"
+                      },
+                      {
+                        "expression": {
+                          "arguments": [
+                            {
+                              "kind": "number",
+                              "nodeType": "YulLiteral",
+                              "src": "1499:4:66",
+                              "type": "",
+                              "value": "0x1c"
+                            },
+                            {
+                              "name": "messageHash",
+                              "nodeType": "YulIdentifier",
+                              "src": "1505:11:66"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "mstore",
+                            "nodeType": "YulIdentifier",
+                            "src": "1492:6:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "1492:25:66"
+                        },
+                        "nodeType": "YulExpressionStatement",
+                        "src": "1492:25:66"
+                      },
+                      {
+                        "nodeType": "YulAssignment",
+                        "src": "1571:31:66",
+                        "value": {
+                          "arguments": [
+                            {
+                              "kind": "number",
+                              "nodeType": "YulLiteral",
+                              "src": "1591:4:66",
+                              "type": "",
+                              "value": "0x00"
+                            },
+                            {
+                              "kind": "number",
+                              "nodeType": "YulLiteral",
+                              "src": "1597:4:66",
+                              "type": "",
+                              "value": "0x3c"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "keccak256",
+                            "nodeType": "YulIdentifier",
+                            "src": "1581:9:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "1581:21:66"
+                        },
+                        "variableNames": [
+                          {
+                            "name": "digest",
+                            "nodeType": "YulIdentifier",
+                            "src": "1571:6:66"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "documentation": "@solidity memory-safe-assembly",
+                  "evmVersion": "shanghai",
+                  "externalReferences": [
+                    {
+                      "declaration": 19818,
+                      "isOffset": false,
+                      "isSlot": false,
+                      "src": "1571:6:66",
+                      "valueSize": 1
+                    },
+                    {
+                      "declaration": 19815,
+                      "isOffset": false,
+                      "isSlot": false,
+                      "src": "1505:11:66",
+                      "valueSize": 1
+                    }
+                  ],
+                  "id": 19820,
+                  "nodeType": "InlineAssembly",
+                  "src": "1367:309:66"
+                }
+              ]
+            },
+            "documentation": {
+              "id": 19813,
+              "nodeType": "StructuredDocumentation",
+              "src": "552:665:66",
+              "text": " @dev Returns the keccak256 digest of an ERC-191 signed data with version\n `0x45` (`personal_sign` messages).\n The digest is calculated by prefixing a bytes32 `messageHash` with\n `\"\\x19Ethereum Signed Message:\\n32\"` and hashing the result. It corresponds with the\n hash signed when using the https://eth.wiki/json-rpc/API#eth_sign[`eth_sign`] JSON-RPC method.\n NOTE: The `messageHash` parameter is intended to be the result of hashing a raw message with\n keccak256, although any bytes32 value can be safely used because the final digest will\n be re-hashed.\n See {ECDSA-recover}."
+            },
+            "id": 19822,
+            "implemented": true,
+            "kind": "function",
+            "modifiers": [],
+            "name": "toEthSignedMessageHash",
+            "nameLocation": "1231:22:66",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 19816,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19815,
+                  "mutability": "mutable",
+                  "name": "messageHash",
+                  "nameLocation": "1262:11:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19822,
+                  "src": "1254:19:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 19814,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1254:7:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1253:21:66"
+            },
+            "returnParameters": {
+              "id": 19819,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19818,
+                  "mutability": "mutable",
+                  "name": "digest",
+                  "nameLocation": "1306:6:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19822,
+                  "src": "1298:14:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 19817,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1298:7:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1297:16:66"
+            },
+            "scope": 19881,
+            "src": "1222:460:66",
+            "stateMutability": "pure",
+            "virtual": false,
+            "visibility": "internal"
+          },
+          {
+            "body": {
+              "id": 19847,
+              "nodeType": "Block",
+              "src": "2234:143:66",
+              "statements": [
+                {
+                  "expression": {
+                    "arguments": [
+                      {
+                        "arguments": [
+                          {
+                            "hexValue": "19457468657265756d205369676e6564204d6573736167653a0a",
+                            "id": 19834,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "string",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "2286:32:66",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_stringliteral_9af2d9c228f6cfddaa6d1e5b94e0bce4ab16bd9a472a2b7fbfd74ebff4c720b4",
+                              "typeString": "literal_string hex\"19457468657265756d205369676e6564204d6573736167653a0a\""
+                            },
+                            "value": "\u0019Ethereum Signed Message:\n"
+                          },
+                          {
+                            "arguments": [
+                              {
+                                "arguments": [
+                                  {
+                                    "expression": {
+                                      "id": 19839,
+                                      "name": "message",
+                                      "nodeType": "Identifier",
+                                      "overloadedDeclarations": [],
+                                      "referencedDeclaration": 19825,
+                                      "src": "2343:7:66",
+                                      "typeDescriptions": {
+                                        "typeIdentifier": "t_bytes_memory_ptr",
+                                        "typeString": "bytes memory"
+                                      }
+                                    },
+                                    "id": 19840,
+                                    "isConstant": false,
+                                    "isLValue": false,
+                                    "isPure": false,
+                                    "lValueRequested": false,
+                                    "memberLocation": "2351:6:66",
+                                    "memberName": "length",
+                                    "nodeType": "MemberAccess",
+                                    "src": "2343:14:66",
+                                    "typeDescriptions": {
+                                      "typeIdentifier": "t_uint256",
+                                      "typeString": "uint256"
+                                    }
+                                  }
+                                ],
+                                "expression": {
+                                  "argumentTypes": [
+                                    {
+                                      "typeIdentifier": "t_uint256",
+                                      "typeString": "uint256"
+                                    }
+                                  ],
+                                  "expression": {
+                                    "id": 19837,
+                                    "name": "Strings",
+                                    "nodeType": "Identifier",
+                                    "overloadedDeclarations": [],
+                                    "referencedDeclaration": 19580,
+                                    "src": "2326:7:66",
+                                    "typeDescriptions": {
+                                      "typeIdentifier": "t_type$_t_contract$_Strings_$19580_$",
+                                      "typeString": "type(library Strings)"
+                                    }
+                                  },
+                                  "id": 19838,
+                                  "isConstant": false,
+                                  "isLValue": false,
+                                  "isPure": false,
+                                  "lValueRequested": false,
+                                  "memberLocation": "2334:8:66",
+                                  "memberName": "toString",
+                                  "nodeType": "MemberAccess",
+                                  "referencedDeclaration": 19393,
+                                  "src": "2326:16:66",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_function_internal_pure$_t_uint256_$returns$_t_string_memory_ptr_$",
+                                    "typeString": "function (uint256) pure returns (string memory)"
+                                  }
+                                },
+                                "id": 19841,
+                                "isConstant": false,
+                                "isLValue": false,
+                                "isPure": false,
+                                "kind": "functionCall",
+                                "lValueRequested": false,
+                                "nameLocations": [],
+                                "names": [],
+                                "nodeType": "FunctionCall",
+                                "src": "2326:32:66",
+                                "tryCall": false,
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_string_memory_ptr",
+                                  "typeString": "string memory"
+                                }
+                              }
+                            ],
+                            "expression": {
+                              "argumentTypes": [
+                                {
+                                  "typeIdentifier": "t_string_memory_ptr",
+                                  "typeString": "string memory"
+                                }
+                              ],
+                              "id": 19836,
+                              "isConstant": false,
+                              "isLValue": false,
+                              "isPure": true,
+                              "lValueRequested": false,
+                              "nodeType": "ElementaryTypeNameExpression",
+                              "src": "2320:5:66",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_type$_t_bytes_storage_ptr_$",
+                                "typeString": "type(bytes storage pointer)"
+                              },
+                              "typeName": {
+                                "id": 19835,
+                                "name": "bytes",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "2320:5:66",
+                                "typeDescriptions": {}
+                              }
+                            },
+                            "id": 19842,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": false,
+                            "kind": "typeConversion",
+                            "lValueRequested": false,
+                            "nameLocations": [],
+                            "names": [],
+                            "nodeType": "FunctionCall",
+                            "src": "2320:39:66",
+                            "tryCall": false,
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_bytes_memory_ptr",
+                              "typeString": "bytes memory"
+                            }
+                          },
+                          {
+                            "id": 19843,
+                            "name": "message",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 19825,
+                            "src": "2361:7:66",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_bytes_memory_ptr",
+                              "typeString": "bytes memory"
+                            }
+                          }
+                        ],
+                        "expression": {
+                          "argumentTypes": [
+                            {
+                              "typeIdentifier": "t_stringliteral_9af2d9c228f6cfddaa6d1e5b94e0bce4ab16bd9a472a2b7fbfd74ebff4c720b4",
+                              "typeString": "literal_string hex\"19457468657265756d205369676e6564204d6573736167653a0a\""
+                            },
+                            {
+                              "typeIdentifier": "t_bytes_memory_ptr",
+                              "typeString": "bytes memory"
+                            },
+                            {
+                              "typeIdentifier": "t_bytes_memory_ptr",
+                              "typeString": "bytes memory"
+                            }
+                          ],
+                          "expression": {
+                            "id": 19832,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "lValueRequested": false,
+                            "nodeType": "ElementaryTypeNameExpression",
+                            "src": "2273:5:66",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_type$_t_bytes_storage_ptr_$",
+                              "typeString": "type(bytes storage pointer)"
+                            },
+                            "typeName": {
+                              "id": 19831,
+                              "name": "bytes",
+                              "nodeType": "ElementaryTypeName",
+                              "src": "2273:5:66",
+                              "typeDescriptions": {}
+                            }
+                          },
+                          "id": 19833,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "memberLocation": "2279:6:66",
+                          "memberName": "concat",
+                          "nodeType": "MemberAccess",
+                          "src": "2273:12:66",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_function_bytesconcat_pure$__$returns$_t_bytes_memory_ptr_$",
+                            "typeString": "function () pure returns (bytes memory)"
+                          }
+                        },
+                        "id": 19844,
+                        "isConstant": false,
+                        "isLValue": false,
+                        "isPure": false,
+                        "kind": "functionCall",
+                        "lValueRequested": false,
+                        "nameLocations": [],
+                        "names": [],
+                        "nodeType": "FunctionCall",
+                        "src": "2273:96:66",
+                        "tryCall": false,
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_bytes_memory_ptr",
+                          "typeString": "bytes memory"
+                        }
+                      }
+                    ],
+                    "expression": {
+                      "argumentTypes": [
+                        {
+                          "typeIdentifier": "t_bytes_memory_ptr",
+                          "typeString": "bytes memory"
+                        }
+                      ],
+                      "id": 19830,
+                      "name": "keccak256",
+                      "nodeType": "Identifier",
+                      "overloadedDeclarations": [],
+                      "referencedDeclaration": 4294967288,
+                      "src": "2263:9:66",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_function_keccak256_pure$_t_bytes_memory_ptr_$returns$_t_bytes32_$",
+                        "typeString": "function (bytes memory) pure returns (bytes32)"
+                      }
+                    },
+                    "id": 19845,
+                    "isConstant": false,
+                    "isLValue": false,
+                    "isPure": false,
+                    "kind": "functionCall",
+                    "lValueRequested": false,
+                    "nameLocations": [],
+                    "names": [],
+                    "nodeType": "FunctionCall",
+                    "src": "2263:107:66",
+                    "tryCall": false,
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "functionReturnParameters": 19829,
+                  "id": 19846,
+                  "nodeType": "Return",
+                  "src": "2244:126:66"
+                }
+              ]
+            },
+            "documentation": {
+              "id": 19823,
+              "nodeType": "StructuredDocumentation",
+              "src": "1688:455:66",
+              "text": " @dev Returns the keccak256 digest of an ERC-191 signed data with version\n `0x45` (`personal_sign` messages).\n The digest is calculated by prefixing an arbitrary `message` with\n `\"\\x19Ethereum Signed Message:\\n\" + len(message)` and hashing the result. It corresponds with the\n hash signed when using the https://eth.wiki/json-rpc/API#eth_sign[`eth_sign`] JSON-RPC method.\n See {ECDSA-recover}."
+            },
+            "id": 19848,
+            "implemented": true,
+            "kind": "function",
+            "modifiers": [],
+            "name": "toEthSignedMessageHash",
+            "nameLocation": "2157:22:66",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 19826,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19825,
+                  "mutability": "mutable",
+                  "name": "message",
+                  "nameLocation": "2193:7:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19848,
+                  "src": "2180:20:66",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes_memory_ptr",
+                    "typeString": "bytes"
+                  },
+                  "typeName": {
+                    "id": 19824,
+                    "name": "bytes",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2180:5:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes_storage_ptr",
+                      "typeString": "bytes"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2179:22:66"
+            },
+            "returnParameters": {
+              "id": 19829,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19828,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19848,
+                  "src": "2225:7:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 19827,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2225:7:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2224:9:66"
+            },
+            "scope": 19881,
+            "src": "2148:229:66",
+            "stateMutability": "pure",
+            "virtual": false,
+            "visibility": "internal"
+          },
+          {
+            "body": {
+              "id": 19867,
+              "nodeType": "Block",
+              "src": "2831:80:66",
+              "statements": [
+                {
+                  "expression": {
+                    "arguments": [
+                      {
+                        "arguments": [
+                          {
+                            "hexValue": "1900",
+                            "id": 19861,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "hexString",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "2875:10:66",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_stringliteral_73fd5d154550a4a103564cb191928cd38898034de1b952dc21b290898b4b697a",
+                              "typeString": "literal_string hex\"1900\""
+                            },
+                            "value": "\u0019\u0000"
+                          },
+                          {
+                            "id": 19862,
+                            "name": "validator",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 19851,
+                            "src": "2887:9:66",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_address",
+                              "typeString": "address"
+                            }
+                          },
+                          {
+                            "id": 19863,
+                            "name": "data",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 19853,
+                            "src": "2898:4:66",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_bytes_memory_ptr",
+                              "typeString": "bytes memory"
+                            }
+                          }
+                        ],
+                        "expression": {
+                          "argumentTypes": [
+                            {
+                              "typeIdentifier": "t_stringliteral_73fd5d154550a4a103564cb191928cd38898034de1b952dc21b290898b4b697a",
+                              "typeString": "literal_string hex\"1900\""
+                            },
+                            {
+                              "typeIdentifier": "t_address",
+                              "typeString": "address"
+                            },
+                            {
+                              "typeIdentifier": "t_bytes_memory_ptr",
+                              "typeString": "bytes memory"
+                            }
+                          ],
+                          "expression": {
+                            "id": 19859,
+                            "name": "abi",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 4294967295,
+                            "src": "2858:3:66",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_magic_abi",
+                              "typeString": "abi"
+                            }
+                          },
+                          "id": 19860,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": true,
+                          "lValueRequested": false,
+                          "memberLocation": "2862:12:66",
+                          "memberName": "encodePacked",
+                          "nodeType": "MemberAccess",
+                          "src": "2858:16:66",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_function_abiencodepacked_pure$__$returns$_t_bytes_memory_ptr_$",
+                            "typeString": "function () pure returns (bytes memory)"
+                          }
+                        },
+                        "id": 19864,
+                        "isConstant": false,
+                        "isLValue": false,
+                        "isPure": false,
+                        "kind": "functionCall",
+                        "lValueRequested": false,
+                        "nameLocations": [],
+                        "names": [],
+                        "nodeType": "FunctionCall",
+                        "src": "2858:45:66",
+                        "tryCall": false,
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_bytes_memory_ptr",
+                          "typeString": "bytes memory"
+                        }
+                      }
+                    ],
+                    "expression": {
+                      "argumentTypes": [
+                        {
+                          "typeIdentifier": "t_bytes_memory_ptr",
+                          "typeString": "bytes memory"
+                        }
+                      ],
+                      "id": 19858,
+                      "name": "keccak256",
+                      "nodeType": "Identifier",
+                      "overloadedDeclarations": [],
+                      "referencedDeclaration": 4294967288,
+                      "src": "2848:9:66",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_function_keccak256_pure$_t_bytes_memory_ptr_$returns$_t_bytes32_$",
+                        "typeString": "function (bytes memory) pure returns (bytes32)"
+                      }
+                    },
+                    "id": 19865,
+                    "isConstant": false,
+                    "isLValue": false,
+                    "isPure": false,
+                    "kind": "functionCall",
+                    "lValueRequested": false,
+                    "nameLocations": [],
+                    "names": [],
+                    "nodeType": "FunctionCall",
+                    "src": "2848:56:66",
+                    "tryCall": false,
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "functionReturnParameters": 19857,
+                  "id": 19866,
+                  "nodeType": "Return",
+                  "src": "2841:63:66"
+                }
+              ]
+            },
+            "documentation": {
+              "id": 19849,
+              "nodeType": "StructuredDocumentation",
+              "src": "2383:332:66",
+              "text": " @dev Returns the keccak256 digest of an ERC-191 signed data with version\n `0x00` (data with intended validator).\n The digest is calculated by prefixing an arbitrary `data` with `\"\\x19\\x00\"` and the intended\n `validator` address. Then hashing the result.\n See {ECDSA-recover}."
+            },
+            "id": 19868,
+            "implemented": true,
+            "kind": "function",
+            "modifiers": [],
+            "name": "toDataWithIntendedValidatorHash",
+            "nameLocation": "2729:31:66",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 19854,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19851,
+                  "mutability": "mutable",
+                  "name": "validator",
+                  "nameLocation": "2769:9:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19868,
+                  "src": "2761:17:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 19850,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2761:7:66",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 19853,
+                  "mutability": "mutable",
+                  "name": "data",
+                  "nameLocation": "2793:4:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19868,
+                  "src": "2780:17:66",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes_memory_ptr",
+                    "typeString": "bytes"
+                  },
+                  "typeName": {
+                    "id": 19852,
+                    "name": "bytes",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2780:5:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes_storage_ptr",
+                      "typeString": "bytes"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2760:38:66"
+            },
+            "returnParameters": {
+              "id": 19857,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19856,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19868,
+                  "src": "2822:7:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 19855,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2822:7:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2821:9:66"
+            },
+            "scope": 19881,
+            "src": "2720:191:66",
+            "stateMutability": "pure",
+            "virtual": false,
+            "visibility": "internal"
+          },
+          {
+            "body": {
+              "id": 19879,
+              "nodeType": "Block",
+              "src": "3462:292:66",
+              "statements": [
+                {
+                  "AST": {
+                    "nodeType": "YulBlock",
+                    "src": "3524:224:66",
+                    "statements": [
+                      {
+                        "nodeType": "YulVariableDeclaration",
+                        "src": "3538:22:66",
+                        "value": {
+                          "arguments": [
+                            {
+                              "kind": "number",
+                              "nodeType": "YulLiteral",
+                              "src": "3555:4:66",
+                              "type": "",
+                              "value": "0x40"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "mload",
+                            "nodeType": "YulIdentifier",
+                            "src": "3549:5:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "3549:11:66"
+                        },
+                        "variables": [
+                          {
+                            "name": "ptr",
+                            "nodeType": "YulTypedName",
+                            "src": "3542:3:66",
+                            "type": ""
+                          }
+                        ]
+                      },
+                      {
+                        "expression": {
+                          "arguments": [
+                            {
+                              "name": "ptr",
+                              "nodeType": "YulIdentifier",
+                              "src": "3580:3:66"
+                            },
+                            {
+                              "hexValue": "1901",
+                              "kind": "string",
+                              "nodeType": "YulLiteral",
+                              "src": "3585:10:66",
+                              "type": "",
+                              "value": "\u0019\u0001"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "mstore",
+                            "nodeType": "YulIdentifier",
+                            "src": "3573:6:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "3573:23:66"
+                        },
+                        "nodeType": "YulExpressionStatement",
+                        "src": "3573:23:66"
+                      },
+                      {
+                        "expression": {
+                          "arguments": [
+                            {
+                              "arguments": [
+                                {
+                                  "name": "ptr",
+                                  "nodeType": "YulIdentifier",
+                                  "src": "3620:3:66"
+                                },
+                                {
+                                  "kind": "number",
+                                  "nodeType": "YulLiteral",
+                                  "src": "3625:4:66",
+                                  "type": "",
+                                  "value": "0x02"
+                                }
+                              ],
+                              "functionName": {
+                                "name": "add",
+                                "nodeType": "YulIdentifier",
+                                "src": "3616:3:66"
+                              },
+                              "nodeType": "YulFunctionCall",
+                              "src": "3616:14:66"
+                            },
+                            {
+                              "name": "domainSeparator",
+                              "nodeType": "YulIdentifier",
+                              "src": "3632:15:66"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "mstore",
+                            "nodeType": "YulIdentifier",
+                            "src": "3609:6:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "3609:39:66"
+                        },
+                        "nodeType": "YulExpressionStatement",
+                        "src": "3609:39:66"
+                      },
+                      {
+                        "expression": {
+                          "arguments": [
+                            {
+                              "arguments": [
+                                {
+                                  "name": "ptr",
+                                  "nodeType": "YulIdentifier",
+                                  "src": "3672:3:66"
+                                },
+                                {
+                                  "kind": "number",
+                                  "nodeType": "YulLiteral",
+                                  "src": "3677:4:66",
+                                  "type": "",
+                                  "value": "0x22"
+                                }
+                              ],
+                              "functionName": {
+                                "name": "add",
+                                "nodeType": "YulIdentifier",
+                                "src": "3668:3:66"
+                              },
+                              "nodeType": "YulFunctionCall",
+                              "src": "3668:14:66"
+                            },
+                            {
+                              "name": "structHash",
+                              "nodeType": "YulIdentifier",
+                              "src": "3684:10:66"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "mstore",
+                            "nodeType": "YulIdentifier",
+                            "src": "3661:6:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "3661:34:66"
+                        },
+                        "nodeType": "YulExpressionStatement",
+                        "src": "3661:34:66"
+                      },
+                      {
+                        "nodeType": "YulAssignment",
+                        "src": "3708:30:66",
+                        "value": {
+                          "arguments": [
+                            {
+                              "name": "ptr",
+                              "nodeType": "YulIdentifier",
+                              "src": "3728:3:66"
+                            },
+                            {
+                              "kind": "number",
+                              "nodeType": "YulLiteral",
+                              "src": "3733:4:66",
+                              "type": "",
+                              "value": "0x42"
+                            }
+                          ],
+                          "functionName": {
+                            "name": "keccak256",
+                            "nodeType": "YulIdentifier",
+                            "src": "3718:9:66"
+                          },
+                          "nodeType": "YulFunctionCall",
+                          "src": "3718:20:66"
+                        },
+                        "variableNames": [
+                          {
+                            "name": "digest",
+                            "nodeType": "YulIdentifier",
+                            "src": "3708:6:66"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "documentation": "@solidity memory-safe-assembly",
+                  "evmVersion": "shanghai",
+                  "externalReferences": [
+                    {
+                      "declaration": 19876,
+                      "isOffset": false,
+                      "isSlot": false,
+                      "src": "3708:6:66",
+                      "valueSize": 1
+                    },
+                    {
+                      "declaration": 19871,
+                      "isOffset": false,
+                      "isSlot": false,
+                      "src": "3632:15:66",
+                      "valueSize": 1
+                    },
+                    {
+                      "declaration": 19873,
+                      "isOffset": false,
+                      "isSlot": false,
+                      "src": "3684:10:66",
+                      "valueSize": 1
+                    }
+                  ],
+                  "id": 19878,
+                  "nodeType": "InlineAssembly",
+                  "src": "3515:233:66"
+                }
+              ]
+            },
+            "documentation": {
+              "id": 19869,
+              "nodeType": "StructuredDocumentation",
+              "src": "2917:431:66",
+              "text": " @dev Returns the keccak256 digest of an EIP-712 typed data (ERC-191 version `0x01`).\n The digest is calculated from a `domainSeparator` and a `structHash`, by prefixing them with\n `\\x19\\x01` and hashing the result. It corresponds to the hash signed by the\n https://eips.ethereum.org/EIPS/eip-712[`eth_signTypedData`] JSON-RPC method as part of EIP-712.\n See {ECDSA-recover}."
+            },
+            "id": 19880,
+            "implemented": true,
+            "kind": "function",
+            "modifiers": [],
+            "name": "toTypedDataHash",
+            "nameLocation": "3362:15:66",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 19874,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19871,
+                  "mutability": "mutable",
+                  "name": "domainSeparator",
+                  "nameLocation": "3386:15:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19880,
+                  "src": "3378:23:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 19870,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "3378:7:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 19873,
+                  "mutability": "mutable",
+                  "name": "structHash",
+                  "nameLocation": "3411:10:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19880,
+                  "src": "3403:18:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 19872,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "3403:7:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "3377:45:66"
+            },
+            "returnParameters": {
+              "id": 19877,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 19876,
+                  "mutability": "mutable",
+                  "name": "digest",
+                  "nameLocation": "3454:6:66",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 19880,
+                  "src": "3446:14:66",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 19875,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "3446:7:66",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "3445:16:66"
+            },
+            "scope": 19881,
+            "src": "3353:401:66",
+            "stateMutability": "pure",
+            "virtual": false,
+            "visibility": "internal"
+          }
+        ],
+        "scope": 19882,
+        "src": "521:3235:66",
+        "usedErrors": [],
+        "usedEvents": []
+      }
+    ],
+    "src": "123:3634:66"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.8.20+commit.a1b79de6.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.4.16",
+  "updatedAt": "2024-01-12T14:11:19.476Z",
+  "devdoc": {
+    "details": "Signature message hash utilities for producing digests to be consumed by {ECDSA} recovery or signing. The library provides methods for generating a hash of a message that conforms to the https://eips.ethereum.org/EIPS/eip-191[ERC-191] and https://eips.ethereum.org/EIPS/eip-712[EIP 712] specifications.",
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  }
+}

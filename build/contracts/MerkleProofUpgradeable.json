@@ -1,16 +1,16 @@
 {
   "contractName": "MerkleProofUpgradeable",
   "abi": [],
-  "metadata": "{\"compiler\":{\"version\":\"0.8.11+commit.d7f03943\"},\"language\":\"Solidity\",\"output\":{\"abi\":[],\"devdoc\":{\"details\":\"These functions deal with verification of Merkle Trees proofs. The proofs can be generated using the JavaScript library https://github.com/miguelmota/merkletreejs[merkletreejs]. Note: the hashing algorithm should be keccak256 and pair sorting should be enabled. See `test/utils/cryptography/MerkleProof.test.js` for some examples. WARNING: You should avoid using leaf values that are 64 bytes long prior to hashing, or use a hash function other than keccak256 for hashing leaves. This is because the concatenation of a sorted pair of internal nodes in the merkle tree could be reinterpreted as a leaf value.\",\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol\":\"MerkleProofUpgradeable\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol\":{\"keccak256\":\"0xc7adeb6058a53a8779699d618eee2ccca5cdc1cc601d423e61e5a7bbc279a29a\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b5a1108e124fdc9680f788a17747770f7691fe864c6651ec929114288e29ff7f\",\"dweb:/ipfs/QmcorJqnmKhTTrJTv9R85pH9crYg8wfvo9uakWnUmYG28A\"]}},\"version\":1}",
-  "bytecode": "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea26469706673582212204244fe8ec305c647ad6e2deebf6750936fb0285bc726b6949fb8c13108f66f5664736f6c634300080b0033",
-  "deployedBytecode": "0x73000000000000000000000000000000000000000030146080604052600080fdfea26469706673582212204244fe8ec305c647ad6e2deebf6750936fb0285bc726b6949fb8c13108f66f5664736f6c634300080b0033",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.20+commit.a1b79de6\"},\"language\":\"Solidity\",\"output\":{\"abi\":[],\"devdoc\":{\"details\":\"These functions deal with verification of Merkle Trees proofs. The proofs can be generated using the JavaScript library https://github.com/miguelmota/merkletreejs[merkletreejs]. Note: the hashing algorithm should be keccak256 and pair sorting should be enabled. See `test/utils/cryptography/MerkleProof.test.js` for some examples. WARNING: You should avoid using leaf values that are 64 bytes long prior to hashing, or use a hash function other than keccak256 for hashing leaves. This is because the concatenation of a sorted pair of internal nodes in the merkle tree could be reinterpreted as a leaf value.\",\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol\":\"MerkleProofUpgradeable\"},\"evmVersion\":\"shanghai\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol\":{\"keccak256\":\"0xc7adeb6058a53a8779699d618eee2ccca5cdc1cc601d423e61e5a7bbc279a29a\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b5a1108e124fdc9680f788a17747770f7691fe864c6651ec929114288e29ff7f\",\"dweb:/ipfs/QmcorJqnmKhTTrJTv9R85pH9crYg8wfvo9uakWnUmYG28A\"]}},\"version\":1}",
+  "bytecode": "0x60556032600b8282823980515f1a607314602657634e487b7160e01b5f525f60045260245ffd5b305f52607381538281f3fe730000000000000000000000000000000000000000301460806040525f80fdfea2646970667358221220389852c0134a288783176b2a36ecf8994dee847db14c01c79683d618b008039464736f6c63430008140033",
+  "deployedBytecode": "0x730000000000000000000000000000000000000000301460806040525f80fdfea2646970667358221220389852c0134a288783176b2a36ecf8994dee847db14c01c79683d618b008039464736f6c63430008140033",
   "immutableReferences": {},
   "generatedSources": [],
   "deployedGeneratedSources": [],
   "sourceMap": "800:1788:14:-:0;;;;;;;;;;;;;;;-1:-1:-1;;;800:1788:14;;;;;;;;;;;;;;;;;",
   "deployedSourceMap": "800:1788:14:-:0;;;;;;;;",
   "source": "// SPDX-License-Identifier: MIT\n// OpenZeppelin Contracts (last updated v4.6.0) (utils/cryptography/MerkleProof.sol)\n\npragma solidity ^0.8.0;\n\n/**\n * @dev These functions deal with verification of Merkle Trees proofs.\n *\n * The proofs can be generated using the JavaScript library\n * https://github.com/miguelmota/merkletreejs[merkletreejs].\n * Note: the hashing algorithm should be keccak256 and pair sorting should be enabled.\n *\n * See `test/utils/cryptography/MerkleProof.test.js` for some examples.\n *\n * WARNING: You should avoid using leaf values that are 64 bytes long prior to\n * hashing, or use a hash function other than keccak256 for hashing leaves.\n * This is because the concatenation of a sorted pair of internal nodes in\n * the merkle tree could be reinterpreted as a leaf value.\n */\nlibrary MerkleProofUpgradeable {\n    /**\n     * @dev Returns true if a `leaf` can be proved to be a part of a Merkle tree\n     * defined by `root`. For this, a `proof` must be provided, containing\n     * sibling hashes on the branch from the leaf to the root of the tree. Each\n     * pair of leaves and each pair of pre-images are assumed to be sorted.\n     */\n    function verify(\n        bytes32[] memory proof,\n        bytes32 root,\n        bytes32 leaf\n    ) internal pure returns (bool) {\n        return processProof(proof, leaf) == root;\n    }\n\n    /**\n     * @dev Returns the rebuilt hash obtained by traversing a Merkle tree up\n     * from `leaf` using `proof`. A `proof` is valid if and only if the rebuilt\n     * hash matches the root of the tree. When processing the proof, the pairs\n     * of leafs & pre-images are assumed to be sorted.\n     *\n     * _Available since v4.4._\n     */\n    function processProof(bytes32[] memory proof, bytes32 leaf) internal pure returns (bytes32) {\n        bytes32 computedHash = leaf;\n        for (uint256 i = 0; i < proof.length; i++) {\n            bytes32 proofElement = proof[i];\n            if (computedHash <= proofElement) {\n                // Hash(current computed hash + current element of the proof)\n                computedHash = _efficientHash(computedHash, proofElement);\n            } else {\n                // Hash(current element of the proof + current computed hash)\n                computedHash = _efficientHash(proofElement, computedHash);\n            }\n        }\n        return computedHash;\n    }\n\n    function _efficientHash(bytes32 a, bytes32 b) private pure returns (bytes32 value) {\n        assembly {\n            mstore(0x00, a)\n            mstore(0x20, b)\n            value := keccak256(0x00, 0x40)\n        }\n    }\n}\n",
-  "sourcePath": "@openzeppelin\\contracts-upgradeable\\utils\\cryptography\\MerkleProofUpgradeable.sol",
+  "sourcePath": "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol",
   "ast": {
     "absolutePath": "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol",
     "exportedSymbols": {
@@ -126,6 +126,7 @@
                       "isPure": false,
                       "kind": "functionCall",
                       "lValueRequested": false,
+                      "nameLocations": [],
                       "names": [],
                       "nodeType": "FunctionCall",
                       "src": "1309:25:14",
@@ -571,6 +572,7 @@
                                   "isPure": false,
                                   "kind": "functionCall",
                                   "lValueRequested": false,
+                                  "nameLocations": [],
                                   "names": [],
                                   "nodeType": "FunctionCall",
                                   "src": "2260:42:14",
@@ -676,6 +678,7 @@
                                   "isPure": false,
                                   "kind": "functionCall",
                                   "lValueRequested": false,
+                                  "nameLocations": [],
                                   "names": [],
                                   "nodeType": "FunctionCall",
                                   "src": "2086:42:14",
@@ -742,6 +745,7 @@
                       "isLValue": false,
                       "isPure": false,
                       "lValueRequested": false,
+                      "memberLocation": "1869:6:14",
                       "memberName": "length",
                       "nodeType": "MemberAccess",
                       "src": "1863:12:14",
@@ -1091,7 +1095,7 @@
                       }
                     ]
                   },
-                  "evmVersion": "london",
+                  "evmVersion": "shanghai",
                   "externalReferences": [
                     {
                       "declaration": 2587,
@@ -1232,18 +1236,19 @@
         ],
         "scope": 2598,
         "src": "800:1788:14",
-        "usedErrors": []
+        "usedErrors": [],
+        "usedEvents": []
       }
     ],
     "src": "118:2471:14"
   },
   "compiler": {
     "name": "solc",
-    "version": "0.8.11+commit.d7f03943.Emscripten.clang"
+    "version": "0.8.20+commit.a1b79de6.Emscripten.clang"
   },
   "networks": {},
-  "schemaVersion": "3.4.7",
-  "updatedAt": "2022-07-01T10:38:45.599Z",
+  "schemaVersion": "3.4.16",
+  "updatedAt": "2024-01-12T14:11:19.316Z",
   "devdoc": {
     "details": "These functions deal with verification of Merkle Trees proofs. The proofs can be generated using the JavaScript library https://github.com/miguelmota/merkletreejs[merkletreejs]. Note: the hashing algorithm should be keccak256 and pair sorting should be enabled. See `test/utils/cryptography/MerkleProof.test.js` for some examples. WARNING: You should avoid using leaf values that are 64 bytes long prior to hashing, or use a hash function other than keccak256 for hashing leaves. This is because the concatenation of a sorted pair of internal nodes in the merkle tree could be reinterpreted as a leaf value.",
     "kind": "dev",

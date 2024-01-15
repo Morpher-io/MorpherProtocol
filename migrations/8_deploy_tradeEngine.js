@@ -20,7 +20,8 @@ module.exports = async function (deployer, network, accounts) {
       let staking = await MorpherStaking.deployed();
 
       for (let i = 0; i < await staking.numInterestRates(); i++) {
-        await morpherTradeEngine.addInterestRate((await staking.interestRates(i)).rate, (await staking.interestRates(i)).validFrom);
+        const interestRate = await staking.interestRates(i);
+        await morpherTradeEngine.addInterestRate((interestRate).rate, (interestRate).validFrom);
       }
 
     }

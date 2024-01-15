@@ -10,9 +10,9 @@ module.exports = async function (deployer, network, accounts) {
   const morpherState = await MorpherState.deployed();
   const morpherAccessControl = await MorpherAccessControl.deployed();
   try {
-    const morpherToken = await MorpherToken.deployed();
+    // const morpherToken = await MorpherToken.deployed();
 
-    await upgradeProxy(morpherToken.address, MorpherToken, {
+    await upgradeProxy('0x322531297FAb2e8FeAf13070a7174a83117ADAd4', MorpherToken, {
       deployer,
     });
   } catch (e) {

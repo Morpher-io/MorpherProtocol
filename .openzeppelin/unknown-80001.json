@@ -44,6 +44,11 @@
       "address": "0x9AFc8d28557a792A9114f86b099Cc9A8829Ce59f",
       "txHash": "0x4584bc2545666dac5873b34685a924dc7cc68fdced68fc45559c392db8a61e76",
       "kind": "transparent"
+    },
+    {
+      "address": "0xA77068573645f92499Bf7c6686BedE2E0D28f7FC",
+      "txHash": "0xeb66d0e517402daa0f707ecd91cdc990426b65ada8f5e25b4fffdc3089e73457",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -2534,6 +2539,924 @@
           },
           "t_array(t_uint256)50_storage": {
             "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "663cbe2359fd7bd4b65b2d06b86cd4c4806b8454ad63a6cb216502f27f5aeb14": {
+      "address": "0x52A4ec77CF900E724e972b2FAC2C303EA01E5a13",
+      "txHash": "0xfd5623abbac3c91639dc5d08864f67e0387a8ae5f20fb89402c888b045e3d391",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_uint8",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "morpherState",
+            "type": "t_contract(MorpherState)10783",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:22"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "orderNonce",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:36"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "lastOrderId",
+            "type": "t_bytes32",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:37"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "deployedTimeStamp",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:38"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "escrowOpenOrderEnabled",
+            "type": "t_bool",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:40"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "priceLockDeactivatedMarket",
+            "type": "t_mapping(t_bytes32,t_struct(PriceLock)11235_storage)",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:53"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "orders",
+            "type": "t_mapping(t_bytes32,t_struct(order)11266_storage)",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:90"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "portfolio",
+            "type": "t_mapping(t_address,t_mapping(t_bytes32,t_struct(position)11309_storage))",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:109"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "exposureByMarket",
+            "type": "t_mapping(t_bytes32,t_struct(hasExposure)11327_storage)",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:120"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "interestRates",
+            "type": "t_mapping(t_uint256,t_struct(InterestRate)11232_storage)",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:123"
+          },
+          {
+            "contract": "MorpherTradeEngine",
+            "label": "numInterestRates",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherTradeEngine.sol:124"
+          }
+        ],
+        "types": {
+          "t_contract(MorpherState)10783": {
+            "label": "contract MorpherState"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_mapping(t_bytes32,t_struct(PriceLock)11235_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.PriceLock)"
+          },
+          "t_struct(PriceLock)11235_storage": {
+            "label": "struct MorpherTradeEngine.PriceLock",
+            "members": [
+              {
+                "label": "lockedPrice",
+                "type": "t_uint256"
+              }
+            ]
+          },
+          "t_mapping(t_bytes32,t_struct(order)11266_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.order)"
+          },
+          "t_struct(order)11266_storage": {
+            "label": "struct MorpherTradeEngine.order",
+            "members": [
+              {
+                "label": "userId",
+                "type": "t_address"
+              },
+              {
+                "label": "marketId",
+                "type": "t_bytes32"
+              },
+              {
+                "label": "closeSharesAmount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "openMPHTokenAmount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "tradeDirection",
+                "type": "t_bool"
+              },
+              {
+                "label": "liquidationTimestamp",
+                "type": "t_uint256"
+              },
+              {
+                "label": "marketPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "marketSpread",
+                "type": "t_uint256"
+              },
+              {
+                "label": "orderLeverage",
+                "type": "t_uint256"
+              },
+              {
+                "label": "timeStamp",
+                "type": "t_uint256"
+              },
+              {
+                "label": "orderEscrowAmount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "modifyPosition",
+                "type": "t_struct(OrderModifier)11287_storage"
+              }
+            ]
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_struct(OrderModifier)11287_storage": {
+            "label": "struct MorpherTradeEngine.OrderModifier",
+            "members": [
+              {
+                "label": "longSharesOrder",
+                "type": "t_uint256"
+              },
+              {
+                "label": "shortSharesOrder",
+                "type": "t_uint256"
+              },
+              {
+                "label": "balanceDown",
+                "type": "t_uint256"
+              },
+              {
+                "label": "balanceUp",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newLongShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newShortShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newMeanEntryPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newMeanEntrySpread",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newMeanEntryLeverage",
+                "type": "t_uint256"
+              },
+              {
+                "label": "newLiquidationPrice",
+                "type": "t_uint256"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_mapping(t_bytes32,t_struct(position)11309_storage))": {
+            "label": "mapping(address => mapping(bytes32 => struct MorpherTradeEngine.position))"
+          },
+          "t_mapping(t_bytes32,t_struct(position)11309_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.position)"
+          },
+          "t_struct(position)11309_storage": {
+            "label": "struct MorpherTradeEngine.position",
+            "members": [
+              {
+                "label": "lastUpdated",
+                "type": "t_uint256"
+              },
+              {
+                "label": "longShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "shortShares",
+                "type": "t_uint256"
+              },
+              {
+                "label": "meanEntryPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "meanEntrySpread",
+                "type": "t_uint256"
+              },
+              {
+                "label": "meanEntryLeverage",
+                "type": "t_uint256"
+              },
+              {
+                "label": "liquidationPrice",
+                "type": "t_uint256"
+              },
+              {
+                "label": "positionHash",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_mapping(t_bytes32,t_struct(hasExposure)11327_storage)": {
+            "label": "mapping(bytes32 => struct MorpherTradeEngine.hasExposure)"
+          },
+          "t_struct(hasExposure)11327_storage": {
+            "label": "struct MorpherTradeEngine.hasExposure",
+            "members": [
+              {
+                "label": "maxMappingIndex",
+                "type": "t_uint256"
+              },
+              {
+                "label": "index",
+                "type": "t_mapping(t_address,t_uint256)"
+              },
+              {
+                "label": "addy",
+                "type": "t_mapping(t_uint256,t_address)"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)"
+          },
+          "t_mapping(t_uint256,t_struct(InterestRate)11232_storage)": {
+            "label": "mapping(uint256 => struct MorpherTradeEngine.InterestRate)"
+          },
+          "t_struct(InterestRate)11232_storage": {
+            "label": "struct MorpherTradeEngine.InterestRate",
+            "members": [
+              {
+                "label": "validFrom",
+                "type": "t_uint256"
+              },
+              {
+                "label": "rate",
+                "type": "t_uint256"
+              }
+            ]
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          }
+        }
+      }
+    },
+    "1588a4656ce06afc8f4984ac9e004a285a63a2208b764bd44c473290f8e1d5d2": {
+      "address": "0xaa8bF48F3Cf475b935777076a727E6b395479EC1",
+      "txHash": "0xf4c92354446c548ec93aa018c1d7c776bdfe45d51a3aae4b9c5f8c0ebc732c46",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_uint8",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "contract": "ERC165Upgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)179_storage)",
+            "src": "../@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "contract": "AccessControlEnumerableUpgradeable",
+            "label": "_roleMembers",
+            "type": "t_mapping(t_bytes32,t_struct(AddressSet)2965_storage)",
+            "src": "../@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol:22"
+          },
+          {
+            "contract": "AccessControlEnumerableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol:76"
+          }
+        ],
+        "types": {
+          "t_mapping(t_bytes32,t_struct(AddressSet)2965_storage)": {
+            "label": "mapping(bytes32 => struct EnumerableSetUpgradeable.AddressSet)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(AddressSet)2965_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)2664_storage"
+              }
+            ]
+          },
+          "t_struct(Set)2664_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)"
+              }
+            ]
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)179_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_struct(RoleData)179_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          }
+        }
+      }
+    },
+    "dc85ddf5ea5a729f6fe6fb958cdcc8d4ad7d48c1cf9253ada719091bd93b56f6": {
+      "address": "0xa1F552f36d4FA50eeb70d93343C701723d0bF5Be",
+      "txHash": "0x4fac45300f0e79b8aa7498d01f0266671547d6ce826b2012b41ca10c7ba092e3",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_uint8",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherAccessControlAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:16"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherAirdropAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:17"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherBridgeAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:18"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherFaucetAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:19"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherGovernanceAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:20"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherMintingLimiterAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:21"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherOracleAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:22"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherStakingAddress",
+            "type": "t_address_payable",
+            "src": "../project:/contracts/MorpherState.sol:23"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherTokenAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:24"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherTradeEngineAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:25"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherUserBlockingAddress",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:26"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "morpherRewards",
+            "type": "t_address",
+            "src": "../project:/contracts/MorpherState.sol:36"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "maximumLeverage",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherState.sol:37"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "rewardBasisPoints",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherState.sol:42"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "lastRewardTime",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherState.sol:43"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "sideChainMerkleRoot",
+            "type": "t_bytes32",
+            "src": "../project:/contracts/MorpherState.sol:45"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "sideChainMerkleRootWrittenAtTime",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherState.sol:46"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "mainChainWithdrawLimit24",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherState.sol:49"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "marketActive",
+            "type": "t_mapping(t_bytes32,t_bool)",
+            "src": "../project:/contracts/MorpherState.sol:51"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "lastRequestBlock",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "../project:/contracts/MorpherState.sol:57"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "numberOfRequests",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "../project:/contracts/MorpherState.sol:58"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "numberOfRequestsLimit",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherState.sol:59"
+          },
+          {
+            "contract": "MorpherState",
+            "label": "mainChain",
+            "type": "t_bool",
+            "src": "../project:/contracts/MorpherState.sol:92"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address"
+          },
+          "t_address_payable": {
+            "label": "address payable"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_mapping(t_bytes32,t_bool)": {
+            "label": "mapping(bytes32 => bool)"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          }
+        }
+      }
+    },
+    "077c1a48e9a487ad8dd3283ddb4f11dd55a1957a6d38daddae0e903f0f89e5b7": {
+      "address": "0x7C4f36d8d07b03ee72E8be6aF846B37cc7CD6386",
+      "txHash": "0x3b72a747a8dc16b11d0fe0156ec6d32cb374d64673ac8201abc842307cbaa89b",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_uint8",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_balances",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:37"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_allowances",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:39"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_totalSupply",
+            "type": "t_uint256",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:41"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_name",
+            "type": "t_string_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:43"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_symbol",
+            "type": "t_string_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:44"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)45_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:394"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "contract": "ERC20PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol:46"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "morpherAccessControl",
+            "type": "t_contract(MorpherAccessControl)3856",
+            "src": "../project:/contracts/MorpherToken.sol:10"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "_totalTokensOnOtherChain",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherToken.sol:21"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "_totalTokensInPositions",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherToken.sol:22"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "_restrictTransfers",
+            "type": "t_bool",
+            "src": "../project:/contracts/MorpherToken.sol:23"
+          }
+        ],
+        "types": {
+          "t_contract(MorpherAccessControl)3856": {
+            "label": "contract MorpherAccessControl"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))"
+          },
+          "t_string_storage": {
+            "label": "string"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          }
+        }
+      }
+    },
+    "d559d68a7755f880273046f9612b35e5d45100c3fd51339819e83d201ed4ecf6": {
+      "address": "0x2bD86eAca41ee548624ab26EEE48598E54e1A160",
+      "txHash": "0xbf6a9d30fb8b29b60d8082f836727ab45a49d8e1a5eb547343a009e5ad673a83",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_uint8",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_balances",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:37"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_allowances",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:39"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_totalSupply",
+            "type": "t_uint256",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:41"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_name",
+            "type": "t_string_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:43"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "_symbol",
+            "type": "t_string_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:44"
+          },
+          {
+            "contract": "ERC20Upgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)45_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:394"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "../@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "contract": "ERC20PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "../@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol:46"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "morpherAccessControl",
+            "type": "t_contract(MorpherAccessControl)4836",
+            "src": "../project:/contracts/MorpherToken.sol:10"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "_totalTokensOnOtherChain",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherToken.sol:21"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "_totalTokensInPositions",
+            "type": "t_uint256",
+            "src": "../project:/contracts/MorpherToken.sol:22"
+          },
+          {
+            "contract": "MorpherToken",
+            "label": "_restrictTransfers",
+            "type": "t_bool",
+            "src": "../project:/contracts/MorpherToken.sol:23"
+          }
+        ],
+        "types": {
+          "t_contract(MorpherAccessControl)4836": {
+            "label": "contract MorpherAccessControl"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))"
+          },
+          "t_string_storage": {
+            "label": "string"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]"
+          },
+          "t_uint8": {
+            "label": "uint8"
           }
         }
       }

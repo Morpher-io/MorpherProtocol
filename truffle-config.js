@@ -76,7 +76,7 @@ module.exports = {
       provider: () =>
       new HDWalletProvider(
         process.env.DEPLOYER_PK,
-       "https://matic-testnet-archive-rpc.bwarelabs.com"
+       "https://polygon-mumbai.infura.io/v3/8078090221dd48b0979de495e6b35c40"
       ),
       network_id: '*',
       chainId: '80001',
@@ -86,7 +86,7 @@ module.exports = {
   },
   compilers: {
     solc: {
-      version: "0.8.11",
+      version: "0.8.20",
       settings: {
         optimizer: {
           enabled: true,
