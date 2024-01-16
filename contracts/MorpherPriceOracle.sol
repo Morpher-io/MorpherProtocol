@@ -2,7 +2,6 @@
 pragma solidity ^0.8.11;
 
 import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 interface IOracle {
     function decimals() external view returns (uint8);
@@ -49,7 +48,6 @@ interface ERC20 {
 
 contract MorpherPriceOracle is IOracle {
 
-    using SafeMath for uint;
 
     address mphToken = 0x322531297FAb2e8FeAf13070a7174a83117ADAd4;
     address wmatic = 0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889;
@@ -81,6 +79,6 @@ contract MorpherPriceOracle is IOracle {
     returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) {
         IUniswapV3Pool pool = getPool(mphToken, wmatic, 3000);
         (uint sqrtPriceX96,,,,,,) = pool.slot0();
-        return (0,int(uint(sqrtPriceX96).mul(uint(sqrtPriceX96)).mul(1e18) >> (96 * 2)),0,block.timestamp,0);
+        return (0,int(uint(sqrtPriceX96) * uint(sqrtPriceX96)*(1e18) >> (96 * 2)),0,block.timestamp,0);
     }
 } 

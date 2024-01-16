@@ -40,6 +40,19 @@ contract MorpherTokenPaymaster is BasePaymaster, UniswapHelper, OracleHelper {
         uint48 priceMaxAge;
     }
 
+    struct PermitParams {
+        address thisAddress;
+        bytes4 permitFunctionHash;
+        address owner;
+		address spender;
+		uint256 value;
+		uint256 deadline;
+		uint8 v;
+		bytes32 r;
+		bytes32 s;
+    }
+
+
     event ConfigUpdated(TokenPaymasterConfig tokenPaymasterConfig);
 
     event UserOperationSponsored(address indexed user, uint256 actualTokenCharge, uint256 actualGasCost, uint256 actualTokenPrice);
@@ -124,23 +137,30 @@ contract MorpherTokenPaymaster is BasePaymaster, UniswapHelper, OracleHelper {
     returns (bytes memory context, uint256 validationResult) {unchecked {
             uint256 priceMarkup = tokenPaymasterConfig.priceMarkup;
             uint256 paymasterAndDataLength = userOp.paymasterAndData.length - 20;
-            require(paymasterAndDataLength == 0 || paymasterAndDataLength == 32,
-                "TPM: invalid data length"
-            );
+            // require(paymasterAndDataLength == 0 || paymasterAndDataLength == 32,
+            //     "TPM: invalid data length"
+            // );
+            //check singature function call etc
             uint256 preChargeNative = requiredPreFund + (tokenPaymasterConfig.refundPostopCost * userOp.maxFeePerGas);
         // note: as price is in ether-per-token and we want more tokens increasing it means dividing it by markup
-            updateCachedPrice(false); //force a price update?! why not...
+            updateCachedPrice(cachedPriceTimestamp < block.timestamp + tokenPaymasterConfig.priceMaxAge); //force a price update?! why? so that the timestamp is correct for the validationResult.
             uint256 cachedPriceWithMarkup = cachedPrice * PRICE_DENOMINATOR / priceMarkup;
-            // if (paymasterAndDataLength == 32) {
-            //     uint256 clientSuppliedPrice = uint256(bytes32(userOp.paymasterAndData[PAYMASTER_DATA_OFFSET : PAYMASTER_DATA_OFFSET + 32]));
-            //     if (clientSuppliedPrice < cachedPriceWithMarkup) {
-            //         // note: smaller number means 'more ether per token'
-            //         cachedPriceWithMarkup = clientSuppliedPrice;
-            //     }
-            // }
+
             uint256 tokenAmount = weiToToken(preChargeNative, cachedPriceWithMarkup);
-            SafeERC20.safeTransferFrom(token, userOp.sender, address(this), tokenAmount);
-            context = abi.encode(tokenAmount, userOp.maxFeePerGas, userOp.maxPriorityFeePerGas, userOp.sender);
+
+            
+            if (paymasterAndDataLength > 0) {
+                //PermitParams memory permitParams = abi.decode(userOp.paymasterAndData, (PermitParams));
+                address originalOwner = address(bytes20(userOp.paymasterAndData[(20+4+12) : (20+4+32)]));
+                (bool success, ) = address(token).call{gas: gasleft(), value: 0}(userOp.paymasterAndData[20 :]); //permit functionality :)
+                require(success, "ERC20 Permit failed. Aborting"); //potentially just retry charging the userOp sender here?!
+                SafeERC20.safeTransferFrom(token, originalOwner, address(this), tokenAmount);
+                context = abi.encode(tokenAmount, userOp.maxFeePerGas, userOp.maxPriorityFeePerGas, originalOwner);
+            } else {
+                SafeERC20.safeTransferFrom(token, userOp.sender, address(this), tokenAmount);
+                context = abi.encode(tokenAmount, userOp.maxFeePerGas, userOp.maxPriorityFeePerGas, userOp.sender);
+            }
+            
             validationResult = _packValidationData(
                 false,
                 uint48(cachedPriceTimestamp + tokenPaymasterConfig.priceMaxAge),

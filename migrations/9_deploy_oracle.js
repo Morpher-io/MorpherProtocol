@@ -11,7 +11,7 @@ module.exports = async function (deployer, network, accounts) {
     const morpherOracle = await MorpherOracle.deployed();
 
     await upgradeProxy(morpherOracle.address, MorpherOracle, {
-      deployer,
+      deployer
     });
   } catch (e) {
     if (

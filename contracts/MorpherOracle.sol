@@ -8,6 +8,9 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgrad
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 
 
 // ----------------------------------------------------------------------------------
@@ -45,6 +48,47 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
     bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 constant public ORACLEOPERATOR_ROLE = keccak256("ORACLEOPERATOR_ROLE"); //used for callbacks from API
     bytes32 constant public PAUSER_ROLE = keccak256("PAUSER_ROLE"); //can pause oracle
+
+    /**
+	 * Permit functionality
+	 * Added after proxy was deployed, so manually adding functionality here
+	 */
+	bytes32 constant public _HASHED_NAME = 0xca82a94b3c35be4fb8e06faa102ba96b016e9c5dd45f747224333f012bfd5e6a;
+	bytes32 constant public _HASHED_VERSION = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
+	bytes32 constant public _TYPE_HASH =
+		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+	using CountersUpgradeable for CountersUpgradeable.Counter;
+
+	mapping(address => CountersUpgradeable.Counter) private _nonces;
+
+	// solhint-disable-next-line var-name-mixedcase
+	bytes32 constant public _PERMIT_TYPEHASH =
+		keccak256("CreateOrder(bytes32 _marketId,uint256 _closeSharesAmount,uint256 _openMPHTokenAmount,address _msgSender,uint256 nonce,uint256 deadline)");
+    
+
+    struct CreateOrderStruct {
+        bytes32 _marketId;
+        uint256 _closeSharesAmount;
+        uint256 _openMPHTokenAmount;
+        bool _tradeDirection;
+        uint256 _orderLeverage;
+        uint256 _onlyIfPriceAbove;
+        uint256 _onlyIfPriceBelow;
+        uint256 _goodUntil;
+        uint256 _goodFrom;
+    }
+
+    
+    address private msgSenderOverride;
+
+    function _msgSender() internal view override returns (address) {
+        if(msgSenderOverride != address(0)) {
+            return msgSenderOverride;
+        }
+
+        return msg.sender;
+    }
+
 
 // ----------------------------------------------------------------------------------
 // Events
@@ -192,6 +236,8 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
         setGasForCallback(_gasForCallback);
     }
 
+    
+
 // ----------------------------------------------------------------------------------
 // Setter/getter functions for trade engine address, oracle operator (callback) address,
 // and prepaid gas limit for callback function
@@ -252,32 +298,29 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 // createOrder(bytes32  _marketId, bool _tradeAmountGivenInShares, uint256 _tradeAmount, bool _tradeDirection, uint256 _orderLeverage)
 // Request a new orderId from trade engine and fires event for price/liquidation check request.
 // ----------------------------------------------------------------------------------
+    function createOrder(bytes32 _marketId, uint256 _closeSharesAmount, uint256 _openMPHTokenAmount, bool _tradeDirection, uint256 _orderLeverage, uint256 _onlyIfPriceAbove,uint256 _onlyIfPriceBelow,uint256 _goodUntil, uint256 _goodFrom) public payable whenNotPaused returns (bytes32 _orderId) {
+        CreateOrderStruct memory createOrderStruct = CreateOrderStruct(_marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage, _onlyIfPriceAbove, _onlyIfPriceBelow, _goodUntil, _goodFrom);
+        return createOrder(createOrderStruct);
+    }
+
     function createOrder(
-        bytes32 _marketId,
-        uint256 _closeSharesAmount,
-        uint256 _openMPHTokenAmount,
-        bool _tradeDirection,
-        uint256 _orderLeverage,
-        uint256 _onlyIfPriceAbove,
-        uint256 _onlyIfPriceBelow,
-        uint256 _goodUntil,
-        uint256 _goodFrom
+        CreateOrderStruct memory createOrderParams
         ) public payable whenNotPaused returns (bytes32 _orderId) {
         if (gasForCallback > 0) {
             require(msg.value >= gasForCallback, "MorpherOracle: Must transfer gas costs for Oracle Callback function.");
             callBackCollectionAddress.transfer(msg.value);
         }
-        _orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(_msgSender(), _marketId, _closeSharesAmount, _openMPHTokenAmount, _tradeDirection, _orderLeverage);
+        _orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(_msgSender(), createOrderParams._marketId, createOrderParams._closeSharesAmount, createOrderParams._openMPHTokenAmount, createOrderParams._tradeDirection, createOrderParams._orderLeverage);
 
         //if the market was deactivated, and the trader didn't fail yet, then we got an orderId to close the position with a locked in price
-        if(state.getMarketActive(_marketId) == false) {
+        if(state.getMarketActive(createOrderParams._marketId) == false) {
 
             //price will come from the position where price is stored forever
-            MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(_orderId, MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(_marketId), 0, 0, block.timestamp * (1000));
+            MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(_orderId, MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(createOrderParams._marketId), 0, 0, block.timestamp * (1000));
             
             emit OrderProcessed(
                 _orderId,
-                MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(_marketId),
+                MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(createOrderParams._marketId),
                 0,
                 0,
                 0,
@@ -290,27 +333,126 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
                 0
                 );
         } else {
-            priceAbove[_orderId] = _onlyIfPriceAbove;
-            priceBelow[_orderId] = _onlyIfPriceBelow;
-            goodFrom[_orderId]   = _goodFrom;
-            goodUntil[_orderId]  = _goodUntil;
+            priceAbove[_orderId] = createOrderParams._onlyIfPriceAbove;
+            priceBelow[_orderId] = createOrderParams._onlyIfPriceBelow;
+            goodFrom[_orderId]   = createOrderParams._goodFrom;
+            goodUntil[_orderId]  = createOrderParams._goodUntil;
             emit OrderCreated(
                 _orderId,
                 _msgSender(),
-                _marketId,
-                _closeSharesAmount,
-                _openMPHTokenAmount,
-                _tradeDirection,
-                _orderLeverage,
-                _onlyIfPriceBelow,
-                _onlyIfPriceAbove,
-                _goodFrom,
-                _goodUntil
+                createOrderParams._marketId,
+                createOrderParams._closeSharesAmount,
+                createOrderParams._openMPHTokenAmount,
+                createOrderParams._tradeDirection,
+                createOrderParams._orderLeverage,
+                createOrderParams._onlyIfPriceBelow,
+                createOrderParams._onlyIfPriceAbove,
+                createOrderParams._goodFrom,
+                createOrderParams._goodUntil
                 );
         }
 
         return _orderId;
     }
+
+    function createOrderPermittedBySignature(
+        CreateOrderStruct memory createOrderParams,
+        address _addressPositionOwner,
+		uint256 deadline,
+		uint8 v,
+		bytes32 r,
+		bytes32 s
+        ) public {
+            require(block.timestamp <= deadline, "MorpherOracle: expired deadline");
+
+            bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, createOrderParams._marketId, createOrderParams._closeSharesAmount, createOrderParams._openMPHTokenAmount, _addressPositionOwner, _useNonce(_addressPositionOwner), deadline));
+
+            bytes32 hash = _hashTypedDataV4(structHash);
+
+            address signer = ECDSAUpgradeable.recover(hash, v, r, s);
+            require(signer == _addressPositionOwner, "MorpherOracle: invalid signature");
+            msgSenderOverride = _addressPositionOwner;
+            createOrder(createOrderParams);
+        }
+    
+    /**
+	 * @dev Returns the domain separator for the current chain.
+	 */
+	function _domainSeparatorV4() internal view returns (bytes32) {
+		return _buildDomainSeparator(_TYPE_HASH, _EIP712NameHash(), _EIP712VersionHash());
+	}
+
+	function _buildDomainSeparator(
+		bytes32 typeHash,
+		bytes32 nameHash,
+		bytes32 versionHash
+	) private view returns (bytes32) {
+		return keccak256(abi.encode(typeHash, nameHash, versionHash, block.chainid, address(this)));
+	}
+
+	/**
+	 * @dev Given an already https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct[hashed struct], this
+	 * function returns the hash of the fully encoded EIP712 message for this domain.
+	 *
+	 * This hash can be used together with {ECDSA-recover} to obtain the signer of a message. For example:
+	 *
+	 * ```solidity
+	 * bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
+	 *     keccak256("Mail(address to,string contents)"),
+	 *     mailTo,
+	 *     keccak256(bytes(mailContents))
+	 * )));
+	 * address signer = ECDSA.recover(digest, signature);
+	 * ```
+	 */
+	function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
+		return ECDSAUpgradeable.toTypedDataHash(_domainSeparatorV4(), structHash);
+	}
+
+	/**
+	 * @dev The hash of the name parameter for the EIP712 domain.
+	 *
+	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
+	 * are a concern.
+	 */
+	function _EIP712NameHash() internal view virtual returns (bytes32) {
+		return _HASHED_NAME;
+	}
+
+	/**
+	 * @dev The hash of the version parameter for the EIP712 domain.
+	 *
+	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
+	 * are a concern.
+	 */
+	function _EIP712VersionHash() internal view virtual returns (bytes32) {
+		return _HASHED_VERSION;
+	}
+	/**
+	 * @dev See {IERC20Permit-nonces}.
+	 */
+	function nonces(address owner) public view virtual returns (uint256) {
+		return _nonces[owner].current();
+	}
+
+	/**
+	 * @dev See {IERC20Permit-DOMAIN_SEPARATOR}.
+	 */
+	// solhint-disable-next-line func-name-mixedcase
+	function DOMAIN_SEPARATOR() external view returns (bytes32) {
+		return _domainSeparatorV4();
+	}
+
+	/**
+	 * @dev "Consume a nonce": return the current value and increment.
+	 *
+	 * _Available since v4.1._
+	 */
+	function _useNonce(address owner) internal virtual returns (uint256 current) {
+		CountersUpgradeable.Counter storage nonce = _nonces[owner];
+		current = nonce.current();
+		nonce.increment();
+	}
 
     function initiateCancelOrder(bytes32 _orderId) public {
         MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
