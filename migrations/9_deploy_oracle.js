@@ -11,8 +11,10 @@ module.exports = async function (deployer, network, accounts) {
     const morpherOracle = await MorpherOracle.deployed();
 
     await upgradeProxy(morpherOracle.address, MorpherOracle, {
-      deployer
+      deployer, unsafeSkipStorageCheck: true
     });
+
+    await morpherOracle.setWmaticAddress("0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"); //WMATIC Mumbai
   } catch (e) {
     if (
       e.message !=
@@ -41,28 +43,28 @@ module.exports = async function (deployer, network, accounts) {
     const morpherTradeEngine = await MorpherTradeEngine.deployed();
     const morpherAccessControl = await MorpherAccessControl.deployed();
 
-    /**
-     * Grant the Oracle the roles so it can do callbacks
-     *
-     * Minting happens via the Minting Limiter
-     */
-    await morpherAccessControl.grantRole(
-      await morpherOracle.ORACLEOPERATOR_ROLE(),
-      callbackAddress1
-    );
+    // /**
+    //  * Grant the Oracle the roles so it can do callbacks
+    //  *
+    //  * Minting happens via the Minting Limiter
+    //  */
+    // await morpherAccessControl.grantRole(
+    //   await morpherOracle.ORACLEOPERATOR_ROLE(),
+    //   callbackAddress1
+    // );
 
-    if (callbackAddress2) {
-      await morpherAccessControl.grantRole(
-        await morpherOracle.ORACLEOPERATOR_ROLE(),
-        callbackAddress2
-      );
-    }
-    if (callbackAddress3) {
-      await morpherAccessControl.grantRole(
-        await morpherOracle.ORACLEOPERATOR_ROLE(),
-        callbackAddress3
-      );
-    }
+    // if (callbackAddress2) {
+    //   await morpherAccessControl.grantRole(
+    //     await morpherOracle.ORACLEOPERATOR_ROLE(),
+    //     callbackAddress2
+    //   );
+    // }
+    // if (callbackAddress3) {
+    //   await morpherAccessControl.grantRole(
+    //     await morpherOracle.ORACLEOPERATOR_ROLE(),
+    //     callbackAddress3
+    //   );
+    // }
 
     
     /**

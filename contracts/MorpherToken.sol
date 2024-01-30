@@ -28,7 +28,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	 * Permit functionality
 	 * Added after proxy was deployed, so manually adding functionality here
 	 */
-	bytes32 private _HASHED_NAME;
+	bytes32 private _HASHED_NAME; //todo: derive from the token name instad of a hardcoded value
 	bytes32 private _HASHED_VERSION;
 	bytes32 private constant _TYPE_HASH =
 		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");

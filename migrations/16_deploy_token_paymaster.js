@@ -4,7 +4,7 @@ const MorpherTokenPaymaster = artifacts.require("MorpherTokenPaymaster");
 
 module.exports = async function (deployer, network, accounts) {
 
-  //TODO change that for polygon mainnet [mphtoken, wmatic, uniswaprouter]
+  //TODO change that for polygon mainnet [mphtoken, wmatic, uniswaprouter] wmatic: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270
   // await deployer.deploy(MorpherPriceOracle, '0x322531297FAb2e8FeAf13070a7174a83117ADAd4','0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889','0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6');
   // const morpherPriceOracle = await MorpherPriceOracle.deployed();
 
