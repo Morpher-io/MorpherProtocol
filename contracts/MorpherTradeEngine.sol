@@ -535,7 +535,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 		uint256 _liquidationTimestamp = orders[_orderId].liquidationTimestamp;
 		if (_liquidationTimestamp > portfolio[_address][_marketId].lastUpdated) {
 			if (portfolio[_address][_marketId].longShares > 0) {
-				setPosition(
+				_setPosition(
 					_address,
 					_marketId,
 					orders[_orderId].timeStamp,
@@ -556,7 +556,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 				);
 			}
 			if (portfolio[_address][_marketId].shortShares > 0) {
-				setPosition(
+				_setPosition(
 					_address,
 					_marketId,
 					orders[_orderId].timeStamp,

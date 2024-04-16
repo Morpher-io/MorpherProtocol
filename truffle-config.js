@@ -10,6 +10,12 @@ module.exports = {
       network_id: "*",
       //websockets: true
     },
+    frame: {
+      host: "127.0.0.1",
+      port: 1248,
+      network_id: "*",
+      //websockets: true
+    },
     morpher: {
       provider: () =>
         new HDWalletProvider(
@@ -37,11 +43,11 @@ module.exports = {
     morphertest: {
       provider: () =>
       new HDWalletProvider(
-        process.env.MORPHER_DEPLOYER_PK,
-        "wss://sidechain-staging.morpher.com:8546"
+        process.env.DEPLOYER_PK,
+        "https://sidechain-test.morpher.com"
       ),
-      network_id: "211",
-      chainId: 211,
+      network_id: "210",
+      chainId: 210,
       networkCheckTimeout: 5000
       //timeoutBlocks: 200,
     },

@@ -4,7 +4,7 @@ const MorpherToken = artifacts.require("MorpherToken");
 const MorpherStaking = artifacts.require("MorpherStaking");
 const MorpherAccessControl = artifacts.require("MorpherAccessControl");
 
-const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
+const { deployProxy, upgradeProxy, forceImport } = require("@openzeppelin/truffle-upgrades");
 
 
 module.exports = async function (deployer, network, accounts) {
@@ -12,6 +12,7 @@ module.exports = async function (deployer, network, accounts) {
   try {
     const morpherTradeEngine = await MorpherTradeEngine.deployed();
 
+    // await forceImport(morpherTradeEngine.address, MorpherTradeEngine, {deployer})
     await upgradeProxy(morpherTradeEngine.address, MorpherTradeEngine, {
       deployer,
     });
@@ -53,7 +54,7 @@ module.exports = async function (deployer, network, accounts) {
       await tradeEngine.addInterestRate((await staking.interestRates(i)).rate, (await staking.interestRates(i)).validFrom);
     }
 
-    const morpherToken = await MorpherToken.deployed();
+    const morpherToken = await MorpherToken.at("0xa1bbaE686eCdE4F61DaF1f40bf4FB81F4BC60f40");
     const morpherTradeEngine = await MorpherTradeEngine.deployed();
     const morpherAccessControl = await MorpherAccessControl.deployed();
 
