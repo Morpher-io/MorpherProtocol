@@ -8,10 +8,11 @@ const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 module.exports = async function (deployer, network, accounts) {
 
   try {
+    console.log(accounts);
     const morpherOracle = await MorpherOracle.deployed();
 
     await upgradeProxy(morpherOracle.address, MorpherOracle, {
-      deployer, unsafeSkipStorageCheck: true
+      deployer
     });
 
     await morpherOracle.setWmaticAddress("0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"); //WMATIC Mumbai
@@ -48,10 +49,7 @@ module.exports = async function (deployer, network, accounts) {
     //  *
     //  * Minting happens via the Minting Limiter
     //  */
-    // await morpherAccessControl.grantRole(
-    //   await morpherOracle.ORACLEOPERATOR_ROLE(),
-    //   callbackAddress1
-    // );
+    await morpherAccessControl.grantRole(await morpherOracle.ORACLEOPERATOR_ROLE(), callbackAddress1 );
 
     // if (callbackAddress2) {
     //   await morpherAccessControl.grantRole(

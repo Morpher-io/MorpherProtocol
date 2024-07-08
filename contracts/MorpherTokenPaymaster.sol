@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.20;
 
 // Import the required libraries and contracts
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -95,6 +95,9 @@ contract MorpherTokenPaymaster is BasePaymaster, UniswapHelper, OracleHelper {
     _uniswap,
     10 ** _token.decimals(),
     _uniswapHelperConfig
+    )
+    Ownable(
+        msg.sender
     )
     {
         setTokenPaymasterConfig(_tokenPaymasterConfig);

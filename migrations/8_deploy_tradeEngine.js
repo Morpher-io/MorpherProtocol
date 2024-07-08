@@ -54,7 +54,7 @@ module.exports = async function (deployer, network, accounts) {
       await tradeEngine.addInterestRate((await staking.interestRates(i)).rate, (await staking.interestRates(i)).validFrom);
     }
 
-    const morpherToken = await MorpherToken.at("0xa1bbaE686eCdE4F61DaF1f40bf4FB81F4BC60f40");
+    const morpherToken = await MorpherToken.deployed(); //.at("0xa1bbaE686eCdE4F61DaF1f40bf4FB81F4BC60f40");
     const morpherTradeEngine = await MorpherTradeEngine.deployed();
     const morpherAccessControl = await MorpherAccessControl.deployed();
 

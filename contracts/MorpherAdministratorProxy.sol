@@ -7,9 +7,10 @@ contract MorpherAdministratorProxy is Ownable {
 
     address public morpherStateAddress;
 
-    constructor(address _morpherAdministrator, address _morpherStateAddress) {
+    constructor(address _morpherAdministrator, address _morpherStateAddress) Ownable(msg.sender) {
         transferOwnership(_morpherAdministrator);
         morpherStateAddress = _morpherStateAddress;
+        
     }
 
     function bulkActivateMarkets(bytes32[] memory _marketHashes) public onlyOwner {

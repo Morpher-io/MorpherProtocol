@@ -14,6 +14,10 @@ module.exports = {
       host: "127.0.0.1",
       port: 1248,
       network_id: "*",
+      chainId: 80002,
+      gas: 8000000,
+      maxFeePerGas: 30000000000,
+      maxPriorityFeePerGas: 30000000000
       //websockets: true
     },
     morpher: {
@@ -30,6 +34,15 @@ module.exports = {
         apiKey: '',
         explorerUrl: 'https://scan.morpher.com/',
       }
+    },
+    anvil: {
+      provider: () =>
+        new HDWalletProvider(
+          process.env.DEPLOYER_PK,
+          "http://localhost:8545"
+        ),
+      network_id: "*",
+      timeoutBlocks: 3,
     },
     polygon: {
      

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./MorpherToken.sol";
@@ -18,7 +18,7 @@ contract MorpherFaucet is Ownable {
     event MorpherFaucetTopUp(address indexed _receiver, uint _amount);
     event MorpherFaucetFillUpAmountChanged(uint _oldAmount, uint _newAmount);
 
-    constructor(address payable _morpherToken, address _coldStorageOwnerAddress, uint _fillUpAmount) {
+    constructor(address payable _morpherToken, address _coldStorageOwnerAddress, uint _fillUpAmount) Ownable(msg.sender) {
         morpherToken = MorpherToken(_morpherToken);
         transferOwnership(_coldStorageOwnerAddress);
         setFillUpAmount(_fillUpAmount);

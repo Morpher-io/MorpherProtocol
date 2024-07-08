@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.20;
 
 contract Migrations {
   address public owner;

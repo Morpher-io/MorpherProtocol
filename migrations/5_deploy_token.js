@@ -10,9 +10,9 @@ module.exports = async function (deployer, network, accounts) {
   const morpherState = await MorpherState.deployed();
   const morpherAccessControl = await MorpherAccessControl.deployed();
   try {
-    // const morpherToken = await MorpherToken.deployed();
+    const morpherToken = await MorpherToken.deployed();
 
-    await upgradeProxy('0x322531297FAb2e8FeAf13070a7174a83117ADAd4', MorpherToken, {
+    await upgradeProxy(morpherToken.address, MorpherToken, {
       deployer,
     });
   } catch (e) {
@@ -32,19 +32,13 @@ module.exports = async function (deployer, network, accounts) {
       await morpherToken.PAUSER_ROLE(),
       accounts[0]
     );
-    await morpherAccessControl.grantRole(
-      await morpherToken.ADMINISTRATOR_ROLE(),
-      accounts[0]
-    );
+    await morpherAccessControl.grantRole(await morpherToken.ADMINISTRATOR_ROLE(),accounts[0]);
 
     // if (
     //   JSON.parse(process.env.DISABLE_INITIAL_MINT) == false ||
     //   JSON.parse(process.env.DISABLE_INITIAL_MINT) === undefined
     // ) {
-    //   await morpherAccessControl.grantRole(
-    //     await morpherToken.MINTER_ROLE(),
-    //     accounts[0]
-    //   );
+      await morpherAccessControl.grantRole(await morpherToken.MINTER_ROLE(),accounts[0]);
     //   const _sideChainMint = web3.utils.toWei("575000000", "ether");
     //   const _mainChainMint = web3.utils.toWei("425000000", "ether");
     //   if (process.env.SIDECHAIN) {

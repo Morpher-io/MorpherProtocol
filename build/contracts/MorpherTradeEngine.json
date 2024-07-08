@@ -89019,6 +89019,488 @@
       "address": "0x2BD68DA45015aded895C03153edB203746EF2A8E",
       "transactionHash": "0x0f0aea195be145e8e725ee1601cb7589d01cc1e94521b0602294960ddcf335eb"
     },
+    "80002": {
+      "events": {
+        "0x558e795083bf3802836b1f3eef9c404a698512ee98b4193781cede9b89fc64d0": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "orderId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "address",
+              "name": "user",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "escrowAmount",
+              "type": "uint256"
+            }
+          ],
+          "name": "EscrowPaid",
+          "type": "event"
+        },
+        "0xbd3ba1f648c8894f4fca2dbf0a22719b08647d73e153e568d413c6dd6e6cb861": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "orderId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "address",
+              "name": "user",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "escrowAmount",
+              "type": "uint256"
+            }
+          ],
+          "name": "EscrowReturned",
+          "type": "event"
+        },
+        "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "uint8",
+              "name": "version",
+              "type": "uint8"
+            }
+          ],
+          "name": "Initialized",
+          "type": "event"
+        },
+        "0x93b9f7720ecbc1a525daad04dea2344903315e98916d6ca70319deddb02eb70b": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "interestRate",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "validFromTimestamp",
+              "type": "uint256"
+            }
+          ],
+          "name": "LeverageInterestRateAdded",
+          "type": "event"
+        },
+        "0x978c711532bae8c58f353b0f3c7f3a0dfe600d9ae9a81818f2ad2919b88e1990": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "address",
+              "name": "_address",
+              "type": "address"
+            }
+          ],
+          "name": "LinkState",
+          "type": "event"
+        },
+        "0x3cf30f15febef0d3f8e86318070db2c80d03fd14e8406d326aab41cb043f1839": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "_marketId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_price",
+              "type": "uint256"
+            }
+          ],
+          "name": "LockedPriceForClosingPositions",
+          "type": "event"
+        },
+        "0xa6eb7cdc219e1518ced964e9a34e61d68a94e4f1569db3e84256ba981ba52753": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "_orderId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "_address",
+              "type": "address"
+            }
+          ],
+          "name": "OrderCancelled",
+          "type": "event"
+        },
+        "0xd5dec9e768ba83c154ee9ecf7a0c145c8e7ee75e1cc4af2d271a1f9c93bb3946": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "_orderId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "_address",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "_marketId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_closeSharesAmount",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_openMPHTokenAmount",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "bool",
+              "name": "_tradeDirection",
+              "type": "bool"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_orderLeverage",
+              "type": "uint256"
+            }
+          ],
+          "name": "OrderIdRequested",
+          "type": "event"
+        },
+        "0x696a3d28d7b4bcfc9cbfef719a03218d7a502cda20d01f9ef8086249e8165492": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "_orderId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_marketPrice",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_marketSpread",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_liquidationTimestamp",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_timeStamp",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newLongShares",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newShortShares",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newAverageEntry",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newAverageSpread",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newAverageLeverage",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_liquidationPrice",
+              "type": "uint256"
+            }
+          ],
+          "name": "OrderProcessed",
+          "type": "event"
+        },
+        "0xe41babb55b71bb17aa9629797bcd2f80ff29c7c3fe5f8d20b8bf3b08d4e4f945": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "_address",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "_marketId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "bool",
+              "name": "_longPosition",
+              "type": "bool"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_timeStamp",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_marketPrice",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_marketSpread",
+              "type": "uint256"
+            }
+          ],
+          "name": "PositionLiquidated",
+          "type": "event"
+        },
+        "0x39cf7e0047b8651259e011d0b3ed8fc2c3dc2e49ed041f1651f06429698c1c94": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "address",
+              "name": "_userId",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "_marketId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_timeStamp",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newLongShares",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newShortShares",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newMeanEntryPrice",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newMeanEntrySpread",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newMeanEntryLeverage",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_newLiquidationPrice",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_mint",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "_burn",
+              "type": "uint256"
+            }
+          ],
+          "name": "PositionUpdated",
+          "type": "event"
+        },
+        "0x8c75318cfd6a0eae2329289b6827fd382e7324865986be09126ce67fc55bedc2": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "_orderId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "oldTimestamp",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "newTimestamp",
+              "type": "uint256"
+            }
+          ],
+          "name": "ResetTimestampInOrder",
+          "type": "event"
+        },
+        "0x0e481d74d8df30e9a6f264be42788c761e1a1eaaaa55515ff0e93c1a3cc40eec": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "newInterestRate",
+              "type": "uint256"
+            }
+          ],
+          "name": "SetLeverageInterestRate",
+          "type": "event"
+        },
+        "0x35ea872e77adbec19df83a66765d5bdc0adfe73d9ada9518cb384242ddb40d5d": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "positionHash",
+              "type": "bytes32"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "sender",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "marketId",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "timeStamp",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "longShares",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "shortShares",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "meanEntryPrice",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "meanEntrySpread",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "meanEntryLeverage",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "liquidationPrice",
+              "type": "uint256"
+            }
+          ],
+          "name": "SetPosition",
+          "type": "event"
+        }
+      },
+      "links": {},
+      "address": "0x22F80144b1b19605AC0895677193AD03d25D35A9"
+    },
     "1647502067158": {
       "events": {},
       "links": {},
@@ -89027,7 +89509,7 @@
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2024-02-16T09:53:19.725Z",
+  "updatedAt": "2024-06-25T08:12:26.358Z",
   "networkType": "ethereum",
   "devdoc": {
     "events": {

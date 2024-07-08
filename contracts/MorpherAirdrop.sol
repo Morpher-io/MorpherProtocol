@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -31,7 +31,7 @@ contract MorpherAirdrop is Ownable {
     event AirdropSent(address indexed _operator, address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
     event SetAirdropAuthorized(address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
 
-    constructor(address _airdropAdminAddress, address _morpherToken, address _coldStorageOwnerAddress) {
+    constructor(address _airdropAdminAddress, address _morpherToken, address _coldStorageOwnerAddress) Ownable(msg.sender){
         setAirdropAdmin(_airdropAdminAddress);
         setMorpherTokenAddress(_morpherToken);
         transferOwnership(_coldStorageOwnerAddress);
