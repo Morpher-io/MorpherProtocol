@@ -1,9 +1,13 @@
 [profile.default]
 src = 'contracts'
 out = 'build/contracts/foundry'
-libs = ['installed_contracts']
+libs = ['lib']
 test = "test_forge"
 auto_detect_solc = true
 
-
+#openzeppelin contract upgrades
+ffi = true
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
