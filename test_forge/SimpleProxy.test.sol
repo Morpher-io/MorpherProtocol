@@ -4,8 +4,8 @@ pragma solidity ^0.8.11;
 import "forge-std/Test.sol";
 import "../contracts/MorpherAccessControl.sol";
 import "../contracts/MorpherState.sol";
-import "../installed_contracts/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import "../installed_contracts/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
+import "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract SimpleProxy is Test {
 	using stdStorage for StdStorage;
