@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "./BaseSetup.sol";
-import "murky/Merkle.sol";
+import "murky/src/Merkle.sol";
 import "../contracts/MorpherBridge.sol";
 
 contract MorpherBridgeTest is BaseSetup, MorpherBridge {
@@ -13,7 +13,7 @@ contract MorpherBridgeTest is BaseSetup, MorpherBridge {
 		morpherToken.mint(address(this), 10000 ether);
 	}
 
-	function testHasRole() public {
+	function testHasRole() public view {
 		assertEq(morpherAccessControl.hasRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this)), true);
 	}
 
