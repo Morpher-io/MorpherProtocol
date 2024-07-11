@@ -18,7 +18,7 @@ contract MorpherFaucet is Ownable {
     event MorpherFaucetTopUp(address indexed _receiver, uint _amount);
     event MorpherFaucetFillUpAmountChanged(uint _oldAmount, uint _newAmount);
 
-    constructor(address payable _morpherToken, address _coldStorageOwnerAddress, uint _fillUpAmount) Ownable(msg.sender) {
+    constructor(address payable _morpherToken, address _coldStorageOwnerAddress, uint _fillUpAmount) Ownable() {
         morpherToken = MorpherToken(_morpherToken);
         transferOwnership(_coldStorageOwnerAddress);
         setFillUpAmount(_fillUpAmount);

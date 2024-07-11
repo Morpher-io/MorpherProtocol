@@ -96,7 +96,7 @@ contract MorpherTokenPaymaster is BasePaymaster, UniswapHelper, OracleHelper {
     _uniswapHelperConfig
     )
     Ownable(
-        msg.sender
+        
     )
     {
         setTokenPaymasterConfig(_tokenPaymasterConfig);
