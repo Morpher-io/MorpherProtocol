@@ -10,8 +10,8 @@ import "./MorpherTradeEngine.sol";
 // Writing access is only granted to platform contracts. The contract can be paused
 // by an elected platform administrator (see MorpherGovernance) to perform protocol updates.
 // ----------------------------------------------------------------------------------
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherState.sol:MorpherState
 
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherState.sol:MorpherState
 contract MorpherState is Initializable, ContextUpgradeable  {
 
     address public morpherAccessControlAddress;

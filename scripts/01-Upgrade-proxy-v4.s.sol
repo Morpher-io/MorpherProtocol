@@ -20,14 +20,12 @@ contract UpgradeProxyV4Versions is Script {
 		console.log(address(this));
 		console.log(msg.sender);
 
-string[] memory inputs = new string[](2);
-inputs[0] = "node";
-inputs[1] = "scripts/dl_source.js";
 
-bytes memory res = vm.ffi(inputs);
-// assertEq(string(res), "gm");
-		//  Options memory opts;
-		// Upgrades.validateUpgrade("MorpherAccessControl.sol", opts);
-		// Upgrades.validateUpgrade("MorpherState.sol", opts);
+		 Options memory opts;
+		Upgrades.validateUpgrade("MorpherAccessControl.sol", opts);
+		Upgrades.validateUpgrade("MorpherState.sol", opts);
+		Upgrades.validateUpgrade("MorpherToken.sol", opts);
+		Upgrades.validateUpgrade("MorpherTradeEngine.sol", opts);
+		Upgrades.validateUpgrade("MorpherOracle.sol", opts);
 	}
 }

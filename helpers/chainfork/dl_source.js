@@ -1,10 +1,18 @@
 const fs = require('node:fs');
 const path = require('node:path');
 (async () => {
-    await getAndWriteContract("0x1ce1efda5d52de421bd3bc1ccc85977d7a0a0f1e");
+    console.log("Downloading old contracts for comparison");
+    await getAndWriteContract("0x1ce1efda5d52de421bd3bc1ccc85977d7a0a0f1e"); //MorpherState
+    await new Promise((res) => setTimeout(res, 5000));
+    await getAndWriteContract("0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A"); //MorpherOracle
+    // await new Promise((res) => setTimeout(res, 5000));
+    // await getAndWriteContract("0x65C9e3289e5949134759119DBc9F862E8d6F2fBE"); //MorpherToken - getting downloaded via MorpherState
+    await new Promise((res) => setTimeout(res, 5000));
+    await getAndWriteContract("0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5"); 
 })()
 
 async function getAndWriteContract(contractAddress, level = 1) {
+    //can load a few free requests before limiting without API key...
     let content = await fetch(`https://api.polygonscan.com/api?module=contract&action=getsourcecode&address=${contractAddress}&apikey=YourApiKeyToken`)
     let json = await content.json();
 

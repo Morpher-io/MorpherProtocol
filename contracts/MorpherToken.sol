@@ -8,6 +8,8 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.
 import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 import "./MorpherAccessControl.sol";
 
+
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherToken.sol:MorpherToken
 contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	MorpherAccessControl public morpherAccessControl;
 

@@ -2,10 +2,6 @@
 
 #!/bin/bash
 
-
-
-set -m
-
 # download the last contracts from polygon
 # Absolute path to this script, e.g. /home/user/bin/foo.sh
 SCRIPT=$(readlink -f "$0")
@@ -13,22 +9,23 @@ SCRIPT=$(readlink -f "$0")
 SCRIPTPATH=$(dirname "$SCRIPT")
 echo $SCRIPTPATH
 cd $SCRIPTPATH
-export $(grep -v '^#' ../../.env | xargs)
-# node dl_source.js
 
-# Start the program in the background
-anvil -f $FORK_URL  &
+echo $ANVILDOMAIN
 
-# Capture the job ID using 'jobs'
-JOB_ID=$(jobs -l | grep "anvil" | awk '{print $1}' | tr -d '[]+')
+node dl_source.js
+
+
+: "${ANVILDOMAIN:=localhost}"
+
+echo $ANVILDOMAIN
 
 # Wait until the port is open
-while ! nc -z localhost 8545; do   
+while ! nc -z $ANVILDOMAIN 8545; do   
   sleep 1
 done
 
 # Use curl to access the RPC port opened by the program
-curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":67}' http://localhost:8545 | jq .result
+curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":67}' http://$ANVILDOMAIN:8545 | jq .result
 
 BALANCEOF=$(curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_call","params": [
         {
@@ -36,7 +33,7 @@ BALANCEOF=$(curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrp
             "to": "0x65C9e3289e5949134759119DBc9F862E8d6F2fBE"
         },
         "latest"
-    ],"id":68}' http://localhost:8545 | jq -r .result)
+    ],"id":68}' http://$ANVILDOMAIN:8545 | jq -r .result)
 
 echo $BALANCEOF
 echo "\n"
@@ -48,7 +45,7 @@ PROXYADMINVAR=$(curl -s -X POST -H "Content-Type: application/json" --data '{"js
         "0x65C9e3289e5949134759119DBc9F862E8d6F2fBE",
         "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103",
         "latest"
-    ],"id":68}' http://localhost:8545 | jq -r .result)
+    ],"id":68}' http://$ANVILDOMAIN:8545 | jq -r .result)
 
 PROXYADMIN="0x${PROXYADMINVAR:26}"
 echo "\n";
@@ -62,28 +59,23 @@ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","me
         "'"$PROXYADMIN"'",
         "0x0",
         "latest"
-    ],"id":69}' http://localhost:8545 | jq -r .result
+    ],"id":69}' http://$ANVILDOMAIN:8545 | jq -r .result
 echo "SETTING new Proxy Admin $NEWADMIN"
 
 curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"hardhat_setStorageAt","params": [
         "'"$PROXYADMIN"'",
         "0x0",
         "'"$NEWADMIN"'"
-    ],"id":70}' http://localhost:8545 | jq -r .resut
+    ],"id":70}' http://$ANVILDOMAIN:8545 | jq -r .resut
 
 
 curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getStorageAt","params": [
         "'"$PROXYADMIN"'",
         "0x0",
         "latest"
-    ],"id":71}' http://localhost:8545 | jq -r .result
+    ],"id":71}' http://$ANVILDOMAIN:8545 | jq -r .result
 
 echo "Deploying new contracts"
 
 cd $SCRIPTPATH/../../
-forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0x720B9742632566b76B53B60Eee8d5FDC20aC74bE --unlocked --chain-id 137 -vvvv --force
-
-
-# Bring the background program back to the foreground using the job ID
-fg %$JOB_ID
-
+forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url http://$ANVILDOMAIN:8545 --broadcast --sender 0x720B9742632566b76B53B60Eee8d5FDC20aC74bE --unlocked --chain-id 137 -vvvv --force

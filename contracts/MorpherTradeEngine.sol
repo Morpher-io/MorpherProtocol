@@ -22,6 +22,7 @@ import "./MorpherAccessControl.sol";
 // portfolios are stored in state.
 // ----------------------------------------------------------------------------------
 
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherTradeEngine.sol:MorpherTradeEngine
 contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	MorpherState public morpherState;
 

@@ -1,0 +1,26 @@
+version: "3"
+services:
+    contracts:
+        build:
+            context: ./
+            dockerfile: Dockerfile
+        image: aa
+        environment:
+            ANVILDOMAIN: "anvil"
+        env_file:
+            - .env
+        restart: always
+        depends_on:
+            - anvil
+    anvil:
+        build:
+            context: ./
+            dockerfile: Dockerfile
+        image: aa
+        environment:
+            ANVILDOMAIN: "anvil"
+        env_file:
+            - .env
+        restart: always
+        command: "anvil -f $${FORK_URL} --host 0.0.0.0"
+          
