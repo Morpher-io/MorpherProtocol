@@ -14,7 +14,7 @@ SCRIPTPATH=$(dirname "$SCRIPT")
 echo $SCRIPTPATH
 cd $SCRIPTPATH
 export $(grep -v '^#' ../../.env | xargs)
-# node dl_source.js
+node dl_source.js
 
 # Start the program in the background
 anvil -f $FORK_URL  &
@@ -54,8 +54,8 @@ PROXYADMIN="0x${PROXYADMINVAR:26}"
 echo "\n";
 echo $PROXYADMIN
 
-NEWADMIN="0x000000000000000000000000720b9742632566b76b53b60eee8d5fdc20ac74be"
-# NEWADMIN="0x000000000000000000000000f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+# NEWADMIN="0x000000000000000000000000720b9742632566b76b53b60eee8d5fdc20ac74be"
+NEWADMIN="0x000000000000000000000000f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
 echo "OLD ProxyAdmin"
 curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getStorageAt","params": [
@@ -81,7 +81,8 @@ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","me
 echo "Deploying new contracts"
 
 cd $SCRIPTPATH/../../
-forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0x720B9742632566b76B53B60Eee8d5FDC20aC74bE --unlocked --chain-id 137 -vvvv --force
+# forge script ./scripts/00-fund-deployer.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --unlocked --chain-id 137 -vvvv --force
+forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --unlocked --chain-id 137 -vvvv --force
 
 
 # Bring the background program back to the foreground using the job ID
