@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "./BaseSetup.sol";
-import "murky/src/Merkle.sol";
+import "murky/Merkle.sol";
 import "../contracts/MorpherBridge.sol";
 
 contract MorpherBridgeTest is BaseSetup, MorpherBridge {
