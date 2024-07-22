@@ -10,7 +10,7 @@ SCRIPTPATH=$(dirname "$SCRIPT")
 # echo $SCRIPTPATH
 cd $SCRIPTPATH
 export $(grep -v '^#' ../../.env | xargs)
-node dl_source.js
+# node dl_source.js
 
 # Start the program in the background
 anvil -b 5 -f $FORK_URL  &
