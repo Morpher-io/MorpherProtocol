@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.11;
+pragma solidity =0.8.15;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
