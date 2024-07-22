@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.15;
+pragma solidity =0.8.15;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
 
