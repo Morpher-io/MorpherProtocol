@@ -32,7 +32,7 @@ BALANCEOF=$(curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrp
             "to": "0x65C9e3289e5949134759119DBc9F862E8d6F2fBE"
         },
         "latest"
-    ],"id":68}' http://localhost:8545 | jq -r .result)
+    ],"id":68}' ${ADMIN_RPC} | jq -r .result)
 
 echo $BALANCEOF
 echo "\n"
@@ -44,7 +44,7 @@ PROXYADMINVAR=$(curl -s -X POST -H "Content-Type: application/json" --data '{"js
         "0x65C9e3289e5949134759119DBc9F862E8d6F2fBE",
         "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103",
         "latest"
-    ],"id":68}' http://localhost:8545 | jq -r .result)
+    ],"id":68}' ${ADMIN_RPC} | jq -r .result)
 
 PROXYADMIN="0x${PROXYADMINVAR:26}"
 echo "\n";
@@ -58,21 +58,21 @@ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","me
         "'"$PROXYADMIN"'",
         "0x0",
         "latest"
-    ],"id":69}' http://localhost:8545 | jq -r .result
+    ],"id":69}' ${ADMIN_RPC} | jq -r .result
 echo "SETTING new Proxy Admin $NEWADMIN"
 
 curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"hardhat_setStorageAt","params": [
         "'"$PROXYADMIN"'",
         "0x0",
         "'"$NEWADMIN"'"
-    ],"id":70}' http://localhost:8545 | jq -r .resut
+    ],"id":70}' ${ADMIN_RPC} | jq -r .resut
 
 
 curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getStorageAt","params": [
         "'"$PROXYADMIN"'",
         "0x0",
         "latest"
-    ],"id":71}' http://localhost:8545 | jq -r .result
+    ],"id":71}' ${ADMIN_RPC} | jq -r .result
 
 echo "Funding Dev Address"
 curl -s -X POST -H "Content-Type: application/json" --data  \
@@ -87,7 +87,7 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
     "gasPrice": "0xFFFFFF"
   }],
   "id":71
-}' "http://127.0.0.1:8545" | jq -r .result
+}' ${ADMIN_RPC} | jq -r .result
 
 curl -s -X POST -H "Content-Type: application/json" --data  \
 '{
@@ -95,7 +95,7 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
   "method":"anvil_setBalance",
   "params":["0x720B9742632566b76B53B60Eee8d5FDC20aC74bE","0x021e19e0c9bab2400000"],
   "id":72
-}' "http://127.0.0.1:8545" | jq -r .result
+}' ${ADMIN_RPC} | jq -r .result
 
 curl -s -X POST -H "Content-Type: application/json" --data  \
 '{
@@ -103,7 +103,7 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
   "method":"anvil_setBalance",
   "params":["0x65C9e3289e5949134759119DBc9F862E8d6F2fBE","0x021e19e0c9bab2400000"],
   "id":72
-}' "http://127.0.0.1:8545" | jq -r .result
+}' ${ADMIN_RPC} | jq -r .result
 
 echo "Setting Dev Permissions - callback accounts"
 curl -s -X POST -H "Content-Type: application/json" --data  \
@@ -118,7 +118,7 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
     "gasPrice": "0xFFFFFF"
   }],
   "id":73
-}' "http://127.0.0.1:8545" | jq -r .result
+}' ${ADMIN_RPC} | jq -r .result
 curl -s -X POST -H "Content-Type: application/json" --data  \
 '{
   "jsonrpc":"2.0",
@@ -131,7 +131,7 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
     "gasPrice": "0xFFFFFF"
   }],
   "id":73
-}' "http://127.0.0.1:8545" | jq -r .result
+}' ${ADMIN_RPC} | jq -r .result
 curl -s -X POST -H "Content-Type: application/json" --data  \
 '{
   "jsonrpc":"2.0",
@@ -144,14 +144,55 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
     "gasPrice": "0xFFFFFF"
   }],
   "id":73
-}' "http://127.0.0.1:8545" | jq -r .result
+}' ${ADMIN_RPC} | jq -r .result
+
+##add trade engine as minter and burner
+curl -s -X POST -H "Content-Type: application/json" --data  \
+'{
+  "jsonrpc":"2.0",
+  "method":"eth_sendUnsignedTransaction",
+  "params":[{
+    "from": "0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762",
+    "to": "0x139950831d8338487db6807c6FdAeD1827726dF2",
+    "data": "0x2f2ff15d9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6000000000000000000000000005cb9ad7c713bff25ed07f3d9e1c3945e543cd5",
+    "gas": "0x20EF3F",
+    "gasPrice": "0xFFFFFF"
+  }],
+  "id":73
+}' ${ADMIN_RPC} | jq -r .result
+curl -s -X POST -H "Content-Type: application/json" --data  \
+'{
+  "jsonrpc":"2.0",
+  "method":"eth_sendUnsignedTransaction",
+  "params":[{
+    "from": "0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762",
+    "to": "0x139950831d8338487db6807c6FdAeD1827726dF2",
+    "data": "0x2f2ff15d3c11d16cbaffd01df69ce1c404f6340ee057498f5f00246190ea54220576a848000000000000000000000000005cb9ad7c713bff25ed07f3d9e1c3945e543cd5",
+    "gas": "0x20EF3F",
+    "gasPrice": "0xFFFFFF"
+  }],
+  "id":73
+}' ${ADMIN_RPC}| jq -r .result
+curl -s -X POST -H "Content-Type: application/json" --data  \
+'{
+  "jsonrpc":"2.0",
+  "method":"eth_sendUnsignedTransaction",
+  "params":[{
+    "from": "0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762",
+    "to": "0x139950831d8338487db6807c6FdAeD1827726dF2",
+    "data": "0x2f2ff15de5a0b4d50f56047f84728557fedbda92f956391bc9d5c762e8461996dd8e7ad7000000000000000000000000a6c5c9c90910c9c12f31c0eb7997c24dddc75afe",
+    "gas": "0x20EF3F",
+    "gasPrice": "0xFFFFFF"
+  }],
+  "id":73
+}' ${ADMIN_RPC}| jq -r .result
 
 
 echo "Deploying new contracts"
 
 cd $SCRIPTPATH/../../
 # forge script ./scripts/00-fund-deployer.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --unlocked --chain-id 137 -vvvv --force
-forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --unlocked --chain-id 137 -vvvv --force
+forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url ${ADMIN_RPC} --broadcast --chain-id 137 -vvvv --force
 
 
 # Bring the background program back to the foreground using the job ID
