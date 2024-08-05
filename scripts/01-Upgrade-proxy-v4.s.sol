@@ -10,6 +10,7 @@ import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
 import {ProxyAdmin} from "openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 
+import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {MorpherOracle} from "../contracts/MorpherOracle.sol";
 import {MorpherTradeEngine} from "../contracts/MorpherTradeEngine.sol";
 import {MorpherPriceOracle} from "../contracts/MorpherPriceOracle.sol";
@@ -38,64 +39,73 @@ contract UpgradeProxyV4Versions is Script {
 		console.log(msg.sender);
 		console.log(address(msg.sender).balance);
 
-		Options memory opts;
-		Upgrades.validateUpgrade("MorpherAccessControl.sol", opts);
-		Upgrades.validateUpgrade("MorpherState.sol", opts);
-		Upgrades.validateUpgrade("MorpherToken.sol", opts);
-		Upgrades.validateUpgrade("MorpherTradeEngine.sol", opts);
-		Upgrades.validateUpgrade("MorpherOracle.sol", opts);
+		// Options memory opts;
+		// Upgrades.validateUpgrade("MorpherAccessControl.sol", opts);
+		// Upgrades.validateUpgrade("MorpherState.sol", opts);
+		// Upgrades.validateUpgrade("MorpherToken.sol", opts);
+		// Upgrades.validateUpgrade("MorpherTradeEngine.sol", opts);
+		// Upgrades.validateUpgrade("MorpherOracle.sol", opts);
 
 		address oracleProxyAddress = 0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A;
 		MorpherOracle newOracle = new MorpherOracle();
+		
 		admin.upgrade(ITransparentUpgradeableProxy(oracleProxyAddress), address(newOracle));
+		MorpherOracle oracleInstance = MorpherOracle(oracleProxyAddress);
+		oracleInstance.setWmaticAddress(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270);
 
-		address tradeEngineAddress = 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5;
-		MorpherTradeEngine newTradeEngine = new MorpherTradeEngine();
-		admin.upgrade(ITransparentUpgradeableProxy(tradeEngineAddress), address(newTradeEngine));
+		// address tradeEngineAddress = 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5;
+		// MorpherTradeEngine newTradeEngine = new MorpherTradeEngine();
+		// admin.upgrade(ITransparentUpgradeableProxy(tradeEngineAddress), address(newTradeEngine));
 
-		address morpherTokenAddress = 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE;
-		address wmaticAddress = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
-		address uniswapQuoterAddress = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
+		// address morpherTokenAddress = 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE;
+		// MorpherToken newMorpherToken = new MorpherToken();
+		// admin.upgrade(ITransparentUpgradeableProxy(morpherTokenAddress), address(newMorpherToken));
+		// MorpherToken tokenProxy = MorpherToken(morpherTokenAddress);
+		// tokenProxy.setHashedName("MorpherToken");
+		// tokenProxy.setHashedVersion("1");
 
-		MorpherPriceOracle morpherPriceOracle = new MorpherPriceOracle(
-			morpherTokenAddress,
-			wmaticAddress,
-			uniswapQuoterAddress
-		);
+		// address wmaticAddress = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+		// address uniswapQuoterAddress = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
 
-		console.log("Price Oracle", address(morpherPriceOracle));
+		// MorpherPriceOracle morpherPriceOracle = new MorpherPriceOracle(
+		// 	morpherTokenAddress,
+		// 	wmaticAddress,
+		// 	uniswapQuoterAddress
+		// );
 
-		address entryPointV6Address = 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
-		address uniswapV3Router2Address = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
+		// console.log("Price Oracle", address(morpherPriceOracle));
 
-		MorpherTokenPaymaster.TokenPaymasterConfig memory tokenPaymasterConfig = MorpherTokenPaymaster
-			.TokenPaymasterConfig(1e26, 100000000000000, 20000, 60);
-		OracleHelper.OracleHelperConfig memory oracleHelperConfig = OracleHelper.OracleHelperConfig(
-			60,
-			60,
-			IOracle(address(morpherPriceOracle)),
-			IOracle(address(0)),
-			true,
-			false,
-			false,
-			100000
-		);
+		// address entryPointV6Address = 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
+		// address uniswapV3Router2Address = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
 
-		UniswapHelper.UniswapHelperConfig memory uniswapHelperConfig = UniswapHelper.UniswapHelperConfig(
-			100000000,
-			300,
-			100
-		);
-		MorpherTokenPaymaster tokenPaymaster = new MorpherTokenPaymaster(
-			IERC20Metadata(morpherTokenAddress),
-			IEntryPoint(entryPointV6Address),
-			IERC20Metadata(wmaticAddress),
-			ISwapRouter(uniswapV3Router2Address),
-			tokenPaymasterConfig,
-			oracleHelperConfig,
-			uniswapHelperConfig,
-			msg.sender
-		);
-		console.log("Token Paymaster", address(tokenPaymaster));
+		// MorpherTokenPaymaster.TokenPaymasterConfig memory tokenPaymasterConfig = MorpherTokenPaymaster
+		// 	.TokenPaymasterConfig(1e26, 100000000000000, 20000, 60);
+		// OracleHelper.OracleHelperConfig memory oracleHelperConfig = OracleHelper.OracleHelperConfig(
+		// 	60,
+		// 	60,
+		// 	IOracle(address(morpherPriceOracle)),
+		// 	IOracle(address(0)),
+		// 	true,
+		// 	false,
+		// 	false,
+		// 	100000
+		// );
+
+		// UniswapHelper.UniswapHelperConfig memory uniswapHelperConfig = UniswapHelper.UniswapHelperConfig(
+		// 	100000000,
+		// 	300,
+		// 	100
+		// );
+		// MorpherTokenPaymaster tokenPaymaster = new MorpherTokenPaymaster(
+		// 	IERC20Metadata(morpherTokenAddress),
+		// 	IEntryPoint(entryPointV6Address),
+		// 	IERC20Metadata(wmaticAddress),
+		// 	ISwapRouter(uniswapV3Router2Address),
+		// 	tokenPaymasterConfig,
+		// 	oracleHelperConfig,
+		// 	uniswapHelperConfig,
+		// 	msg.sender
+		// );
+		// console.log("Token Paymaster", address(tokenPaymaster));
 	}
 }

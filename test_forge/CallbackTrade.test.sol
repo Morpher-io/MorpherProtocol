@@ -26,7 +26,20 @@ import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/exten
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 
 import {ITransparentUpgradeableProxy} from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
+interface UniswapQuoter {
+	function factory() external view returns (address);
+	function WETH9() external view returns (address);
+
+	function quoteExactOutputSingle(
+		address tokenIn,
+		address tokenOut,
+		uint24 fee,
+		uint256 amountOut,
+		uint160 sqrtPriceLimitX96
+	) external view returns (uint256 amountIn);
+}
 // Test if callbacks are working
 // forge test --match-test testCallbackOracle --fork-url=...
 contract CallbackTrade is Test {
@@ -37,16 +50,40 @@ contract CallbackTrade is Test {
 	bytes32 public constant CRYPTO_BTC = keccak256("CRYPTO_BTC");
 	bytes32 public constant CRYPTO_ETH = keccak256("CTYPTO_ETH");
 
-	function testCallbackOracle() public {
+	function testPoolAddress() public {
+		address morpherTokenAddress = 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE;
+		address wmaticAddress = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+		address uniswapQuoterAddress = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
 
+		MorpherPriceOracle morpherPriceOracle = new MorpherPriceOracle(
+			morpherTokenAddress,
+			wmaticAddress,
+			uniswapQuoterAddress
+		);
+
+		console.log("Price Oracle", address(morpherPriceOracle));
+		UniswapQuoter quoter = UniswapQuoter(uniswapQuoterAddress);
+		console.log(quoter.factory());
+		console.log(wmaticAddress);
+		console.log(morpherTokenAddress);
+		console.log(
+			morpherPriceOracle.computeAddress(
+				quoter.factory(),
+				PoolAddress.getPoolKey(wmaticAddress, morpherTokenAddress, 3000)
+			)
+		);
+	}
+
+
+	function testCallbackOracle() public {
 		MorpherState state = MorpherState(morpherStateAddress);
 		MorpherTradeEngine tradeEngine = MorpherTradeEngine(tradeEngineAddress);
 		MorpherOracle oracle = MorpherOracle(oracleProxyAddress);
-        MorpherToken morpherToken = MorpherToken(state.morpherTokenAddress());
-        ProxyAdmin admin = ProxyAdmin(0x3cFa9C5F4238fe6200b73038b1e6daBb5F6b8A0a);
+		MorpherToken morpherToken = MorpherToken(state.morpherTokenAddress());
+		ProxyAdmin admin = ProxyAdmin(0x3cFa9C5F4238fe6200b73038b1e6daBb5F6b8A0a);
 
 		vm.startPrank(0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762);
-        MorpherOracle newOracle = new MorpherOracle();
+		MorpherOracle newOracle = new MorpherOracle();
 		admin.upgrade(ITransparentUpgradeableProxy(oracleProxyAddress), address(newOracle));
 
 		MorpherTradeEngine newTradeEngine = new MorpherTradeEngine();
@@ -66,18 +103,11 @@ contract CallbackTrade is Test {
 		state.activateMarket(CRYPTO_ETH);
 		vm.stopPrank();
 		vm.startPrank(0x5AD2d0Ebe451B9bC2550e600f2D2Acd31113053E);
-        bytes32 orderId = oracle.createOrder(CRYPTO_BTC, 0, 10 ether, true, 1e9, 0, 0, 0, 0);
+		bytes32 orderId = oracle.createOrder(CRYPTO_BTC, 0, 10 ether, true, 1e9, 0, 0, 0, 0);
 		vm.stopPrank();
 		vm.startPrank(0x58f0442c8F9C9ecd2a09b9De3f1D834068387304);
-		oracle.__callback(
-			orderId,
-			50000*1e9,
-			50000*1e9,
-			500*1e9,
-			0,
-			block.timestamp * 1000,
-			0
-		);
+		oracle.__callback(orderId, 50000 * 1e9, 50000 * 1e9, 500 * 1e9, 0, block.timestamp * 1000, 0);
 		vm.stopPrank();
 	}
+	
 }

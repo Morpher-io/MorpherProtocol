@@ -57,7 +57,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE"); //can pause oracle
 
 	uint delistMarketFromIx;
-	
+
 	using CountersUpgradeable for CountersUpgradeable.Counter;
 
 	/**
@@ -102,16 +102,12 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	uint24 public constant poolFee = 3000;
 
-
-
-	
 	mapping(bytes32 => TokenPermitEIP712Struct) closeOrderIdSwapToToken; //tokenAddress will be the target address, the permit needs to be for MPH and needs to be larger than the MPH amount to be closed otherwise it will fail.
 
 	address private msgSenderOverride;
-	
+
 	address public wMaticAddress;
 
-	
 	mapping(address => CountersUpgradeable.Counter) private _nonces;
 
 	// ----------------------------------------------------------------------------------
@@ -212,6 +208,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
 	event DelistMarketComplete(bytes32 _marketId);
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
+
+	/**
+	 * MPH Uniswap Conversion Events
+	 */
+	event MphCloseOrderSoftFail(bytes32 _orderId, uint _mphTokenAmountCloseOrder, uint _mphTokenAmountPermit); //used when on close order all tokens cannot be converted back, so it fails, but it will still close the position just keep it in MPH token then
 
 	/**
 	 * Overrides the msgSender Context to understand when a subsequent token sale happened
@@ -441,11 +442,12 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	//sent directly from the owner
 	function createOrderFromToken(
-		CreateOrderStruct memory createOrderParams,
+		CreateOrderStruct memory createOrderParams, //_openMphTokenAmount is the minimum swap amount (including slippage). the Actual token amount will be overwritten by the swapped output amount
 		TokenPermitEIP712Struct memory inputToken
 	) public {
 		if (createOrderParams._openMPHTokenAmount > 0) {
-			permitTransferAndSwap(inputToken, createOrderParams._openMPHTokenAmount);
+			uint mphTokenAmountAfterSwap = permitTransferAndSwap(inputToken, createOrderParams._openMPHTokenAmount);
+			createOrderParams._openMPHTokenAmount = mphTokenAmountAfterSwap; //overriding this as its exactInput for UI reasons
 			// require(createOrderParams.openMPHTokenAmount <= amountOut, "MorpherOracle: OpenMPHTokenAmount bigger than conversion amount, aborting"); //it does not matter, because total balance of MPH counts here more
 			createOrder(createOrderParams);
 		} else {
@@ -470,7 +472,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 				_PERMIT_TYPEHASH,
 				createOrderParams._marketId,
 				createOrderParams._closeSharesAmount,
-				createOrderParams._openMPHTokenAmount,
+				createOrderParams._openMPHTokenAmount, //minimum amount of MPH token to be traded with, actual amount depends on the swap
 				_addressPositionOwner,
 				_useNonce(_addressPositionOwner),
 				deadline
@@ -487,7 +489,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		msgSenderOverride = address(0);
 	}
 
-	function permitTransferAndSwap(TokenPermitEIP712Struct memory inputToken, uint256 mphTokenAmount) internal {
+	function permitTransferAndSwap(
+		TokenPermitEIP712Struct memory inputToken,
+		uint256 mphTokenAmount
+	) internal returns (uint amountOut) {
 		//increase allowance
 		IERC20Permit(inputToken.tokenAddress).permit(
 			inputToken.owner,
@@ -515,36 +520,47 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 		if (inputToken.tokenAddress != wMaticAddress) {
 			path = abi.encodePacked( //reversed path for exactOutput! FU oz!
-					state.morpherTokenAddress(),
+					inputToken.tokenAddress,
 					poolFee,
 					wMaticAddress,
 					poolFee,
-					inputToken.tokenAddress
+					state.morpherTokenAddress()
 				);
 		} else {
-			path = abi.encodePacked(state.morpherTokenAddress(), poolFee, wMaticAddress); //reversed path for exactOutput! FU oz!
+			path = abi.encodePacked(wMaticAddress, poolFee, state.morpherTokenAddress()); //reversed path for exactOutput! FU oz!
 		}
 
 		ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
-		ISwapRouter.ExactOutputParams memory outputSwapParams = ISwapRouter.ExactOutputParams({
+		ISwapRouter.ExactInputParams memory inputSwapParams = ISwapRouter.ExactInputParams({
 			path: path,
 			recipient: _msgSender(),
 			deadline: block.timestamp,
-			amountOut: mphTokenAmount,
-			amountInMaximum: inputToken.value //safeguarded by the permit functionality.
+			amountOutMinimum: mphTokenAmount,
+			amountIn: inputToken.value //safeguarded by the permit functionality.
 		});
 
-		uint amountIn = swapRouter.exactOutput(outputSwapParams);
+		amountOut = swapRouter.exactInput(inputSwapParams);
 
-		//TransferBack the remainder
-		IERC20Upgradeable(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
+		// ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
+		// ISwapRouter.ExactOutputParams memory outputSwapParams = ISwapRouter.ExactOutputParams({
+		// 	path: path,
+		// 	recipient: _msgSender(),
+		// 	deadline: block.timestamp,
+		// 	amountOut: mphTokenAmount,
+		// 	amountInMaximum: inputToken.value //safeguarded by the permit functionality.
+		// });
+
+		// uint amountIn = swapRouter.exactOutput(outputSwapParams);
+
+		// //TransferBack the remainder
+		// IERC20Upgradeable(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
 
 		//reset the approved amounts
 		IERC20Upgradeable(inputToken.tokenAddress).approve(address(UNISWAP_ROUTER), 0);
 		IERC20Upgradeable(state.morpherTokenAddress()).approve(address(UNISWAP_ROUTER), 0);
 	}
 
-	function convertMphAndPayout(bytes32 orderId) internal {
+	function convertMphAndPayout(bytes32 orderId, uint mphTokenAmount) internal {
 		//convert the MPH paid out by the close order back to the
 		if (closeOrderIdSwapToToken[orderId].tokenAddress != address(0)) {
 			ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
@@ -560,16 +576,32 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 				inputToken.r,
 				inputToken.s
 			);
+			delete closeOrderIdSwapToToken[orderId];
 
-			MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
-			(, , , , , , , , , , , MorpherTradeEngine.OrderModifier memory oldOrder) = tradeEngine.orders(orderId);
-			uint mphTokenAmount = oldOrder.balanceUp;
+			// MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+			// (, , , , , , , , , , , MorpherTradeEngine.OrderModifier memory oldOrder) = tradeEngine.orders(orderId);
+			// uint mphTokenAmount = oldOrder.balanceUp; //never try to transfer more than the user gave permission for
+			if (mphTokenAmount > inputToken.value) {
+				emit MphCloseOrderSoftFail(orderId, mphTokenAmount, inputToken.value);
+				return; //do nothing here, don't error out, just keep the MPH.
+			}
 
-			SafeERC20Upgradeable.safeApprove(
+			// Transfer `MPH payout` of Close position to this contract.
+			SafeERC20Upgradeable.safeTransferFrom(
 				IERC20Upgradeable(state.morpherTokenAddress()),
-				address(swapRouter),
+				inputToken.owner,
+				address(this),
 				mphTokenAmount
 			);
+
+			// Approve the router to spend the token.
+			IERC20Upgradeable(state.morpherTokenAddress()).approve(address(UNISWAP_ROUTER), mphTokenAmount);
+
+			// SafeERC20Upgradeable.safeApprove(
+			// 	IERC20Upgradeable(state.morpherTokenAddress()),
+			// 	address(swapRouter),
+			// 	mphTokenAmount
+			// );
 			ISwapRouter.ExactInputParams memory backConvertParams = ISwapRouter.ExactInputParams({
 				path: abi.encodePacked(
 					state.morpherTokenAddress(),
@@ -580,12 +612,13 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 				),
 				recipient: inputToken.owner,
 				deadline: block.timestamp,
-				amountIn: inputToken.value,
+				amountIn: mphTokenAmount,
 				amountOutMinimum: inputToken.minOutValue
 			});
 
 			// swap the remaining token back
 			swapRouter.exactInput(backConvertParams);
+			IERC20Upgradeable(state.morpherTokenAddress()).approve(address(UNISWAP_ROUTER), 0);
 		}
 	}
 
@@ -793,6 +826,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		uint256 _gasForNextCallback
 	) public onlyRole(ORACLEOPERATOR_ROLE) whenNotPaused returns (MorpherTradeEngine.position memory createdPosition) {
 		require(checkOrderConditions(_orderId, _price), "MorpherOracle Error: Order Conditions are not met");
+		(address positionOwnerAddress, , , , , , , , , , , ) = MorpherTradeEngine(state.morpherTradeEngineAddress())
+			.orders(_orderId);
+		uint balanceBeforeClose = IERC20Upgradeable(state.morpherTokenAddress()).balanceOf(positionOwnerAddress);
 
 		createdPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(
 			_orderId,
@@ -818,6 +854,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			createdPosition.liquidationPrice
 		);
 		setGasForCallback(_gasForNextCallback);
+
+		uint balanceBeforeAfter = IERC20Upgradeable(state.morpherTokenAddress()).balanceOf(positionOwnerAddress);
+		if (balanceBeforeAfter > balanceBeforeClose) {
+			convertMphAndPayout(_orderId, balanceBeforeAfter - balanceBeforeClose);
+		}
 		return createdPosition;
 	}
 
@@ -825,7 +866,6 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	// delistMarket(bytes32 _marketId)
 	// Administrator closes out all existing positions on _marketId market at current prices
 	// ----------------------------------------------------------------------------------
-
 
 	function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyRole(ADMINISTRATOR_ROLE) {
 		require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
