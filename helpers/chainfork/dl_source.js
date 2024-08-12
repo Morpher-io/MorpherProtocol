@@ -13,7 +13,7 @@ const path = require('node:path');
 
 async function getAndWriteContract(contractAddress, level = 1) {
     //can load a few free requests before limiting without API key...
-    let content = await fetch(`https://api.polygonscan.com/api?module=contract&action=getsourcecode&address=${contractAddress}&apikey=YourApiKeyToken`)
+    let content = await fetch(`https://api.polygonscan.com/api?module=contract&action=getsourcecode&address=${contractAddress}&apikey=${process.env.POLYGON_KEY}`)
     let json = await content.json();
 
     try {
@@ -35,6 +35,8 @@ async function getAndWriteContract(contractAddress, level = 1) {
             }
         }
     } catch (e) {
+        console.error(e);
+        console.error(json);
         try {
             if (!fs.existsSync(`./../../contracts/prev/`)) {
                 fs.mkdirSync(`./../../contracts/prev/`, { recursive: true });

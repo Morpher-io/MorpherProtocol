@@ -1,6 +1,6 @@
 
 
-#!/bin/bash
+#!/bin/sh
 
 # download the last contracts from polygon
 # Absolute path to this script, e.g. /home/user/bin/foo.sh

@@ -12,14 +12,20 @@ cd $SCRIPTPATH
 export $(grep -v '^#' ../../.env | xargs)
 # node dl_source.js
 
+ADMIN_RPC="http://localhost:8545"
+
 # Start the program in the background
-anvil -b 5 -f $FORK_URL  &
+anvil -b 5 -f $FORK_URL --host 0.0.0.0 &
 
 # Capture the job ID using 'jobs'
 JOB_ID=$(jobs -l | grep "anvil" | awk '{print $1}' | tr -d '[]+')
 
+echo $JOB_ID
+
+IP_ADDRESS=$(hostname -i)
+
 # Wait until the port is open
-while ! nc -z localhost 8545; do   
+while ! nc -z $IP_ADDRESS 8545; do   
   sleep 1
 done
 
@@ -200,14 +206,14 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
     "gasPrice": "0xFFFFFF"
   }],
   "id":73
-}' ${ADMIN_RPC}| jq -r .result
+}' ${ADMIN_RPC} | jq -r .result
 
 
 echo "Deploying new contracts"
 
 cd $SCRIPTPATH/../../
 # forge script ./scripts/00-fund-deployer.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --unlocked --chain-id 137 -vvvv --force
-forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url ${ADMIN_RPC} --broadcast --chain-id 137 -vvvv --force
+forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url ${ADMIN_RPC} --slow --broadcast --chain-id 137 -vvvv --force
 
 
 # Bring the background program back to the foreground using the job ID
