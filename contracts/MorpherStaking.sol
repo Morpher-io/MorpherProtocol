@@ -102,7 +102,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     
     function updatePoolShareValue() public returns (uint256 _newPoolShareValue) {
         if (block.timestamp >= lastReward + INTERVAL) {
-            uint256 _numOfIntervals = block.timestamp - lastReward / INTERVAL;
+            uint256 _numOfIntervals = uint256(block.timestamp - lastReward) / INTERVAL;
             poolShareValue = poolShareValue + (_numOfIntervals * interestRate());
             lastReward = lastReward + (_numOfIntervals * (INTERVAL));
             emit PoolShareValueUpdated(lastReward, poolShareValue);
@@ -190,9 +190,10 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         if(numInterestRates == 0) {
             return 0;
         }
-        for(uint256 i = numInterestRates - 1; i >= 0; i--) {
-            if(interestRates[i].validFrom <= block.timestamp) {
-                return interestRates[i].rate;
+        // i gets -1 before checking it to be >= 0 causing underflow of uint
+        for(int256 i = int256(numInterestRates) - 1; i >= 0; i--) {
+            if(interestRates[uint256(i)].validFrom <= block.timestamp) {
+                return interestRates[uint256(i)].rate;
             }
         }
         return 0;

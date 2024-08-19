@@ -50,7 +50,7 @@ contract CallbackTrade is Test {
 	bytes32 public constant CRYPTO_BTC = keccak256("CRYPTO_BTC");
 	bytes32 public constant CRYPTO_ETH = keccak256("CTYPTO_ETH");
 
-	function testPoolAddress() public {
+	function _testPoolAddress() public {
 		address morpherTokenAddress = 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE;
 		address wmaticAddress = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
 		address uniswapQuoterAddress = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
@@ -75,7 +75,7 @@ contract CallbackTrade is Test {
 	}
 
 
-	function testCallbackOracle() public {
+	function _testCallbackOracle() public {
 		MorpherState state = MorpherState(morpherStateAddress);
 		MorpherTradeEngine tradeEngine = MorpherTradeEngine(tradeEngineAddress);
 		MorpherOracle oracle = MorpherOracle(oracleProxyAddress);

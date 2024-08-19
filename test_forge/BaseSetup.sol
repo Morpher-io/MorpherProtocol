@@ -77,6 +77,7 @@ contract BaseSetup is Test {
 		morpherToken.setRestrictTransfers(!isMainChain);
 
 		//deploy staking
+		vm.warp(1617094819);
 		morpherStaking = new MorpherStaking();
 		morpherStaking.initialize(address(morpherState));
 		morpherAccessControl.grantRole(
@@ -94,6 +95,7 @@ contract BaseSetup is Test {
 			address(morpherStaking)
 		);
     	morpherState.setMorpherStaking(payable(address(morpherStaking)));
+		vm.warp(1);
 
 		//deploy mintingLimiter
 		morpherMintingLimiter = new MorpherMintingLimiter(
@@ -116,6 +118,7 @@ contract BaseSetup is Test {
 			vm.warp(validFrom-100);
 			morpherTradeEngine.addInterestRate(rate, validFrom);
 		}
+		vm.warp(1);
 		morpherAccessControl.grantRole(
 			morpherToken.BURNER_ROLE(),
 			address(morpherTradeEngine)
