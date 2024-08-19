@@ -77,16 +77,59 @@ contract BaseSetup is Test {
 		morpherToken.setRestrictTransfers(!isMainChain);
 
 		//deploy staking
-		//TODO
+		morpherStaking = new MorpherStaking();
+		morpherStaking.initialize(address(morpherState));
+		morpherAccessControl.grantRole(
+      		morpherStaking.STAKINGADMIN_ROLE(),
+			address(this)
+    	);
+    	morpherStaking.addInterestRate(15000,1617094819);
+    	morpherStaking.addInterestRate(30000,1644491427);
+    	morpherAccessControl.grantRole(
+      		morpherToken.BURNER_ROLE(),
+      		address(morpherStaking)
+		);
+		morpherAccessControl.grantRole(
+			morpherToken.MINTER_ROLE(),
+			address(morpherStaking)
+		);
+    	morpherState.setMorpherStaking(payable(address(morpherStaking)));
 
 		//deploy mintingLimiter
-		//TODO
+		morpherMintingLimiter = new MorpherMintingLimiter(
+			address(morpherState),
+			500000000000000000000000,
+			5000000000000000000000000,
+			260000
+		);
+		morpherState.setMorpherMintingLimiter(address(morpherMintingLimiter));
+		morpherAccessControl.grantRole(
+			morpherToken.MINTER_ROLE(),
+			address(morpherMintingLimiter)
+		);
 
 		//deploy tradeEngine
-		//TODO
+		morpherTradeEngine = new MorpherTradeEngine();
+		morpherTradeEngine.initialize(address(morpherState), false, 1613399217);
+  		for (uint i = 0; i < morpherStaking.numInterestRates(); i++) {
+			(uint256 validFrom, uint256 rate) = morpherStaking.interestRates(i);
+			vm.warp(validFrom-100);
+			morpherTradeEngine.addInterestRate(rate, validFrom);
+		}
+		morpherAccessControl.grantRole(
+			morpherToken.BURNER_ROLE(),
+			address(morpherTradeEngine)
+		);
+		morpherAccessControl.grantRole(
+			morpherTradeEngine.POSITIONADMIN_ROLE(),
+			address(morpherTradeEngine)
+		);
+		morpherState.setMorpherTradeEngine(address(morpherTradeEngine));
 
 		//deploy oracle
-		//TODO
+		morpherOracle = new MorpherOracle();
+		morpherOracle.initialize(address(morpherState), payable(address(this)), 0);
+		morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this));
 
 		//deploy bridge
 		morpherBridge = new MorpherBridge();
