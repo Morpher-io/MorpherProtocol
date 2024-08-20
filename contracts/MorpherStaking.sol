@@ -136,7 +136,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         updatePoolShareValue();
         _poolShares = _amount / (poolShareValue);
         uint _numOfShares = poolShares[msg.sender].numPoolShares;
-        require(minimumStake <= _numOfShares + _poolShares * poolShareValue, "MorpherStaking: stake amount lower than minimum stake");
+        require(minimumStake <= (_numOfShares + _poolShares) * poolShareValue, "MorpherStaking: stake amount lower than minimum stake");
         MorpherToken(state.morpherTokenAddress()).burn(msg.sender, _poolShares * (poolShareValue));
         totalShares = totalShares + (_poolShares);
         poolShares[msg.sender].numPoolShares = _numOfShares + _poolShares;
@@ -227,29 +227,47 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         interestRates[_numInterestRate].validFrom = _validFrom;
     }
 
-     function getInterestRate(uint256 _positionTimestamp) public view returns(uint256) {
+    function getInterestRate(uint256 _positionTimestamp) public view returns(uint256) {
         uint256 sumInterestRatesWeighted = 0;
-        uint256 startingTimestamp = 0;
-        
+
+        // in case we are before the first rate
+        if (numInterestRates == 0 || interestRates[0].validFrom > block.timestamp) {
+            return 0;
+        }
+
+        // position should be all opened after the first interest rate
+        require(_positionTimestamp >= interestRates[0].validFrom, "Invalid position timestamp");
+
+        // avoid division by 0
+        if (block.timestamp == _positionTimestamp) {
+            return interestRate();
+        }
+
         for(uint256 i = 0; i < numInterestRates; i++) {
             if(i == numInterestRates-1 || interestRates[i+1].validFrom > block.timestamp) {
                 //reached last interest rate
-                sumInterestRatesWeighted = sumInterestRatesWeighted + (interestRates[i].rate * (block.timestamp - interestRates[i].validFrom));
-                if(startingTimestamp == 0) {
-                    startingTimestamp = interestRates[i].validFrom;
+                uint rateIncrease;
+                if (_positionTimestamp > interestRates[i].validFrom) {
+                    rateIncrease = (interestRates[i].rate * (block.timestamp - _positionTimestamp));
+                } else {
+                    rateIncrease = (interestRates[i].rate * (block.timestamp - interestRates[i].validFrom));
                 }
+                sumInterestRatesWeighted = sumInterestRatesWeighted + rateIncrease; 
                 break; //in case there are more in the future
             } else {
                 //only take interest rates after the position was created
                 if(interestRates[i+1].validFrom > _positionTimestamp) {
-                    sumInterestRatesWeighted = sumInterestRatesWeighted + (interestRates[i].rate * (interestRates[i+1].validFrom - interestRates[i].validFrom));
-                    if(interestRates[i].validFrom <= _positionTimestamp) {
-                        startingTimestamp = interestRates[i].validFrom;
+                    uint rateIncrease;
+                    if (_positionTimestamp > interestRates[i].validFrom) {
+                        rateIncrease = (interestRates[i].rate * (interestRates[i+1].validFrom - _positionTimestamp));
+                    } else {
+                        rateIncrease = (interestRates[i].rate * (interestRates[i+1].validFrom - interestRates[i].validFrom));
                     }
+                    sumInterestRatesWeighted = sumInterestRatesWeighted + rateIncrease; 
                 }
             } 
         }
-        uint interestRateInternal = sumInterestRatesWeighted / (block.timestamp - startingTimestamp);
+        uint interestRateInternal = sumInterestRatesWeighted / (block.timestamp - _positionTimestamp);
         return interestRateInternal;
 
     }
