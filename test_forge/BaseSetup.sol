@@ -128,10 +128,13 @@ contract BaseSetup is Test {
 			address(morpherTradeEngine)
 		);
 		morpherState.setMorpherTradeEngine(address(morpherTradeEngine));
+		// enable 1 market
+        morpherState.activateMarket(keccak256("CRYPTO_BTC"));
 
 		//deploy oracle
 		morpherOracle = new MorpherOracle();
 		morpherOracle.initialize(address(morpherState), payable(address(this)), 0);
+		morpherAccessControl.grantRole(morpherTradeEngine.ORACLE_ROLE(), address(morpherOracle));
 		morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this));
 
 		//deploy bridge

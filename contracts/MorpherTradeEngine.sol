@@ -266,18 +266,19 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	/**
         fallback function in case the old tradeengine asks for the current interest rate
     */
-	function interestRate() public view returns (uint256) {
-		//start with the last one, as its most likely the last active one, no need to run through the whole map
-		if (numInterestRates == 0) {
-			return 0;
-		}
-		for (uint256 i = numInterestRates - 1; i >= 0; i--) {
-			if (interestRates[i].validFrom <= block.timestamp) {
-				return interestRates[i].rate;
-			}
-		}
-		return 0;
-	}
+    function interestRate() public view returns (uint256) {
+        //start with the last one, as its most likely the last active one, no need to run through the whole map
+        if(numInterestRates == 0) {
+            return 0;
+        }
+        // i gets -1 before checking it to be >= 0 causing underflow of uint
+        for(int256 i = int256(numInterestRates) - 1; i >= 0; i--) {
+            if(interestRates[uint256(i)].validFrom <= block.timestamp) {
+                return interestRates[uint256(i)].rate;
+            }
+        }
+        return 0;
+    }
 
 	function addInterestRate(uint _rate, uint _validFrom) public onlyRole(ADMINISTRATOR_ROLE) {
 		require(
@@ -296,35 +297,50 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 		emit LeverageInterestRateAdded(_rate, _validFrom);
 	}
 
-	function getInterestRate(uint256 _positionTimestamp) public view returns (uint256) {
-		uint256 sumInterestRatesWeighted = 0;
-		uint256 startingTimestamp = 0;
+	function getInterestRate(uint256 _positionTimestamp) public view returns(uint256) {
+        uint256 sumInterestRatesWeighted = 0;
 
-		for (uint256 i = 0; i < numInterestRates; i++) {
-			if (i == numInterestRates - 1 || interestRates[i + 1].validFrom > block.timestamp) {
-				//reached last interest rate
-				sumInterestRatesWeighted =
-					sumInterestRatesWeighted +
-					(interestRates[i].rate * (block.timestamp - interestRates[i].validFrom));
-				if (startingTimestamp == 0) {
-					startingTimestamp = interestRates[i].validFrom;
-				}
-				break; //in case there are more in the future
-			} else {
-				//only take interest rates after the position was created
-				if (interestRates[i + 1].validFrom > _positionTimestamp) {
-					sumInterestRatesWeighted =
-						sumInterestRatesWeighted +
-						(interestRates[i].rate * (interestRates[i + 1].validFrom - interestRates[i].validFrom));
-					if (interestRates[i].validFrom <= _positionTimestamp) {
-						startingTimestamp = interestRates[i].validFrom;
-					}
-				}
-			}
-		}
-		uint interestRateInternal = sumInterestRatesWeighted / (block.timestamp - startingTimestamp);
-		return interestRateInternal;
-	}
+        // in case we are before the first rate
+        if (numInterestRates == 0 || interestRates[0].validFrom > block.timestamp) {
+            return 0;
+        }
+
+        // position should be all opened after the first interest rate
+        require(_positionTimestamp >= interestRates[0].validFrom, "Invalid position timestamp");
+
+        // avoid division by 0
+        if (block.timestamp == _positionTimestamp) {
+            return interestRate();
+        }
+
+        for(uint256 i = 0; i < numInterestRates; i++) {
+            if(i == numInterestRates-1 || interestRates[i+1].validFrom > block.timestamp) {
+                //reached last interest rate
+                uint rateIncrease;
+                if (_positionTimestamp > interestRates[i].validFrom) {
+                    rateIncrease = (interestRates[i].rate * (block.timestamp - _positionTimestamp));
+                } else {
+                    rateIncrease = (interestRates[i].rate * (block.timestamp - interestRates[i].validFrom));
+                }
+                sumInterestRatesWeighted = sumInterestRatesWeighted + rateIncrease; 
+                break; //in case there are more in the future
+            } else {
+                //only take interest rates after the position was created
+                if(interestRates[i+1].validFrom > _positionTimestamp) {
+                    uint rateIncrease;
+                    if (_positionTimestamp > interestRates[i].validFrom) {
+                        rateIncrease = (interestRates[i].rate * (interestRates[i+1].validFrom - _positionTimestamp));
+                    } else {
+                        rateIncrease = (interestRates[i].rate * (interestRates[i+1].validFrom - interestRates[i].validFrom));
+                    }
+                    sumInterestRatesWeighted = sumInterestRatesWeighted + rateIncrease; 
+                }
+            } 
+        }
+        uint interestRateInternal = sumInterestRatesWeighted / (block.timestamp - _positionTimestamp);
+        return interestRateInternal;
+
+    }
 
 	function paybackEscrow(bytes32 _orderId) private {
 		//pay back the escrow to the user so he has it back on his balance/**
