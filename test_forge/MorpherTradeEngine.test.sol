@@ -20,6 +20,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 
 	function setUp() public override {
 		super.setUp();
+        morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
 	}
 
 	// POSITION VALUE ------------------------------------------------------------------------------
@@ -364,5 +365,307 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		assertEq(storedOrderLeverage, 2 * PRECISION);
         assertEq(storedTimestamp, 0);
         assertEq(storedEscrowAmount, 0);
+	}
+
+	function testOrderFieldsCleared() public {
+		address user = address(0xff01);
+		morpherToken.mint(user, 100 * 10 ** 18);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 10 ** 18,
+			true,
+            2 * PRECISION
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, 50000 * 10 ** 8, 5 * 10 ** 8, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		(
+			address userId,
+			bytes32 storedMarketId,
+			uint256 storedCloseSharesAmount,
+			uint256 storedOpenMPHTokenAmount,
+			bool storedTradeDirection,
+            uint256 storedLiquidationTimestamp,
+            uint256 storedMarketPrice,
+            uint256 storedMarketSpread,
+			uint256 storedOrderLeverage,
+            uint256 storedTimestamp,
+            uint256 storedEscrowAmount,
+		) = morpherTradeEngine.orders(orderId);
+
+		assertEq(userId, address(0x00));
+		assertEq(storedMarketId, bytes32(0x00));
+		assertEq(storedCloseSharesAmount, 0);
+		assertEq(storedOpenMPHTokenAmount, 0);
+		assertEq(storedTradeDirection, false);
+        assertEq(storedLiquidationTimestamp, 0);
+        assertEq(storedMarketPrice, 0);
+        assertEq(storedMarketSpread, 0);
+		assertEq(storedOrderLeverage, 0);
+        assertEq(storedTimestamp, 0);
+        assertEq(storedEscrowAmount, 0);
+	}
+
+	function testProcessSimpleBuyOrder() public {
+		uint256 marketPrice = 50000 * PRECISION;
+		uint256 marketSpread = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		address user = address(0xff01);
+		morpherToken.mint(user, 1001 * 10 ** 18);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			true,
+            orderLeverage
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice, marketSpread, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		(	
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+			bytes32 positionHash
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		bytes32 expectedPositionHash = keccak256(
+				abi.encodePacked(
+					user,
+					keccak256("CRYPTO_BTC"),
+					uint(SECOND_RATE_TS * 1000 + 1000),
+					uint(2 * 10 ** 8),
+					uint(0),
+					uint(50000 * PRECISION),
+					uint(10 * PRECISION),
+					uint(5 * PRECISION),
+					uint(4001200000000)
+				)
+			);
+		assertEq(lastUpdated, SECOND_RATE_TS * 1000 + 1000);
+		assertEq(longShares, 2 * 10 ** 8);
+		assertEq(shortShares, 0);
+        assertEq(meanEntryPrice, uint(50000 * PRECISION));
+        assertEq(meanEntrySpread, uint(10 * PRECISION));
+		assertEq(meanEntryLeverage, uint(5 * PRECISION));
+        assertEq(liquidationPrice, 4001200000000);
+        assertEq(positionHash, expectedPositionHash);
+	}
+
+	function testProcessSimpleSellOrder() public {
+		uint256 marketPrice = 50000 * PRECISION;
+		uint256 marketSpread = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		address user = address(0xff01);
+		morpherToken.mint(user, 1001 * 10 ** 18);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			false,
+            orderLeverage
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice, marketSpread, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		(	
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+			bytes32 positionHash
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		bytes32 expectedPositionHash = keccak256(
+				abi.encodePacked(
+					user,
+					keccak256("CRYPTO_BTC"),
+					uint(SECOND_RATE_TS * 1000 + 1000),
+					uint(0),
+					uint(2 * 10 ** 8),
+					uint(50000 * PRECISION),
+					uint(10 * PRECISION),
+					uint(5 * PRECISION),
+					uint(5998800000000)
+				)
+			);
+		assertEq(lastUpdated, SECOND_RATE_TS * 1000 + 1000);
+		assertEq(longShares, 0);
+		assertEq(shortShares, 2 * 10 ** 8);
+        assertEq(meanEntryPrice, uint(50000 * PRECISION));
+        assertEq(meanEntrySpread, uint(10 * PRECISION));
+		assertEq(meanEntryLeverage, uint(5 * PRECISION));
+        assertEq(liquidationPrice, 5998800000000);
+        assertEq(positionHash, expectedPositionHash);
+	}
+
+	function testOpenAndCloseBuyOrder() public {
+		uint256 marketPrice = 50000 * PRECISION;
+		uint256 marketSpread = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		address user = address(0xff01);
+		morpherToken.mint(user, 1001 * 10 ** 18);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			true,
+            orderLeverage
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice, marketSpread, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		vm.warp(block.timestamp + 10 * 24 * 60 * 60);
+
+		vm.prank(address(morpherOracle));
+		orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			2 * 10 ** 8,
+			0,
+			false,
+            PRECISION
+		);
+
+		vm.warp(block.timestamp + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice + 50 * PRECISION, marketSpread, 0, block.timestamp * 1000 - 1000);
+
+		(	
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		assertEq(lastUpdated, block.timestamp * 1000 - 1000);
+		assertEq(longShares, 0);
+		assertEq(shortShares, 0);
+        assertEq(meanEntryPrice, 0);
+        assertEq(meanEntrySpread, 0);
+		assertEq(meanEntryLeverage, PRECISION);
+        assertEq(liquidationPrice, 0);
+
+		uint userBalance = morpherToken.balanceOf(user);
+		uint256 marginInterest = morpherTradeEngine.calculateMarginInterest(
+			marketPrice,
+			orderLeverage,
+			SECOND_RATE_TS * 1000 + 1000
+		);
+		uint expectedShareValue = (50050 * PRECISION) * 5 - 50000 * PRECISION * (5 - 1) - 10 * 5 * PRECISION - marginInterest;
+		assertEq(userBalance, expectedShareValue * 2 * 10 ** 8);
+	}
+
+	function testOpenAndCloseSellOrder() public {
+		uint256 marketPrice = 50000 * PRECISION;
+		uint256 marketSpread = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		address user = address(0xff01);
+		morpherToken.mint(user, 1001 * 10 ** 18);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			false,
+            orderLeverage
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice, marketSpread, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		vm.warp(block.timestamp + 10 * 24 * 60 * 60);
+
+		vm.prank(address(morpherOracle));
+		orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			2 * 10 ** 8,
+			0,
+			true,
+            PRECISION
+		);
+
+		vm.warp(block.timestamp + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice + 50 * PRECISION, marketSpread, 0, block.timestamp * 1000 - 1000);
+
+		(	
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		assertEq(lastUpdated, block.timestamp * 1000 - 1000);
+		assertEq(longShares, 0);
+		assertEq(shortShares, 0);
+        assertEq(meanEntryPrice, 0);
+        assertEq(meanEntrySpread, 0);
+		assertEq(meanEntryLeverage, PRECISION);
+        assertEq(liquidationPrice, 0);
+
+		uint userBalance = morpherToken.balanceOf(user);
+		uint256 marginInterest = morpherTradeEngine.calculateMarginInterest(
+			marketPrice,
+			orderLeverage,
+			SECOND_RATE_TS * 1000 + 1000
+		);
+		uint expectedShareValue = 50000 * PRECISION * (5 + 1) - 50050 * PRECISION * 5 - 10 * 5 * PRECISION - marginInterest;
+		assertEq(userBalance, expectedShareValue * 2 * 10 ** 8);
 	}
 }

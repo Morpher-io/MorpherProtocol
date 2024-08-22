@@ -305,9 +305,6 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
             return 0;
         }
 
-        // position should be all opened after the first interest rate
-        require(_positionTimestamp >= interestRates[0].validFrom, "Invalid position timestamp");
-
         // avoid division by 0
         if (block.timestamp == _positionTimestamp) {
             return interestRate();
