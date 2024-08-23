@@ -972,7 +972,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 		_newMeanLeverage = _newMeanLeverage / (_adjustedLongShares + (orders[_orderId].modifyPosition.longSharesOrder));
 
 		// _newMeanSpread is the weighted spread of the existing position and the new position
-		_newMeanSpread = portfolio[_userId][_marketId].meanEntrySpread * (portfolio[_userId][_marketId].longShares);
+		_newMeanSpread = portfolio[_userId][_marketId].meanEntrySpread * (_adjustedLongShares);
 		_newMeanSpread =
 			_newMeanSpread +
 			(orders[_orderId].marketSpread * (orders[_orderId].modifyPosition.longSharesOrder));
@@ -1158,7 +1158,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 			(_adjustedShortShares + (orders[_orderId].modifyPosition.shortSharesOrder));
 
 		// _newMeanSpread is the weighted spread of the existing position and the new position
-		_newMeanSpread = portfolio[_userId][_marketId].meanEntrySpread * (portfolio[_userId][_marketId].shortShares);
+		_newMeanSpread = portfolio[_userId][_marketId].meanEntrySpread * (_adjustedShortShares);
 		_newMeanSpread =
 			_newMeanSpread +
 			(orders[_orderId].marketSpread * (orders[_orderId].modifyPosition.shortSharesOrder));
