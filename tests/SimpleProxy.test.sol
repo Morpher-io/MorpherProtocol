@@ -20,7 +20,6 @@ contract SimpleProxy is Test {
 	MorpherState private proxiedState;
 
 	function setUp() public {
-		// Deploy NFT contract
 		morpherState = new MorpherState();
 		morpherAccessControl = new MorpherAccessControl();
 

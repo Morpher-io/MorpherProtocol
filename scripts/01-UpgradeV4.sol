@@ -25,6 +25,8 @@ import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 
 import {ITransparentUpgradeableProxy} from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import "@openzeppelin/contracts/utils/Strings.sol";
+
 contract UpgradeProxyV4Versions is Script {
 	// address constant CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
 
@@ -33,6 +35,13 @@ contract UpgradeProxyV4Versions is Script {
 		vm.startBroadcast(deployerPrivateKey);
 		// _tryUpBalance(msg.sender);
 		// vm.startBroadcast();
+		 // Store the contract address in an environment variable
+        string memory root = vm.projectRoot();
+		string memory path = string.concat(root, "/docs/", String.toString(block.chainid), "_addresses.json");
+		bool fileExists = vm.isFile(path);
+		if (fileExists) {
+			string memory json = vm.readFile(path);
+		}
 		ProxyAdmin admin = ProxyAdmin(0x3cFa9C5F4238fe6200b73038b1e6daBb5F6b8A0a);
 		console.log(admin.owner());
 		console.log(address(this));
