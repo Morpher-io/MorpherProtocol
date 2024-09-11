@@ -22,13 +22,13 @@ Morpher Smart Contracts are fully and regularly audited. 🙌
 # Getting Started
 
 ## Prerequisites
-* Git and Foundry
+* Git, Foundry, NodeJs
 
 ## Foundry and Truffle in the same projects
 
-We migrated all the functionality from Truffle to Foundry. There is no Hardhat, Truffle or anything else necessary, just Foundry
+We migrated all the functionality from Truffle to Foundry. There is no Hardhat, Truffle or anything else necessary, just Foundry. However, the contract upgrade helper which are checking storage slots for proxy upgrades are running those with nodejs, hence NodeJs is required.
 
-## Clone the Repository
+## 1. Clone the Repository
 
 ```
 git clone https://github.com/Morpher-io/MorpherProtocol.git
@@ -37,13 +37,24 @@ git checkout account-abstraction
 git submodule update --init --recursive
 ```
 
-## How to run the Tests
+## 2. How to run the Tests
 Tests are implemented using [Foundry](https://book.getfoundry.sh).
 
 Run the following commands to start the test suite. 😎
 * Run `forge test` to run the tests
 
-If you want to see exactly what assertions are being made, you can take a look at the `test_forge` folder.
+If you want to see exactly what assertions are being made, you can take a look at the `tests` folder. Tests can also be executed using `forge test -vvv` for a verbose debug output.
+
+## Local Dev Environment
+
+There is a setup for a local development environment. This will:
+
+1. Start anvil with a Polygon Mainnet Fork
+2. Download the old sources from the polygonscan block explorer
+3. Override Storage slots for Proxy Admins, as well as AccessControl Roles with local Addresses
+4. Run the deployment script which checks for storage slot errors and deploys the contracts
+
+`./helpers/chainfork/start.sh`
 
 
 # Smart Contract Components

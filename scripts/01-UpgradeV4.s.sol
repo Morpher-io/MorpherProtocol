@@ -33,20 +33,9 @@ contract UpgradeProxyV4Versions is Script {
 	function run() public {
 		uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
 		vm.startBroadcast(deployerPrivateKey);
-		// _tryUpBalance(msg.sender);
-		// vm.startBroadcast();
-		 // Store the contract address in an environment variable
-        string memory root = vm.projectRoot();
-		string memory path = string.concat(root, "/docs/", String.toString(block.chainid), "_addresses.json");
-		bool fileExists = vm.isFile(path);
-		if (fileExists) {
-			string memory json = vm.readFile(path);
-		}
+        
 		ProxyAdmin admin = ProxyAdmin(0x3cFa9C5F4238fe6200b73038b1e6daBb5F6b8A0a);
-		console.log(admin.owner());
-		console.log(address(this));
-		console.log(msg.sender);
-		console.log(address(msg.sender).balance);
+		
 
 		Options memory opts;
 		Upgrades.validateUpgrade("MorpherAccessControl.sol", opts);
