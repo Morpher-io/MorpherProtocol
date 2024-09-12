@@ -1,13 +1,13 @@
 # Introduction
 This is the repository for the core Morpher smart contract components of https://morpher.com
 
-Morpher Smart Contracts are a collection of solidity files for on-chain transactions and trustless state transfer and recovery from sidechain. 😳
+Morpher Smart Contracts are a collection of solidity files for on-chain transactions to invest into different asset classes, such as Stocks, Commodities, Forex, but also into Unique Markets like Watches, Shoes and Football. 😳
 
 ![](https://img.shields.io/github/last-commit/Morpher-io/MorpherProtocol) ![](https://img.shields.io/github/license/Morpher-io/MorpherProtocol)
 
 ---
 
-Morpher rebuilds financial markets from the ground up on the Ethereum Blockchain. All in the pursuit of the perfect trading experience.
+Morpher rebuilds financial markets from the ground up on EVM based Blockchains. All in the pursuit of the perfect trading experience.
 
 [![Image of Morpher](./docs/laptop_phone_shot.3303f142.webp)](https://morpher.com)
 
@@ -22,28 +22,39 @@ Morpher Smart Contracts are fully and regularly audited. 🙌
 # Getting Started
 
 ## Prerequisites
-* Install Node.js, Npm and build-essential (Linux and MacOS package to build Web3 C/C++ files) on your computer. 
-* Install Foundry to run the Unit-Tests
-* Install Truffle to run the Migrations/Deployment/Interaction
-* Git clone this repo and `cd` into it.
+* Git, Foundry, NodeJs
 
 ## Foundry and Truffle in the same projects
 
-We took steps to make truffle and foundry "compatible". Truffle is pulling smart contracts via npm, foundry directly via git submodules.
+We migrated all the functionality from Truffle to Foundry. There is no Hardhat, Truffle or anything else necessary, just Foundry. However, the contract upgrade helper which are checking storage slots for proxy upgrades are running those with nodejs, hence NodeJs is required.
 
-The namespace for contracts we use is the same. For truffle/npm the openzeppelin contracts are residing in `node_modules/@openzeppelin/contracts`
+## 1. Clone the Repository
 
-The github submodule would reside in @openzeppelin/contracts, which, by default, would get installed into the lib folder. But we simply redirect to `node_modules`.
+```
+git clone https://github.com/Morpher-io/MorpherProtocol.git
+cd MorpherProtocol
+git checkout account-abstraction
+git submodule update --init --recursive
+```
 
-## How to run the Tests
-Tests are implemented using [Foundry](https://book.getfoundry.sh). Please install Foundry first.
+## 2. How to run the Tests
+Tests are implemented using [Foundry](https://book.getfoundry.sh).
 
 Run the following commands to start the test suite. 😎
-* `npm install` to install all the truffle/node dependencies.
-* _Potentially_ fix the IWETH9.sol compiler pragma (at the time of writing its set to =0.7.6), compiler version is 0.8.11, so, change it to >=0.7.6 in node_modules/@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol
 * Run `forge test` to run the tests
 
-If you want to see exactly what assertions are being made, you can take a look at the `test_forge` folder.
+If you want to see exactly what assertions are being made, you can take a look at the `tests` folder. Tests can also be executed using `forge test -vvv` for a verbose debug output.
+
+## Local Dev Environment
+
+There is a setup for a local development environment. This will:
+
+1. Start anvil with a Polygon Mainnet Fork
+2. Download the old sources from the polygonscan block explorer
+3. Override Storage slots for Proxy Admins, as well as AccessControl Roles with local Addresses
+4. Run the deployment script which checks for storage slot errors and deploys the contracts
+
+`./helpers/chainfork/start.sh`
 
 
 # Smart Contract Components

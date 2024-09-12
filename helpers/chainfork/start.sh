@@ -10,19 +10,19 @@ SCRIPTPATH=$(dirname "$SCRIPT")
 # echo $SCRIPTPATH
 cd $SCRIPTPATH
 export $(grep -v '^#' ../../.env | xargs)
-# node dl_source.js
+node dl_source.js
 
 ADMIN_RPC="http://localhost:8545"
 
 # Start the program in the background
-anvil -b 5 -f $FORK_URL --host 0.0.0.0 &
+anvil -b 5 -f $FORK_URL & # --host 0.0.0.0 &
 
 # Capture the job ID using 'jobs'
 JOB_ID=$(jobs -l | grep "anvil" | awk '{print $1}' | tr -d '[]+')
 
 echo $JOB_ID
 
-IP_ADDRESS=$(hostname -i)
+IP_ADDRESS=127.0.0.1 #$(hostname -i)
 
 # Wait until the port is open
 while ! nc -z $IP_ADDRESS 8545; do   
@@ -194,6 +194,7 @@ curl -s -X POST -H "Content-Type: application/json" --data  \
   }],
   "id":73
 }' ${ADMIN_RPC}| jq -r .result
+
 curl -s -X POST -H "Content-Type: application/json" --data  \
 '{
   "jsonrpc":"2.0",
@@ -213,7 +214,7 @@ echo "Deploying new contracts"
 
 cd $SCRIPTPATH/../../
 # forge script ./scripts/00-fund-deployer.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --unlocked --chain-id 137 -vvvv --force
-forge script ./scripts/01-Upgrade-proxy-v4.s.sol --rpc-url ${ADMIN_RPC} --slow --broadcast --chain-id 137 -vvvv --force
+forge script ./scripts/01-UpgradeV4.s.sol --rpc-url ${ADMIN_RPC} --slow --broadcast --chain-id 137 -vvvv --force
 
 
 # Bring the background program back to the foreground using the job ID

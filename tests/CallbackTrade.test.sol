@@ -77,7 +77,6 @@ contract CallbackTrade is Test {
 
 	function _testCallbackOracle() public {
 		MorpherState state = MorpherState(morpherStateAddress);
-		MorpherTradeEngine tradeEngine = MorpherTradeEngine(tradeEngineAddress);
 		MorpherOracle oracle = MorpherOracle(oracleProxyAddress);
 		MorpherToken morpherToken = MorpherToken(state.morpherTokenAddress());
 		ProxyAdmin admin = ProxyAdmin(0x3cFa9C5F4238fe6200b73038b1e6daBb5F6b8A0a);

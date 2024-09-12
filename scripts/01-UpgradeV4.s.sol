@@ -25,19 +25,17 @@ import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 
 import {ITransparentUpgradeableProxy} from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import "@openzeppelin/contracts/utils/Strings.sol";
+
 contract UpgradeProxyV4Versions is Script {
 	// address constant CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
 
 	function run() public {
 		uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
 		vm.startBroadcast(deployerPrivateKey);
-		// _tryUpBalance(msg.sender);
-		// vm.startBroadcast();
+        
 		ProxyAdmin admin = ProxyAdmin(0x3cFa9C5F4238fe6200b73038b1e6daBb5F6b8A0a);
-		console.log(admin.owner());
-		console.log(address(this));
-		console.log(msg.sender);
-		console.log(address(msg.sender).balance);
+		
 
 		Options memory opts;
 		Upgrades.validateUpgrade("MorpherAccessControl.sol", opts);
