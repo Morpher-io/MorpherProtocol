@@ -87,7 +87,7 @@ contract MorpherAdmin is Initializable {
         for(uint i = 0; i < _marketHashes.length; i++) {
             bytes memory payload = abi.encodeWithSignature("activateMarket(bytes32)", _marketHashes[i]);
             (bool success, ) = address(state).call(payload);
-            require(success,  "MorpherAdministratorProxy: Failed to activate Market");
+            require(success,  "MorpherAdmin: Failed to activate Market");
         }
     }
 
