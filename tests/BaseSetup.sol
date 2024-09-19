@@ -73,7 +73,6 @@ contract BaseSetup is Test {
 		vm.warp(1617094819);
 		morpherStaking = new MorpherStaking();
 		morpherStaking.initialize(address(morpherState));
-		morpherAccessControl.grantRole(morpherStaking.STAKINGADMIN_ROLE(), address(this));
 		morpherStaking.addInterestRate(15000, 1617094819);
 		morpherStaking.addInterestRate(30000, 1644491427);
 		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherStaking));
