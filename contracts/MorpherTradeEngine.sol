@@ -14,7 +14,7 @@ import "./MorpherStaking.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherMintingLimiter.sol";
 import "./MorpherAccessControl.sol";
-import "./MorpherInterestRateBase.sol";
+import "./MorpherInterestRateManager.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -24,11 +24,14 @@ import "./MorpherInterestRateBase.sol";
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherTradeEngine.sol:MorpherTradeEngine
-contract MorpherTradeEngine is Initializable, ContextUpgradeable, MorpherInterestRateBase {
+contract MorpherTradeEngine is Initializable, ContextUpgradeable {
+
+	MorpherState public morpherState;
 
 	/**
 	 * Known Roles to Trade Engine
 	 */
+	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 	bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
 	bytes32 public constant POSITIONADMIN_ROLE = keccak256("POSITIONADMIN_ROLE"); //can set and modify positions
 	bytes32 public constant _HASHED_NAME = keccak256("MorpherTradeEngine");
@@ -43,6 +46,11 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable, MorpherInteres
 	uint256 public deployedTimeStamp;
 
 	bool public escrowOpenOrderEnabled;
+
+	struct InterestRate {
+		uint256 validFrom;
+		uint256 rate;
+	}
 
 	struct PriceLock {
 		uint lockedPrice;
@@ -114,6 +122,9 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable, MorpherInteres
 	}
 
 	mapping(bytes32 => hasExposure) public exposureByMarket;
+
+	mapping(uint256 => InterestRate) private _OLDinterestRates;
+	uint256 private _OLDnumInterestRates;
 
 	using CountersUpgradeable for CountersUpgradeable.Counter;
 
@@ -205,6 +216,8 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable, MorpherInteres
 	event EscrowPaid(bytes32 orderId, address user, uint escrowAmount);
 	event EscrowReturned(bytes32 orderId, address user, uint escrowAmount);
 
+	event LinkState(address stateAddress);
+
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
 	function initialize(
@@ -219,10 +232,23 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable, MorpherInteres
 		deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
 	}
 
+	modifier onlyRole(bytes32 role) {
+		require(
+			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()),
+			"MorpherToken: Permission denied."
+		);
+		_;
+	}
+
 	// ----------------------------------------------------------------------------
 	// Administrative functions
 	// Set state address, get administrator address
 	// ----------------------------------------------------------------------------
+
+	function setMorpherStateAddress(address _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+		morpherState = MorpherState(_stateAddress);
+		emit LinkState(_stateAddress);
+	}
 
 	function setEscrowOpenOrderEnabled(bool _isEnabled) public onlyRole(ADMINISTRATOR_ROLE) {
 		escrowOpenOrderEnabled = _isEnabled;
@@ -705,7 +731,9 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable, MorpherInteres
 		}
 		_marginInterest = _averagePrice * (_averageLeverage - PRECISION);
 		_marginInterest = _marginInterest * (((block.timestamp - (_positionTimeStampInMs / 1000)) / 86400) + 1);
-		_marginInterest = ((_marginInterest * getInterestRate(_positionTimeStampInMs / 1000)) / PRECISION) / PRECISION;
+		uint256 _interestRate = MorpherInterestRateManager(morpherState.morpherInterestRateManagerAddress())
+			.getInterestRate(_positionTimeStampInMs / 1000);
+		_marginInterest = ((_marginInterest * _interestRate) / PRECISION) / PRECISION;
 		return _marginInterest;
 	}
 

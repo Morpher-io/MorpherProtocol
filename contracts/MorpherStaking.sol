@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherToken.sol";
-import "./MorpherInterestRateBase.sol";
+import "./MorpherInterestRateManager.sol";
 
 // ----------------------------------------------------------------------------------
 // Staking Morpher Token generates interest
@@ -15,11 +15,14 @@ import "./MorpherInterestRateBase.sol";
 // There is a lockup after staking or topping up (30 days) and a minimum stake (100k MPH)
 // ----------------------------------------------------------------------------------
 
-contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRateBase {
+contract MorpherStaking is Initializable, ContextUpgradeable {
+
+    MorpherState public morpherState;
 
     uint256 constant PRECISION = 10**8;
     uint256 constant INTERVAL  = 1 days;
 
+    bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 constant public STAKINGADMIN_ROLE = keccak256("STAKINGADMIN_ROLE");
 
     //mapping(address => uint256) private poolShares;
@@ -28,6 +31,14 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
     uint256 public poolShareValue;
     uint256 public lastReward;
     uint256 public totalShares;
+
+    struct InterestRate {
+		uint256 validFrom;
+		uint256 rate;
+	}
+
+	mapping(uint256 => InterestRate) private _OLDinterestRates;
+	uint256 private _OLDnumInterestRates;
 
     uint256 public lockupPeriod; // to prevent tactical staking and ensure smooth governance
     uint256 public minimumStake; // 100k MPH minimum
@@ -41,17 +52,24 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
     }
     mapping(address => PoolShares) public poolShares;
 
-// ----------------------------------------------------------------------------
-// Events
-// ----------------------------------------------------------------------------
+    // END STATE ----------------------------------------------------------------------------
 
     event SetLockupPeriod(uint256 newLockupPeriod);
     event SetMinimumStake(uint256 newMinimumStake);
+	event LinkState(address stateAddress);
     
     event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
     event StakingRewardsMinted(uint256 indexed lastReward, uint256 delta);
     event Staked(address indexed userAddress, uint256 indexed amount, uint256 poolShares, uint256 lockedUntil);
     event Unstaked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);
+
+    modifier onlyRole(bytes32 role) {
+		require(
+			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()),
+			"MorpherToken: Permission denied."
+		);
+		_;
+	}
     
     modifier userNotBlocked {
         require(!MorpherUserBlocking(morpherState.morpherUserBlockingAddress()).userIsBlocked(msg.sender), "MorpherStaking: User is blocked");
@@ -74,16 +92,18 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
         // missing: transferOwnership to Governance once deployed
     }
 
-// ----------------------------------------------------------------------------
-// updatePoolShareValue
-// Updates the value of the Pool Shares and returns the new value.
-// Staking rewards are linear, there is no compound interest.
-// ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
+    // updatePoolShareValue
+    // Updates the value of the Pool Shares and returns the new value.
+    // Staking rewards are linear, there is no compound interest.
+    // ----------------------------------------------------------------------------
     
     function updatePoolShareValue() public returns (uint256 _newPoolShareValue) {
         if (block.timestamp >= lastReward + INTERVAL) {
             uint256 _numOfIntervals = uint256(block.timestamp - lastReward) / INTERVAL;
-            poolShareValue = poolShareValue + (_numOfIntervals * interestRate());
+            uint256 _interestRate = MorpherInterestRateManager(morpherState.morpherInterestRateManagerAddress())
+                .interestRate();
+            poolShareValue = poolShareValue + (_numOfIntervals * _interestRate);
             lastReward = lastReward + (_numOfIntervals * (INTERVAL));
             emit PoolShareValueUpdated(lastReward, poolShareValue);
         }
@@ -91,9 +111,9 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
         return poolShareValue;        
     }
 
-// ----------------------------------------------------------------------------
-// Staking rewards are minted if necessary
-// ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
+    // Staking rewards are minted if necessary
+    // ----------------------------------------------------------------------------
 
     // function mintStakingRewards() private {
     //     uint256 _targetBalance = poolShareValue * (totalShares);
@@ -105,11 +125,11 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
     //     }
     // }
 
-// ----------------------------------------------------------------------------
-// stake(uint256 _amount)
-// User specifies an amount they intend to stake. Pool Shares are issued accordingly
-// and the _amount is transferred to the staking contract
-// ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
+    // stake(uint256 _amount)
+    // User specifies an amount they intend to stake. Pool Shares are issued accordingly
+    // and the _amount is transferred to the staking contract
+    // ----------------------------------------------------------------------------
 
     function stake(uint256 _amount) public userNotBlocked returns (uint256 _poolShares) {
         require(MorpherToken(morpherState.morpherTokenAddress()).balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
@@ -125,11 +145,11 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
         return _poolShares;
     }
 
-// ----------------------------------------------------------------------------
-// unstake(uint256 _amount)
-// User specifies number of Pool Shares they want to unstake. 
-// Pool Shares get deleted and the user receives their MPH plus interest
-// ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
+    // unstake(uint256 _amount)
+    // User specifies number of Pool Shares they want to unstake. 
+    // Pool Shares get deleted and the user receives their MPH plus interest
+    // ----------------------------------------------------------------------------
 
     function unstake(uint256 _numOfShares) public userNotBlocked returns (uint256 _amount) {
         uint256 _numOfExistingShares = poolShares[msg.sender].numPoolShares;
@@ -146,6 +166,11 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
         return _amount;
     }
 
+    function setMorpherStateAddress(address _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+		morpherState = MorpherState(_stateAddress);
+		emit LinkState(_stateAddress);
+	}
+
     function setLockupPeriodRate(uint256 _lockupPeriod) public onlyRole(STAKINGADMIN_ROLE) {
         lockupPeriod = _lockupPeriod;
         emit SetLockupPeriod(_lockupPeriod);
@@ -156,9 +181,9 @@ contract MorpherStaking is Initializable, ContextUpgradeable, MorpherInterestRat
         emit SetMinimumStake(_minimumStake);
     }
 
-// ----------------------------------------------------------------------------
-// Getter functions
-// ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
+    // Getter functions
+    // ----------------------------------------------------------------------------
 
     function getTotalPooledValue() public view returns (uint256 _totalPooled) {
         // Only accurate if poolShareValue is up to date

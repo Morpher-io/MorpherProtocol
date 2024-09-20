@@ -12,6 +12,7 @@ import "../contracts/MorpherTradeEngine.sol";
 import "../contracts/MorpherOracle.sol";
 import "../contracts/MorpherBridge.sol";
 import "../contracts/MorpherAdmin.sol";
+import "../contracts/MorpherInterestRateManager.sol";
 
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
@@ -34,6 +35,7 @@ contract BaseSetup is Test {
 	MorpherOracle internal morpherOracle;
 	MorpherBridge internal morpherBridge;
 	MorpherAdmin internal morpherAdmin;
+	MorpherInterestRateManager internal morpherInterestRateManager;
 
 	function setUp() public virtual {
 		//deploy Access Control
@@ -69,12 +71,19 @@ contract BaseSetup is Test {
 		}
 		morpherToken.setRestrictTransfers(!isMainChain);
 
+		//deploy interest rate manager
+		vm.warp(1617094819);
+		morpherInterestRateManager = new MorpherInterestRateManager();
+		morpherInterestRateManager.initialize(address(morpherState));
+		morpherInterestRateManager.addInterestRate(15000, 1617094819);
+		morpherInterestRateManager.addInterestRate(30000, 1644491427);
+		morpherState.setMorpherInterestRateManager(address(morpherInterestRateManager));
+		vm.warp(1);
+
 		//deploy staking
 		vm.warp(1617094819);
 		morpherStaking = new MorpherStaking();
 		morpherStaking.initialize(address(morpherState));
-		morpherStaking.addInterestRate(15000, 1617094819);
-		morpherStaking.addInterestRate(30000, 1644491427);
 		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherStaking));
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherStaking));
 		morpherState.setMorpherStaking(payable(address(morpherStaking)));
@@ -93,12 +102,6 @@ contract BaseSetup is Test {
 		//deploy tradeEngine
 		morpherTradeEngine = new MorpherTradeEngine();
 		morpherTradeEngine.initialize(address(morpherState), false, 1613399217);
-		for (uint i = 0; i < morpherStaking.numInterestRates(); i++) {
-			(uint256 validFrom, uint256 rate) = morpherStaking.interestRates(i);
-			vm.warp(validFrom - 100);
-			morpherTradeEngine.addInterestRate(rate, validFrom);
-		}
-		vm.warp(1);
 		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherTradeEngine));
 		morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherTradeEngine));
 		morpherState.setMorpherTradeEngine(address(morpherTradeEngine));

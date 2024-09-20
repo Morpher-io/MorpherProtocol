@@ -27,9 +27,9 @@ contract MorkpherStakingTest is BaseSetup {
 
 		vm.warp(1670000000);
 		vm.prank(admin);
-		morpherStaking.setInterestRate(50000);
+		morpherInterestRateManager.setInterestRate(50000);
 
-		uint currentRate = morpherStaking.interestRate();
+		uint currentRate = morpherInterestRateManager.interestRate();
 		assertEq(currentRate, 50000);
 
 		vm.prank(admin);
@@ -70,7 +70,7 @@ contract MorkpherStakingTest is BaseSetup {
 		vm.warp(1617094819);
 
 		uint256 initialPoolShareValue = morpherStaking.poolShareValue();
-		uint256 interestRate = morpherStaking.interestRate();
+		uint256 interestRate = morpherInterestRateManager.interestRate();
 		uint256 initialLastReward = morpherStaking.lastReward();
 
 		vm.warp(block.timestamp + INTERVAL);
@@ -88,7 +88,7 @@ contract MorkpherStakingTest is BaseSetup {
 		vm.warp(1617094819);
 
 		uint256 initialPoolShareValue = morpherStaking.poolShareValue();
-		uint256 interestRate = morpherStaking.interestRate();
+		uint256 interestRate = morpherInterestRateManager.interestRate();
 		uint256 initialLastReward = morpherStaking.lastReward();
 
 		vm.warp(block.timestamp + (5 * INTERVAL) + 50000);

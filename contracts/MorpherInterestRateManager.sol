@@ -1,5 +1,7 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.15;
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 import "./MorpherState.sol";
 import "./MorpherAccessControl.sol";
@@ -11,7 +13,7 @@ import "./MorpherAccessControl.sol";
 // There is a lockup after staking or topping up (30 days) and a minimum stake (100k MPH)
 // ----------------------------------------------------------------------------------
 
-contract MorpherInterestRateBase {
+contract MorpherInterestRateManager is Initializable, ContextUpgradeable {
 	MorpherState public morpherState;
 
 	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
@@ -33,9 +35,14 @@ contract MorpherInterestRateBase {
 	event InterestRateValidFromChanged(uint256 interstRateIndex, uint256 oldvalue, uint256 newValue);
 	event LinkState(address stateAddress);
 
+	function initialize(address _morpherState) public initializer {
+		ContextUpgradeable.__Context_init();
+		morpherState = MorpherState(_morpherState);	
+	}
+
 	modifier onlyRole(bytes32 role) {
 		require(
-			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, msg.sender),
+			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()),
 			"MorpherToken: Permission denied."
 		);
 		_;
@@ -50,9 +57,7 @@ contract MorpherInterestRateBase {
 		addInterestRate(_interestRate, block.timestamp);
 	}
 
-	/**
-        fallback function in case the old tradeengine asks for the current interest rate
-    */
+	/** fallback function in case the old tradeengine asks for the current interest rate */
 	function interestRate() public view returns (uint256) {
 		//start with the last one, as its most likely the last active one, no need to run through the whole map
 		if (numInterestRates == 0) {

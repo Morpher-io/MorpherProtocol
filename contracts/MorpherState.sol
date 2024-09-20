@@ -60,6 +60,12 @@ contract MorpherState is Initializable, ContextUpgradeable  {
     uint256 public numberOfRequestsLimit;
 
     // ----------------------------------------------------------------------------
+    // New interest rate management
+    // ----------------------------------------------------------------------------
+
+    address public morpherInterestRateManagerAddress;
+
+    // ----------------------------------------------------------------------------
     // Events
     // ----------------------------------------------------------------------------
     event OperatingRewardMinted(address indexed recipient, uint256 amount);
@@ -170,6 +176,11 @@ contract MorpherState is Initializable, ContextUpgradeable  {
         morpherUserBlockingAddress = _morpherUserBlockingAddress;
     }
 
+    event SetMorpherInterestRateManagerAddress(address _oldAddress, address _newAddress);
+    function setMorpherInterestRateManager(address _morpherInterestRateManagerAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+        emit SetMorpherInterestRateManagerAddress(morpherInterestRateManagerAddress, _morpherInterestRateManagerAddress);
+        morpherInterestRateManagerAddress = _morpherInterestRateManagerAddress;
+    }
 
     // ----------------------------------------------------------------------------
     // Setter/Getter functions for platform administration
