@@ -4,7 +4,7 @@ pragma solidity ^0.8.15;
 import "./BaseSetup.sol";
 
 // using staking as one of the inheriting contracts
-contract MorkpherInterestRateBaseTest is BaseSetup {
+contract MorkpherInterestRateManagerTest is BaseSetup {
 
 	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 

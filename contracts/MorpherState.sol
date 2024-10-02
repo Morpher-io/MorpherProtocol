@@ -84,19 +84,7 @@ contract MorpherState is Initializable, ContextUpgradeable  {
         _;
     }
 
-
-
-    modifier onlyBridge {
-        require(msg.sender == morpherBridgeAddress, "MorpherState: Caller is not the Bridge. Aborting.");
-        _;
-    }
-
-    modifier onlyMainChain {
-        require(mainChain == true, "MorpherState: Can only be called on mainchain.");
-        _;
-    }
-
-    bool mainChain;
+    bool public mainChain;
 
     function initialize(bool _mainChain, address _morpherAccessControlAddress) public initializer {
         ContextUpgradeable.__Context_init();
@@ -221,7 +209,7 @@ contract MorpherState is Initializable, ContextUpgradeable  {
         return MorpherToken(morpherTokenAddress).totalSupply();
     }
 
-       function getPosition(
+    function getPosition(
         address _address,
         bytes32 _marketId
     ) public view returns (
