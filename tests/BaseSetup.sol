@@ -105,6 +105,7 @@ contract BaseSetup is Test {
 		morpherTradeEngine = new MorpherTradeEngine();
 		morpherTradeEngine.initialize(address(morpherState), false, 1613399217);
 		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherTradeEngine));
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherTradeEngine));
 		morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherTradeEngine));
 		morpherState.setMorpherTradeEngine(address(morpherTradeEngine));
 		// enable 1 market

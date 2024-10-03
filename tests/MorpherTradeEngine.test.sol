@@ -8,6 +8,11 @@ contract MorkpherTradingEngineTest is BaseSetup {
 	uint public constant PRECISION = 10 ** 8;
 	uint public constant SECOND_RATE_TS = 1644491427;
 
+	event Transfer(address indexed from, address indexed to, uint256 value);
+	event LinkState(address stateAddress);
+	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
+	event EscrowPaid(bytes32 orderId, address user, uint escrowAmount);
+	event EscrowReturned(bytes32 orderId, address user, uint escrowAmount);
 	event OrderIdRequested(
 		bytes32 _orderId,
 		address indexed _address,
@@ -20,7 +25,21 @@ contract MorkpherTradingEngineTest is BaseSetup {
 
 	function setUp() public override {
 		super.setUp();
+		morpherAccessControl.grantRole(morpherToken.ADMINISTRATOR_ROLE(), address(this));
         morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+	}
+
+	function testAdminFunctions() public {		
+		bytes32 marketId = keccak256("CRYPTO_DOGE");
+		vm.expectEmit(true, true, true, true);
+		emit LockedPriceForClosingPositions(marketId, 5 * 10 ** 8);
+		morpherTradeEngine.setDeactivatedMarketPrice(marketId, 5 * 10 ** 8);
+		assertEq(morpherTradeEngine.getDeactivatedMarketPrice(marketId), 5 * 10 ** 8);
+
+		vm.expectEmit(true, true, true, true);
+		emit LinkState(address(0x01));
+		morpherTradeEngine.setMorpherStateAddress(address(0x01));	
+		assertEq(address(morpherTradeEngine.morpherState()), address(0x01));
 	}
 
 	// POSITION VALUE ------------------------------------------------------------------------------
@@ -1111,5 +1130,46 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		assertEq(liquidationPrice, expectedLiquidationPrice);
 		uint userBalance = morpherToken.balanceOf(user);
 		assertEq(userBalance, expectedShareValue * 10 ** 8);
+	}
+
+	function testBuildUpAndPaybackEscrow() public {
+		morpherTradeEngine.setEscrowOpenOrderEnabled(true);
+		address user = address(0xff01);
+		morpherToken.mint(user, 100 ether);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		vm.expectEmit(true, true, true, false);
+		emit OrderIdRequested(bytes32(0x0), user, keccak256("CRYPTO_BTC"), 0, 100 ether, true, 500000000);
+		vm.expectEmit(true, true, true, true);
+		emit Transfer(user, address(0x0), 100 ether);
+		vm.expectEmit(true, true, true, false);
+		emit EscrowPaid(bytes32(0x0), user, 100 ether);
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 ether,
+			true,
+            5 * PRECISION
+		);
+
+		(, , , , , , , , , , uint256 orderEscrowAmount, ) = morpherTradeEngine.orders(orderId);
+		assertEq(orderEscrowAmount, 100 ether);
+		assertEq(morpherToken.balanceOf(user), 0);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		// vm.expectEmit(true, true, true, true);
+		// emit Transfer(address(0x0), user, 100 ether);
+		// vm.expectEmit(true, true, true, true);
+		// emit EscrowReturned(orderId, user, 100 ether);	
+		morpherTradeEngine.processOrder(orderId, 50000 * PRECISION, 10 * PRECISION, 0, SECOND_RATE_TS * 1000 + 1000);
+		(, , , , , , , , , , uint256 orderEscrowAmount2, ) = morpherTradeEngine.orders(orderId);
+		assertEq(orderEscrowAmount2, 0);
+		// reminder of the position opening
+		assertEq(morpherToken.balanceOf(user), 4905000000000);
 	}
 }
