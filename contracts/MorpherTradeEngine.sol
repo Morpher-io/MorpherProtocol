@@ -297,7 +297,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 				if (_tradeDirection) {
 					//long
 					require(
-						_closeSharesAmount == portfolio[_address][_marketId].longShares,
+						_closeSharesAmount == portfolio[_address][_marketId].shortShares,
 						"MorpherTradeEngine: Deactivated market order needs all shares to be closed"
 					);
 				} else {

@@ -1172,4 +1172,67 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		// reminder of the position opening
 		assertEq(morpherToken.balanceOf(user), 4905000000000);
 	}
+
+	function testValidateClosedMarketOrderConditions() public {
+		address user = address(0xff01);
+		morpherToken.mint(user, 100 ether);
+
+		vm.warp(SECOND_RATE_TS);
+		vm.startPrank(address(morpherOracle));	
+
+		vm.expectRevert();
+		// can't open if market disabled
+		morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_DOGE"), 0, 100 ether, true, PRECISION);
+	
+		bytes32 orderId = morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 0, 100 ether, true, PRECISION);
+		morpherTradeEngine.processOrder(orderId, 50000 * PRECISION, 10 * PRECISION, 0, SECOND_RATE_TS * 1000);
+
+		// disable market now
+		vm.stopPrank();
+		morpherState.deActivateMarket(keccak256("CRYPTO_BTC"));
+
+		vm.prank(address(morpherOracle));
+		// fails because of no deactivated market price
+		vm.expectRevert();
+		morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 19996000, 0, false, PRECISION);
+	
+		morpherTradeEngine.setDeactivatedMarketPrice(keccak256("CRYPTO_BTC"), 25000 * PRECISION);
+
+		vm.startPrank(address(morpherOracle));
+
+		// fails because of no full position close
+		vm.expectRevert();
+		morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 19995999, 0, false, PRECISION);
+
+		// now it goes through
+		orderId = morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 19996000, 0, false, PRECISION);
+		morpherTradeEngine.processOrder(orderId, 50000 * PRECISION, 10 * PRECISION, 0, SECOND_RATE_TS * 1000);
+		// uses the deactivated market price instead of the oracle one
+		uint256 userBalance = morpherToken.balanceOf(user);
+		assertEq(userBalance, 49.970008 ether);
+
+		// activate to create a short
+		vm.stopPrank();
+		morpherState.activateMarket(keccak256("CRYPTO_BTC"));
+		vm.startPrank(address(morpherOracle));
+
+		orderId = morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 0, 10 ether, false, PRECISION);
+		morpherTradeEngine.processOrder(orderId, 50000 * PRECISION, 10 * PRECISION, 0, SECOND_RATE_TS * 1000);
+
+		// disable market now
+		vm.stopPrank();
+		morpherState.deActivateMarket(keccak256("CRYPTO_BTC"));
+		vm.startPrank(address(morpherOracle));
+
+		// fails because of no full position close
+		vm.expectRevert();
+		morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 1999599, 0, true, PRECISION);
+
+		// now it goes through
+		orderId = morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 1999600, 0, true, PRECISION);
+		morpherTradeEngine.processOrder(orderId, 50000 * PRECISION, 10 * PRECISION, 0, SECOND_RATE_TS * 1000);
+		// uses the deactivated market price instead of the oracle one
+		userBalance = morpherToken.balanceOf(user);
+		assertEq(userBalance, 54.9650088 ether);
+	}
 }
