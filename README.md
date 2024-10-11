@@ -61,9 +61,9 @@ There is a setup for a local development environment. This will:
 
 There are several components playing together, these are here described in more detail in order of their importance.
 
-Also, there are two versions of the Morpher Protocol. One with Proxies, and another, older one, without Proxies. On the Morpher Production Sidechain, as well as the Ethereum Mainchain, both versions are mixed, as the state was previously stored in MorpherState, but the Bridge was updated.
+Also, there are two versions of the Morpher Protocol. One with Proxies meant for deployment on l2 public chains, and another, older one, without Proxies. On the Morpher Production Sidechain, as well as the Ethereum Mainchain, both versions are mixed, as the state was previously stored in MorpherState, but the Bridge was updated.
 
-On Development networks, as well as Polygon Production networks, only the new, Proxied version is deployed.
+Polygon contains OpenZeppelin v0.4 proxies. There are currently no intentions to deploy the Protocol to any other chain.
 
 ## MorpherAccessControl.sol
 
@@ -72,43 +72,40 @@ This contract was introduced in the proxied contracts to manage access controls 
 * **MINTER_ROLE**: Is allowed to mint tokens, usually only given to other smart contracts. E.g. TradeEngine can mint, staking can mint, the faucet (on dev only) can mint
 * **BURNER_ROLE**: Same as minterrole, just for burning
 * **PAUSER_ROLE**: Can pause any mint/burn/transfer. Effectively pauses the whole protocol. Is assigned to the owner.
-* **SIDECHAINOPERATOR_ROLE**: Is updating the Merkle Root, as well as triggers withdrawal functionality
-* **ADMINISTRATOR_ROLE**: 
-* ORACLEOPERATOR_ROLE
-* STAKINGADMIN_ROLE
-* GOVERNANCE_ROLE
-* TRANSFER_ROLE
-* ORACLE_ROLE
-* POSITIONADMIN_ROLE
-* USERBLOCKINGADMIN_ROLE
-* POLYGONMINTER_ROLE
+* **SIDECHAINOPERATOR_ROLE**: Is updating the Merkle Root, as well as triggers withdrawal functionality. (deprecated on sunsetting the morpher sidechain)
+* **ADMINISTRATOR_ROLE**: Can do market delistings, administrative liquidations, update the interest rate etc.
+* ORACLEOPERATOR_ROLE: Is responsible for the callback handling from the oracle
+* STAKINGADMIN_ROLE: Can do all the adminstrative actions regarding the staking, staking rewards, staking interest rates.
+* GOVERNANCE_ROLE: Current not in use, will be superseeded by a proper voting based governance.
+* TRANSFER_ROLE: Regulatory role for chains which need a token transfer restriction to allow only certain addresses to transfer Tokens. E.g. on Sidechain it wasn't possible to transfer tokens, only for specific contracts or specific actions, such as account migrations.
+* ORACLE_ROLE: Only the Oracle (contract) is allowed to kick of position creation in the TradeEngine.
+* POSITIONADMIN_ROLE: The admin contract can modify positions, such as for market migrations (migrating a market from one symbol to another) or during migration of the permissioned private sidechain to the public blockchain.
+* USERBLOCKINGADMIN_ROLE: Regulatory role for blocking users from Trading.
+* POLYGONMINTER_ROLE: Role that was once assigned to the Polygon Bridge for depositing/withdrawing tokens. Currently not in use, because polygon does not support upgradeable contracts or dynamic role assignments. Might be in use for other bridges later on.
 
 ## MorpherState.sol
 
-### Non-Proxy Version
+It holds a pointer to the other contracts. The State does nothing substantial other than being a focal point for managing contract addresses in the MorpherProtocol space. All the actual information is stored on the proxied contracts themselves (Tokens in MorpherToken, Positions in TradeEngine, etc...)
+
+### Non-Proxy Version (deprecated)
 
 This smart contract is _the brain_ of what happens with users, balances, trading and governance. It is the central point which stores balances for each user. It also stores the addresses of other smart contracts, such as the ERC20 token, the bridge or the governance functionality.
 
-### Proxy Version
-
-It holds a pointer to the other contracts. The State does nothing substantial anymore, all the actual information is stored on the proxied contracts themselves (Tokens in MorpherToken, Positions in TradeEngine, etc...)
-
 ## MorpherToken.sol
 
-### Non-Proxy Version 
+Its an ERC20 Token, that can be Minted and burned, as well as transferred. It's derived from OpenZeppelin Tokens. It's upgradeable. It also can do Permit via EIP712 Signature Scheme. The hashed version is 1, the hashed name is MorpherToken.
 
-It is the ERC20 Compatible token for Morpher. All the balances are stored in MorpherState.sol, it's just the interface.
+### Non-Proxy Version (deprecated) 
 
-### Proxy Version
+It is the ERC20 Compatible token for Morpher. All the balances are stored in MorpherState.sol, it's just the interface. It can do allowance, but not Permits.
 
-Its an ERC20 Token, that can be Minted
 
 ## MorpherTradeEngine.sol
 
-This is the contract that processes and stores orders. The orders can only be given by the oracle smart contract. This smart contract is the trusted entity taking prices from outside into the sandboxed blockchain.
+This is the contract that processes and stores orders. The orders can only be given by another entity with an ORACLE_ROLE. Usually this is the Oracle Contract, a smart contract that is the trusted entity taking prices from outside into the sandboxed blockchain.
 
 
-## MorpherBridge.sol
+## MorpherBridge.sol (deprecated, since sidechain is sunset)
 
 Morpher Bridge takes care of bridging functionality from Main-Chain to Side-Chain and vice versa. It contains functionality to burn tokens upon deposit on the main-chain and credit (or mint) tokens on the side-chain. It can also take the merkle-proofs from the side-chain and let you withdraw tokens on the main-chain. 
 
