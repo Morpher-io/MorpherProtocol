@@ -1445,4 +1445,56 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		assertEq(pos.meanEntryLeverage, meanEntryLeverage);
 		assertEq(pos.liquidationPrice, liquidationPrice);
 	}
+
+	function testExposureAddAndRemove() public {
+		address addr1 = address(0x0001);
+		address addr2 = address(0x0002);
+		address addr3 = address(0x0003);
+		address addr4 = address(0x0004);
+		bytes32 mId = keccak256("CRYPTO_BTC");
+		uint256 ts = SECOND_RATE_TS;
+		uint256 ls = 100;
+		uint256 ss = 50;
+		uint256 mep = 1000 * 10 ** 8;
+		uint256 mes = 1 * 10 ** 8;
+		uint256 mel = PRECISION;
+		uint256 lp = 500 * 10 ** 8;
+
+		morpherAccessControl.grantRole(keccak256("POSITIONADMIN_ROLE"), address(this));
+		morpherTradeEngine.setPosition(addr1, mId, ts, ls, ss, mep, mes, mel, lp);
+		morpherTradeEngine.setPosition(addr2, mId, ts, ls, ss, mep, mes, mel, lp);
+		morpherTradeEngine.setPosition(addr3, mId, ts, ls, ss, mep, mes, mel, lp);
+		morpherTradeEngine.setPosition(addr4, mId, ts, ls, ss, mep, mes, mel, lp);
+
+		assertEq(morpherTradeEngine.getMaxMappingIndex(mId), 4);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr1), 1);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr2), 2);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr3), 3);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr4), 4);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 1), addr1);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 2), addr2);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 3), addr3);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 4), addr4);
+
+		morpherTradeEngine.setPosition(addr2, mId, 0, 0, 0, 0, 0, mel, 0);
+		assertEq(morpherTradeEngine.getMaxMappingIndex(mId), 3);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr1), 1);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr4), 2);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr3), 3);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 1), addr1);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 2), addr4);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 3), addr3);
+
+		morpherTradeEngine.setPosition(addr3, mId, 0, 0, 0, 0, 0, mel, 0);
+		assertEq(morpherTradeEngine.getMaxMappingIndex(mId), 2);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr1), 1);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr4), 2);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 1), addr1);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 2), addr4);
+
+		morpherTradeEngine.setPosition(addr1, mId, 0, 0, 0, 0, 0, mel, 0);
+		assertEq(morpherTradeEngine.getMaxMappingIndex(mId), 1);
+		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr4), 1);
+		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 1), addr4);
+	}
 }
