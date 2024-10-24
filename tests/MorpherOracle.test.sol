@@ -4,13 +4,19 @@ pragma solidity ^0.8.15;
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
 
 import "./BaseSetup.sol";
+import "./mocks/ERC20.sol";
+import "./mocks/UniswapRouter.sol";
 import "../contracts/MorpherOracle.sol";
 
 // using staking as one of the inheriting contracts
 contract MorpherOracleTest is BaseSetup, MorpherOracle {
 	uint public constant PRECISION = 1e8;
 
+	MockERC20 public WMATIC;
+	MockERC20 public OTHER_ERC20;
+
 	event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
 	event PositionUpdated(
 		address _userId,
@@ -66,6 +72,17 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 	function setUp() public override {
 		super.setUp();
 		morpherAccessControl.grantRole(morpherOracle.ADMINISTRATOR_ROLE(), address(this));
+		bytes memory contractCode = type(MockUniswapRouter).runtimeCode;
+		vm.etch(UNISWAP_ROUTER, contractCode);
+		WMATIC = new MockERC20("wmatic", "WMATIC");
+		WMATIC.mint(UNISWAP_ROUTER, 100000 ether);
+		OTHER_ERC20 = new MockERC20("test", "TEST");
+		OTHER_ERC20.mint(UNISWAP_ROUTER, 100000 ether);
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+		morpherToken.mint(UNISWAP_ROUTER, 100000 ether);
+		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+		morpherOracle.setWmaticAddress(address(WMATIC));
+		morpherToken.setRestrictTransfers(false);
 	}
 
 	function generatePosition(bytes32 market, address user) public {
@@ -323,4 +340,283 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 orderId = morpherOracle.createOrderPermittedBySignature(str, owner.addr, str._goodUntil, v, r, s);
 		assertEq(orderId, expectedOrderId);
 	}
+
+	function testCreateOpenOrderWithToken() public {
+		Account memory owner = makeAccount("owner");
+
+		WMATIC.mint(owner.addr, 50 ether);
+
+		CreateOrderStruct memory str = CreateOrderStruct(
+			keccak256("CRYPTO_BTC"),
+			uint(0),
+			uint(100 * 1e18),
+			true,
+			2 * PRECISION,
+			uint(90 * 1e18),
+			uint(110 * 1e18),
+			uint(999999999999999),
+			uint(1)
+		);
+
+		bytes32 erc20PermitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
+		bytes32 structHash = keccak256(
+			abi.encode(erc20PermitTypehash, owner.addr, address(morpherOracle), 50 ether, 0, 1)
+		);
+		bytes32 domainHash = keccak256(
+			abi.encode(_TYPE_HASH, keccak256("wmatic"), keccak256("1"), block.chainid, address(WMATIC))
+		);
+
+		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+			address(WMATIC),
+			owner.addr,
+			50 ether,
+			50 ether,
+			1,
+			v,
+			r,
+			s
+		);
+
+		bytes32 expectedOrderId = keccak256(
+			abi.encodePacked(
+				owner.addr,
+				block.number,
+				keccak256("CRYPTO_BTC"),
+				uint(0),
+				uint(100 * 1e18),
+				true,
+				2 * PRECISION,
+				uint(1)
+			)
+		);
+
+		vm.prank(owner.addr);
+		// wmatic from user to morpher oracle
+		vm.expectEmit(true, true, true, true);
+		emit Approval(owner.addr, address(morpherOracle), 50 ether);
+		vm.expectEmit(true, true, true, true);
+		emit Approval(owner.addr, address(morpherOracle), 0);
+		vm.expectEmit(true, true, true, true);
+		emit Transfer(owner.addr, address(morpherOracle), 50 ether);
+		// wmatic and mph from oracle to uniswap	
+		vm.expectEmit(true, true, true, true);
+		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 50 ether);
+		vm.expectEmit(true, true, true, true);
+		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 100 ether);
+		// swap get executed (mocking contract)
+		vm.expectEmit(true, true, true, true);
+		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 0);
+		vm.expectEmit(true, true, true, true);
+		emit Transfer(address(morpherOracle), UNISWAP_ROUTER, 50 ether); // -> wmatic
+		vm.expectEmit(true, true, true, true);
+		emit Transfer(UNISWAP_ROUTER, owner.addr, 100 ether); // -> mph
+		// wmatic and mph from oracle to uniswap reset
+		vm.expectEmit(true, true, true, true);
+		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 0);
+		vm.expectEmit(true, true, true, true);
+		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 0);
+		vm.expectEmit(true, true, true, true);
+		emit OrderIdRequested(expectedOrderId, owner.addr, keccak256("CRYPTO_BTC"), 0, 100 * 1e18, true, 2 * PRECISION);
+		vm.expectEmit(true, true, true, true);
+		emit OrderCreated(
+			expectedOrderId,
+			owner.addr,
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 1e18,
+			true,
+			2 * PRECISION,
+			110 * 1e18,
+			90 * 1e18,
+			1,
+			999999999999999
+		);
+		morpherOracle.createOrderFromToken(str, inputToken);
+
+		assertEq(morpherOracle.priceAbove(expectedOrderId), 90 * 1e18);
+		assertEq(morpherOracle.priceBelow(expectedOrderId), 110 * 1e18);
+		assertEq(morpherOracle.goodFrom(expectedOrderId), 1);
+		assertEq(morpherOracle.goodUntil(expectedOrderId), 999999999999999);
+
+		// check balances
+		assertEq(WMATIC.balanceOf(address(morpherOracle)), 0);
+		assertEq(morpherToken.balanceOf(address(morpherOracle)), 0);
+		assertEq(WMATIC.balanceOf(owner.addr), 0);
+		assertEq(morpherToken.balanceOf(owner.addr), 100 ether);
+		assertEq(WMATIC.balanceOf(UNISWAP_ROUTER), 100050 ether);
+		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
+	}
+
+	function testCreateOpenOrderWithTokenWithOtherERC20() public {
+		Account memory owner = makeAccount("owner");
+
+		OTHER_ERC20.mint(owner.addr, 50 ether);
+
+		CreateOrderStruct memory str = CreateOrderStruct(
+			keccak256("CRYPTO_BTC"),
+			uint(0),
+			uint(100 * 1e18),
+			true,
+			2 * PRECISION,
+			uint(90 * 1e18),
+			uint(110 * 1e18),
+			uint(999999999999999),
+			uint(1)
+		);
+
+		bytes32 erc20PermitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
+		bytes32 structHash = keccak256(
+			abi.encode(erc20PermitTypehash, owner.addr, address(morpherOracle), 50 ether, 0, 1)
+		);
+		bytes32 domainHash = keccak256(
+			abi.encode(_TYPE_HASH, keccak256("test"), keccak256("1"), block.chainid, address(OTHER_ERC20))
+		);
+
+		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+			address(OTHER_ERC20),
+			owner.addr,
+			50 ether,
+			50 ether,
+			1,
+			v,
+			r,
+			s
+		);
+
+		bytes32 expectedOrderId = keccak256(
+			abi.encodePacked(
+				owner.addr,
+				block.number,
+				keccak256("CRYPTO_BTC"),
+				uint(0),
+				uint(100 * 1e18),
+				true,
+				2 * PRECISION,
+				uint(1)
+			)
+		);
+
+		vm.prank(owner.addr);
+		morpherOracle.createOrderFromToken(str, inputToken);
+
+		// check balances
+		assertEq(WMATIC.balanceOf(address(morpherOracle)), 0);
+		assertEq(OTHER_ERC20.balanceOf(address(morpherOracle)), 0);
+		assertEq(morpherToken.balanceOf(address(morpherOracle)), 0);
+		assertEq(WMATIC.balanceOf(owner.addr), 0);
+		assertEq(OTHER_ERC20.balanceOf(owner.addr), 0);
+		assertEq(morpherToken.balanceOf(owner.addr), 100 ether);
+		assertEq(WMATIC.balanceOf(UNISWAP_ROUTER), 100000 ether);
+		assertEq(OTHER_ERC20.balanceOf(UNISWAP_ROUTER), 100050 ether);
+		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
+	}
+
+	function testCreateOpenOrderWithTokenAndSignature() public {
+		Account memory owner = makeAccount("owner");
+
+		WMATIC.mint(owner.addr, 50 ether);
+
+		CreateOrderStruct memory str = CreateOrderStruct(
+			keccak256("CRYPTO_BTC"),
+			uint(0),
+			uint(100 * 1e18),
+			true,
+			2 * PRECISION,
+			uint(90 * 1e18),
+			uint(110 * 1e18),
+			uint(999999999999999),
+			uint(1)
+		);
+
+		bytes32 erc20PermitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
+		bytes32 structHash = keccak256(
+			abi.encode(erc20PermitTypehash, owner.addr, address(morpherOracle), 50 ether, 0, 1)
+		);
+		bytes32 domainHash = keccak256(
+			abi.encode(_TYPE_HASH, keccak256("wmatic"), keccak256("1"), block.chainid, address(WMATIC))
+		);
+
+		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+			address(WMATIC),
+			owner.addr,
+			50 ether,
+			50 ether,
+			1,
+			v,
+			r,
+			s
+		);
+
+		uint nonce = morpherOracle.nonces(owner.addr);
+
+		structHash = keccak256(
+			abi.encode(
+				_PERMIT_TYPEHASH,
+				str._marketId,
+				str._closeSharesAmount,
+				str._openMPHTokenAmount,
+				owner.addr,
+				nonce,
+				str._goodUntil
+			)
+		);
+		domainHash = keccak256(
+			abi.encode(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION, block.chainid, address(morpherOracle))
+		);
+		finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		(v, r, s) = vm.sign(owner.key, finalHash);
+
+		bytes32 expectedOrderId = keccak256(
+			abi.encodePacked(
+				owner.addr,
+				block.number,
+				keccak256("CRYPTO_BTC"),
+				uint(0),
+				uint(100 * 1e18),
+				true,
+				2 * PRECISION,
+				uint(1)
+			)
+		);
+	
+		morpherOracle.createOrderFromToken(str, inputToken, owner.addr, str._goodUntil, v, r, s);
+
+		assertEq(morpherOracle.priceAbove(expectedOrderId), 90 * 1e18);
+		assertEq(morpherOracle.priceBelow(expectedOrderId), 110 * 1e18);
+		assertEq(morpherOracle.goodFrom(expectedOrderId), 1);
+		assertEq(morpherOracle.goodUntil(expectedOrderId), 999999999999999);
+
+		// check balances
+		assertEq(WMATIC.balanceOf(address(morpherOracle)), 0);
+		assertEq(morpherToken.balanceOf(address(morpherOracle)), 0);
+		assertEq(WMATIC.balanceOf(owner.addr), 0);
+		assertEq(morpherToken.balanceOf(owner.addr), 100 ether);
+		assertEq(WMATIC.balanceOf(UNISWAP_ROUTER), 100050 ether);
+		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
+	}
+
+	function testCallbackForOpenPosition() public {}
+	function testCallbackForClosePositionInMph() public {}
+	function testCallbackForClosePositionInWMmatic() public {}
+	function testLiquidationOrder() public {}
+	function testLiquidationOrderFromAdmin() public {}
+	function testCancelOrder() public {}
+	function testCancelOrderFromAdmin() public {}
+	function testDelistMarket() public {}
+	function testCheckOrderConditionsLogic() public {}
 }
