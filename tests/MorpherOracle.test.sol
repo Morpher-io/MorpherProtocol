@@ -15,8 +15,10 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 	MockERC20 public WMATIC;
 	MockERC20 public OTHER_ERC20;
 
+	uint public constant SECOND_RATE_TS = 1644491427;
+
 	event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
+	event Approval(address indexed owner, address indexed spender, uint256 value);
 
 	event PositionUpdated(
 		address _userId,
@@ -375,7 +377,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			address(WMATIC),
 			owner.addr,
 			50 ether,
-			50 ether,
+			100 ether,
 			1,
 			v,
 			r,
@@ -403,7 +405,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		emit Approval(owner.addr, address(morpherOracle), 0);
 		vm.expectEmit(true, true, true, true);
 		emit Transfer(owner.addr, address(morpherOracle), 50 ether);
-		// wmatic and mph from oracle to uniswap	
+		// wmatic and mph from oracle to uniswap
 		vm.expectEmit(true, true, true, true);
 		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 50 ether);
 		vm.expectEmit(true, true, true, true);
@@ -486,7 +488,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			address(OTHER_ERC20),
 			owner.addr,
 			50 ether,
-			50 ether,
+			100 ether,
 			1,
 			v,
 			r,
@@ -555,7 +557,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			address(WMATIC),
 			owner.addr,
 			50 ether,
-			50 ether,
+			100 ether,
 			1,
 			v,
 			r,
@@ -593,7 +595,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 				uint(1)
 			)
 		);
-	
+
 		morpherOracle.createOrderFromToken(str, inputToken, owner.addr, str._goodUntil, v, r, s);
 
 		assertEq(morpherOracle.priceAbove(expectedOrderId), 90 * 1e18);
@@ -610,11 +612,316 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
 	}
 
-	function testCallbackForOpenPosition() public {}
-	function testCallbackForClosePositionInMph() public {}
-	function testCallbackForClosePositionInWMmatic() public {}
-	function testLiquidationOrder() public {}
-	function testLiquidationOrderFromAdmin() public {}
+	function testCallbackForOpenPosition() public {
+		address user = address(0xff01);
+
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+		morpherToken.mint(user, 1001 * 10 ** 18);
+		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(user);
+		bytes32 orderId = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 1e18,
+			true,
+			5 * PRECISION,
+			40000 * PRECISION,
+			60000 * PRECISION,
+			999999999999999,
+			1
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		morpherOracle.__callback(
+			orderId,
+			50000 * PRECISION,
+			50000 * PRECISION,
+			10 * PRECISION,
+			0,
+			SECOND_RATE_TS * 1000 + 1000,
+			0.001 ether
+		);
+
+		bytes32 expectedPositionHash = keccak256(
+			abi.encodePacked(
+				user,
+				keccak256("CRYPTO_BTC"),
+				uint(SECOND_RATE_TS * 1000 + 1000),
+				uint(2 * 10 ** 8),
+				uint(0),
+				uint(50000 * PRECISION),
+				uint(10 * PRECISION),
+				uint(5 * PRECISION),
+				uint(4001200000000)
+			)
+		);
+
+		(
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+			bytes32 positionHash
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		assertEq(lastUpdated, SECOND_RATE_TS * 1000 + 1000);
+		assertEq(longShares, 2 * 10 ** 8);
+		assertEq(shortShares, 0);
+		assertEq(meanEntryPrice, uint(50000 * PRECISION));
+		assertEq(meanEntrySpread, uint(10 * PRECISION));
+		assertEq(meanEntryLeverage, uint(5 * PRECISION));
+		assertEq(liquidationPrice, 4001200000000);
+		assertEq(positionHash, expectedPositionHash);
+
+		assertEq(morpherOracle.gasForCallback(), 0.001 ether);
+
+		assertEq(morpherOracle.priceAbove(orderId), 0);
+		assertEq(morpherOracle.priceBelow(orderId), 0);
+		assertEq(morpherOracle.goodFrom(orderId), 0);
+		assertEq(morpherOracle.goodUntil(orderId), 0);
+	}
+
+	function testCallbackForClosePositionInMph() public {
+		address user = address(0xff01);
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+		morpherToken.mint(user, 1001 * 10 ** 18);
+		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderBuyId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			true,
+			5 * PRECISION
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderBuyId, 50000 * PRECISION, 10 * PRECISION, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		vm.warp(block.timestamp + 10 * 24 * 60 * 60);
+
+		// now, create the close order
+
+		vm.prank(user);
+		bytes32 orderId = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			2 * 1e8,
+			0,
+			false,
+			PRECISION,
+			40000 * PRECISION,
+			60000 * PRECISION,
+			999999999999999,
+			1
+		);
+
+		vm.warp(block.timestamp + 2);
+
+		morpherOracle.__callback(
+			orderId,
+			50050 * PRECISION,
+			50050 * PRECISION,
+			10 * PRECISION,
+			0,
+			block.timestamp * 1000 - 1000,
+			0
+		);
+		(
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		assertEq(lastUpdated, block.timestamp * 1000 - 1000);
+		assertEq(longShares, 0);
+		assertEq(shortShares, 0);
+		assertEq(meanEntryPrice, 0);
+		assertEq(meanEntrySpread, 0);
+		assertEq(meanEntryLeverage, PRECISION);
+		assertEq(liquidationPrice, 0);
+
+		uint userBalance = morpherToken.balanceOf(user);
+		uint expectedShareValue = 49540 * 1e8; // calculated in t.e. test
+		assertEq(userBalance, expectedShareValue * 2 * 1e8);
+	}
+
+	function testCallbackForClosePositionInWMmatic() public {
+		Account memory owner = makeAccount("owner");
+
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+		morpherToken.mint(owner.addr, 1001 * 10 ** 18);
+		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderBuyId = morpherTradeEngine.requestOrderId(
+			owner.addr,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			true,
+			5 * PRECISION
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderBuyId, 50000 * PRECISION, 10 * PRECISION, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		vm.warp(block.timestamp + 10 * 24 * 60 * 60);
+
+		// now, create the close order with token permit
+
+		CreateOrderStruct memory str = CreateOrderStruct(
+			keccak256("CRYPTO_BTC"),
+			uint(2 * 1e8),
+			uint(0),
+			false,
+			PRECISION,
+			uint(40000 * 1e8),
+			uint(60000 * 1e8),
+			uint(999999999999999),
+			uint(1)
+		);
+
+		uint256 mphBalanceAfterClose = 49540 * 1e8 * 2 * 1e8;
+
+		bytes32 erc20PermitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
+		bytes32 structHash = keccak256(
+			abi.encode(
+				erc20PermitTypehash,
+				owner.addr,
+				address(morpherOracle),
+				mphBalanceAfterClose,
+				0,
+				block.timestamp + 100
+			)
+		);
+		bytes32 domainHash = keccak256(
+			abi.encode(_TYPE_HASH, keccak256("MorpherToken"), keccak256("1"), block.chainid, address(morpherToken))
+		);
+
+		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+			address(WMATIC),
+			owner.addr,
+			mphBalanceAfterClose,
+			mphBalanceAfterClose / 2,
+			block.timestamp + 100,
+			v,
+			r,
+			s
+		);
+
+		vm.prank(owner.addr);
+		morpherOracle.createOrderFromToken(str, inputToken);
+
+		vm.warp(block.timestamp + 2);
+
+		morpherOracle.__callback(
+			bytes32(0xcb9f2da0a98770797be5af78dfa27085d73dc98713711199274acce9b68b317f),
+			50050 * PRECISION,
+			50050 * PRECISION,
+			10 * PRECISION,
+			0,
+			block.timestamp * 1000 - 1000,
+			0
+		);
+
+		uint expectedShareValue = 49540 * 1e8; // calculated in t.e. test
+		assertEq(morpherToken.balanceOf(owner.addr), 0);
+		assertEq(WMATIC.balanceOf(owner.addr), expectedShareValue * 1e8);
+	}
+
+	function testLiquidationOrder() public {
+		address user = address(0xff01);
+
+		bytes32 orderId = keccak256(
+			abi.encodePacked(user, block.number, keccak256("CRYPTO_BTC"), uint(0), uint(0), true, PRECISION, uint(1))
+		);
+		vm.expectEmit(true, true, true, true);
+		emit OrderIdRequested(orderId, user, keccak256("CRYPTO_BTC"), 0, 0, true, PRECISION);
+		vm.expectEmit(true, true, true, true);
+		emit LiquidationOrderCreated(orderId, address(this), user, keccak256("CRYPTO_BTC"));
+		morpherOracle.createLiquidationOrder(user, keccak256("CRYPTO_BTC"));
+	}
+
+	function testLiquidationOrderFromAdmin() public {
+		address user = address(0xff01);
+
+		morpherAccessControl.grantRole(keccak256("POSITIONADMIN_ROLE"), address(this));
+		morpherTradeEngine.setPosition(
+			user,
+			keccak256("CRYPTO_BTC"),
+			block.timestamp,
+			10 * PRECISION,
+			5 * PRECISION,
+			50000 * PRECISION,
+			10 * PRECISION,
+			PRECISION,
+			0
+		);
+
+		bytes32 orderId1 = keccak256(
+			abi.encodePacked(
+				user,
+				block.number,
+				keccak256("CRYPTO_BTC"),
+				10 * PRECISION,
+				uint(0),
+				false,
+				PRECISION,
+				uint(1)
+			)
+		);
+
+		bytes32 orderId2 = keccak256(
+			abi.encodePacked(
+				user,
+				block.number,
+				keccak256("CRYPTO_BTC"),
+				5 * PRECISION,
+				uint(0),
+				true,
+				PRECISION,
+				uint(2)
+			)
+		);
+
+		vm.expectEmit(true, true, true, true);
+		emit OrderIdRequested(orderId1, user, keccak256("CRYPTO_BTC"), 10 * PRECISION, 0, false, PRECISION);
+		vm.expectEmit(true, true, true, true);
+		emit AdminLiquidationOrderCreated(orderId1, user, keccak256("CRYPTO_BTC"), 10 * PRECISION, 0, false, 10 ** 8);
+		vm.expectEmit(true, true, true, true);
+		emit OrderIdRequested(orderId2, user, keccak256("CRYPTO_BTC"), 5 * PRECISION, 0, true, PRECISION);
+		vm.expectEmit(true, true, true, true);
+		emit AdminLiquidationOrderCreated(orderId2, user, keccak256("CRYPTO_BTC"), 5 * PRECISION, 0, true, 10 ** 8);
+		morpherOracle.adminLiquidationOrder(user, keccak256("CRYPTO_BTC"));
+	}
+
 	function testCancelOrder() public {}
 	function testCancelOrderFromAdmin() public {}
 	function testDelistMarket() public {}

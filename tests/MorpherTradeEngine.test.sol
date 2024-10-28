@@ -1215,6 +1215,80 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		assertEq(userBalance, expectedShareValue * 10 ** 8);
 	}
 
+	function testLiquidation() public {
+		uint256 marketPrice = 50000 * PRECISION;
+		uint256 marketSpread = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		address user = address(0xff01);
+		morpherToken.mint(user, 1001 * 10 ** 18);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			true,
+			orderLeverage
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice, marketSpread, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		vm.warp(SECOND_RATE_TS + 3);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderIdLiq = morpherTradeEngine.requestOrderId(user, keccak256("CRYPTO_BTC"), 0, 0, true, PRECISION);
+
+		vm.warp(SECOND_RATE_TS + 5);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(
+			orderIdLiq,
+			marketPrice,
+			marketSpread,
+			SECOND_RATE_TS * 1000 + 4000,
+			SECOND_RATE_TS * 1000 + 4000
+		);
+
+		(
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+			bytes32 positionHash
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		bytes32 expectedPositionHash = keccak256(
+			abi.encodePacked(
+				user,
+				keccak256("CRYPTO_BTC"),
+				uint(SECOND_RATE_TS * 1000 + 4000),
+				uint(0),
+				uint(0),
+				uint(0),
+				uint(0),
+				uint(PRECISION),
+				uint(0)
+			)
+		);
+		assertEq(lastUpdated, SECOND_RATE_TS * 1000 + 4000);
+		assertEq(longShares, 0);
+		assertEq(shortShares, 0);
+		assertEq(meanEntryPrice, 0);
+		assertEq(meanEntrySpread, 0);
+		assertEq(meanEntryLeverage, PRECISION);
+		assertEq(liquidationPrice, 0);
+		assertEq(positionHash, expectedPositionHash);
+	}
+
 	function testBuildUpAndPaybackEscrow() public {
 		morpherTradeEngine.setEscrowOpenOrderEnabled(true);
 		address user = address(0xff01);
