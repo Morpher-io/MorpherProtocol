@@ -71,6 +71,8 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		uint256 _liquidationPrice
 	);
 
+	event OrderCancelled(bytes32 indexed _orderId, address indexed _address);
+
 	function setUp() public override {
 		super.setUp();
 		morpherAccessControl.grantRole(morpherOracle.ADMINISTRATOR_ROLE(), address(this));
@@ -922,8 +924,137 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		morpherOracle.adminLiquidationOrder(user, keccak256("CRYPTO_BTC"));
 	}
 
-	function testCancelOrder() public {}
-	function testCancelOrderFromAdmin() public {}
-	function testDelistMarket() public {}
-	function testCheckOrderConditionsLogic() public {}
+	function testCancelOrder() public {
+		address user = address(0xff01);
+
+		vm.prank(user);
+
+		bytes32 orderId = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 1e18,
+			true,
+			2 * PRECISION,
+			90 * 1e18,
+			110 * 1e18,
+			999999999999999,
+			1
+		);
+
+		assertEq(morpherOracle.orderCancellationRequested(orderId), false);
+
+		vm.prank(user);
+
+		vm.expectEmit(true, true, true, true);
+		emit OrderCancellationRequestedEvent(orderId, user);
+		morpherOracle.initiateCancelOrder(orderId);
+
+		assertEq(morpherOracle.orderCancellationRequested(orderId), true);
+
+		vm.expectEmit(true, true, true, true);
+		emit OrderCancelled(orderId, user);
+		emit MorpherOracle.OrderCancelled(orderId, user, address(this));
+		morpherOracle.cancelOrder(orderId);
+
+		assertEq(morpherOracle.priceAbove(orderId), 0);
+		assertEq(morpherOracle.priceBelow(orderId), 0);
+		assertEq(morpherOracle.goodFrom(orderId), 0);
+		assertEq(morpherOracle.goodUntil(orderId), 0);
+
+		(address addr, , , , , , , , , , , ) = morpherTradeEngine.orders(orderId);
+		assertEq(addr, address(0));
+	}
+
+	function testCancelOrderFromAdmin() public {
+		address user = address(0xff01);
+
+		vm.prank(user);
+
+		bytes32 orderId = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 1e18,
+			true,
+			2 * PRECISION,
+			90 * 1e18,
+			110 * 1e18,
+			999999999999999,
+			1
+		);
+
+		assertEq(morpherOracle.orderCancellationRequested(orderId), false);
+
+		vm.expectEmit(true, true, true, true);
+		emit OrderCancelled(orderId, user);
+		emit MorpherOracle.OrderCancelled(orderId, user, address(this));
+		morpherOracle.adminCancelOrder(orderId);
+
+		assertEq(morpherOracle.priceAbove(orderId), 0);
+		assertEq(morpherOracle.priceBelow(orderId), 0);
+		assertEq(morpherOracle.goodFrom(orderId), 0);
+		assertEq(morpherOracle.goodUntil(orderId), 0);
+
+		(address addr, , , , , , , , , , , ) = morpherTradeEngine.orders(orderId);
+		assertEq(addr, address(0));
+	}
+
+	function testDelistMarket() public {
+		address addr1 = address(0x0001);
+		address addr2 = address(0x0002);
+		address addr3 = address(0x0003);
+		address addr4 = address(0x0004);
+		bytes32 mId = keccak256("CRYPTO_BTC");
+		uint256 ts = SECOND_RATE_TS;
+		uint256 ls = 100;
+		uint256 ss = 50;
+		uint256 mep = 1000 * 10 ** 8;
+		uint256 mes = 1 * 10 ** 8;
+		uint256 mel = PRECISION;
+		uint256 lp = 500 * 10 ** 8;
+
+		morpherAccessControl.grantRole(keccak256("POSITIONADMIN_ROLE"), address(this));
+		morpherTradeEngine.setPosition(addr1, mId, ts, ls, 0, mep, mes, mel, lp);
+		morpherTradeEngine.setPosition(addr2, mId, ts, 0, ss, mep, mes, mel, lp);
+		morpherTradeEngine.setPosition(addr3, mId, ts, ls, 0, mep, mes, mel, lp);
+		morpherTradeEngine.setPosition(addr4, mId, ts, 0, ss, mep, mes, mel, lp);
+
+		vm.expectEmit(false, true, true, true);
+		emit AdminLiquidationOrderCreated(bytes32(0), addr1, mId, ls, 0, false, 10 ** 8);
+		vm.expectEmit(false, true, true, true);
+		emit AdminLiquidationOrderCreated(bytes32(0), addr2, mId, ss, 0, true, 10 ** 8);
+		vm.expectEmit(false, true, true, true);
+		emit AdminLiquidationOrderCreated(bytes32(0), addr3, mId, ls, 0, false, 10 ** 8);
+		vm.expectEmit(false, true, true, true);
+		emit AdminLiquidationOrderCreated(bytes32(0), addr4, mId, ss, 0, true, 10 ** 8);
+		vm.expectEmit(false, true, true, true);
+		emit DelistMarketComplete(mId);
+		morpherOracle.delistMarket(mId, false);
+	}
+
+	function testCheckOrderConditionsLogic() public {
+		address user = address(0xff01);
+
+		vm.prank(user);
+
+		bytes32 orderId = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 1e18,
+			true,
+			2 * PRECISION,
+			90 * PRECISION,
+			110 * PRECISION,
+			1000,
+			500
+		);
+
+		vm.warp(750);
+		assertEq(morpherOracle.checkOrderConditions(orderId, 100 * PRECISION), true);
+		assertEq(morpherOracle.checkOrderConditions(orderId, 120 * PRECISION), false);
+		assertEq(morpherOracle.checkOrderConditions(orderId, 80 * PRECISION), false);
+		vm.warp(400);
+		assertEq(morpherOracle.checkOrderConditions(orderId, 100 * PRECISION), false);
+		vm.warp(1200);
+		assertEq(morpherOracle.checkOrderConditions(orderId, 100 * PRECISION), false);
+	}
 }
