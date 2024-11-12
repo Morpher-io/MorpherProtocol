@@ -4,16 +4,13 @@ pragma solidity ^0.8.15;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
-
 import "./MorpherState.sol";
 import "./MorpherToken.sol";
 import "./MorpherStaking.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherMintingLimiter.sol";
 import "./MorpherAccessControl.sol";
+import "./MorpherInterestRateManager.sol";
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -24,12 +21,12 @@ import "./MorpherAccessControl.sol";
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherTradeEngine.sol:MorpherTradeEngine
 contract MorpherTradeEngine is Initializable, ContextUpgradeable {
+
 	MorpherState public morpherState;
 
 	/**
 	 * Known Roles to Trade Engine
 	 */
-
 	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 	bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
 	bytes32 public constant POSITIONADMIN_ROLE = keccak256("POSITIONADMIN_ROLE"); //can set and modify positions
@@ -122,28 +119,8 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 
 	mapping(bytes32 => hasExposure) public exposureByMarket;
 
-	mapping(uint256 => InterestRate) public interestRates;
-	uint256 public numInterestRates;
-
-	using CountersUpgradeable for CountersUpgradeable.Counter;
-
-	mapping(address => CountersUpgradeable.Counter) private _nonces;
-
-    bytes32 public constant DOMAIN_TYPE_HASH =
-		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-
-	bytes32 public constant POSITION_TYPE_HASH =
-		keccak256(
-			"Position(uint256 lastUpdated,uint256 longShares,uint256 shortShares,uint256 meanEntryPrice,uint256 meanEntrySpread,uint256 meanEntryLeverage,uint256 liquidationPrice,bytes32 positionHash)"
-		);
-
-	struct EIP712Signature {
-		bytes32 r;
-		bytes32 s;
-		uint8 v;
-		uint256 deadline;
-		address signer;
-	}
+	mapping(uint256 => InterestRate) private _OLDinterestRates;
+	uint256 private _OLDnumInterestRates;
 
 	// ----------------------------------------------------------------------------
 	// Events
@@ -215,12 +192,9 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	event EscrowPaid(bytes32 orderId, address user, uint escrowAmount);
 	event EscrowReturned(bytes32 orderId, address user, uint escrowAmount);
 
-	event LinkState(address _address);
+	event LinkState(address stateAddress);
 
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
-
-	event SetLeverageInterestRate(uint256 newInterestRate);
-	event LeverageInterestRateAdded(uint256 interestRate, uint256 validFromTimestamp);
 
 	function initialize(
 		address _stateAddress,
@@ -237,7 +211,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	modifier onlyRole(bytes32 role) {
 		require(
 			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()),
-			"MorpherTradeEngine: Permission denied."
+			"MorpherToken: Permission denied."
 		);
 		_;
 	}
@@ -247,7 +221,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	// Set state address, get administrator address
 	// ----------------------------------------------------------------------------
 
-	function setMorpherState(address _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+	function setMorpherStateAddress(address _stateAddress) public onlyRole(ADMINISTRATOR_ROLE) {
 		morpherState = MorpherState(_stateAddress);
 		emit LinkState(_stateAddress);
 	}
@@ -255,89 +229,6 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	function setEscrowOpenOrderEnabled(bool _isEnabled) public onlyRole(ADMINISTRATOR_ROLE) {
 		escrowOpenOrderEnabled = _isEnabled;
 	}
-
-	/**
-    Interest rate
-     */
-	function setLeverageInterestRate(uint256 _interestRate) public onlyRole(ADMINISTRATOR_ROLE) {
-		addInterestRate(_interestRate, block.timestamp);
-	}
-
-	/**
-        fallback function in case the old tradeengine asks for the current interest rate
-    */
-    function interestRate() public view returns (uint256) {
-        //start with the last one, as its most likely the last active one, no need to run through the whole map
-        if(numInterestRates == 0) {
-            return 0;
-        }
-        // i gets -1 before checking it to be >= 0 causing underflow of uint
-        for(int256 i = int256(numInterestRates) - 1; i >= 0; i--) {
-            if(interestRates[uint256(i)].validFrom <= block.timestamp) {
-                return interestRates[uint256(i)].rate;
-            }
-        }
-        return 0;
-    }
-
-	function addInterestRate(uint _rate, uint _validFrom) public onlyRole(ADMINISTRATOR_ROLE) {
-		require(
-			numInterestRates == 0 || interestRates[numInterestRates - 1].validFrom < _validFrom,
-			"MorpherTradeEngine: Interest Rate Valid From must be later than last interestRate"
-		);
-		require(_rate <= 100000000, "MorpherTradeEngine: Interest Rate cannot be larger than 100%");
-		require(
-			_validFrom - 365 days <= block.timestamp,
-			"MorpherTradeEngine: Interest Rate cannot start more than 1 year into the future"
-		);
-		//omitting rate sanity checks here. It should always be smaller than 100% (100000000) but I'll leave that to the common sense of the admin.
-		interestRates[numInterestRates].validFrom = _validFrom;
-		interestRates[numInterestRates].rate = _rate;
-		numInterestRates++;
-		emit LeverageInterestRateAdded(_rate, _validFrom);
-	}
-
-	function getInterestRate(uint256 _positionTimestamp) public view returns(uint256) {
-        uint256 sumInterestRatesWeighted = 0;
-
-        // in case we are before the first rate
-        if (numInterestRates == 0 || interestRates[0].validFrom > block.timestamp) {
-            return 0;
-        }
-
-        // avoid division by 0
-        if (block.timestamp == _positionTimestamp) {
-            return interestRate();
-        }
-
-        for(uint256 i = 0; i < numInterestRates; i++) {
-            if(i == numInterestRates-1 || interestRates[i+1].validFrom > block.timestamp) {
-                //reached last interest rate
-                uint rateIncrease;
-                if (_positionTimestamp > interestRates[i].validFrom) {
-                    rateIncrease = (interestRates[i].rate * (block.timestamp - _positionTimestamp));
-                } else {
-                    rateIncrease = (interestRates[i].rate * (block.timestamp - interestRates[i].validFrom));
-                }
-                sumInterestRatesWeighted = sumInterestRatesWeighted + rateIncrease; 
-                break; //in case there are more in the future
-            } else {
-                //only take interest rates after the position was created
-                if(interestRates[i+1].validFrom > _positionTimestamp) {
-                    uint rateIncrease;
-                    if (_positionTimestamp > interestRates[i].validFrom) {
-                        rateIncrease = (interestRates[i].rate * (interestRates[i+1].validFrom - _positionTimestamp));
-                    } else {
-                        rateIncrease = (interestRates[i].rate * (interestRates[i+1].validFrom - interestRates[i].validFrom));
-                    }
-                    sumInterestRatesWeighted = sumInterestRatesWeighted + rateIncrease; 
-                }
-            } 
-        }
-        uint interestRateInternal = sumInterestRatesWeighted / (block.timestamp - _positionTimestamp);
-        return interestRateInternal;
-
-    }
 
 	function paybackEscrow(bytes32 _orderId) private {
 		//pay back the escrow to the user so he has it back on his balance/**
@@ -382,7 +273,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 				if (_tradeDirection) {
 					//long
 					require(
-						_closeSharesAmount == portfolio[_address][_marketId].longShares,
+						_closeSharesAmount == portfolio[_address][_marketId].shortShares,
 						"MorpherTradeEngine: Deactivated market order needs all shares to be closed"
 					);
 				} else {
@@ -816,7 +707,9 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 		}
 		_marginInterest = _averagePrice * (_averageLeverage - PRECISION);
 		_marginInterest = _marginInterest * (((block.timestamp - (_positionTimeStampInMs / 1000)) / 86400) + 1);
-		_marginInterest = ((_marginInterest * getInterestRate(_positionTimeStampInMs / 1000)) / PRECISION) / PRECISION;
+		uint256 _interestRate = MorpherInterestRateManager(morpherState.morpherInterestRateManagerAddress())
+			.getInterestRate(_positionTimeStampInMs / 1000);
+		_marginInterest = ((_marginInterest * _interestRate) / PRECISION) / PRECISION;
 		return _marginInterest;
 	}
 
@@ -1282,208 +1175,6 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 			orders[_orderId].modifyPosition.balanceUp,
 			orders[_orderId].modifyPosition.balanceDown
 		);
-	}
-
-
-
-    /**
-     * Non custodial way of setting a position
-     * Used to bring positions from one chain to another
-     * 1. The position migration gets signed by the owner
-     * 2. The position migration gets signed by the position Admin 
-     * 3. The position gets removed on sidechain (setPosition)
-     * 4. The position gets re-created on polygon/mainchain
-     * 5. Database values should change accordingly
-     */
-	function setPositionWithSignature(
-		bytes32 marketId,
-		position memory _position,
-		EIP712Signature memory ownerSignature,
-		EIP712Signature memory positionAdminSignature
-	) public {
-        _checkPositionAdminSignature(_position, positionAdminSignature);
-        _checkPositionOwnerSignature(marketId, _position, ownerSignature);
-		_setPosition(
-			ownerSignature.signer,
-			marketId,
-			_position.lastUpdated,
-			_position.longShares,
-			_position.shortShares,
-			_position.meanEntryPrice,
-			_position.meanEntrySpread,
-			_position.meanEntryLeverage,
-			_position.liquidationPrice
-		);
-	}
-
-    function _checkPositionOwnerSignature(bytes32 marketId,
-		position memory _position,
-		EIP712Signature memory ownerSignature) internal {
-        require(block.timestamp <= ownerSignature.deadline, "MorpherTradeEngine: expired deadline from owner");
-		
-		//check2: owner + marketid + position == position.positionHash (means the position was burned non-custodial)
-		bytes32 hashPositionOwner = _hashTypedDataV4(
-			keccak256(
-				abi.encode(
-					POSITION_TYPE_HASH,
-					_position.lastUpdated,
-					_position.longShares,
-					_position.shortShares,
-					_position.meanEntryPrice,
-					_position.meanEntrySpread,
-					_position.meanEntryLeverage,
-					_position.liquidationPrice,
-					ownerSignature.signer,
-					_useNonce(ownerSignature.signer),
-					ownerSignature.deadline
-				)
-			)
-		);
-		address signerOwner = ECDSAUpgradeable.recover(
-			hashPositionOwner,
-			ownerSignature.v,
-			ownerSignature.r,
-			ownerSignature.s
-		);
-		require(signerOwner == ownerSignature.signer, "MorpherTradeEngine: invalid signature for Owner");
-
-		//then add position (we got a new position, but with old parameters - especially the lastUpdated)
-		bytes32 positionHash = getPositionHash(
-			signerOwner,
-			marketId,
-			_position.lastUpdated,
-			_position.longShares,
-			_position.shortShares,
-			_position.meanEntryPrice,
-			_position.meanEntrySpread,
-			_position.meanEntryLeverage,
-			_position.liquidationPrice
-		);
-		require(positionHash == _position.positionHash, "MorpherTradeEngine: Position Hash not matching, aborting.");
-		
-    }
-
-    function _checkPositionAdminSignature(position memory _position, EIP712Signature memory positionAdminSignature) internal  {
-        require(block.timestamp <= positionAdminSignature.deadline, "MorpherTradeEngine: expired deadline from owner");
-
-		//check1: positionAdminSignature == positionadmin (means notarized the position was correctly burned on other chain)
-		bytes32 hashPositionAdmin = _hashTypedDataV4(
-			keccak256(
-				abi.encode(
-					POSITION_TYPE_HASH,
-					_position.lastUpdated,
-					_position.longShares,
-					_position.shortShares,
-					_position.meanEntryPrice,
-					_position.meanEntrySpread,
-					_position.meanEntryLeverage,
-					_position.liquidationPrice,
-					positionAdminSignature.signer,
-					_useNonce(positionAdminSignature.signer),
-					positionAdminSignature.deadline
-				)
-			)
-		);
-
-		//the position admin will only sign if the position has been deleted on the other chain
-		address signerPositionAdmin = ECDSAUpgradeable.recover(
-			hashPositionAdmin,
-			positionAdminSignature.v,
-			positionAdminSignature.r,
-			positionAdminSignature.s
-		);
-		require(
-			signerPositionAdmin == positionAdminSignature.signer,
-			"MorpherTradeEngine: invalid signature for PositionAdmin"
-		);
-		require(
-			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(
-				POSITIONADMIN_ROLE,
-				signerPositionAdmin
-			),
-			"MorpherTradeEngine: Permission denied, not a position admin role attached."
-		);
-
-    }
-
-	/**
-	 * @dev Returns the domain separator for the current chain.
-	 */
-	function _domainSeparatorV4() internal view returns (bytes32) {
-		return _buildDomainSeparator(DOMAIN_TYPE_HASH, _EIP712NameHash(), _EIP712VersionHash());
-	}
-
-	function _buildDomainSeparator(
-		bytes32 typeHash,
-		bytes32 nameHash,
-		bytes32 versionHash
-	) private view returns (bytes32) {
-		return keccak256(abi.encode(typeHash, nameHash, versionHash, block.chainid, address(this)));
-	}
-
-	/**
-	 * @dev Given an already https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct[hashed struct], this
-	 * function returns the hash of the fully encoded EIP712 message for this domain.
-	 *
-	 * This hash can be used together with {ECDSA-recover} to obtain the signer of a message. For example:
-	 *
-	 * ```solidity
-	 * bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
-	 *     keccak256("Mail(address to,string contents)"),
-	 *     mailTo,
-	 *     keccak256(bytes(mailContents))
-	 * )));
-	 * address signer = ECDSA.recover(digest, signature);
-	 * ```
-	 */
-	function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
-		return ECDSAUpgradeable.toTypedDataHash(_domainSeparatorV4(), structHash);
-	}
-
-	/**
-	 * @dev The hash of the name parameter for the EIP712 domain.
-	 *
-	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
-	 * are a concern.
-	 */
-	function _EIP712NameHash() internal view virtual returns (bytes32) {
-		return _HASHED_NAME;
-	}
-
-	/**
-	 * @dev The hash of the version parameter for the EIP712 domain.
-	 *
-	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
-	 * are a concern.
-	 */
-	function _EIP712VersionHash() internal view virtual returns (bytes32) {
-		return _HASHED_VERSION;
-	}
-
-	/**
-	 * @dev See {IERC20Permit-nonces}.
-	 */
-	function nonces(address owner) public view virtual returns (uint256) {
-		return _nonces[owner].current();
-	}
-
-	/**
-	 * @dev See {IERC20Permit-DOMAIN_SEPARATOR}.
-	 */
-	// solhint-disable-next-line func-name-mixedcase
-	function DOMAIN_SEPARATOR() external view returns (bytes32) {
-		return _domainSeparatorV4();
-	}
-
-	/**
-	 * @dev "Consume a nonce": return the current value and increment.
-	 *
-	 * _Available since v4.1._
-	 */
-	function _useNonce(address owner) internal virtual returns (uint256 current) {
-		CountersUpgradeable.Counter storage nonce = _nonces[owner];
-		current = nonce.current();
-		nonce.increment();
 	}
 
 	function setPosition(

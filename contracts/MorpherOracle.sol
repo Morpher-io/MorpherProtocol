@@ -602,14 +602,23 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			// 	address(swapRouter),
 			// 	mphTokenAmount
 			// );
-			ISwapRouter.ExactInputParams memory backConvertParams = ISwapRouter.ExactInputParams({
-				path: abi.encodePacked(
+
+			bytes memory path;
+
+			if (inputToken.tokenAddress != wMaticAddress) {
+				path = abi.encodePacked(
 					state.morpherTokenAddress(),
 					poolFee,
 					wMaticAddress,
 					poolFee,
 					inputToken.tokenAddress
-				),
+				);
+			} else {
+				path = abi.encodePacked(state.morpherTokenAddress(), poolFee, wMaticAddress);
+			}
+
+			ISwapRouter.ExactInputParams memory backConvertParams = ISwapRouter.ExactInputParams({
+				path: path,
 				recipient: inputToken.owner,
 				deadline: block.timestamp,
 				amountIn: mphTokenAmount,
@@ -722,18 +731,6 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		_tradeEngine.cancelOrder(_orderId, userId);
 		clearOrderConditions(_orderId);
 		emit OrderCancelled(_orderId, userId, _msgSender());
-	}
-
-	// ----------------------------------------------------------------------------------
-	// adminCancelOrder(bytes32  _orderId)
-	// Administrator can cancel before the _callback has been executed to provide an updateOrder functionality
-	// ----------------------------------------------------------------------------------
-	function adminCancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
-		MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
-		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
-		_tradeEngine.cancelOrder(_orderId, userId);
-		clearOrderConditions(_orderId);
-		emit AdminOrderCancelled(_orderId, userId, _msgSender());
 	}
 
 	// ------------------------------------------------------------------------

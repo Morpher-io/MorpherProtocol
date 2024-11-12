@@ -60,6 +60,12 @@ contract MorpherState is Initializable, ContextUpgradeable  {
     uint256 public numberOfRequestsLimit;
 
     // ----------------------------------------------------------------------------
+    // New interest rate management
+    // ----------------------------------------------------------------------------
+
+    address public morpherInterestRateManagerAddress;
+
+    // ----------------------------------------------------------------------------
     // Events
     // ----------------------------------------------------------------------------
     event OperatingRewardMinted(address indexed recipient, uint256 amount);
@@ -78,19 +84,7 @@ contract MorpherState is Initializable, ContextUpgradeable  {
         _;
     }
 
-
-
-    modifier onlyBridge {
-        require(msg.sender == morpherBridgeAddress, "MorpherState: Caller is not the Bridge. Aborting.");
-        _;
-    }
-
-    modifier onlyMainChain {
-        require(mainChain == true, "MorpherState: Can only be called on mainchain.");
-        _;
-    }
-
-    bool mainChain;
+    bool public mainChain;
 
     function initialize(bool _mainChain, address _morpherAccessControlAddress) public initializer {
         ContextUpgradeable.__Context_init();
@@ -170,6 +164,11 @@ contract MorpherState is Initializable, ContextUpgradeable  {
         morpherUserBlockingAddress = _morpherUserBlockingAddress;
     }
 
+    event SetMorpherInterestRateManagerAddress(address _oldAddress, address _newAddress);
+    function setMorpherInterestRateManager(address _morpherInterestRateManagerAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+        emit SetMorpherInterestRateManagerAddress(morpherInterestRateManagerAddress, _morpherInterestRateManagerAddress);
+        morpherInterestRateManagerAddress = _morpherInterestRateManagerAddress;
+    }
 
     // ----------------------------------------------------------------------------
     // Setter/Getter functions for platform administration
@@ -210,7 +209,7 @@ contract MorpherState is Initializable, ContextUpgradeable  {
         return MorpherToken(morpherTokenAddress).totalSupply();
     }
 
-       function getPosition(
+    function getPosition(
         address _address,
         bytes32 _marketId
     ) public view returns (

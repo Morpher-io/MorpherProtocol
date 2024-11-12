@@ -59,7 +59,7 @@ contract MorpherMintingLimiter {
         mintingLimitDaily = _newMintingLimit;
     }
     function setMintingLimitPerUser(uint256 _newMintingLimit) public onlyAdministrator {
-        emit MintingLimitUpdatedPerUser(mintingLimitDaily, _newMintingLimit);
+        emit MintingLimitUpdatedPerUser(mintingLimitPerUser, _newMintingLimit);
         mintingLimitPerUser = _newMintingLimit;
     }
 
