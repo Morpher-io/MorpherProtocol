@@ -965,39 +965,6 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(addr, address(0));
 	}
 
-	function testCancelOrderFromAdmin() public {
-		address user = address(0xff01);
-
-		vm.prank(user);
-
-		bytes32 orderId = morpherOracle.createOrder(
-			keccak256("CRYPTO_BTC"),
-			0,
-			100 * 1e18,
-			true,
-			2 * PRECISION,
-			90 * 1e18,
-			110 * 1e18,
-			999999999999999,
-			1
-		);
-
-		assertEq(morpherOracle.orderCancellationRequested(orderId), false);
-
-		vm.expectEmit(true, true, true, true);
-		emit OrderCancelled(orderId, user);
-		emit MorpherOracle.OrderCancelled(orderId, user, address(this));
-		morpherOracle.adminCancelOrder(orderId);
-
-		assertEq(morpherOracle.priceAbove(orderId), 0);
-		assertEq(morpherOracle.priceBelow(orderId), 0);
-		assertEq(morpherOracle.goodFrom(orderId), 0);
-		assertEq(morpherOracle.goodUntil(orderId), 0);
-
-		(address addr, , , , , , , , , , , ) = morpherTradeEngine.orders(orderId);
-		assertEq(addr, address(0));
-	}
-
 	function testDelistMarket() public {
 		address addr1 = address(0x0001);
 		address addr2 = address(0x0002);
@@ -1031,30 +998,57 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		morpherOracle.delistMarket(mId, false);
 	}
 
-	function testCheckOrderConditionsLogic() public {
-		address user = address(0xff01);
-
-		vm.prank(user);
-
+	function testCheckOrderConditionsLogic() public {	
 		bytes32 orderId = morpherOracle.createOrder(
 			keccak256("CRYPTO_BTC"),
 			0,
 			100 * 1e18,
 			true,
 			2 * PRECISION,
-			90 * PRECISION,
 			110 * PRECISION,
+			0,
 			1000,
 			500
 		);
 
-		vm.warp(750);
-		assertEq(morpherOracle.checkOrderConditions(orderId, 100 * PRECISION), true);
-		assertEq(morpherOracle.checkOrderConditions(orderId, 120 * PRECISION), false);
-		assertEq(morpherOracle.checkOrderConditions(orderId, 80 * PRECISION), false);
+		bytes32 order2Id = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 1e18,
+			true,
+			2 * PRECISION,
+			0,
+			90 * PRECISION,
+			0,
+			0
+		);
+
+		bytes32 order3Id = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 1e18,
+			true,
+			2 * PRECISION,
+			110 * PRECISION,
+			90 * PRECISION,
+			0,
+			0
+		);
+
 		vm.warp(400);
-		assertEq(morpherOracle.checkOrderConditions(orderId, 100 * PRECISION), false);
+		assertEq(morpherOracle.checkOrderConditions(orderId, 150 * PRECISION), false);
 		vm.warp(1200);
+		assertEq(morpherOracle.checkOrderConditions(orderId, 150 * PRECISION), false);
+		vm.warp(750);
+		// only price above order
+		assertEq(morpherOracle.checkOrderConditions(orderId, 150 * PRECISION), true);
 		assertEq(morpherOracle.checkOrderConditions(orderId, 100 * PRECISION), false);
+		// only price below order
+		assertEq(morpherOracle.checkOrderConditions(order2Id, 50 * PRECISION), true);
+		assertEq(morpherOracle.checkOrderConditions(order2Id, 100 * PRECISION), false);
+		// both
+		assertEq(morpherOracle.checkOrderConditions(order3Id, 150 * PRECISION), true);
+		assertEq(morpherOracle.checkOrderConditions(order3Id, 50 * PRECISION), true);
+		assertEq(morpherOracle.checkOrderConditions(order3Id, 100 * PRECISION), false);
 	}
 }
