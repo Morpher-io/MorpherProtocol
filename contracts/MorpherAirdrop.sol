@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.15;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // ----------------------------------------------------------------------------------
@@ -10,7 +12,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // Users have to claim their airdrop actively or Admin initiates transfer.
 // ----------------------------------------------------------------------------------
 
-contract MorpherAirdrop is Ownable {
+contract MorpherAirdrop is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
 
 // ----------------------------------------------------------------------------
@@ -31,11 +33,25 @@ contract MorpherAirdrop is Ownable {
     event AirdropSent(address indexed _operator, address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
     event SetAirdropAuthorized(address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
 
-    constructor(address _airdropAdminAddress, address _morpherToken, address _coldStorageOwnerAddress) Ownable() {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address _airdropAdminAddress,
+        address _morpherToken,
+        address _coldStorageOwnerAddress
+    ) public initializer {
+        __Ownable_init();
+        __UUPSUpgradeable_init();
+        
         setAirdropAdmin(_airdropAdminAddress);
         setMorpherTokenAddress(_morpherToken);
         transferOwnership(_coldStorageOwnerAddress);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     modifier onlyAirdropAdmin {
         require(msg.sender == airdropAdmin, "MorpherAirdrop: can only be called by Airdrop Administrator.");
