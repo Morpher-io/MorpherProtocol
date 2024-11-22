@@ -1,13 +1,13 @@
 const MorpherToken = artifacts.require("MorpherToken");
 const MorpherAirdrop = artifacts.require("MorpherAirdrop");
-const { deployProxy } = require('@openzeppelin/truffle-upgrades');
+const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades');
 const truffleAssert = require('truffle-assertions');
 
 contract('MorpherAirdrop', (accounts) => {
     it('test airdrop authorizations', async () => {
         const deployerAddress = accounts[0]; const testAddress1 = accounts[1]; const testAddress2 = accounts[2];
 
-        const morpherAirdrop = await deployProxy(MorpherAirdrop, [deployerAddress, morpherToken.address, deployerAddress]);
+        const morpherAirdrop = await deployProxy(MorpherAirdrop, [deployerAddress, morpherToken.address, deployerAddress], { kind: 'transparent' });
         const morpherToken = await MorpherToken.deployed();
 
         await morpherToken.transfer(morpherAirdrop.address, '20000000', { from: deployerAddress });

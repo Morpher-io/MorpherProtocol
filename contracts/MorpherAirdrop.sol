@@ -2,7 +2,6 @@
 pragma solidity ^0.8.15;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -12,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // Users have to claim their airdrop actively or Admin initiates transfer.
 // ----------------------------------------------------------------------------------
 
-contract MorpherAirdrop is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract MorpherAirdrop is Initializable, OwnableUpgradeable {
 
 
 // ----------------------------------------------------------------------------
@@ -44,14 +43,11 @@ contract MorpherAirdrop is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         address _coldStorageOwnerAddress
     ) public initializer {
         __Ownable_init();
-        __UUPSUpgradeable_init();
         
         setAirdropAdmin(_airdropAdminAddress);
         setMorpherTokenAddress(_morpherToken);
         transferOwnership(_coldStorageOwnerAddress);
     }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     modifier onlyAirdropAdmin {
         require(msg.sender == airdropAdmin, "MorpherAirdrop: can only be called by Airdrop Administrator.");
