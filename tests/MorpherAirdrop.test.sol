@@ -3,10 +3,17 @@ pragma solidity ^0.8.15;
 
 import "./BaseSetup.sol";
 import "../contracts/MorpherAirdrop.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 contract MorpherAirdropTest is BaseSetup {
 	address _airdropAdmin = address(0x1234);
 	address _coldStorageOwner = address(0x5678);
+	
+	ProxyAdmin proxyAdmin;
+	MorpherAirdrop implementation;
+	TransparentUpgradeableProxy proxy;
+	MorpherAirdrop wrappedProxy;
 
 	event AirdropSent(
 		address indexed _operator,
@@ -19,17 +26,43 @@ contract MorpherAirdropTest is BaseSetup {
 
 	function setUp() public override {
 		super.setUp();
-		morpherAirdrop = new MorpherAirdrop(_airdropAdmin, address(morpherToken), _coldStorageOwner);
-		morpherAccessControl.grantRole(morpherToken.TRANSFER_ROLE(), address(morpherAirdrop));
+
+		// Deploy implementation
+		implementation = new MorpherAirdrop();
+		
+		// Deploy ProxyAdmin
+		proxyAdmin = new ProxyAdmin();
+
+		// Encode initialization data
+		bytes memory initData = abi.encodeWithSelector(
+			MorpherAirdrop.initialize.selector,
+			_airdropAdmin,
+			address(morpherToken),
+			_coldStorageOwner
+		);
+
+		// Deploy proxy
+		proxy = new TransparentUpgradeableProxy(
+			address(implementation),
+			address(proxyAdmin),
+			initData
+		);
+
+		// Create wrapped proxy for easier calls
+		wrappedProxy = MorpherAirdrop(address(proxy));
+		morpherAirdrop = wrappedProxy;
+
+		// Setup permissions
+		morpherAccessControl.grantRole(morpherToken.TRANSFER_ROLE(), address(proxy));
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
-		morpherToken.mint(address(morpherAirdrop), 10 ether);
+		morpherToken.mint(address(proxy), 10 ether);
 	}
 
 	function testAdminFunctions() public {	
-		vm.expectRevert();
+		vm.expectRevert("Ownable: caller is not the owner");
 		morpherAirdrop.setAirdropAdmin(address(0x11));
 
-		vm.expectRevert();
+		vm.expectRevert("Ownable: caller is not the owner");
 		morpherAirdrop.setMorpherTokenAddress(address(0x22));
 
 		vm.prank(_coldStorageOwner);
