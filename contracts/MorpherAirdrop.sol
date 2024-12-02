@@ -141,6 +141,23 @@ contract MorpherAirdrop is Initializable, OwnableUpgradeable {
         _sendAirdrop(_recipient, _amount);
     }
 
+    /**
+     * @dev Sends tokens as locked rewards to a recipient
+     * @param _recipient Address to receive the rewards
+     * @param _amount Amount of tokens to send as rewards
+     */
+    function adminSendLockedRewards(address _recipient, uint256 _amount) public onlyAirdropAdmin {
+        require(_amount > 0, "MorpherAirdrop: amount must be greater than 0");
+        
+        // First transfer the tokens
+        IERC20(morpherToken).transfer(_recipient, _amount);
+        
+        // Then lock them as rewards
+        MorpherToken(morpherToken).lockRewards(_recipient, _amount);
+        
+        emit AirdropSent(msg.sender, _recipient, _amount, _amount);
+    }
+
 // ------------------------------------------------------------------------
 // Don't accept ETH
 // ------------------------------------------------------------------------
