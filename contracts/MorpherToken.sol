@@ -25,6 +25,13 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	uint256 private _totalTokensOnOtherChain;
 	uint256 private _totalTokensInPositions;
 	bool private _restrictTransfers;
+	
+	// Mapping to track locked rewards balances
+	mapping(address => uint256) private _lockedRewards;
+	uint256 private _totalLockedRewards;
+
+	event RewardsLocked(address indexed account, uint256 amount);
+	event RewardsUnlocked(address indexed account, uint256 amount);
 
 	/**
 	 * Permit functionality
@@ -176,6 +183,55 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		_unpause();
 	}
 
+	/**
+	 * @dev Returns the amount of tokens that are locked as rewards for an account
+	 */
+	function getLockedRewards(address account) public view returns (uint256) {
+		return _lockedRewards[account];
+	}
+
+	/**
+	 * @dev Returns the total amount of tokens that are locked as rewards
+	 */
+	function getTotalLockedRewards() public view returns (uint256) {
+		return _totalLockedRewards;
+	}
+
+	/**
+	 * @dev Returns the amount of tokens that can be transferred by an account
+	 */
+	function getUnlockedBalance(address account) public view returns (uint256) {
+		return balanceOf(account) - _lockedRewards[account];
+	}
+
+	/**
+	 * @dev Locks tokens as rewards for an account
+	 * @param account Address to lock rewards for
+	 * @param amount Amount of tokens to lock
+	 */
+	function lockRewards(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
+		require(balanceOf(account) >= _lockedRewards[account] + amount, "MorpherToken: insufficient balance for locking");
+		
+		_lockedRewards[account] += amount;
+		_totalLockedRewards += amount;
+		
+		emit RewardsLocked(account, amount);
+	}
+
+	/**
+	 * @dev Unlocks previously locked reward tokens for an account
+	 * @param account Address to unlock rewards for
+	 * @param amount Amount of tokens to unlock
+	 */
+	function unlockRewards(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
+		require(_lockedRewards[account] >= amount, "MorpherToken: insufficient locked rewards");
+		
+		_lockedRewards[account] -= amount;
+		_totalLockedRewards -= amount;
+		
+		emit RewardsUnlocked(account, amount);
+	}
+
 	function _beforeTokenTransfer(
 		address from,
 		address to,
@@ -194,6 +250,14 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 			!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, _msgSender()),
 			"MorpherToken: Transfer for User is blocked."
 		);
+
+		// Check if transfer would leave enough tokens to cover locked rewards
+		if (from != address(0)) { // Skip check for minting
+			require(
+				balanceOf(from) - amount >= _lockedRewards[from],
+				"MorpherToken: transfer amount exceeds unlocked balance"
+			);
+		}
 
 		super._beforeTokenTransfer(from, to, amount);
 	}
