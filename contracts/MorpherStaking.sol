@@ -32,14 +32,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     uint256 public lastReward;
     uint256 public totalShares;
 
-    struct InterestRate {
-		uint256 validFrom;
-		uint256 rate;
-	}
-
-	mapping(uint256 => InterestRate) private _OLDinterestRates;
-	uint256 private _OLDnumInterestRates;
-
+    uint256 public interestRate; // Daily interest rate with PRECISION decimals
     uint256 public lockupPeriod; // to prevent tactical staking and ensure smooth governance
     uint256 public minimumStake; // 100k MPH minimum
 
@@ -56,6 +49,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
 
     event SetLockupPeriod(uint256 newLockupPeriod);
     event SetMinimumStake(uint256 newMinimumStake);
+    event InterestRateChanged(uint256 newInterestRate);
 	event LinkState(address stateAddress);
     
     event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
@@ -101,9 +95,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     function updatePoolShareValue() public returns (uint256 _newPoolShareValue) {
         if (block.timestamp >= lastReward + INTERVAL) {
             uint256 _numOfIntervals = uint256(block.timestamp - lastReward) / INTERVAL;
-            uint256 _interestRate = MorpherInterestRateManager(morpherState.morpherInterestRateManagerAddress())
-                .interestRate();
-            poolShareValue = poolShareValue + (_numOfIntervals * _interestRate);
+            poolShareValue = poolShareValue + (_numOfIntervals * interestRate);
             lastReward = lastReward + (_numOfIntervals * (INTERVAL));
             emit PoolShareValueUpdated(lastReward, poolShareValue);
         }
@@ -179,6 +171,12 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     function setMinimumStake(uint256 _minimumStake) public onlyRole(STAKINGADMIN_ROLE) {
         minimumStake = _minimumStake;
         emit SetMinimumStake(_minimumStake);
+    }
+
+    function setInterestRate(uint256 _interestRate) public onlyRole(STAKINGADMIN_ROLE) {
+        require(_interestRate <= 100000000, "MorpherStaking: Interest Rate cannot be larger than 100%");
+        interestRate = _interestRate;
+        emit InterestRateChanged(_interestRate);
     }
 
     // ----------------------------------------------------------------------------
