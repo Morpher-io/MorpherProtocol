@@ -41,7 +41,7 @@ contract DeployMorpherOracle is DeployOrUpgrade {
         address oracle = deployOrUpgrade(
             existingOracle,
             address(implementation),
-            abi.encodeCall(MorpherOracle.initialize, (stateAddress, gasCollectionAddress, 0)),
+            abi.encodeCall(MorpherOracle.initialize, (stateAddress, payable(gasCollectionAddress), 0)),
             "MorpherOracle.sol"
         );
         

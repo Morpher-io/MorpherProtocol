@@ -14,6 +14,7 @@ import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
 import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
 
 //morpher contracts
+import {MorpherState} from "../contracts/MorpherState.sol";
 import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
 
@@ -57,11 +58,11 @@ contract DeployMorpherToken is DeployOrUpgrade {
             address treasuryAddress = vm.envOr("MORPHER_TREASURY", vm.addr(deployerPrivateKey));
 
             // Mint tokens and set other chain balance
-            uint256 _mainChainMint = 425_000_000 ether;
             // uint256 _sideChainMint = 575_000_000 ether;
+            // tokenContract.setTotalTokensOnOtherChain(_sideChainMint);
             
+            uint256 _mainChainMint = 425_000_000 ether;
             tokenContract.mint(treasuryAddress, _mainChainMint);
-            tokenContract.setTotalTokensOnOtherChain(_sideChainMint);
 
             // Configure State with token address
             address stateAddress = loadAddress("MorpherState");
