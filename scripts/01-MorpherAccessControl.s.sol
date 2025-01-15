@@ -25,29 +25,27 @@ contract DeployMorpherAccessControl is DeployOrUpgrade {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
         vm.startBroadcast(deployerPrivateKey);
 
-        // Load existing addresses
-        Addresses memory addrs = loadAddresses();
-
-        // Deploy ProxyAdmin if not already deployed
-        if (addrs.proxyAdmin == address(0)) {
-            addrs.proxyAdmin = deployProxyAdmin();
-            console.log("Deployed ProxyAdmin at:", addrs.proxyAdmin);
+        // Load or deploy ProxyAdmin
+        address proxyAdmin = loadAddress("proxyAdmin");
+        if (proxyAdmin == address(0)) {
+            proxyAdmin = deployProxyAdmin();
+            saveAddress("proxyAdmin", proxyAdmin);
+            console.log("Deployed ProxyAdmin at:", proxyAdmin);
         }
 
         // Deploy or upgrade MorpherAccessControl
+        address existingAccessControl = loadAddress("accessControl");
         MorpherAccessControl implementation = new MorpherAccessControl();
-        addrs.accessControl = deployOrUpgrade(
-            addrs.accessControl,
+        
+        address accessControl = deployOrUpgrade(
+            existingAccessControl,
             address(implementation),
-            addrs.proxyAdmin,
+            proxyAdmin,
             abi.encodeCall(MorpherAccessControl.initialize, ())
         );
-        console.log("MorpherAccessControl at:", addrs.accessControl);
-
-      
-
-        // Save updated addresses
-        saveAddresses(addrs);
+        
+        saveAddress("accessControl", accessControl);
+        console.log("MorpherAccessControl at:", accessControl);
         
         vm.stopBroadcast();
     }
