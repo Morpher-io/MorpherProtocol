@@ -29,21 +29,11 @@ echo "The following changes will be made:"
 echo "----------------------------------------"
 
 # Parse JSON and prepare changes
-while IFS=":" read -r key value; do
-    # Clean up the key and value
-    key=$(echo "$key" | tr -d '"' | tr -d ' ' | tr -d '{' | tr -d '}' | tr -d ',')
-    value=$(echo "$value" | tr -d '"' | tr -d ' ' | tr -d '{' | tr -d '}' | tr -d ',')
+jq -r 'to_entries[] | select(.value != "0x0") | @base64' "$DEPLOYMENT_FILE" | while read -r item; do
+    decoded=$(echo "$item" | base64 --decode)
+    key=$(echo "$decoded" | jq -r '.key')
+    value=$(echo "$decoded" | jq -r '.value')
     
-    # Skip empty or invalid lines
-    if [ -z "$key" ] || [ -z "$value" ]; then
-        continue
-    fi
-
-    # Skip 0x0 addresses
-    if [ "$value" = "0x0" ]; then
-        continue
-    fi
-
     secret_name="${key}_${CHAIN_ID}"
     full_secret_name="${ENVIRONMENT}/${secret_name}"
     
@@ -58,7 +48,7 @@ while IFS=":" read -r key value; do
         echo "New value: $value"
     fi
     echo "----------------------------------------"
-done < <(echo "$DEPLOYMENT_DATA" | jq -r 'to_entries | .[] | "\(.key):\(.value)"')
+done
 
 read -p "Do you want to proceed with these changes? (yes/no) " confirm
 if [ "$confirm" != "yes" ]; then
@@ -69,21 +59,11 @@ fi
 echo "Updating secrets..."
 
 # Perform the actual updates
-while IFS=":" read -r key value; do
-    # Clean up the key and value
-    key=$(echo "$key" | tr -d '"' | tr -d ' ' | tr -d '{' | tr -d '}' | tr -d ',')
-    value=$(echo "$value" | tr -d '"' | tr -d ' ' | tr -d '{' | tr -d '}' | tr -d ',')
+jq -r 'to_entries[] | select(.value != "0x0") | @base64' "$DEPLOYMENT_FILE" | while read -r item; do
+    decoded=$(echo "$item" | base64 --decode)
+    key=$(echo "$decoded" | jq -r '.key')
+    value=$(echo "$decoded" | jq -r '.value')
     
-    # Skip empty or invalid lines
-    if [ -z "$key" ] || [ -z "$value" ]; then
-        continue
-    fi
-
-    # Skip 0x0 addresses
-    if [ "$value" = "0x0" ]; then
-        continue
-    fi
-
     secret_name="${key}_${CHAIN_ID}"
     full_secret_name="${ENVIRONMENT}/${secret_name}"
     
@@ -97,6 +77,6 @@ while IFS=":" read -r key value; do
         --no-cli-pager >/dev/null 2>&1
     
     echo "Updated $full_secret_name"
-done < <(echo "$DEPLOYMENT_DATA" | jq -r 'to_entries | .[] | "\(.key):\(.value)"')
+done
 
 echo "Secret updates completed successfully"
