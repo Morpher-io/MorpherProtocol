@@ -95,7 +95,25 @@ contract DeployOrUpgrade is Script {
 
     function saveAddresses(Addresses memory addrs) internal {
         string memory path = getAddressesPath();
-        string memory json = vm.serializeJson("addresses", addrs);
+        
+        // Start with empty JSON object
+        string memory json = "{}";
+        
+        // Serialize each field individually
+        json = vm.serializeJson(json, "proxyAdmin", addrs.proxyAdmin);
+        json = vm.serializeJson(json, "accessControl", addrs.accessControl);
+        json = vm.serializeJson(json, "state", addrs.state);
+        json = vm.serializeJson(json, "userBlocking", addrs.userBlocking);
+        json = vm.serializeJson(json, "token", addrs.token);
+        json = vm.serializeJson(json, "staking", addrs.staking);
+        json = vm.serializeJson(json, "mintingLimiter", addrs.mintingLimiter);
+        json = vm.serializeJson(json, "tradeEngine", addrs.tradeEngine);
+        json = vm.serializeJson(json, "oracle", addrs.oracle);
+        json = vm.serializeJson(json, "bridge", addrs.bridge);
+        json = vm.serializeJson(json, "admin", addrs.admin);
+        json = vm.serializeJson(json, "interestRateManager", addrs.interestRateManager);
+        json = vm.serializeJson(json, "airdrop", addrs.airdrop);
+        
         vm.writeFile(path, json);
     }
 
