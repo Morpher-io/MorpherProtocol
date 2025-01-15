@@ -26,11 +26,11 @@ contract DeployMorpherUserBlocking is DeployOrUpgrade {
         vm.startBroadcast(deployerPrivateKey);
 
         // Load State address - required for UserBlocking initialization
-        address stateAddress = loadAddress("state");
+        address stateAddress = loadAddress("MorpherState");
         require(stateAddress != address(0), "MorpherState must be deployed first");
 
         // Deploy or upgrade MorpherUserBlocking
-        address existingUserBlocking = loadAddress("userBlocking");
+        address existingUserBlocking = loadAddress("MorpherUserBlocking");
         MorpherUserBlocking implementation = new MorpherUserBlocking();
         
         address userBlocking = deployOrUpgrade(
@@ -40,7 +40,7 @@ contract DeployMorpherUserBlocking is DeployOrUpgrade {
             "MorpherUserBlocking.sol"
         );
         
-        saveAddress("userBlocking", userBlocking);
+        saveAddress("MorpherUserBlocking", userBlocking);
         console.log("MorpherUserBlocking at:", userBlocking);
 
         // Set UserBlocking in State if this is a new deployment

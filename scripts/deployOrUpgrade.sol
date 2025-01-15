@@ -140,26 +140,26 @@ abstract contract DeployOrUpgrade is Script {
 
     function saveAddresses(Addresses memory addrs) internal {
         string memory path = getAddressesPath();
-        string memory jsonObj = '{"accessControl": "0x0", "admin": "0x0", "airdrop": "0x0", "bridge": "0x0", "interestRateManager": "0x0", "mintingLimiter": "0x0", "oracle": "0x0", "proxyAdmin": "0x0", "state": "0x0", "staking": "0x0", "token": "0x0", "tradeEngine": "0x0", "userBlocking": "0x0"}';
+        string memory jsonObj = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "proxyAdmin": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherUserBlocking": "0x0"}';
 
         if (!vm.isFile(path)) {
             vm.writeFile(path, jsonObj);
         }
         
         // Write each address individually to avoid stack too deep
-        vm.writeJson(vm.toString(addrs.accessControl), path, ".accessControl");
-        vm.writeJson(vm.toString(addrs.admin), path, ".admin");
-        vm.writeJson(vm.toString(addrs.airdrop), path, ".airdrop");
-        vm.writeJson(vm.toString(addrs.bridge), path, ".bridge");
-        vm.writeJson(vm.toString(addrs.interestRateManager), path, ".interestRateManager");
-        vm.writeJson(vm.toString(addrs.mintingLimiter), path, ".mintingLimiter");
-        vm.writeJson(vm.toString(addrs.oracle), path, ".oracle");
+        vm.writeJson(vm.toString(addrs.accessControl), path, ".MorpherAccessControl");
+        vm.writeJson(vm.toString(addrs.admin), path, ".MorpherAdmin");
+        vm.writeJson(vm.toString(addrs.airdrop), path, ".MorpherAirdrop");
+        vm.writeJson(vm.toString(addrs.bridge), path, ".MorpherBridge");
+        vm.writeJson(vm.toString(addrs.interestRateManager), path, ".MorpherInterestRateManager");
+        vm.writeJson(vm.toString(addrs.mintingLimiter), path, ".MorpherMintingLimiter");
+        vm.writeJson(vm.toString(addrs.oracle), path, ".MorpherOracle");
         vm.writeJson(vm.toString(addrs.proxyAdmin), path, ".proxyAdmin");
-        vm.writeJson(vm.toString(addrs.state), path, ".state");
-        vm.writeJson(vm.toString(addrs.staking), path, ".staking");
-        vm.writeJson(vm.toString(addrs.token), path, ".token");
-        vm.writeJson(vm.toString(addrs.tradeEngine), path, ".tradeEngine");
-        vm.writeJson(vm.toString(addrs.userBlocking), path, ".userBlocking");
+        vm.writeJson(vm.toString(addrs.state), path, ".MorpherState");
+        vm.writeJson(vm.toString(addrs.staking), path, ".MorpherStaking");
+        vm.writeJson(vm.toString(addrs.token), path, ".MorpherToken");
+        vm.writeJson(vm.toString(addrs.tradeEngine), path, ".MorpherTradeEngine");
+        vm.writeJson(vm.toString(addrs.userBlocking), path, ".MorpherUserBlocking");
     }
 
     function deployProxyAdmin() internal returns (address) {

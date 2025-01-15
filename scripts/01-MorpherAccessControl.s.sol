@@ -26,7 +26,7 @@ contract DeployMorpherAccessControl is DeployOrUpgrade {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy or upgrade MorpherAccessControl
-        address existingAccessControl = loadAddress("accessControl");
+        address existingAccessControl = loadAddress("MorpherAccessControl");
         MorpherAccessControl implementation = new MorpherAccessControl();
         
         address accessControl = deployOrUpgrade(
@@ -36,7 +36,7 @@ contract DeployMorpherAccessControl is DeployOrUpgrade {
             "MorpherAccessControl.sol"
         );
         
-        saveAddress("accessControl", accessControl);
+        saveAddress("MorpherAccessControl", accessControl);
         console.log("MorpherAccessControl at:", accessControl);
         
         vm.stopBroadcast();

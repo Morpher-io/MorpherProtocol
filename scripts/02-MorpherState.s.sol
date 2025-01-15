@@ -26,11 +26,11 @@ contract DeployMorpherState is DeployOrUpgrade {
         vm.startBroadcast(deployerPrivateKey);
 
         // Load AccessControl address - required for State initialization
-        address accessControlAddress = loadAddress("accessControl");
+        address accessControlAddress = loadAddress("MorpherAccessControl");
         require(accessControlAddress != address(0), "AccessControl must be deployed first");
 
         // Deploy or upgrade MorpherState
-        address existingState = loadAddress("state");
+        address existingState = loadAddress("MorpherState");
         MorpherState implementation = new MorpherState();
         
         address state = deployOrUpgrade(
@@ -40,7 +40,7 @@ contract DeployMorpherState is DeployOrUpgrade {
             "MorpherState.sol"
         );
         
-        saveAddress("state", state);
+        saveAddress("MorpherState", state);
         console.log("MorpherState at:", state);
 
         // Only set admin rights for new deployments
