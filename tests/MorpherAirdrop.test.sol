@@ -159,4 +159,32 @@ contract MorpherAirdropTest is BaseSetup {
 		assertEq(morpherAirdrop.totalAirdropAuthorized(), 5 ether);
 		assertEq(morpherAirdrop.totalAirdropClaimed(), 5 ether);
 	}
+
+	function testAdminSendLockedRewards() public {
+		address user = address(0xabc);
+		uint256 rewardAmount = 1 ether;
+
+		// Non-admin should not be able to send locked rewards
+		vm.prank(user);
+		vm.expectRevert("MorpherAirdrop: can only be called by Airdrop Administrator.");
+		morpherAirdrop.adminSendLockedRewards(user, rewardAmount);
+
+		// Admin should be able to send locked rewards
+		vm.prank(_airdropAdmin);
+		vm.expectEmit(true, true, true, true);
+		emit Transfer(address(morpherAirdrop), user, rewardAmount);
+		vm.expectEmit(true, true, true, true);
+		emit AirdropSent(_airdropAdmin, user, rewardAmount, rewardAmount);
+		morpherAirdrop.adminSendLockedRewards(user, rewardAmount);
+
+		// Verify the rewards are locked
+		assertEq(MorpherToken(morpherToken).balanceOf(user), rewardAmount);
+		assertEq(MorpherToken(morpherToken).getLockedRewards(user), rewardAmount);
+		assertEq(MorpherToken(morpherToken).getUnlockedBalance(user), 0);
+
+		// User should not be able to transfer locked rewards
+		vm.prank(user);
+		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
+		MorpherToken(morpherToken).transfer(address(0xdef), rewardAmount);
+	}
 }
