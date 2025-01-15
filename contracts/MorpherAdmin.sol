@@ -5,7 +5,7 @@ import "./MorpherAccessControl.sol";
 import "./MorpherState.sol";
 import "./MorpherTradeEngine.sol";
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 
 // ----------------------------------------------------------------------------------
 // Administrator of the Morpher platform

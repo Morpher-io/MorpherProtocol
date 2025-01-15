@@ -3,8 +3,8 @@ pragma solidity ^0.8.11;
 
 import "./MorpherState.sol";
 import "./interfaces/IMorpherStateDeprecated.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
 
 contract MorpherDeprecatedTokenMapper is Initializable, ContextUpgradeable {
 	MorpherState morpherState;

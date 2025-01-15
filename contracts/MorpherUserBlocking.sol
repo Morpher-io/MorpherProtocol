@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.15;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "./MorpherAccessControl.sol";
 import "./MorpherState.sol";
 

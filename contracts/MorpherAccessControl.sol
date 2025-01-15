@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlEnumerableUpgradeable.sol";
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAccessControl.sol:MorpherAccessControl
 contract MorpherAccessControl is AccessControlEnumerableUpgradeable {

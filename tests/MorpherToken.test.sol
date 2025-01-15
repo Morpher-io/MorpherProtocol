@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.15;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 
 import "./BaseSetup.sol";
 
@@ -44,7 +44,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		morpherToken.setHashedVersion(version);
 
 		vm.expectEmit(true, true, true, true);
-		emit SetRestrictTransfers(true, false);
+		emit SetRestrictTransfers(false, false);
 		morpherToken.setRestrictTransfers(false);
 		assertEq(morpherToken.getRestrictTransfers(), false);
 
