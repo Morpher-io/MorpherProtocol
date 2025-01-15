@@ -23,9 +23,7 @@ contract DeployMorpherStaking is DeployOrUpgrade {
     using stdJson for string;
 
     function run() public {
-        // Get deployer private key from environment
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // Load State address - required for Staking initialization
         address stateAddress = loadAddress("MorpherState");
@@ -53,7 +51,7 @@ contract DeployMorpherStaking is DeployOrUpgrade {
             MorpherStaking stakingContract = MorpherStaking(staking);
 
             // Grant STAKINGADMIN role to deployer
-            accessControl.grantRole(stakingContract.STAKINGADMIN_ROLE(), vm.addr(deployerPrivateKey));
+            accessControl.grantRole(stakingContract.STAKINGADMIN_ROLE(), msg.sender);
 
             // Set initial interest rate
             stakingContract.setInterestRate(15000); // 0.015% daily interest rate

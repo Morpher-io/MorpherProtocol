@@ -23,16 +23,14 @@ contract DeployMorpherOracle is DeployOrUpgrade {
     using stdJson for string;
 
     function run() public {
-        // Get deployer private key from environment
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // Load State address - required for Oracle initialization
         address stateAddress = loadAddress("MorpherState");
         require(stateAddress != address(0), "MorpherState must be deployed first");
 
         // Get configuration
-        address gasCollectionAddress = vm.envOr("GAS_COLLECTION", vm.addr(deployerPrivateKey));
+        address gasCollectionAddress = vm.envOr("GAS_COLLECTION", msg.sender);
         
         // Deploy or upgrade MorpherOracle
         address existingOracle = loadAddress("MorpherOracle");
@@ -54,7 +52,7 @@ contract DeployMorpherOracle is DeployOrUpgrade {
             MorpherAccessControl accessControl = MorpherAccessControl(loadAddress("MorpherAccessControl"));
 
             // Grant oracle operator roles
-            address callbackAddress1 = vm.envOr("CALLBACK_ADDRESS_1", vm.addr(deployerPrivateKey));
+            address callbackAddress1 = vm.envOr("CALLBACK_ADDRESS_1", msg.sender);
             accessControl.grantRole(oracleContract.ORACLEOPERATOR_ROLE(), callbackAddress1);
 
             address callbackAddress2 = vm.envOr("CALLBACK_ADDRESS_2", address(0));

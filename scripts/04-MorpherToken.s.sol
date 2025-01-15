@@ -22,9 +22,7 @@ contract DeployMorpherToken is DeployOrUpgrade {
     using stdJson for string;
 
     function run() public {
-        // Get deployer private key from environment
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // Load AccessControl address - required for Token initialization
         address accessControlAddress = loadAddress("MorpherAccessControl");
@@ -50,12 +48,12 @@ contract DeployMorpherToken is DeployOrUpgrade {
             MorpherToken tokenContract = MorpherToken(token);
             
             // Grant initial roles to deployer
-            accessControl.grantRole(implementation.PAUSER_ROLE(), vm.addr(deployerPrivateKey));
-            accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), vm.addr(deployerPrivateKey));
-            accessControl.grantRole(implementation.MINTER_ROLE(), vm.addr(deployerPrivateKey));
+            accessControl.grantRole(implementation.PAUSER_ROLE(), msg.sender);
+            accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), msg.sender);
+            accessControl.grantRole(implementation.MINTER_ROLE(), msg.sender);
 
             // Get treasury address from environment or use deployer
-            address treasuryAddress = vm.envOr("MORPHER_TREASURY", vm.addr(deployerPrivateKey));
+            address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);
 
             // Mint tokens and set other chain balance
             // uint256 _sideChainMint = 575_000_000 ether;

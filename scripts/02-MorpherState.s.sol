@@ -21,9 +21,7 @@ contract DeployMorpherState is DeployOrUpgrade {
     using stdJson for string;
 
     function run() public {
-        // Get deployer private key from environment
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // Load AccessControl address - required for State initialization
         address accessControlAddress = loadAddress("MorpherAccessControl");

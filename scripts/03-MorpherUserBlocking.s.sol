@@ -21,9 +21,7 @@ contract DeployMorpherUserBlocking is DeployOrUpgrade {
     using stdJson for string;
 
     function run() public {
-        // Get deployer private key from environment
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // Load State address - required for UserBlocking initialization
         address stateAddress = loadAddress("MorpherState");
