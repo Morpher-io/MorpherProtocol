@@ -115,6 +115,10 @@ contract DeployOrUpgrade is Script {
 
     function saveAddresses(Addresses memory addrs) internal {
         string memory path = getAddressesPath();
+
+        if (!vm.isFile(path)) {
+            vm.writeFile(path, "{}");
+        }
         
         // Write each address individually to avoid stack too deep
         vm.writeJson(vm.toString(addrs.proxyAdmin), path, ".proxyAdmin");
