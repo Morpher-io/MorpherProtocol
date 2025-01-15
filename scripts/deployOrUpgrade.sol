@@ -21,19 +21,19 @@ abstract contract DeployOrUpgrade is Script {
     using stdJson for string;
 
     struct Addresses {
-        address proxyAdmin;
         address accessControl;
-        address state;
-        address userBlocking;
-        address token;
-        address staking;
-        address mintingLimiter;
-        address tradeEngine;
-        address oracle;
-        address bridge;
         address admin;
-        address interestRateManager;
         address airdrop;
+        address bridge;
+        address interestRateManager;
+        address mintingLimiter;
+        address oracle;
+        address proxyAdmin;
+        address state;
+        address staking;
+        address token;
+        address tradeEngine;
+        address userBlocking;
     }
 
     // function run() public {
@@ -116,7 +116,7 @@ abstract contract DeployOrUpgrade is Script {
     function saveAddress(string memory key, address value) internal {
         string memory path = getAddressesPath();
         if (!vm.isFile(path)) {
-            string memory jsonObj = '{"proxyAdmin": "0x0", "accessControl": "0x0", "state": "0x0", "userBlocking": "0x0", "token": "0x0", "staking": "0x0", "mintingLimiter": "0x0", "tradeEngine": "0x0", "oracle": "0x0", "bridge": "0x0", "admin": "0x0", "interestRateManager": "0x0", "airdrop": "0x0"}';
+            string memory jsonObj = '{"accessControl": "0x0", "admin": "0x0", "airdrop": "0x0", "bridge": "0x0", "interestRateManager": "0x0", "mintingLimiter": "0x0", "oracle": "0x0", "proxyAdmin": "0x0", "state": "0x0", "staking": "0x0", "token": "0x0", "tradeEngine": "0x0", "userBlocking": "0x0"}';
             vm.writeFile(path, jsonObj);
         }
         vm.writeJson(vm.toString(value), path, string.concat(".", key));
@@ -138,26 +138,26 @@ abstract contract DeployOrUpgrade is Script {
 
     function saveAddresses(Addresses memory addrs) internal {
         string memory path = getAddressesPath();
-        string memory jsonObj = '{"proxyAdmin": "0x0", "accessControl": "0x0", "state": "0x0", "userBlocking": "0x0", "token": "0x0", "staking": "0x0", "mintingLimiter": "0x0", "tradeEngine": "0x0", "oracle": "0x0", "bridge": "0x0", "admin": "0x0", "interestRateManager": "0x0", "airdrop": "0x0"}';
+        string memory jsonObj = '{"accessControl": "0x0", "admin": "0x0", "airdrop": "0x0", "bridge": "0x0", "interestRateManager": "0x0", "mintingLimiter": "0x0", "oracle": "0x0", "proxyAdmin": "0x0", "state": "0x0", "staking": "0x0", "token": "0x0", "tradeEngine": "0x0", "userBlocking": "0x0"}';
 
         if (!vm.isFile(path)) {
             vm.writeFile(path, jsonObj);
         }
         
         // Write each address individually to avoid stack too deep
-        vm.writeJson(vm.toString(addrs.proxyAdmin), path, ".proxyAdmin");
-        vm.writeJson(vm.toString(addrs.accessControl), path, ".accessControl"); 
-        vm.writeJson(vm.toString(addrs.state), path, ".state");
-        vm.writeJson(vm.toString(addrs.userBlocking), path, ".userBlocking");
-        vm.writeJson(vm.toString(addrs.token), path, ".token");
-        vm.writeJson(vm.toString(addrs.staking), path, ".staking");
-        vm.writeJson(vm.toString(addrs.mintingLimiter), path, ".mintingLimiter");
-        vm.writeJson(vm.toString(addrs.tradeEngine), path, ".tradeEngine");
-        vm.writeJson(vm.toString(addrs.oracle), path, ".oracle");
-        vm.writeJson(vm.toString(addrs.bridge), path, ".bridge");
+        vm.writeJson(vm.toString(addrs.accessControl), path, ".accessControl");
         vm.writeJson(vm.toString(addrs.admin), path, ".admin");
-        vm.writeJson(vm.toString(addrs.interestRateManager), path, ".interestRateManager");
         vm.writeJson(vm.toString(addrs.airdrop), path, ".airdrop");
+        vm.writeJson(vm.toString(addrs.bridge), path, ".bridge");
+        vm.writeJson(vm.toString(addrs.interestRateManager), path, ".interestRateManager");
+        vm.writeJson(vm.toString(addrs.mintingLimiter), path, ".mintingLimiter");
+        vm.writeJson(vm.toString(addrs.oracle), path, ".oracle");
+        vm.writeJson(vm.toString(addrs.proxyAdmin), path, ".proxyAdmin");
+        vm.writeJson(vm.toString(addrs.state), path, ".state");
+        vm.writeJson(vm.toString(addrs.staking), path, ".staking");
+        vm.writeJson(vm.toString(addrs.token), path, ".token");
+        vm.writeJson(vm.toString(addrs.tradeEngine), path, ".tradeEngine");
+        vm.writeJson(vm.toString(addrs.userBlocking), path, ".userBlocking");
     }
 
     function deployProxyAdmin() internal returns (address) {
