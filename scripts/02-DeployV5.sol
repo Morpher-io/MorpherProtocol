@@ -28,7 +28,7 @@ contract DeployV5 is DeployOrUpgrade {
             addrs.proxyAdmin,
             abi.encodeCall(MorpherAccessControl.initialize, ())
         );
-        console.log(addrs.accessControl == address(0) ? "Deployed" : "Upgraded", "MorpherAccessControl at:", addrs.accessControl);
+        console.log("MorpherAccessControl at:", addrs.accessControl);
 
         // Save updated addresses
         saveAddresses(addrs);

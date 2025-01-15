@@ -1,31 +1,32 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import {Upgrades} from "openzeppelin-foundry-upgrades/LegacyUpgrades.sol";
 import "forge-std/console.sol";
 import {Vm} from "forge-std/Vm.sol";
 
+import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
+
 import {Script} from "forge-std/Script.sol";
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
-import {ProxyAdmin} from "openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
+import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {MorpherOracle} from "../contracts/MorpherOracle.sol";
 import {MorpherTradeEngine} from "../contracts/MorpherTradeEngine.sol";
 import {MorpherPriceOracle} from "../contracts/MorpherPriceOracle.sol";
 import {MorpherTokenPaymaster} from "../contracts/MorpherTokenPaymaster.sol";
-import {OracleHelper} from "account-abstraction-v7/samples/utils/OracleHelper.sol";
-import {IOracle} from "account-abstraction-v7/samples/utils/IOracle.sol";
-import {UniswapHelper} from "account-abstraction-v7/samples/utils/UniswapHelper.sol";
-import {ISwapRouter} from "uniswap-v3-periphery/interfaces/ISwapRouter.sol";
+import {OracleHelper} from "../lib/account-abstraction-v7/contracts/samples/utils/OracleHelper.sol";
+import {IOracle} from "../lib/account-abstraction-v7/contracts/samples/utils/IOracle.sol";
+import {UniswapHelper} from "../lib/account-abstraction-v7/contracts/samples/utils/UniswapHelper.sol";
+import {ISwapRouter} from "../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
-import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {IERC20Metadata} from "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IEntryPoint} from "../lib/account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
-import {ITransparentUpgradeableProxy} from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import "@openzeppelin/contracts/utils/Strings.sol";
+import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
 contract UpgradeProxyV4Versions is Script {
 	// address constant CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
