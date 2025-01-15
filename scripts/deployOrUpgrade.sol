@@ -107,6 +107,8 @@ abstract contract DeployOrUpgrade is Script {
     function loadAddress(string memory key) internal returns (address) {
         string memory path = getAddressesPath();
         if (!vm.isFile(path)) {
+            Addresses memory addrs = getEmptyAddresses();
+            saveAddresses(addrs);
             return address(0);
         }
         string memory json = vm.readFile(path);
@@ -131,7 +133,7 @@ abstract contract DeployOrUpgrade is Script {
         );
     }
     
-    function loadAddressesFromJson(string memory json) internal view returns (Addresses memory) {
+    function loadAddressesFromJson(string memory json) internal pure returns (Addresses memory) {
         bytes memory data = vm.parseJson(json);
         return abi.decode(data, (Addresses));
     }
