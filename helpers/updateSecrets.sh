@@ -15,10 +15,37 @@ if [ ! -f "$DEPLOYMENT_FILE" ]; then
     exit 1
 fi
 
-# Function to get current secret value
+# Function to get current secret value as JSON
 get_current_secret() {
     local secret_name=$1
-    aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'SecretString' --output text 2>/dev/null || echo "NOT_FOUND"
+    local secret_value
+    secret_value=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'SecretString' --output text 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "$secret_value"
+    else
+        echo "{}"
+    fi
+}
+
+# Function to update secret with merged JSON
+update_secret() {
+    local secret_name=$1
+    local new_value=$2
+    local current_json
+    current_json=$(get_current_secret "$secret_name")
+    
+    # Merge current JSON with new value, new value takes precedence
+    local merged_json
+    merged_json=$(echo "$current_json" | jq -s --arg new "$new_value" '.[0] * ($new | fromjson)')
+    
+    aws secretsmanager put-secret-value \
+        --secret-id "$secret_name" \
+        --secret-string "$merged_json" \
+        --no-cli-pager >/dev/null 2>&1 || \
+    aws secretsmanager create-secret \
+        --name "$secret_name" \
+        --secret-string "$merged_json" \
+        --no-cli-pager >/dev/null 2>&1
 }
 
 # Read deployment file
@@ -39,11 +66,16 @@ jq -r 'to_entries[] | select(.value != "0x0" and .value != "0x000000000000000000
     
     current_value=$(get_current_secret "$full_secret_name")
     
-    if [ "$current_value" = "NOT_FOUND" ]; then
-        echo "New secret: $full_secret_name"
+    current_json=$(get_current_secret "$full_secret_name")
+    current_value=$(echo "$current_json" | jq -r --arg key "${key}_${CHAIN_ID}" '.[$key] // "NOT_SET"' 2>/dev/null || echo "NOT_SET")
+    
+    if [ "$current_value" = "NOT_SET" ]; then
+        echo "New key in secret: $full_secret_name"
+        echo "Key: ${key}_${CHAIN_ID}"
         echo "Value: $value"
     else
-        echo "Update secret: $full_secret_name"
+        echo "Update key in secret: $full_secret_name"
+        echo "Key: ${key}_${CHAIN_ID}"
         echo "Old value: $current_value"
         echo "New value: $value"
     fi
@@ -67,16 +99,14 @@ jq -r 'to_entries[] | select(.value != "0x0" and .value != "0x000000000000000000
     secret_name="${key}_${CHAIN_ID}"
     full_secret_name="${ENVIRONMENT}/${secret_name}"
     
-    aws secretsmanager put-secret-value \
-        --secret-id "$full_secret_name" \
-        --secret-string "$value" \
-        --no-cli-pager >/dev/null 2>&1 || \
-    aws secretsmanager create-secret \
-        --name "$full_secret_name" \
-        --secret-string "$value" \
-        --no-cli-pager >/dev/null 2>&1
+    # Create JSON object with the new key-value pair
+    new_json=$(jq -n \
+        --arg key "${key}_${CHAIN_ID}" \
+        --arg value "$value" \
+        '{($key): $value}')
     
-    echo "Updated $full_secret_name"
+    update_secret "$full_secret_name" "$new_json"
+    echo "Updated key ${key}_${CHAIN_ID} in $full_secret_name"
 done
 
 echo "Secret updates completed successfully"
