@@ -78,7 +78,8 @@ contract DeployMorpherOracle is DeployOrUpgrade {
             MorpherState(stateAddress).setMorpherOracle(oracle);
 
             // Set WMATIC address for Mumbai testnet
-            oracleContract.setWmaticAddress(0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889);
+            // oracleContract.setWmaticAddress(0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889);
+            oracleContract.setWmaticAddress(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14); //weth token on sepolia
         }
         
         vm.stopBroadcast();

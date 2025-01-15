@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Sepolia:
+# source .env
+# forge script scripts/01-MorpherAccessControl.s.sol --private-key ${DEPLOYER_PK} --rpc-url ${SEPOLIA_RPC_URL} --slow --broadcast -vvvv --force --etherscan-api-key ${ETHERSCAN_API_KEY} --verify
+
 # Execute deployment scripts in order, passing through all arguments
 forge script scripts/01-MorpherAccessControl.s.sol "$@"
 forge script scripts/02-MorpherState.s.sol "$@"

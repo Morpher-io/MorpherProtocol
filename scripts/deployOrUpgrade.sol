@@ -36,58 +36,6 @@ abstract contract DeployOrUpgrade is Script {
         address userBlocking;
     }
 
-    // function run() public {
-    //     // Get deployer private key from environment
-    //     uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
-    //     vm.startBroadcast(deployerPrivateKey);
-
-    //     // Load existing addresses
-    //     Addresses memory addrs = loadAddresses();
-
-    //     // Deploy ProxyAdmin if not already deployed
-    //     if (addrs.proxyAdmin == address(0)) {
-    //         addrs.proxyAdmin = deployProxyAdmin();
-    //         console.log("Deployed ProxyAdmin at:", addrs.proxyAdmin);
-    //     }
-
-    //     // Deploy or upgrade MorpherAccessControl
-    //     MorpherAccessControl implementation = new MorpherAccessControl();
-    //     addrs.accessControl = deployOrUpgrade(
-    //         addrs.accessControl,
-    //         address(implementation),
-    //         addrs.proxyAdmin,
-    //         abi.encodeCall(MorpherAccessControl.initialize, ())
-    //     );
-    //     console.log("MorpherAccessControl at:", addrs.accessControl);
-
-    //     // Deploy or upgrade MorpherState
-    //     MorpherState stateImplementation = new MorpherState();
-    //     addrs.state = deployOrUpgrade(
-    //         addrs.state,
-    //         address(stateImplementation),
-    //         addrs.proxyAdmin,
-    //         abi.encodeCall(MorpherState.initialize, (true, addrs.accessControl))
-    //     );
-    //     console.log("MorpherState at:", addrs.state);
-
-    //     // Grant roles
-    //     accessControl.grantRole(stateImplementation.ADMINISTRATOR_ROLE(), vm.addr(deployerPrivateKey));
-    //     accessControl.grantRole(stateImplementation.GOVERNANCE_ROLE(), vm.addr(deployerPrivateKey));
-        
-    //     // Grant role to environment address if specified
-    //     if (vm.envOr("MORPHER_ADMINISTRATOR", address(0)) != address(0)) {
-    //         accessControl.grantRole(
-    //             stateImplementation.ADMINISTRATOR_ROLE(),
-    //             vm.envAddress("MORPHER_ADMINISTRATOR")
-    //         );
-    //     }
-
-    //     // Save updated addresses
-    //     saveAddresses(addrs);
-        
-    //     vm.stopBroadcast();
-    // }
-
     function getAddressesPath() internal view returns (string memory) {
         string memory root = vm.projectRoot();
         return string.concat(root, "/deployments/", Strings.toString(block.chainid), ".json");
@@ -117,8 +65,9 @@ abstract contract DeployOrUpgrade is Script {
 
     function saveAddress(string memory key, address value) internal {
         string memory path = getAddressesPath();
+         string memory jsonObj = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "proxyAdmin": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherUserBlocking": "0x0"}';
+
         if (!vm.isFile(path)) {
-            string memory jsonObj = '{"accessControl": "0x0", "admin": "0x0", "airdrop": "0x0", "bridge": "0x0", "interestRateManager": "0x0", "mintingLimiter": "0x0", "oracle": "0x0", "proxyAdmin": "0x0", "state": "0x0", "staking": "0x0", "token": "0x0", "tradeEngine": "0x0", "userBlocking": "0x0"}';
             vm.writeFile(path, jsonObj);
         }
         vm.writeJson(vm.toString(value), path, string.concat(".", key));

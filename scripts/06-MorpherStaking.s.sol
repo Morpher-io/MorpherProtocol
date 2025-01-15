@@ -61,7 +61,7 @@ contract DeployMorpherStaking is DeployOrUpgrade {
             accessControl.grantRole(token.MINTER_ROLE(), staking);
 
             // Set staking contract in state
-            state.setMorpherStaking(staking);
+            state.setMorpherStaking(payable(staking));
         }
         
         vm.stopBroadcast();

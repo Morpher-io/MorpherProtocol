@@ -31,8 +31,14 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     uint256 public poolShareValue;
     uint256 public lastReward;
     uint256 public totalShares;
-
-    uint256 public interestRate; // Daily interest rate with PRECISION decimals
+    
+    struct InterestRate {                                                                                                       
+         uint256 validFrom;                                                                                                      
+         uint256 rate;                                                                                                           
+     }                                                                                                                           
+                              
+    mapping(uint256 => InterestRate) private _OLDinterestRates; //deprecated, not in use/proxy
+    uint256 public interestRate; // Daily interest rate with PRECISION decimals, reuse/changed from numInterestRates
     uint256 public lockupPeriod; // to prevent tactical staking and ensure smooth governance
     uint256 public minimumStake; // 100k MPH minimum
 

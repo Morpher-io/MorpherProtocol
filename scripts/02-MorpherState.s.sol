@@ -18,45 +18,42 @@ import {MorpherState} from "../contracts/MorpherState.sol";
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
 
 contract DeployMorpherState is DeployOrUpgrade {
-    using stdJson for string;
+	using stdJson for string;
 
-    function run() public {
-        vm.startBroadcast();
+	function run() public {
+		vm.startBroadcast();
 
-        // Load AccessControl address - required for State initialization
-        address accessControlAddress = loadAddress("MorpherAccessControl");
-        require(accessControlAddress != address(0), "AccessControl must be deployed first");
+		// Load AccessControl address - required for State initialization
+		address accessControlAddress = loadAddress("MorpherAccessControl");
+		require(accessControlAddress != address(0), "AccessControl must be deployed first");
 
-        // Deploy or upgrade MorpherState
-        address existingState = loadAddress("MorpherState");
-        MorpherState implementation = new MorpherState();
-        
-        address state = deployOrUpgrade(
-            existingState,
-            address(implementation),
-            abi.encodeCall(MorpherState.initialize, (true, accessControlAddress)),
-            "MorpherState.sol"
-        );
-        
-        saveAddress("MorpherState", state);
-        console.log("MorpherState at:", state);
+		// Deploy or upgrade MorpherState
+		address existingState = loadAddress("MorpherState");
+		MorpherState implementation = new MorpherState();
 
-        // Only set admin rights for new deployments
-        if (existingState == address(0)) {
-            MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
-            accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), vm.addr(deployerPrivateKey));
-            accessControl.grantRole(implementation.GOVERNANCE_ROLE(), vm.addr(deployerPrivateKey));
-            
-            // Grant role to environment address if specified
-            address envAdmin = vm.envOr("MORPHER_ADMINISTRATOR", address(0));
-            if (envAdmin != address(0)) {
-                accessControl.grantRole(
-                    implementation.ADMINISTRATOR_ROLE(),
-                    envAdmin
-                );
-            }
-        }
-        
-        vm.stopBroadcast();
-    }
+		address state = deployOrUpgrade(
+			existingState,
+			address(implementation),
+			abi.encodeCall(MorpherState.initialize, (true, accessControlAddress)),
+			"MorpherState.sol"
+		);
+
+		saveAddress("MorpherState", state);
+		console.log("MorpherState at:", state);
+
+		// Only set admin rights for new deployments
+		if (existingState == address(0)) {
+			MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+			accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), msg.sender);
+			accessControl.grantRole(implementation.GOVERNANCE_ROLE(), msg.sender);
+
+			// Grant role to environment address if specified
+			address envAdmin = vm.envOr("MORPHER_ADMINISTRATOR", address(0));
+			if (envAdmin != address(0)) {
+				accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), envAdmin);
+			}
+		}
+
+		vm.stopBroadcast();
+	}
 }

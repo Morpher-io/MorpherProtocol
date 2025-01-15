@@ -70,7 +70,7 @@ contract DeployMorpherToken is DeployOrUpgrade {
             }
 
             // Revoke minter role from deployer
-            accessControl.revokeRole(implementation.MINTER_ROLE(), vm.addr(deployerPrivateKey));
+            accessControl.revokeRole(implementation.MINTER_ROLE(), msg.sender);
         }
         
         vm.stopBroadcast();
