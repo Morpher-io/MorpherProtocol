@@ -1,19 +1,59 @@
 const fs = require('node:fs');
 const path = require('node:path');
+
+const NETWORKS = {
+    1: {
+        name: 'Ethereum Mainnet',
+        apiKey: process.env.ETHERSCAN_KEY,
+        apiUrl: 'https://api.etherscan.io'
+    },
+    11155111: {
+        name: 'Ethereum Sepolia',
+        apiKey: process.env.ETHERSCAN_KEY,
+        apiUrl: 'https://api-sepolia.etherscan.io'
+    },
+    137: {
+        name: 'Polygon Mainnet',
+        apiKey: process.env.POLYGON_KEY,
+        apiUrl: 'https://api.polygonscan.com'
+    },
+    80002: {
+        name: 'Polygon Amoy',
+        apiKey: process.env.POLYGON_KEY,
+        apiUrl: 'https://api-amoy.polygonscan.com'
+    }
+};
+
 (async () => {
-    console.log("Downloading old contracts for comparison");
-    await getAndWriteContract("0x1ce1efda5d52de421bd3bc1ccc85977d7a0a0f1e"); //MorpherState
-    await new Promise((res) => setTimeout(res, 5000));
-    await getAndWriteContract("0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A"); //MorpherOracle
-    // await new Promise((res) => setTimeout(res, 5000));
-    // await getAndWriteContract("0x65C9e3289e5949134759119DBc9F862E8d6F2fBE"); //MorpherToken - getting downloaded via MorpherState
-    await new Promise((res) => setTimeout(res, 5000));
-    await getAndWriteContract("0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5"); 
+    // Clear previous contracts directory
+    if (fs.existsSync('./../../contracts/prev')) {
+        fs.rmSync('./../../contracts/prev', { recursive: true, force: true });
+    }
+    
+    // Process each network
+    for (const [chainId, network] of Object.entries(NETWORKS)) {
+        const deploymentFile = `./../../deployments/${chainId}.json`;
+        
+        if (!fs.existsSync(deploymentFile)) {
+            console.log(`Skipping ${network.name} - no deployment file found`);
+            continue;
+        }
+
+        console.log(`\nProcessing ${network.name}...`);
+        const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
+        
+        for (const [contractName, address] of Object.entries(deployment)) {
+            if (address && address !== "0x0") {
+                console.log(`Downloading ${contractName} at ${address}`);
+                await getAndWriteContract(address, network);
+                await new Promise((res) => setTimeout(res, 5000)); // Rate limit delay
+            }
+        }
+    }
 })()
 
-async function getAndWriteContract(contractAddress, level = 1) {
-    //can load a few free requests before limiting without API key...
-    let content = await fetch(`https://api.polygonscan.com/api?module=contract&action=getsourcecode&address=${contractAddress}&apikey=${process.env.POLYGON_KEY}`)
+async function getAndWriteContract(contractAddress, network, level = 1) {
+    let content = await fetch(`${network.apiUrl}/api?module=contract&action=getsourcecode&address=${contractAddress}&apikey=${network.apiKey}`)
     let json = await content.json();
 
     try {
