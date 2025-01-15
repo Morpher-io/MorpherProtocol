@@ -36,7 +36,8 @@ contract DeployMorpherState is DeployOrUpgrade {
         address state = deployOrUpgrade(
             existingState,
             address(implementation),
-            abi.encodeCall(MorpherState.initialize, (true, accessControlAddress))
+            abi.encodeCall(MorpherState.initialize, (true, accessControlAddress)),
+            "MorpherState.sol"
         );
         
         saveAddress("state", state);

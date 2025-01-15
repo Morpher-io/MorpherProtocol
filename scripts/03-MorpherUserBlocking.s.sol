@@ -36,7 +36,8 @@ contract DeployMorpherUserBlocking is DeployOrUpgrade {
         address userBlocking = deployOrUpgrade(
             existingUserBlocking,
             address(implementation),
-            abi.encodeCall(MorpherUserBlocking.initialize, (stateAddress))
+            abi.encodeCall(MorpherUserBlocking.initialize, (stateAddress)),
+            "MorpherUserBlocking.sol"
         );
         
         saveAddress("userBlocking", userBlocking);

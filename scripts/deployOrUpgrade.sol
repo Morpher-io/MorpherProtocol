@@ -189,7 +189,8 @@ abstract contract DeployOrUpgrade is Script {
     function deployOrUpgrade(
         address existingProxy,
         address implementation,
-        bytes memory initData
+        bytes memory initData,
+        string memory contractName
     ) internal returns (address) {
         // Load or deploy ProxyAdmin as prerequisite
         address proxyAdmin = loadAddress("proxyAdmin");
@@ -208,7 +209,7 @@ abstract contract DeployOrUpgrade is Script {
             );
         } else {
             // Validate and upgrade existing proxy
-            validateUpgrade(type(TransparentUpgradeableProxy).name);
+            validateUpgrade(contractName);
             upgradeProxy(
                 existingProxy,
                 implementation,
