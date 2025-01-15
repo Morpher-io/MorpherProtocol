@@ -187,14 +187,21 @@ abstract contract DeployOrUpgrade is Script {
     function deployOrUpgrade(
         address existingProxy,
         address implementation,
-        address admin,
         bytes memory initData
     ) internal returns (address) {
+        // Load or deploy ProxyAdmin as prerequisite
+        address proxyAdmin = loadAddress("proxyAdmin");
+        if (proxyAdmin == address(0)) {
+            proxyAdmin = deployProxyAdmin();
+            saveAddress("proxyAdmin", proxyAdmin);
+            console.log("Deployed ProxyAdmin at:", proxyAdmin);
+        }
+
         if (existingProxy == address(0)) {
             // Deploy new proxy
             return deployProxy(
                 implementation,
-                admin,
+                proxyAdmin,
                 initData
             );
         } else {
@@ -203,7 +210,7 @@ abstract contract DeployOrUpgrade is Script {
             upgradeProxy(
                 existingProxy,
                 implementation,
-                admin
+                proxyAdmin
             );
             return existingProxy;
         }
