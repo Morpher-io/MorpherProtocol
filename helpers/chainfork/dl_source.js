@@ -25,29 +25,37 @@ const NETWORKS = {
 };
 
 (async () => {
+    const chainId = process.argv[2];
+    if (!chainId || !NETWORKS[chainId]) {
+        console.error('Please provide a valid chain ID as parameter.');
+        console.error('Supported networks:');
+        Object.entries(NETWORKS).forEach(([id, net]) => {
+            console.error(`  ${id}: ${net.name}`);
+        });
+        process.exit(1);
+    }
+
+    const network = NETWORKS[chainId];
+    const deploymentFile = `./../../deployments/${chainId}.json`;
+    
+    if (!fs.existsSync(deploymentFile)) {
+        console.error(`No deployment file found for ${network.name}`);
+        process.exit(1);
+    }
+
     // Clear previous contracts directory
     if (fs.existsSync('./../../contracts/prev')) {
         fs.rmSync('./../../contracts/prev', { recursive: true, force: true });
     }
-    
-    // Process each network
-    for (const [chainId, network] of Object.entries(NETWORKS)) {
-        const deploymentFile = `./../../deployments/${chainId}.json`;
-        
-        if (!fs.existsSync(deploymentFile)) {
-            console.log(`Skipping ${network.name} - no deployment file found`);
-            continue;
-        }
 
-        console.log(`\nProcessing ${network.name}...`);
-        const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
-        
-        for (const [contractName, address] of Object.entries(deployment)) {
-            if (address && address !== "0x0") {
-                console.log(`Downloading ${contractName} at ${address}`);
-                await getAndWriteContract(address, network);
-                await new Promise((res) => setTimeout(res, 5000)); // Rate limit delay
-            }
+    console.log(`\nProcessing ${network.name}...`);
+    const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
+    
+    for (const [contractName, address] of Object.entries(deployment)) {
+        if (address && address !== "0x0") {
+            console.log(`Downloading ${contractName} at ${address}`);
+            await getAndWriteContract(address, network);
+            await new Promise((res) => setTimeout(res, 5000)); // Rate limit delay
         }
     }
 })()
