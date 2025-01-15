@@ -55,16 +55,6 @@ contract DeployMorpherTradeEngine is DeployOrUpgrade {
             MorpherTradeEngine tradeEngineContract = MorpherTradeEngine(tradeEngine);
             MorpherAccessControl accessControl = MorpherAccessControl(loadAddress("MorpherAccessControl"));
             
-            // Copy interest rates from Staking contract
-            address stakingAddress = loadAddress("MorpherStaking");
-            if (stakingAddress != address(0)) {
-                MorpherStaking staking = MorpherStaking(stakingAddress);
-                uint256 numRates = staking.numInterestRates();
-                for (uint256 i = 0; i < numRates; i++) {
-                    (uint256 rate, uint256 validFrom) = staking.interestRates(i);
-                    tradeEngineContract.addInterestRate(rate, validFrom);
-                }
-            }
 
             // Configure permissions
             address tokenAddress = loadAddress("MorpherToken");
