@@ -102,6 +102,31 @@ contract DeployOrUpgrade is Script {
         Upgrades.validateUpgrade(contractName);
     }
 
+    function deployOrUpgrade(
+        address existingProxy,
+        address implementation,
+        address admin,
+        bytes memory initData
+    ) internal returns (address) {
+        if (existingProxy == address(0)) {
+            // Deploy new proxy
+            return deployProxy(
+                implementation,
+                admin,
+                initData
+            );
+        } else {
+            // Validate and upgrade existing proxy
+            validateUpgrade(type(TransparentUpgradeableProxy).name);
+            upgradeProxy(
+                existingProxy,
+                implementation,
+                admin
+            );
+            return existingProxy;
+        }
+    }
+
     function upgradeProxy(
         address proxy,
         address implementation,

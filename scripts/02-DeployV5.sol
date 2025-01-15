@@ -21,34 +21,14 @@ contract DeployV5 is DeployOrUpgrade {
         }
 
         // Deploy or upgrade MorpherAccessControl
-        if (addrs.accessControl == address(0)) {
-            // Deploy implementation
-            MorpherAccessControl implementation = new MorpherAccessControl();
-            
-            // Deploy proxy
-            addrs.accessControl = deployProxy(
-                address(implementation),
-                addrs.proxyAdmin,
-                abi.encodeCall(MorpherAccessControl.initialize, ())
-            );
-            
-            console.log("Deployed MorpherAccessControl at:", addrs.accessControl);
-        } else {
-            // For upgrades, validate compatibility
-            validateUpgrade("MorpherAccessControl.sol");
-            
-            // Deploy new implementation
-            MorpherAccessControl newImplementation = new MorpherAccessControl();
-            
-            // Upgrade proxy to new implementation
-            upgradeProxy(
-                addrs.accessControl,
-                address(newImplementation),
-                addrs.proxyAdmin
-            );
-            
-            console.log("Upgraded MorpherAccessControl at:", addrs.accessControl);
-        }
+        MorpherAccessControl implementation = new MorpherAccessControl();
+        addrs.accessControl = deployOrUpgrade(
+            addrs.accessControl,
+            address(implementation),
+            addrs.proxyAdmin,
+            abi.encodeCall(MorpherAccessControl.initialize, ())
+        );
+        console.log(addrs.accessControl == address(0) ? "Deployed" : "Upgraded", "MorpherAccessControl at:", addrs.accessControl);
 
         // Save updated addresses
         saveAddresses(addrs);
