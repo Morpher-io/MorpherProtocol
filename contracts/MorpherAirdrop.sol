@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./MorpherToken.sol";
 
 // ----------------------------------------------------------------------------------
 // Holds the Airdrop Token balance on contract address
@@ -129,7 +129,7 @@ contract MorpherAirdrop is Initializable, OwnableUpgradeable {
         require(airdropAuthorized[_recipient] >= airdropClaimed[_recipient] + _amount, "MorpherAirdrop: amount exceeds authorized airdrop amount.");
         airdropClaimed[_recipient] = airdropClaimed[_recipient] + _amount;
         totalAirdropClaimed = totalAirdropClaimed + _amount;
-        IERC20(morpherToken).transfer(_recipient, _amount);
+        MorpherToken(morpherToken).transfer(_recipient, _amount);
         emit AirdropSent(msg.sender, _recipient, airdropClaimed[_recipient], airdropAuthorized[_recipient]);
     }
 
@@ -150,7 +150,7 @@ contract MorpherAirdrop is Initializable, OwnableUpgradeable {
         require(_amount > 0, "MorpherAirdrop: amount must be greater than 0");
         
         // First transfer the tokens
-        IERC20(morpherToken).transfer(_recipient, _amount);
+        MorpherToken(morpherToken).transfer(_recipient, _amount);
         
         // Then lock them as rewards
         MorpherToken(morpherToken).lockRewards(_recipient, _amount);

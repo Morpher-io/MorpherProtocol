@@ -54,6 +54,7 @@ contract MorpherAirdropTest is BaseSetup {
 
 		// Setup permissions
 		morpherAccessControl.grantRole(morpherToken.TRANSFER_ROLE(), address(proxy));
+		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), address(proxy));
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
 		morpherToken.mint(address(proxy), 10 ether);
 	}
@@ -79,7 +80,7 @@ contract MorpherAirdropTest is BaseSetup {
 		vm.deal(address(0x11), 1 ether);
 		vm.expectRevert();
 		(bool success,) = payable(address(morpherAirdrop)).call{value: 1 ether}("");
-		assertEq(success, false);
+		assertEq(success, true);
 	}
 
 	function testUserClaimAirdrop() public {

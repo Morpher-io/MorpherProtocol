@@ -21,6 +21,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	bytes32 public constant TRANSFERBLOCKED_ROLE = keccak256("TRANSFERBLOCKED_ROLE");
 	bytes32 public constant POLYGONMINTER_ROLE = keccak256("POLYGONMINTER_ROLE");
 	bytes32 public constant TOKENUPDATER_ROLE = keccak256("TOKENUPDATER_ROLE");
+	bytes32 public constant AIRDROPADMIN_ROLE = keccak256("AIRDROPADMIN_ROLE");
 
 	uint256 private _totalTokensOnOtherChain;
 	uint256 private _totalTokensInPositions;
@@ -209,7 +210,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	 * @param account Address to lock rewards for
 	 * @param amount Amount of tokens to lock
 	 */
-	function lockRewards(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
+	function lockRewards(address account, uint256 amount) public onlyRole(AIRDROPADMIN_ROLE) {
 		require(balanceOf(account) >= _lockedRewards[account] + amount, "MorpherToken: insufficient balance for locking");
 		
 		_lockedRewards[account] += amount;
@@ -223,7 +224,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	 * @param account Address to unlock rewards for
 	 * @param amount Amount of tokens to unlock
 	 */
-	function unlockRewards(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
+	function unlockRewards(address account, uint256 amount) public onlyRole(ADMINISTRATOR_ROLE) {
 		require(_lockedRewards[account] >= amount, "MorpherToken: insufficient locked rewards");
 		
 		_lockedRewards[account] -= amount;

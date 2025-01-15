@@ -20,7 +20,7 @@ import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 contract BaseSetup is Test {
 	using stdStorage for StdStorage;
 
-	bool isMainChain = false;
+	bool isMainChain = true;
 	bool initialMint = false;
 	address treasuryAddress = msg.sender;
 	bool recoveryEnabled_baseSetup = false;
