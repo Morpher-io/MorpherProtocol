@@ -27,31 +27,10 @@ get_current_secret() {
     fi
 }
 
-# Function to update secret with merged JSON
-update_secret() {
-    local secret_name=$1
-    local new_value=$2
-    local current_json
-    current_json=$(get_current_secret "$secret_name")
-    
-    # Merge current JSON with new value, new value takes precedence
-    local merged_json
-    merged_json=$(echo "$current_json" | jq -s --arg new "$new_value" '.[0] * ($new | fromjson)')
-    
-    aws secretsmanager put-secret-value \
-        --secret-id "$secret_name" \
-        --secret-string "$merged_json" \
-        --no-cli-pager >/dev/null 2>&1 || \
-    aws secretsmanager create-secret \
-        --name "$secret_name" \
-        --secret-string "$merged_json" \
-        --no-cli-pager >/dev/null 2>&1
-}
-
 # Read deployment file
 DEPLOYMENT_DATA=$(cat "$DEPLOYMENT_FILE")
 
-echo "Will update secrets for environment: $ENVIRONMENT using chain ID: $CHAIN_ID"
+echo "Will update secret for environment: $ENVIRONMENT using chain ID: $CHAIN_ID"
 echo "The following changes will be made:"
 echo "----------------------------------------"
 
@@ -61,21 +40,18 @@ jq -r 'to_entries[] | select(.value != "0x0" and .value != "0x000000000000000000
     key=$(echo "$decoded" | jq -r '.key')
     value=$(echo "$decoded" | jq -r '.value')
     
-    secret_name="${key}_${CHAIN_ID}"
-    full_secret_name="${ENVIRONMENT}/${secret_name}"
+    secret_key="${key}_${CHAIN_ID}"
     
-    current_value=$(get_current_secret "$full_secret_name")
-    
-    current_json=$(get_current_secret "$full_secret_name")
-    current_value=$(echo "$current_json" | jq -r --arg key "${key}_${CHAIN_ID}" '.[$key] // "NOT_SET"' 2>/dev/null || echo "NOT_SET")
+    current_json=$(get_current_secret "$ENVIRONMENT")
+    current_value=$(echo "$current_json" | jq -r --arg key "$secret_key" '.[$key] // "NOT_SET"' 2>/dev/null || echo "NOT_SET")
     
     if [ "$current_value" = "NOT_SET" ]; then
-        echo "New key in secret: $full_secret_name"
-        echo "Key: ${key}_${CHAIN_ID}"
+        echo "New key in secret: $ENVIRONMENT"
+        echo "Key: $secret_key"
         echo "Value: $value"
     else
-        echo "Update key in secret: $full_secret_name"
-        echo "Key: ${key}_${CHAIN_ID}"
+        echo "Update key in secret: $ENVIRONMENT"
+        echo "Key: $secret_key"
         echo "Old value: $current_value"
         echo "New value: $value"
     fi
@@ -88,25 +64,37 @@ if [ "$confirm" != "yes" ]; then
     exit 0
 fi
 
-echo "Updating secrets..."
+echo "Updating secret..."
 
-# Perform the actual updates
-jq -r 'to_entries[] | select(.value != "0x0" and .value != "0x0000000000000000000000000000000000000000") | @base64' "$DEPLOYMENT_FILE" | while read -r item; do
+# Create a temporary file to store the updates
+UPDATES_JSON="{}"
+
+# Build the updates JSON
+while read -r item; do
     decoded=$(echo "$item" | base64 --decode)
     key=$(echo "$decoded" | jq -r '.key')
     value=$(echo "$decoded" | jq -r '.value')
     
-    secret_name="${key}_${CHAIN_ID}"
-    full_secret_name="${ENVIRONMENT}/${secret_name}"
+    secret_key="${key}_${CHAIN_ID}"
     
-    # Create JSON object with the new key-value pair
-    new_json=$(jq -n \
-        --arg key "${key}_${CHAIN_ID}" \
-        --arg value "$value" \
-        '{($key): $value}')
-    
-    update_secret "$full_secret_name" "$new_json"
-    echo "Updated key ${key}_${CHAIN_ID} in $full_secret_name"
-done
+    # Add to updates JSON
+    UPDATES_JSON=$(echo "$UPDATES_JSON" | jq --arg key "$secret_key" --arg value "$value" '. + {($key): $value}')
+done < <(jq -r 'to_entries[] | select(.value != "0x0" and .value != "0x0000000000000000000000000000000000000000") | @base64' "$DEPLOYMENT_FILE")
 
-echo "Secret updates completed successfully"
+# Get current secret
+CURRENT_JSON=$(get_current_secret "$ENVIRONMENT")
+
+# Merge current JSON with updates, updates take precedence
+MERGED_JSON=$(echo "$CURRENT_JSON" | jq -s --argjson updates "$UPDATES_JSON" '.[0] * $updates')
+
+# Update the secret
+aws secretsmanager put-secret-value \
+    --secret-id "$ENVIRONMENT" \
+    --secret-string "$MERGED_JSON" \
+    --no-cli-pager >/dev/null 2>&1 || \
+aws secretsmanager create-secret \
+    --name "$ENVIRONMENT" \
+    --secret-string "$MERGED_JSON" \
+    --no-cli-pager >/dev/null 2>&1
+
+echo "Secret update completed successfully"
