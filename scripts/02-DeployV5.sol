@@ -20,11 +20,8 @@ contract DeployV5 is DeployOrUpgrade {
             console.log("Deployed ProxyAdmin at:", addrs.proxyAdmin);
         }
 
-        // Deploy MorpherAccessControl if not already deployed
+        // Deploy or upgrade MorpherAccessControl
         if (addrs.accessControl == address(0)) {
-            // Validate implementation for upgrade compatibility
-            validateUpgrade("MorpherAccessControl.sol");
-            
             // Deploy implementation
             MorpherAccessControl implementation = new MorpherAccessControl();
             
@@ -36,6 +33,21 @@ contract DeployV5 is DeployOrUpgrade {
             );
             
             console.log("Deployed MorpherAccessControl at:", addrs.accessControl);
+        } else {
+            // For upgrades, validate compatibility
+            validateUpgrade("MorpherAccessControl.sol");
+            
+            // Deploy new implementation
+            MorpherAccessControl newImplementation = new MorpherAccessControl();
+            
+            // Upgrade proxy to new implementation
+            upgradeProxy(
+                addrs.accessControl,
+                address(newImplementation),
+                addrs.proxyAdmin
+            );
+            
+            console.log("Upgraded MorpherAccessControl at:", addrs.accessControl);
         }
 
         // Save updated addresses

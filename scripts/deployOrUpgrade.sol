@@ -101,4 +101,15 @@ contract DeployOrUpgrade is Script {
     function validateUpgrade(string memory contractName) internal {
         Upgrades.validateUpgrade(contractName);
     }
+
+    function upgradeProxy(
+        address proxy,
+        address implementation,
+        address admin
+    ) internal {
+        ProxyAdmin(admin).upgrade(
+            ITransparentUpgradeableProxy(proxy),
+            implementation
+        );
+    }
 }
