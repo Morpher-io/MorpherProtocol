@@ -48,7 +48,7 @@ contract DeployMorpherAdmin is DeployOrUpgrade {
 
         // Enable markets using the helper script
         EnableMarkets enableMarkets = new EnableMarkets();
-        enableMarkets.enableMarketsFromJson(admin);
+        enableMarkets.run();
         
         vm.stopBroadcast();
     }

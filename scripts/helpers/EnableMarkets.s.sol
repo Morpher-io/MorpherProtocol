@@ -5,12 +5,18 @@ import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {MorpherAdmin} from "../../contracts/MorpherAdmin.sol";
+import {DeployOrUpgrade} from "../deployOrUpgrade.sol";
 
-contract EnableMarkets is Script {
+contract EnableMarkets is DeployOrUpgrade {
     using stdJson for string;
 
-    function enableMarketsFromJson(address admin) public {
+    function run() public {
         // Read and process markets.json
+
+        // Deploy or upgrade MorpherAdmin
+        address existingAdmin = loadAddress("MorpherAdmin");
+        require(existingAdmin != address(0x0), "MorpherAdmin must be deployed for this network");
+
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/docs/markets.json");
         string memory json = vm.readFile(path);
