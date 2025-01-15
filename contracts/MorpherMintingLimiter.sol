@@ -44,7 +44,17 @@ contract MorpherMintingLimiter is Initializable {
         _;
     }
 
-    constructor(address _stateAddress, uint256 _mintingLimitPerUser, uint256 _mintingLimitDaily, uint256 _timeLockingPeriodInSeconds) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address _stateAddress,
+        uint256 _mintingLimitPerUser,
+        uint256 _mintingLimitDaily,
+        uint256 _timeLockingPeriodInSeconds
+    ) public initializer {
         state = MorpherState(_stateAddress);
         mintingLimitPerUser = _mintingLimitPerUser;
         mintingLimitDaily = _mintingLimitDaily;

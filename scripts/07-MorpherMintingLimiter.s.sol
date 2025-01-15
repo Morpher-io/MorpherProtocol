@@ -37,18 +37,16 @@ contract DeployMorpherMintingLimiter is DeployOrUpgrade {
         uint256 timelockPeriodMinting = vm.envOr("MINTING_TIME_LOCK_PERIOD", uint256(0));
 
         // Deploy MorpherMintingLimiter
-        MorpherMintingLimiter implementation = new MorpherMintingLimiter(
-            stateAddress,
-            mintLimitPerUser,
-            mintLimitDaily,
-            timelockPeriodMinting
-        );
+        MorpherMintingLimiter implementation = new MorpherMintingLimiter();
         
         address existingMintingLimiter = loadAddress("MorpherMintingLimiter");
         address mintingLimiter = deployOrUpgrade(
             existingMintingLimiter,
             address(implementation),
-            "",  // No initialization needed as constructor handles it
+            abi.encodeCall(
+                MorpherMintingLimiter.initialize,
+                (stateAddress, mintLimitPerUser, mintLimitDaily, timelockPeriodMinting)
+            ),
             "MorpherMintingLimiter.sol"
         );
         
