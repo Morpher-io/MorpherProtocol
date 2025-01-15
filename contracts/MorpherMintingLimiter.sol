@@ -6,8 +6,11 @@ import "./MorpherState.sol";
 import "./MorpherTradeEngine.sol";
 import "./MorpherToken.sol";
 
+import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 
-contract MorpherMintingLimiter {
+
+
+contract MorpherMintingLimiter is Initializable {
 
     bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 
