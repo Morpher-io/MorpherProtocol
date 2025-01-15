@@ -53,18 +53,12 @@ contract DeployMorpherToken is DeployOrUpgrade {
             accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), vm.addr(deployerPrivateKey));
             accessControl.grantRole(implementation.MINTER_ROLE(), vm.addr(deployerPrivateKey));
 
-            // Grant roles to environment address if specified
-            address envAdmin = vm.envOr("MORPHER_ADMINISTRATOR", address(0));
-            if (envAdmin != address(0)) {
-                accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), envAdmin);
-            }
-
             // Get treasury address from environment or use deployer
             address treasuryAddress = vm.envOr("MORPHER_TREASURY", vm.addr(deployerPrivateKey));
 
             // Mint tokens and set other chain balance
             uint256 _mainChainMint = 425_000_000 ether;
-            uint256 _sideChainMint = 575_000_000 ether;
+            // uint256 _sideChainMint = 575_000_000 ether;
             
             tokenContract.mint(treasuryAddress, _mainChainMint);
             tokenContract.setTotalTokensOnOtherChain(_sideChainMint);

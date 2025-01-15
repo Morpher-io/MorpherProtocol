@@ -59,11 +59,6 @@ contract MorpherState is Initializable, ContextUpgradeable  {
     mapping(address => uint256) private numberOfRequests;
     uint256 public numberOfRequestsLimit;
 
-    // ----------------------------------------------------------------------------
-    // New interest rate management
-    // ----------------------------------------------------------------------------
-
-    address public morpherInterestRateManagerAddress;
 
     // ----------------------------------------------------------------------------
     // Events
@@ -85,6 +80,13 @@ contract MorpherState is Initializable, ContextUpgradeable  {
     }
 
     bool public mainChain;
+
+    
+    // ----------------------------------------------------------------------------
+    // New interest rate management
+    // ----------------------------------------------------------------------------
+
+    address public morpherInterestRateManagerAddress;
 
     function initialize(bool _mainChain, address _morpherAccessControlAddress) public initializer {
         ContextUpgradeable.__Context_init();
