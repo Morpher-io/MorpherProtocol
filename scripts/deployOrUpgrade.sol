@@ -14,6 +14,7 @@ import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
 
 //morpher contracts
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
+import {MorpherState} from "../contracts/MorpherState.sol";
 
 
 contract DeployOrUpgrade is Script {
@@ -22,6 +23,7 @@ contract DeployOrUpgrade is Script {
     struct Addresses {
         address proxyAdmin;
         address accessControl;
+        address state;
         address state;
         address userBlocking;
         address token;
@@ -58,6 +60,29 @@ contract DeployOrUpgrade is Script {
             abi.encodeCall(MorpherAccessControl.initialize, ())
         );
         console.log("MorpherAccessControl at:", addrs.accessControl);
+
+        // Deploy or upgrade MorpherState
+        MorpherState stateImplementation = new MorpherState();
+        addrs.state = deployOrUpgrade(
+            addrs.state,
+            address(stateImplementation),
+            addrs.proxyAdmin,
+            abi.encodeCall(MorpherState.initialize, (true, addrs.accessControl))
+        );
+        console.log("MorpherState at:", addrs.state);
+
+        // Grant roles
+        MorpherAccessControl accessControl = MorpherAccessControl(addrs.accessControl);
+        accessControl.grantRole(accessControl.ADMINISTRATOR_ROLE(), vm.addr(deployerPrivateKey));
+        accessControl.grantRole(accessControl.GOVERNANCE_ROLE(), vm.addr(deployerPrivateKey));
+        
+        // Grant role to environment address if specified
+        if (vm.envOr("MORPHER_ADMINISTRATOR", address(0)) != address(0)) {
+            accessControl.grantRole(
+                accessControl.ADMINISTRATOR_ROLE(),
+                vm.envAddress("MORPHER_ADMINISTRATOR")
+            );
+        }
 
         // Save updated addresses
         saveAddresses(addrs);
