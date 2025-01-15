@@ -89,6 +89,7 @@ contract DeployOrUpgrade is Script {
     }
 
     function loadAddressesFromJson(string memory json) internal returns (Addresses memory addrs) {
+        {
         // Load first batch of addresses
         addrs.proxyAdmin = json.readAddress(".proxyAdmin");
         addrs.accessControl = json.readAddress(".accessControl");
@@ -96,7 +97,9 @@ contract DeployOrUpgrade is Script {
         addrs.userBlocking = json.readAddress(".userBlocking");
         addrs.token = json.readAddress(".token");
         addrs.staking = json.readAddress(".staking");
+        }
         
+        {
         // Load second batch of addresses
         addrs.mintingLimiter = json.readAddress(".mintingLimiter");
         addrs.tradeEngine = json.readAddress(".tradeEngine");
@@ -105,6 +108,7 @@ contract DeployOrUpgrade is Script {
         addrs.admin = json.readAddress(".admin");
         addrs.interestRateManager = json.readAddress(".interestRateManager");
         addrs.airdrop = json.readAddress(".airdrop");
+        }
         
         return addrs;
     }
