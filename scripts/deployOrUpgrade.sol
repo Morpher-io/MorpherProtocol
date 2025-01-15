@@ -99,10 +99,27 @@ abstract contract DeployOrUpgrade is Script {
             addrs = getEmptyAddresses();
             saveAddresses(addrs);
             return addrs;
-
         }
         string memory json = vm.readFile(path);
         return loadAddressesFromJson(json);
+    }
+
+    function loadAddress(string memory key) internal returns (address) {
+        string memory path = getAddressesPath();
+        if (!vm.isFile(path)) {
+            return address(0);
+        }
+        string memory json = vm.readFile(path);
+        return vm.parseJsonAddress(json, string.concat(".", key));
+    }
+
+    function saveAddress(string memory key, address value) internal {
+        string memory path = getAddressesPath();
+        if (!vm.isFile(path)) {
+            string memory jsonObj = '{"proxyAdmin": "0x0", "accessControl": "0x0", "state": "0x0", "userBlocking": "0x0", "token": "0x0", "staking": "0x0", "mintingLimiter": "0x0", "tradeEngine": "0x0", "oracle": "0x0", "bridge": "0x0", "admin": "0x0", "interestRateManager": "0x0", "airdrop": "0x0"}';
+            vm.writeFile(path, jsonObj);
+        }
+        vm.writeJson(vm.toString(value), path, string.concat(".", key));
     }
 
     function getEmptyAddresses() internal pure returns (Addresses memory) {
@@ -113,7 +130,6 @@ abstract contract DeployOrUpgrade is Script {
             address(0)
         );
     }
-
     
     function loadAddressesFromJson(string memory json) internal view returns (Addresses memory) {
         bytes memory data = vm.parseJson(json);
