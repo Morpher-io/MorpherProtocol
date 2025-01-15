@@ -70,28 +70,43 @@ contract DeployOrUpgrade is Script {
         return string.concat(root, "/deployments/", Strings.toString(block.chainid), ".json");
     }
 
-    function loadAddresses() internal returns (Addresses memory) {
+    function loadAddresses() internal returns (Addresses memory addrs) {
         string memory path = getAddressesPath();
         if (!vm.isFile(path)) {
-            return Addresses(address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0));
+            return getEmptyAddresses();
         }
-
         string memory json = vm.readFile(path);
-        return Addresses({
-            proxyAdmin: json.readAddress(".proxyAdmin"),
-            accessControl: json.readAddress(".accessControl"),
-            state: json.readAddress(".state"),
-            userBlocking: json.readAddress(".userBlocking"),
-            token: json.readAddress(".token"),
-            staking: json.readAddress(".staking"),
-            mintingLimiter: json.readAddress(".mintingLimiter"),
-            tradeEngine: json.readAddress(".tradeEngine"),
-            oracle: json.readAddress(".oracle"),
-            bridge: json.readAddress(".bridge"),
-            admin: json.readAddress(".admin"),
-            interestRateManager: json.readAddress(".interestRateManager"),
-            airdrop: json.readAddress(".airdrop")
-        });
+        return loadAddressesFromJson(json);
+    }
+
+    function getEmptyAddresses() internal pure returns (Addresses memory) {
+        return Addresses(
+            address(0), address(0), address(0), address(0), 
+            address(0), address(0), address(0), address(0), 
+            address(0), address(0), address(0), address(0), 
+            address(0)
+        );
+    }
+
+    function loadAddressesFromJson(string memory json) internal returns (Addresses memory addrs) {
+        // Load first batch of addresses
+        addrs.proxyAdmin = json.readAddress(".proxyAdmin");
+        addrs.accessControl = json.readAddress(".accessControl");
+        addrs.state = json.readAddress(".state");
+        addrs.userBlocking = json.readAddress(".userBlocking");
+        addrs.token = json.readAddress(".token");
+        addrs.staking = json.readAddress(".staking");
+        
+        // Load second batch of addresses
+        addrs.mintingLimiter = json.readAddress(".mintingLimiter");
+        addrs.tradeEngine = json.readAddress(".tradeEngine");
+        addrs.oracle = json.readAddress(".oracle");
+        addrs.bridge = json.readAddress(".bridge");
+        addrs.admin = json.readAddress(".admin");
+        addrs.interestRateManager = json.readAddress(".interestRateManager");
+        addrs.airdrop = json.readAddress(".airdrop");
+        
+        return addrs;
     }
 
     function saveAddresses(Addresses memory addrs) internal {
