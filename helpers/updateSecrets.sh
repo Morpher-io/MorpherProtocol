@@ -29,7 +29,7 @@ echo "The following changes will be made:"
 echo "----------------------------------------"
 
 # Parse JSON and prepare changes
-jq -r 'to_entries[] | select(.value != "0x0") | @base64' "$DEPLOYMENT_FILE" | while read -r item; do
+jq -r 'to_entries[] | select(.value != "0x0" and .value != "0x0000000000000000000000000000000000000000") | @base64' "$DEPLOYMENT_FILE" | while read -r item; do
     decoded=$(echo "$item" | base64 --decode)
     key=$(echo "$decoded" | jq -r '.key')
     value=$(echo "$decoded" | jq -r '.value')
@@ -59,7 +59,7 @@ fi
 echo "Updating secrets..."
 
 # Perform the actual updates
-jq -r 'to_entries[] | select(.value != "0x0") | @base64' "$DEPLOYMENT_FILE" | while read -r item; do
+jq -r 'to_entries[] | select(.value != "0x0" and .value != "0x0000000000000000000000000000000000000000") | @base64' "$DEPLOYMENT_FILE" | while read -r item; do
     decoded=$(echo "$item" | base64 --decode)
     key=$(echo "$decoded" | jq -r '.key')
     value=$(echo "$decoded" | jq -r '.value')
