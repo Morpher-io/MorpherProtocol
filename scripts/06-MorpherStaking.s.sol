@@ -55,9 +55,8 @@ contract DeployMorpherStaking is DeployOrUpgrade {
             // Grant STAKINGADMIN role to deployer
             accessControl.grantRole(stakingContract.STAKINGADMIN_ROLE(), vm.addr(deployerPrivateKey));
 
-            // Set initial interest rates
-            stakingContract.addInterestRate(15000, 1617094819); // Initial interest rate from trade engine deployment
-            stakingContract.addInterestRate(30000, 1644491427); // Second interest rate timestamp
+            // Set initial interest rate
+            stakingContract.setInterestRate(15000); // 0.015% daily interest rate
 
             // Grant token roles to staking contract
             accessControl.grantRole(token.BURNER_ROLE(), staking);
