@@ -115,25 +115,21 @@ contract DeployOrUpgrade is Script {
 
     function saveAddresses(Addresses memory addrs) internal {
         string memory path = getAddressesPath();
-        string memory json = string(
-            abi.encodePacked(
-                '{"proxyAdmin":"', vm.toString(addrs.proxyAdmin),
-                '","accessControl":"', vm.toString(addrs.accessControl),
-                '","state":"', vm.toString(addrs.state),
-                '","userBlocking":"', vm.toString(addrs.userBlocking),
-                '","token":"', vm.toString(addrs.token),
-                '","staking":"', vm.toString(addrs.staking),
-                '","mintingLimiter":"', vm.toString(addrs.mintingLimiter),
-                '","tradeEngine":"', vm.toString(addrs.tradeEngine),
-                '","oracle":"', vm.toString(addrs.oracle),
-                '","bridge":"', vm.toString(addrs.bridge),
-                '","admin":"', vm.toString(addrs.admin),
-                '","interestRateManager":"', vm.toString(addrs.interestRateManager),
-                '","airdrop":"', vm.toString(addrs.airdrop),
-                '"}'
-            )
-        );
-        vm.writeFile(path, json);
+        
+        // Write each address individually to avoid stack too deep
+        vm.writeJson(vm.toString(addrs.proxyAdmin), path, ".proxyAdmin");
+        vm.writeJson(vm.toString(addrs.accessControl), path, ".accessControl"); 
+        vm.writeJson(vm.toString(addrs.state), path, ".state");
+        vm.writeJson(vm.toString(addrs.userBlocking), path, ".userBlocking");
+        vm.writeJson(vm.toString(addrs.token), path, ".token");
+        vm.writeJson(vm.toString(addrs.staking), path, ".staking");
+        vm.writeJson(vm.toString(addrs.mintingLimiter), path, ".mintingLimiter");
+        vm.writeJson(vm.toString(addrs.tradeEngine), path, ".tradeEngine");
+        vm.writeJson(vm.toString(addrs.oracle), path, ".oracle");
+        vm.writeJson(vm.toString(addrs.bridge), path, ".bridge");
+        vm.writeJson(vm.toString(addrs.admin), path, ".admin");
+        vm.writeJson(vm.toString(addrs.interestRateManager), path, ".interestRateManager");
+        vm.writeJson(vm.toString(addrs.airdrop), path, ".airdrop");
     }
 
     function deployProxyAdmin() internal returns (address) {
