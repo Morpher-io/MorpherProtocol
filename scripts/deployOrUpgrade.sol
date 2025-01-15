@@ -73,7 +73,10 @@ contract DeployOrUpgrade is Script {
     function loadAddresses() internal returns (Addresses memory addrs) {
         string memory path = getAddressesPath();
         if (!vm.isFile(path)) {
-            return getEmptyAddresses();
+            addrs = getEmptyAddresses();
+            saveAddresses(addrs);
+            return addrs;
+
         }
         string memory json = vm.readFile(path);
         return loadAddressesFromJson(json);
@@ -88,6 +91,7 @@ contract DeployOrUpgrade is Script {
         );
     }
 
+    
     function loadAddressesFromJson(string memory json) internal view returns (Addresses memory) {
         bytes memory data = vm.parseJson(json);
         return abi.decode(data, (Addresses));
@@ -95,26 +99,26 @@ contract DeployOrUpgrade is Script {
 
     function saveAddresses(Addresses memory addrs) internal {
         string memory path = getAddressesPath();
+        string memory jsonObj = '{"proxyAdmin": "0x0", "accessControl": "0x0", "state": "0x0", "userBlocking": "0x0", "token": "0x0", "staking": "0x0", "mintingLimiter": "0x0", "tradeEngine": "0x0", "oracle": "0x0", "bridge": "0x0", "admin": "0x0", "interestRateManager": "0x0", "airdrop": "0x0"}';
+
+        if (!vm.isFile(path)) {
+            vm.writeFile(path, jsonObj);
+        }
         
-        // Start with empty JSON object
-        string memory json = "{}";
-        
-        // Serialize each field individually
-        json = vm.serializeJson(json, "proxyAdmin", addrs.proxyAdmin);
-        json = vm.serializeJson(json, "accessControl", addrs.accessControl);
-        json = vm.serializeJson(json, "state", addrs.state);
-        json = vm.serializeJson(json, "userBlocking", addrs.userBlocking);
-        json = vm.serializeJson(json, "token", addrs.token);
-        json = vm.serializeJson(json, "staking", addrs.staking);
-        json = vm.serializeJson(json, "mintingLimiter", addrs.mintingLimiter);
-        json = vm.serializeJson(json, "tradeEngine", addrs.tradeEngine);
-        json = vm.serializeJson(json, "oracle", addrs.oracle);
-        json = vm.serializeJson(json, "bridge", addrs.bridge);
-        json = vm.serializeJson(json, "admin", addrs.admin);
-        json = vm.serializeJson(json, "interestRateManager", addrs.interestRateManager);
-        json = vm.serializeJson(json, "airdrop", addrs.airdrop);
-        
-        vm.writeFile(path, json);
+        // Write each address individually to avoid stack too deep
+        vm.writeJson(vm.toString(addrs.proxyAdmin), path, ".proxyAdmin");
+        vm.writeJson(vm.toString(addrs.accessControl), path, ".accessControl"); 
+        vm.writeJson(vm.toString(addrs.state), path, ".state");
+        vm.writeJson(vm.toString(addrs.userBlocking), path, ".userBlocking");
+        vm.writeJson(vm.toString(addrs.token), path, ".token");
+        vm.writeJson(vm.toString(addrs.staking), path, ".staking");
+        vm.writeJson(vm.toString(addrs.mintingLimiter), path, ".mintingLimiter");
+        vm.writeJson(vm.toString(addrs.tradeEngine), path, ".tradeEngine");
+        vm.writeJson(vm.toString(addrs.oracle), path, ".oracle");
+        vm.writeJson(vm.toString(addrs.bridge), path, ".bridge");
+        vm.writeJson(vm.toString(addrs.admin), path, ".admin");
+        vm.writeJson(vm.toString(addrs.interestRateManager), path, ".interestRateManager");
+        vm.writeJson(vm.toString(addrs.airdrop), path, ".airdrop");
     }
 
     function deployProxyAdmin() internal returns (address) {
