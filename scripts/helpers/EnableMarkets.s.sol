@@ -18,24 +18,20 @@ contract EnableMarkets is DeployOrUpgrade {
         require(existingAdmin != address(0x0), "MorpherAdmin must be deployed for this network");
 
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/deployments/markets.json");
+        string memory path = string.concat(root, "/deployments/market_ids.json");
         string memory json = vm.readFile(path);
-        bytes memory marketsRaw = json.parseRaw(".");
-        
-        // Parse the JSON array
-        bytes[] memory marketIds = abi.decode(marketsRaw, (bytes[]));
-        
+        string[] memory marketIds = abi.decode(
+            json.parseRaw(""),
+            (string[])
+        );
+
         // Process markets in batches of 20
         bytes32[] memory marketsToAdd = new bytes32[](20);
         uint256 batchCount = 0;
         
         for (uint256 i = 0; i < marketIds.length; i++) {
-            // Extract market ID from the JSON object
-            bytes memory marketData = marketIds[i];
-            string memory marketId = abi.decode(marketData, (string));
-            
             // Add market to current batch
-            marketsToAdd[i % 20] = keccak256(bytes(marketId));
+            marketsToAdd[i % 20] = keccak256(bytes(marketIds[i]));
             
             // When batch is full or we're at the end, process it
             if ((i + 1) % 20 == 0 || i == marketIds.length - 1) {
