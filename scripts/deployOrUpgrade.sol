@@ -6,8 +6,15 @@ import {console} from "forge-std/console.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
+import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+
+
+//morpher contracts
+import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
+
 
 contract DeployOrUpgrade is Script {
     using stdJson for string;
@@ -28,12 +35,42 @@ contract DeployOrUpgrade is Script {
         address airdrop;
     }
 
+    function run() public {
+        // Get deployer private key from environment
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
+        vm.startBroadcast(deployerPrivateKey);
+
+        // Load existing addresses
+        Addresses memory addrs = loadAddresses();
+
+        // Deploy ProxyAdmin if not already deployed
+        if (addrs.proxyAdmin == address(0)) {
+            addrs.proxyAdmin = deployProxyAdmin();
+            console.log("Deployed ProxyAdmin at:", addrs.proxyAdmin);
+        }
+
+        // Deploy or upgrade MorpherAccessControl
+        MorpherAccessControl implementation = new MorpherAccessControl();
+        addrs.accessControl = deployOrUpgrade(
+            addrs.accessControl,
+            address(implementation),
+            addrs.proxyAdmin,
+            abi.encodeCall(MorpherAccessControl.initialize, ())
+        );
+        console.log("MorpherAccessControl at:", addrs.accessControl);
+
+        // Save updated addresses
+        saveAddresses(addrs);
+        
+        vm.stopBroadcast();
+    }
+
     function getAddressesPath() internal view returns (string memory) {
         string memory root = vm.projectRoot();
         return string.concat(root, "/deployments/", Strings.toString(block.chainid), ".json");
     }
 
-    function loadAddresses() internal view returns (Addresses memory) {
+    function loadAddresses() internal returns (Addresses memory) {
         string memory path = getAddressesPath();
         if (!vm.isFile(path)) {
             return Addresses(address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0));
@@ -99,7 +136,9 @@ contract DeployOrUpgrade is Script {
     }
 
     function validateUpgrade(string memory contractName) internal {
-        Upgrades.validateUpgrade(contractName);
+
+		Options memory opts;
+        Upgrades.validateUpgrade(contractName, opts);
     }
 
     function deployOrUpgrade(
