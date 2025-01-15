@@ -49,7 +49,7 @@ contract MorpherAirdropTest is BaseSetup {
 		);
 
 		// Create wrapped proxy for easier calls
-		wrappedProxy = MorpherAirdrop(address(proxy));
+		wrappedProxy = MorpherAirdrop(payable(address(proxy)));
 		morpherAirdrop = wrappedProxy;
 
 		// Setup permissions
@@ -78,7 +78,8 @@ contract MorpherAirdropTest is BaseSetup {
 	function testCannotReceiveETH() public {
 		vm.deal(address(0x11), 1 ether);
 		vm.expectRevert();
-		payable(morpherAirdrop).call{value: 1 ether}("");
+		(bool success,) = payable(address(morpherAirdrop)).call{value: 1 ether}("");
+		assertEq(success, false);
 	}
 
 	function testUserClaimAirdrop() public {
