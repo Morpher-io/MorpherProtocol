@@ -18,7 +18,7 @@ contract EnableMarkets is DeployOrUpgrade {
         require(existingAdmin != address(0x0), "MorpherAdmin must be deployed for this network");
 
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/docs/markets.json");
+        string memory path = string.concat(root, "/deployments/markets.json");
         string memory json = vm.readFile(path);
         bytes memory marketsRaw = json.parseRaw(".");
         
@@ -45,8 +45,8 @@ contract EnableMarkets is DeployOrUpgrade {
                     currentBatch[j] = marketsToAdd[j];
                 }
                 
-                MorpherAdmin(admin).bulkActivateMarkets(currentBatch);
-                console.log("Added batch", batchCount, "with", batchSize, "markets");
+                MorpherAdmin(existingAdmin).bulkActivateMarkets(currentBatch);
+                console.log("Added batch", batchCount);
                 batchCount++;
             }
         }
