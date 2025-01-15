@@ -87,13 +87,9 @@ CURRENT_JSON=$(get_current_secret "$ENVIRONMENT")
 # Merge current JSON with updates, updates take precedence
 MERGED_JSON=$(echo "$CURRENT_JSON" | jq -s --argjson updates "$UPDATES_JSON" '.[0] * $updates')
 
-# Update the secret
-aws secretsmanager put-secret-value \
+# Update or create the secret
+aws secretsmanager update-secret \
     --secret-id "$ENVIRONMENT" \
-    --secret-string "$MERGED_JSON" \
-    --no-cli-pager >/dev/null 2>&1 || \
-aws secretsmanager create-secret \
-    --name "$ENVIRONMENT" \
     --secret-string "$MERGED_JSON" \
     --no-cli-pager >/dev/null 2>&1
 
