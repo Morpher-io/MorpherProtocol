@@ -43,9 +43,10 @@ contract DeployMorpherToken is DeployOrUpgrade {
         saveAddress("MorpherToken", token);
         console.log("MorpherToken at:", token);
 
-        // Only set roles for new deployments
+        // Only set roles and mint for new deployments
         if (existingToken == address(0)) {
             MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+            MorpherToken tokenContract = MorpherToken(token);
             
             // Grant initial roles to deployer
             accessControl.grantRole(implementation.PAUSER_ROLE(), vm.addr(deployerPrivateKey));
@@ -57,6 +58,26 @@ contract DeployMorpherToken is DeployOrUpgrade {
             if (envAdmin != address(0)) {
                 accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), envAdmin);
             }
+
+            // Get treasury address from environment or use deployer
+            address treasuryAddress = vm.envOr("MORPHER_TREASURY", vm.addr(deployerPrivateKey));
+
+            // Mint tokens and set other chain balance
+            uint256 _mainChainMint = 425_000_000 ether;
+            uint256 _sideChainMint = 575_000_000 ether;
+            
+            tokenContract.mint(treasuryAddress, _mainChainMint);
+            tokenContract.setTotalTokensOnOtherChain(_sideChainMint);
+
+            // Configure State with token address
+            address stateAddress = loadAddress("MorpherState");
+            if (stateAddress != address(0)) {
+                MorpherState state = MorpherState(stateAddress);
+                state.setMorpherToken(token);
+            }
+
+            // Revoke minter role from deployer
+            accessControl.revokeRole(implementation.MINTER_ROLE(), vm.addr(deployerPrivateKey));
         }
         
         vm.stopBroadcast();
