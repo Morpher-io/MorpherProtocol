@@ -12,7 +12,7 @@ import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initiali
 // ----------------------------------------------------------------------------------
 
 contract MorpherAdmin is Initializable {
-    MorpherState state;
+    MorpherState public state;
 
     bytes32 constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 
@@ -85,9 +85,12 @@ contract MorpherAdmin is Initializable {
     */
     function bulkActivateMarkets(bytes32[] memory _marketHashes) public onlyAdministrator {
         for(uint i = 0; i < _marketHashes.length; i++) {
-            bytes memory payload = abi.encodeWithSignature("activateMarket(bytes32)", _marketHashes[i]);
-            (bool success, ) = address(state).call(payload);
-            require(success,  "MorpherAdmin: Failed to activate Market");
+            if(_marketHashes[i] != bytes32(0x0)) {
+                MorpherState(state).activateMarket(_marketHashes[i]);
+                // bytes memory payload = abi.encodeWithSignature("activateMarket(bytes32)", _marketHashes[i]);
+                // (bool success, ) = address(state).call(payload);
+                // require(success,  "MorpherAdmin: Failed to activate Market");
+            }
         }
     }
 

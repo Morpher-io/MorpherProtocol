@@ -16,6 +16,7 @@ import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
 //morpher contracts
 import {MorpherAirdrop} from "../contracts/MorpherAirdrop.sol";
 import {MorpherToken} from "../contracts/MorpherToken.sol";
+import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
 
 contract DeployMorpherAirdrop is DeployOrUpgrade {
     using stdJson for string;
@@ -28,7 +29,7 @@ contract DeployMorpherAirdrop is DeployOrUpgrade {
         require(tokenAddress != address(0), "MorpherToken must be deployed first");
 
         // Get configuration from environment
-        address airdropAdmin = vm.envOr("AIRDROP_ADMIN", msg.sender);
+        address airdropAdmin = vm.envOr("MORPHER_AIRDROP_ADMIN", msg.sender);
         address coldStorageOwner = vm.envOr("MORPHER_OWNER", msg.sender);
 
         // Deploy or upgrade MorpherAirdrop
@@ -44,6 +45,24 @@ contract DeployMorpherAirdrop is DeployOrUpgrade {
             ),
             "MorpherAirdrop.sol"
         );
+
+        if(existingAirdrop == address(0x0)) {
+            address existingToken = loadAddress("MorpherToken");
+            MorpherToken token = MorpherToken(existingToken);
+            address accessControlAddress = loadAddress("MorpherAccessControl");
+            MorpherAccessControl ac = MorpherAccessControl(accessControlAddress);
+
+            ac.grantRole(token.BURNER_ROLE(), msg.sender);
+            ac.grantRole(token.MINTER_ROLE(), msg.sender);
+
+            address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);
+
+            uint treasuryRollover = token.balanceOf(treasuryAddress);
+            token.burn(treasuryAddress, treasuryRollover);
+            token.mint(msg.sender, treasuryRollover);
+            token.transfer(airdropAdmin, 100_000 ether);
+
+        }
         
         saveAddress("MorpherAirdrop", airdrop);
         console.log("MorpherAirdrop at:", airdrop);

@@ -45,11 +45,11 @@ contract DeployMorpherAdmin is DeployOrUpgrade {
         
         saveAddress("MorpherAdmin", admin);
         console.log("MorpherAdmin at:", admin);
+        vm.stopBroadcast();
 
         // Enable markets using the helper script
         EnableMarkets enableMarkets = new EnableMarkets();
         enableMarkets.run();
         
-        vm.stopBroadcast();
     }
 }

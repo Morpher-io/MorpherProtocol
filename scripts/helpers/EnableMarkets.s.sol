@@ -6,6 +6,7 @@ import {console} from "forge-std/console.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {MorpherAccessControl} from "../../contracts/MorpherAccessControl.sol";
 import {MorpherAdmin} from "../../contracts/MorpherAdmin.sol";
+import {MorpherState} from "../../contracts/MorpherState.sol";
 import {DeployOrUpgrade} from "../deployOrUpgrade.sol";
 
 //pre processing of the market ids: 
@@ -28,9 +29,9 @@ contract EnableMarkets is DeployOrUpgrade {
         console.log("Granting ADMINISTRATOR_ROLE to:", existingAdmin);
         
         // Verify MorpherAdmin is initialized
-        try MorpherAdmin(existingAdmin).state() returns (address stateAddr) {
-            console.log("MorpherAdmin state address:", stateAddr);
-            require(stateAddr != address(0), "MorpherAdmin not properly initialized");
+        try MorpherAdmin(existingAdmin).state() returns (MorpherState stateAddr) {
+            console.log("MorpherAdmin state address:", address(stateAddr));
+            require(address(stateAddr) != address(0), "MorpherAdmin not properly initialized");
         } catch {
             revert("Failed to query MorpherAdmin state - contract may not be initialized");
         }
@@ -68,7 +69,7 @@ contract EnableMarkets is DeployOrUpgrade {
                     }
                 }
                 
-                console.log("Processing batch", batchCount, "with", validCount, "valid markets");
+                // console.log(abi.encodePacked("Processing batch", string(batchCount), "with", string(validCount), "valid markets"));
                 console.log("Calling bulkActivateMarkets from address:", address(this));
                 console.log("MorpherAdmin address:", existingAdmin);
                 
