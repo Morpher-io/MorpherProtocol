@@ -69,6 +69,12 @@ contract DeployMorpherTradeEngine is DeployOrUpgrade {
                 tradeEngine
             );
 
+            // Grant position admin role
+            accessControl.grantRole(
+                MorpherToken(tokenAddress).MINTER_ROLE(),
+                tradeEngine
+            );
+
             // Set TradeEngine in State
             MorpherState(stateAddress).setMorpherTradeEngine(tradeEngine);
         }

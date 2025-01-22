@@ -90,7 +90,7 @@ async function getAndWriteContract(contractAddress, network, level = 1) {
                 if (!fs.existsSync(`./../../contracts/prev/`)) {
                     fs.mkdirSync(`./../../contracts/prev/`, { recursive: true });
                 }
-                fs.writeFileSync(`./../../contracts/prev/${json.result[0].ContractName}.sol`, json.result[0].SourceCode);
+                fs.writeFileSync(`./../../contracts/prev/${json.result[0].ContractName}.sol`, json.result[0].SourceCode.replace(/@openzeppelin\/contracts-upgradeable\//g, "../lib/openzeppelin-contracts-upgradeable/contracts/"));
                 // file written successfully
                 console.log(`Written ${json.result[0].ContractName}.sol`)
             } catch (err) {
@@ -102,7 +102,7 @@ async function getAndWriteContract(contractAddress, network, level = 1) {
     }
 
 
-    if (json.result[0].Implementation != '' && level < 2) {
+    if (json.result[0].Implementation != '' && level <= 2) {
         await new Promise((res) => setTimeout(res, 5000))
         await getAndWriteContract(json.result[0].Implementation, network, level + 1);
     }

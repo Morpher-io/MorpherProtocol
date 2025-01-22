@@ -92,12 +92,12 @@ contract BaseSetup is Test {
 		vm.warp(1);
 
 		//deploy mintingLimiter
-		morpherMintingLimiter = new MorpherMintingLimiter(
+		morpherMintingLimiter = new MorpherMintingLimiter();
+		morpherMintingLimiter.initialize(
 			address(morpherState),
 			500000000000000000000000,
 			5000000000000000000000000,
-			260000
-		);
+			260000);
 		morpherState.setMorpherMintingLimiter(address(morpherMintingLimiter));
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherMintingLimiter));
 
