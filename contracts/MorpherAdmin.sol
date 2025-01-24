@@ -29,10 +29,27 @@ contract MorpherAdmin is Initializable {
  event AddressPositionMigrationComplete(address _owner, bytes32 _oldMarketId, bytes32 _newMarketId);
  event AllPositionMigrationsComplete(bytes32 _oldMarketId, bytes32 _newMarketId);
  event AllPositionMigrationIncomplete(bytes32 _oldMarketId, bytes32 _newMarketId, uint _maxIx);
+ event BatchMintCompleted(address[] recipients, uint256[] amounts, uint256 totalAmount);
 
 // ----------------------------------------------------------------------------
 // Precision of prices and leverage
 // ----------------------------------------------------------------------------
+
+    function batchMint(address[] calldata _recipients, uint256[] calldata _amounts) external onlyAdministrator {
+        require(_recipients.length == _amounts.length, "Arrays must be same length");
+        require(_recipients.length > 0, "Arrays cannot be empty");
+        
+        uint256 totalAmount;
+        for(uint256 i = 0; i < _recipients.length; i++) {
+            require(_recipients[i] != address(0), "Invalid recipient address");
+            require(_amounts[i] > 0, "Amount must be greater than 0");
+            totalAmount += _amounts[i];
+            
+            MorpherToken(state.morpherTokenAddress()).mint(_recipients[i], _amounts[i]);
+        }
+        
+        emit BatchMintCompleted(_recipients, _amounts, totalAmount);
+    }
 
     modifier onlyAdministrator {
         require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(ADMINISTRATOR_ROLE, msg.sender), "Function can only be called by the Administrator.");
