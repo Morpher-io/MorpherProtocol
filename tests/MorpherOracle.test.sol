@@ -614,6 +614,45 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
 	}
 
+	function testInitiateCancelOrderWithSignature() public {
+		Account memory owner = makeAccount("owner");
+		
+		bytes32 orderId = morpherOracle.createOrder(
+			keccak256("CRYPTO_BTC"),
+			0,
+			100 * 1e18,
+			true,
+			2 * PRECISION,
+			90 * 1e18,
+			110 * 1e18,
+			999999999999999,
+			1
+		);
+
+		uint nonce = morpherOracle.nonces(owner.addr);
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_CANCEL_ORDER_TYPEHASH,
+				orderId,
+				owner.addr,
+				nonce,
+				uint256(1000)
+			)
+		);
+		bytes32 domainSeparator = keccak256(
+			abi.encode(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION, block.chainid, address(morpherOracle))
+		);
+		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		vm.expectEmit(true, true, true, true);
+		emit OrderCancellationRequestedEvent(orderId, owner.addr);
+		morpherOracle.initiateCancelOrderPermitted(orderId, owner.addr, 1000, v, r, s);
+
+		assertEq(morpherOracle.orderCancellationRequested(orderId), true);
+	}
+
 	function testCallbackForOpenPosition() public {
 		address user = address(0xff01);
 
