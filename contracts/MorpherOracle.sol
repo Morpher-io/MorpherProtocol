@@ -76,6 +76,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		keccak256(
 			"CreateOrder(bytes32 _marketId,uint256 _closeSharesAmount,uint256 _openMPHTokenAmount,address _msgSender,uint256 nonce,uint256 deadline)"
 		);
+		
+	bytes32 public constant _CANCEL_ORDER_TYPEHASH =
+		keccak256(
+			"CancelOrder(bytes32 _orderId,address _msgSender,uint256 nonce,uint256 deadline)"
+		);
 
 	struct CreateOrderStruct {
 		bytes32 _marketId;
@@ -711,13 +716,43 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		nonce.increment();
 	}
 
-	function initiateCancelOrder(bytes32 _orderId) public {
+	function initiateCancelOrder(bytes32 _orderId) public virtual {
 		MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
 		require(orderCancellationRequested[_orderId] == false, "MorpherOracle: Order was already canceled.");
 		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
 		require(userId == _msgSender(), "MorpherOracle: Only the user can request an order cancellation.");
 		orderCancellationRequested[_orderId] = true;
 		emit OrderCancellationRequestedEvent(_orderId, _msgSender());
+	}
+
+	function initiateCancelOrderPermitted(
+		bytes32 _orderId,
+		address _owner,
+		uint256 deadline,
+		uint8 v,
+		bytes32 r,
+		bytes32 s
+	) public virtual {
+		require(block.timestamp <= deadline, "MorpherOracle: expired deadline");
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_CANCEL_ORDER_TYPEHASH,
+				_orderId,
+				_owner,
+				_useNonce(_owner),
+				deadline
+			)
+		);
+
+		bytes32 hash = _hashTypedDataV4(structHash);
+
+		address signer = ECDSAUpgradeable.recover(hash, v, r, s);
+		require(signer == _owner, "MorpherOracle: invalid signature");
+		
+		msgSenderOverride = _owner;
+		initiateCancelOrder(_orderId);
+		msgSenderOverride = address(0);
 	}
 
 	// ----------------------------------------------------------------------------------
