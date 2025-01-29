@@ -10,7 +10,7 @@ import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initiali
 // ----------------------------------------------------------------------------------
 // Administrator of the Morpher platform
 // ----------------------------------------------------------------------------------
-
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAdmin.sol:MorpherAdmin
 contract MorpherAdmin is Initializable {
     MorpherState public state;
 

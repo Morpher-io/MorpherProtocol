@@ -20,36 +20,34 @@ import {MorpherAdmin} from "../contracts/MorpherAdmin.sol";
 import {MorpherState} from "../contracts/MorpherState.sol";
 
 contract DeployMorpherAdmin is DeployOrUpgrade {
-    using stdJson for string;
+	using stdJson for string;
 
-    function run() public {
-        vm.startBroadcast();
+	function run() public {
+		vm.startBroadcast();
 
-        // Load State address - required for Admin initialization
-        address stateAddress = loadAddress("MorpherState");
-        require(stateAddress != address(0), "MorpherState must be deployed first");
+		// Load State address - required for Admin initialization
+		address stateAddress = loadAddress("MorpherState");
+		require(stateAddress != address(0), "MorpherState must be deployed first");
 
-        // Deploy or upgrade MorpherAdmin
-        address existingAdmin = loadAddress("MorpherAdmin");
-        MorpherAdmin implementation = new MorpherAdmin();
-        
-        address admin = deployOrUpgrade(
-            existingAdmin,
-            address(implementation),
-            abi.encodeCall(
-                MorpherAdmin.initialize,
-                (stateAddress)
-            ),
-            "MorpherAdmin.sol"
-        );
-        
-        saveAddress("MorpherAdmin", admin);
-        console.log("MorpherAdmin at:", admin);
-        vm.stopBroadcast();
+		// Deploy or upgrade MorpherAdmin
+		address existingAdmin = loadAddress("MorpherAdmin");
+		MorpherAdmin implementation = new MorpherAdmin();
 
-        // Enable markets using the helper script
-        EnableMarkets enableMarkets = new EnableMarkets();
-        enableMarkets.run();
-        
-    }
+		address admin = deployOrUpgrade(
+			existingAdmin,
+			address(implementation),
+			abi.encodeCall(MorpherAdmin.initialize, (stateAddress)),
+			"MorpherAdmin.sol"
+		);
+
+		saveAddress("MorpherAdmin", admin);
+		console.log("MorpherAdmin at:", admin);
+		vm.stopBroadcast();
+
+		if (existingAdmin == address(0)) {
+			// Enable markets using the helper script
+			EnableMarkets enableMarkets = new EnableMarkets();
+			enableMarkets.run();
+		}
+	}
 }

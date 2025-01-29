@@ -616,7 +616,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 
 	function testInitiateCancelOrderWithSignature() public {
 		Account memory owner = makeAccount("owner");
-		
+		vm.prank(owner.addr);
 		bytes32 orderId = morpherOracle.createOrder(
 			keccak256("CRYPTO_BTC"),
 			0,

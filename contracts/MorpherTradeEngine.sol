@@ -211,7 +211,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	modifier onlyRole(bytes32 role) {
 		require(
 			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()),
-			"MorpherToken: Permission denied."
+			"MorpherTradeEngine: Permission denied."
 		);
 		_;
 	}
