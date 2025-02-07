@@ -7,6 +7,7 @@ import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/d
 import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/CountersUpgradeable.sol";
 import "./MorpherAccessControl.sol";
+import "./MorpherState.sol";
 
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherToken.sol:MorpherToken
@@ -52,15 +53,19 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	
 	bytes32 private _PERMIT_TYPEHASH_DEPRECATED_SLOT;
 
+	MorpherState public morpherState;
+
+
 	event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);
 	event SetTotalTokensInPositions(uint256 _oldValue, uint256 _newValue);
 	event SetRestrictTransfers(bool _oldValue, bool _newValue);
 
-	function initialize(address _morpherAccessControl) public initializer {
+	function initialize(address _morpherAccessControl, address _morpherState) public initializer {
 		ERC20Upgradeable.__ERC20_init("Morpher", "MPH");
 		morpherAccessControl = MorpherAccessControl(_morpherAccessControl);
 		_HASHED_NAME = keccak256(bytes("MorpherToken"));
 		_HASHED_VERSION = keccak256(bytes("1"));
+		morpherState = MorpherState(_morpherState);
 	}
 
 	modifier onlyRole(bytes32 role) {
@@ -74,6 +79,10 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
     function setHashedVersion(string memory _version) public onlyRole(ADMINISTRATOR_ROLE) {
         _HASHED_VERSION = keccak256(bytes(_version));
     }
+
+	function setMorpherStateAddress(address _morpherState) public onlyRole(ADMINISTRATOR_ROLE) {
+		morpherState = MorpherState(_morpherState);
+	}
 
 	// function getMorpherAccessControl() public view returns(address) {
 	//     return address(morpherAccessControl);
@@ -262,7 +271,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		// Check if transfer would leave enough tokens to cover locked rewards
 		// Skip check for minting and if sender is trade engine
 		if (from != address(0)) { // Skip check for minting
-			if (_msgSender() != MorpherState(morpherAccessControl.morpherStateAddress()).morpherTradeEngineAddress()) {
+			if (_msgSender() != morpherState.morpherTradeEngineAddress()) {
 				require(
 					amount <= balanceOf(from),
 					"MorpherToken: transfer amount exceeds unlocked balance"

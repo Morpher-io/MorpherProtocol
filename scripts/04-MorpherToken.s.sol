@@ -26,7 +26,9 @@ contract DeployMorpherToken is DeployOrUpgrade {
 
         // Load AccessControl address - required for Token initialization
         address accessControlAddress = loadAddress("MorpherAccessControl");
+        address stateAddress = loadAddress("MorpherState");
         require(accessControlAddress != address(0), "AccessControl must be deployed first");
+        require(stateAddress != address(0), "MorpherState must be deployed first");
 
         // Deploy or upgrade MorpherToken
         address existingToken = loadAddress("MorpherToken");
@@ -35,7 +37,7 @@ contract DeployMorpherToken is DeployOrUpgrade {
         address token = deployOrUpgrade(
             existingToken,
             address(implementation),
-            abi.encodeCall(MorpherToken.initialize, (accessControlAddress)),
+            abi.encodeCall(MorpherToken.initialize, (accessControlAddress, stateAddress)),
             "MorpherToken.sol"
         );
         
@@ -63,7 +65,6 @@ contract DeployMorpherToken is DeployOrUpgrade {
             tokenContract.mint(treasuryAddress, _mainChainMint);
 
             // Configure State with token address
-            address stateAddress = loadAddress("MorpherState");
             if (stateAddress != address(0)) {
                 MorpherState state = MorpherState(stateAddress);
                 state.setMorpherToken(token);
@@ -71,6 +72,11 @@ contract DeployMorpherToken is DeployOrUpgrade {
 
             // Revoke minter role from deployer
             accessControl.revokeRole(implementation.MINTER_ROLE(), msg.sender);
+        } else {
+            //update MorpherState if its not set yet
+            if(address(MorpherToken(existingToken).morpherState()) == address(0)) {
+                MorpherToken(existingToken).setMorpherStateAddress(stateAddress);
+            }
         }
         
         vm.stopBroadcast();

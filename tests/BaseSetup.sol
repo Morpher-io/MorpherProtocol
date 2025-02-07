@@ -58,7 +58,7 @@ contract BaseSetup is Test {
 
 		//deploy token
 		morpherToken = new MorpherToken();
-		morpherToken.initialize(address(morpherAccessControl));
+		morpherToken.initialize(address(morpherAccessControl), address(morpherState));
 		morpherState.setMorpherToken(address(morpherToken));
 		if (initialMint) {
 			morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));

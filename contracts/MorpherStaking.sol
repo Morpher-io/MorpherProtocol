@@ -159,7 +159,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     // ----------------------------------------------------------------------------
 
     function stake(uint256 _amount) public virtual userNotBlocked returns (uint256 _poolShares) {
-        require(MorpherToken(morpherState.morpherTokenAddress()).balanceOf(_msgSender()) >= _amount, "MorpherStaking: insufficient MPH token balance");
+        require(MorpherToken(morpherState.morpherTokenAddress()).getTradeableBalanceOf(_msgSender()) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
         _poolShares = _amount / (poolShareValue);
         uint _numOfShares = poolShares[_msgSender()].numPoolShares;
