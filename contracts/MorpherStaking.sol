@@ -20,15 +20,6 @@ import "./MorpherInterestRateManager.sol";
 
 contract MorpherStaking is Initializable, ContextUpgradeable {
     using CountersUpgradeable for CountersUpgradeable.Counter;
-    
-    bytes32 public constant _HASHED_NAME = keccak256("MorpherStaking");
-    bytes32 public constant _HASHED_VERSION = keccak256("1");
-    bytes32 public constant _TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    
-    bytes32 public constant _STAKE_TYPEHASH = keccak256("Stake(uint256 amount,address owner,uint256 nonce,uint256 deadline)");
-    bytes32 public constant _UNSTAKE_TYPEHASH = keccak256("Unstake(uint256 shares,address owner,uint256 nonce,uint256 deadline)");
-    
-    mapping(address => CountersUpgradeable.Counter) private _nonces;
 
     MorpherState public morpherState;
 
@@ -63,6 +54,17 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         uint256 lockedUntil;
     }
     mapping(address => PoolShares) public poolShares;
+
+
+    
+    bytes32 public constant _HASHED_NAME = keccak256("MorpherStaking");
+    bytes32 public constant _HASHED_VERSION = keccak256("1");
+    bytes32 public constant _TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    
+    bytes32 public constant _STAKE_TYPEHASH = keccak256("Stake(uint256 amount,address owner,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _UNSTAKE_TYPEHASH = keccak256("Unstake(uint256 shares,address owner,uint256 nonce,uint256 deadline)");
+    
+    mapping(address => CountersUpgradeable.Counter) private _nonces;
 
     // END STATE ----------------------------------------------------------------------------
 
