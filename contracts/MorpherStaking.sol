@@ -2,6 +2,9 @@
 pragma solidity ^0.8.15;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
@@ -16,6 +19,16 @@ import "./MorpherInterestRateManager.sol";
 // ----------------------------------------------------------------------------------
 
 contract MorpherStaking is Initializable, ContextUpgradeable {
+    using CountersUpgradeable for CountersUpgradeable.Counter;
+    
+    bytes32 public constant _HASHED_NAME = keccak256("MorpherStaking");
+    bytes32 public constant _HASHED_VERSION = keccak256("1");
+    bytes32 public constant _TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    
+    bytes32 public constant _STAKE_TYPEHASH = keccak256("Stake(uint256 amount,address owner,uint256 nonce,uint256 deadline)");
+    bytes32 public constant _UNSTAKE_TYPEHASH = keccak256("Unstake(uint256 shares,address owner,uint256 nonce,uint256 deadline)");
+    
+    mapping(address => CountersUpgradeable.Counter) private _nonces;
 
     MorpherState public morpherState;
 
@@ -129,7 +142,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     // and the _amount is transferred to the staking contract
     // ----------------------------------------------------------------------------
 
-    function stake(uint256 _amount) public userNotBlocked returns (uint256 _poolShares) {
+    function stake(uint256 _amount) public virtual userNotBlocked returns (uint256 _poolShares) {
         require(MorpherToken(morpherState.morpherTokenAddress()).balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
         _poolShares = _amount / (poolShareValue);
@@ -149,7 +162,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     // Pool Shares get deleted and the user receives their MPH plus interest
     // ----------------------------------------------------------------------------
 
-    function unstake(uint256 _numOfShares) public userNotBlocked returns (uint256 _amount) {
+    function unstake(uint256 _numOfShares) public virtual userNotBlocked returns (uint256 _amount) {
         uint256 _numOfExistingShares = poolShares[msg.sender].numPoolShares;
         require(_numOfShares <= _numOfExistingShares, "MorpherStaking: insufficient pool shares");
 
@@ -188,6 +201,104 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     // ----------------------------------------------------------------------------
     // Getter functions
     // ----------------------------------------------------------------------------
+
+    /**
+     * @dev "Consume a nonce": return the current value and increment.
+     */
+    function _useNonce(address owner) internal virtual returns (uint256 current) {
+        CountersUpgradeable.Counter storage nonce = _nonces[owner];
+        current = nonce.current();
+        nonce.increment();
+    }
+
+    /**
+     * @dev Returns the domain separator for the current chain.
+     */
+    function _domainSeparatorV4() internal view returns (bytes32) {
+        return _buildDomainSeparator(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION);
+    }
+
+    function _buildDomainSeparator(
+        bytes32 typeHash,
+        bytes32 nameHash,
+        bytes32 versionHash
+    ) private view returns (bytes32) {
+        return keccak256(abi.encode(typeHash, nameHash, versionHash, block.chainid, address(this)));
+    }
+
+    function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
+        return ECDSAUpgradeable.toTypedDataHash(_domainSeparatorV4(), structHash);
+    }
+
+    /**
+     * @dev See {IERC20Permit-nonces}.
+     */
+    function nonces(address owner) public view virtual returns (uint256) {
+        return _nonces[owner].current();
+    }
+
+    /**
+     * @dev See {IERC20Permit-DOMAIN_SEPARATOR}.
+     */
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    function stakeWithPermit(
+        uint256 _amount,
+        address _owner,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public virtual returns (uint256) {
+        require(block.timestamp <= deadline, "MorpherStaking: expired deadline");
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                _STAKE_TYPEHASH,
+                _amount,
+                _owner,
+                _useNonce(_owner),
+                deadline
+            )
+        );
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSAUpgradeable.recover(hash, v, r, s);
+        require(signer == _owner, "MorpherStaking: invalid signature");
+
+        return stake(_amount);
+    }
+
+    function unstakeWithPermit(
+        uint256 _shares,
+        address _owner,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public virtual returns (uint256) {
+        require(block.timestamp <= deadline, "MorpherStaking: expired deadline");
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                _UNSTAKE_TYPEHASH,
+                _shares,
+                _owner,
+                _useNonce(_owner),
+                deadline
+            )
+        );
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSAUpgradeable.recover(hash, v, r, s);
+        require(signer == _owner, "MorpherStaking: invalid signature");
+
+        return unstake(_shares);
+    }
 
     function getTotalPooledValue() public view returns (uint256 _totalPooled) {
         // Only accurate if poolShareValue is up to date
