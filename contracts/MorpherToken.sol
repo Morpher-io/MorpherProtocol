@@ -213,13 +213,6 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	}
 
 	/**
-	 * @dev Returns the amount of tokens that can be transferred by an account
-	 */
-	function getUnlockedBalance(address account) public view returns (uint256) {
-		return balanceOf(account) - _lockedRewards[account];
-	}
-
-	/**
 	 * @dev Locks tokens as rewards for an account
 	 * @param account Address to lock rewards for
 	 * @param amount Amount of tokens to lock
