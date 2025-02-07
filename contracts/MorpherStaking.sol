@@ -18,6 +18,7 @@ import "./MorpherInterestRateManager.sol";
 // There is a lockup after staking or topping up (30 days) and a minimum stake (100k MPH)
 // ----------------------------------------------------------------------------------
 
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherStaking.sol:MorpherStaking
 contract MorpherStaking is Initializable, ContextUpgradeable {
     using CountersUpgradeable for CountersUpgradeable.Counter;
 

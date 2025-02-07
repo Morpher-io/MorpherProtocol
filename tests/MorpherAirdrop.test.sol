@@ -179,9 +179,9 @@ contract MorpherAirdropTest is BaseSetup {
 		morpherAirdrop.adminSendLockedRewards(user, rewardAmount);
 
 		// Verify the rewards are locked
-		assertEq(MorpherToken(morpherToken).balanceOf(user), rewardAmount);
+		assertEq(MorpherToken(morpherToken).balanceOf(user), 0);
+		assertEq(MorpherToken(morpherToken).getTradeableBalanceOf(user), rewardAmount);
 		assertEq(MorpherToken(morpherToken).getLockedRewards(user), rewardAmount);
-		assertEq(MorpherToken(morpherToken).getUnlockedBalance(user), 0);
 
 		// User should not be able to transfer locked rewards
 		vm.prank(user);
