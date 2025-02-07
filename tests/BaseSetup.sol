@@ -89,6 +89,8 @@ contract BaseSetup is Test {
 		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherStaking));
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherStaking));
 		morpherState.setMorpherStaking(payable(address(morpherStaking)));
+		morpherAccessControl.grantRole(morpherStaking.STAKINGADMIN_ROLE(), address(this));
+		morpherStaking.setInterestRate(50000);
 		vm.warp(1);
 
 		//deploy mintingLimiter

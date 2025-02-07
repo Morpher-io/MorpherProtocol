@@ -66,6 +66,8 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     
     mapping(address => CountersUpgradeable.Counter) private _nonces;
 
+	address private msgSenderOverride;
+
     // END STATE ----------------------------------------------------------------------------
 
     event SetLockupPeriod(uint256 newLockupPeriod);
@@ -87,7 +89,7 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
 	}
     
     modifier userNotBlocked {
-        require(!MorpherUserBlocking(morpherState.morpherUserBlockingAddress()).userIsBlocked(msg.sender), "MorpherStaking: User is blocked");
+        require(!MorpherUserBlocking(morpherState.morpherUserBlockingAddress()).userIsBlocked(_msgSender()), "MorpherStaking: User is blocked");
         _;
     }
     
@@ -106,6 +108,17 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         emit SetMinimumStake(minimumStake);
         // missing: transferOwnership to Governance once deployed
     }
+
+    /**
+	 * Overrides the msgSender Context to understand when a call by signature happened
+	 */
+	function _msgSender() internal view override returns (address) {
+		if (msgSenderOverride != address(0)) {
+			return msgSenderOverride;
+		}
+
+		return msg.sender;
+	}
 
     // ----------------------------------------------------------------------------
     // updatePoolShareValue
@@ -145,16 +158,16 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     // ----------------------------------------------------------------------------
 
     function stake(uint256 _amount) public virtual userNotBlocked returns (uint256 _poolShares) {
-        require(MorpherToken(morpherState.morpherTokenAddress()).balanceOf(msg.sender) >= _amount, "MorpherStaking: insufficient MPH token balance");
+        require(MorpherToken(morpherState.morpherTokenAddress()).balanceOf(_msgSender()) >= _amount, "MorpherStaking: insufficient MPH token balance");
         updatePoolShareValue();
         _poolShares = _amount / (poolShareValue);
-        uint _numOfShares = poolShares[msg.sender].numPoolShares;
+        uint _numOfShares = poolShares[_msgSender()].numPoolShares;
         require(minimumStake <= (_numOfShares + _poolShares) * poolShareValue, "MorpherStaking: stake amount lower than minimum stake");
-        MorpherToken(morpherState.morpherTokenAddress()).burn(msg.sender, _poolShares * (poolShareValue));
+        MorpherToken(morpherState.morpherTokenAddress()).burn(_msgSender(), _poolShares * (poolShareValue));
         totalShares = totalShares + (_poolShares);
-        poolShares[msg.sender].numPoolShares = _numOfShares + _poolShares;
-        poolShares[msg.sender].lockedUntil = block.timestamp + lockupPeriod;
-        emit Staked(msg.sender, _amount, _poolShares, block.timestamp + (lockupPeriod));
+        poolShares[_msgSender()].numPoolShares = _numOfShares + _poolShares;
+        poolShares[_msgSender()].lockedUntil = block.timestamp + lockupPeriod;
+        emit Staked(_msgSender(), _amount, _poolShares, block.timestamp + (lockupPeriod));
         return _poolShares;
     }
 
@@ -165,17 +178,17 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     // ----------------------------------------------------------------------------
 
     function unstake(uint256 _numOfShares) public virtual userNotBlocked returns (uint256 _amount) {
-        uint256 _numOfExistingShares = poolShares[msg.sender].numPoolShares;
+        uint256 _numOfExistingShares = poolShares[_msgSender()].numPoolShares;
         require(_numOfShares <= _numOfExistingShares, "MorpherStaking: insufficient pool shares");
 
-        uint256 lockedInUntil = poolShares[msg.sender].lockedUntil;
+        uint256 lockedInUntil = poolShares[_msgSender()].lockedUntil;
         require(block.timestamp >= lockedInUntil, "MorpherStaking: cannot unstake before lockup expiration");
         updatePoolShareValue();
-        poolShares[msg.sender].numPoolShares = poolShares[msg.sender].numPoolShares - _numOfShares;
+        poolShares[_msgSender()].numPoolShares = poolShares[_msgSender()].numPoolShares - _numOfShares;
         totalShares = totalShares - _numOfShares;
         _amount = _numOfShares * poolShareValue;
-        MorpherToken(morpherState.morpherTokenAddress()).mint(msg.sender, _amount);
-        emit Unstaked(msg.sender, _amount, _numOfShares);
+        MorpherToken(morpherState.morpherTokenAddress()).mint(_msgSender(), _amount);
+        emit Unstaked(_msgSender(), _amount, _numOfShares);
         return _amount;
     }
 
@@ -270,8 +283,11 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
 
         address signer = ECDSAUpgradeable.recover(hash, v, r, s);
         require(signer == _owner, "MorpherStaking: invalid signature");
+        msgSenderOverride = _owner;
+        uint _poolShares = stake(_amount);
+        msgSenderOverride = address(0);
+        return _poolShares;
 
-        return stake(_amount);
     }
 
     function unstakeWithPermit(
@@ -299,7 +315,10 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         address signer = ECDSAUpgradeable.recover(hash, v, r, s);
         require(signer == _owner, "MorpherStaking: invalid signature");
 
-        return unstake(_shares);
+        msgSenderOverride = _owner;
+        uint _amount = unstake(_shares);
+        msgSenderOverride = address(0);
+        return _amount;
     }
 
     function getTotalPooledValue() public view returns (uint256 _totalPooled) {
