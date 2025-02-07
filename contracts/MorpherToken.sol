@@ -113,6 +113,20 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		return super.totalSupply() + _totalTokensOnOtherChain + _totalTokensInPositions;
 	}
 
+	/**
+	 * @dev Returns the full balance including locked rewards, used for trading
+	 */
+	function getTradeableBalanceOf(address account) public view returns (uint256) {
+		return super.balanceOf(account);
+	}
+
+	/**
+	 * @dev Override balanceOf to subtract locked rewards
+	 */
+	function balanceOf(address account) public view virtual override returns (uint256) {
+		return super.balanceOf(account) - _lockedRewards[account];
+	}
+
 	function deposit(address user, bytes calldata depositData) external onlyRole(POLYGONMINTER_ROLE) {
 		uint256 amount = abi.decode(depositData, (uint256));
 		_mint(user, amount);
