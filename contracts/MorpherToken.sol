@@ -260,11 +260,19 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		);
 
 		// Check if transfer would leave enough tokens to cover locked rewards
+		// Skip check for minting and if sender is trade engine
 		if (from != address(0)) { // Skip check for minting
-			require(
-				amount <= balanceOf(from),
-				"MorpherToken: transfer amount exceeds unlocked balance"
-			);
+			if (_msgSender() != MorpherState(morpherAccessControl.morpherStateAddress()).morpherTradeEngineAddress()) {
+				require(
+					amount <= balanceOf(from),
+					"MorpherToken: transfer amount exceeds unlocked balance"
+				);
+			} else {
+				require(
+					amount <= getTradeableBalanceOf(from),
+					"MorpherToken: transfer amount exceeds total balance"
+				);
+			}
 		}
 
 		super._beforeTokenTransfer(from, to, amount);
