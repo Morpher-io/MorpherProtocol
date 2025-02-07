@@ -282,6 +282,106 @@ contract MorkpherStakingTest is BaseSetup {
 		morpherStaking.unstake(resultingPoolShares);
 	}
 
+	function testStakeWithPermit() public {
+		vm.warp(1617094819);
+		Account memory owner = makeAccount("owner");
+		uint256 stakeAmount = 300000 * 1e18;
+
+		morpherToken.mint(owner.addr, stakeAmount);
+
+		uint nonce = morpherStaking.nonces(owner.addr);
+		uint deadline = block.timestamp + 100;
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				morpherStaking._STAKE_TYPEHASH(),
+				stakeAmount,
+				owner.addr,
+				nonce,
+				deadline
+			)
+		);
+		bytes32 domainSeparator = keccak256(
+			abi.encode(
+				morpherStaking._TYPE_HASH(),
+				morpherStaking._HASHED_NAME(),
+				morpherStaking._HASHED_VERSION(),
+				block.chainid,
+				address(morpherStaking)
+			)
+		);
+		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		uint256 resultingPoolShares = stakeAmount / morpherStaking.poolShareValue();
+		uint256 expectedLockedUntil = block.timestamp + morpherStaking.lockupPeriod();
+
+		vm.expectEmit(true, true, true, true);
+		emit Staked(owner.addr, stakeAmount, resultingPoolShares, expectedLockedUntil);
+		morpherStaking.stakeWithPermit(stakeAmount, owner.addr, deadline, v, r, s);
+
+		assertEq(morpherToken.balanceOf(owner.addr), 0);
+		assertEq(morpherStaking.totalShares(), resultingPoolShares);
+		(uint numPoolShares, uint lockedUntil) = morpherStaking.poolShares(owner.addr);
+		assertEq(numPoolShares, resultingPoolShares);
+		assertEq(lockedUntil, expectedLockedUntil);
+	}
+
+	function testUnstakeWithPermit() public {
+		vm.warp(1617094819);
+		Account memory owner = makeAccount("owner");
+		uint256 stakeAmount = 300000 * 1e18;
+
+		// First stake some tokens
+		morpherToken.mint(owner.addr, stakeAmount);
+		vm.prank(owner.addr);
+		morpherToken.approve(address(morpherStaking), stakeAmount);
+		vm.prank(owner.addr);
+		morpherStaking.stake(stakeAmount);
+
+		uint256 resultingPoolShares = stakeAmount / morpherStaking.poolShareValue();
+
+		// Warp past lockup period
+		vm.warp(block.timestamp + morpherStaking.lockupPeriod());
+
+		// Prepare unstake permit
+		uint nonce = morpherStaking.nonces(owner.addr);
+		uint deadline = block.timestamp + 100;
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				morpherStaking._UNSTAKE_TYPEHASH(),
+				resultingPoolShares,
+				owner.addr,
+				nonce,
+				deadline
+			)
+		);
+		bytes32 domainSeparator = keccak256(
+			abi.encode(
+				morpherStaking._TYPE_HASH(),
+				morpherStaking._HASHED_NAME(),
+				morpherStaking._HASHED_VERSION(),
+				block.chainid,
+				address(morpherStaking)
+			)
+		);
+		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		morpherStaking.updatePoolShareValue();
+		uint256 expectedAmount = morpherStaking.poolShareValue() * resultingPoolShares;
+
+		vm.expectEmit(true, true, true, true);
+		emit Unstaked(owner.addr, expectedAmount, resultingPoolShares);
+		morpherStaking.unstakeWithPermit(resultingPoolShares, owner.addr, deadline, v, r, s);
+
+		assertEq(morpherToken.balanceOf(owner.addr), expectedAmount);
+		assertEq(morpherStaking.totalShares(), 0);
+		(uint numPoolShares, ) = morpherStaking.poolShares(owner.addr);
+		assertEq(numPoolShares, 0);
+	}
+
 	function testUnstakeSuccess() public {
 		vm.warp(1617094819);
 
