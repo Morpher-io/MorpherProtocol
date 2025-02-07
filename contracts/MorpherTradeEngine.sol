@@ -1125,7 +1125,7 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	// ----------------------------------------------------------------------------
 	function setPositionInState(bytes32 _orderId) private {
 		require(
-			MorpherToken(morpherState.morpherTokenAddress()).balanceOf(orders[_orderId].userId) +
+			MorpherToken(morpherState.morpherTokenAddress()).getTradeableBalanceOf(orders[_orderId].userId) +
 				(orders[_orderId].modifyPosition.balanceUp) >=
 				orders[_orderId].modifyPosition.balanceDown,
 			"MorpherTradeEngine: insufficient funds."

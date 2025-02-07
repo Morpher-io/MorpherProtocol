@@ -255,7 +255,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		// Check if transfer would leave enough tokens to cover locked rewards
 		if (from != address(0)) { // Skip check for minting
 			require(
-				balanceOf(from) - amount >= _lockedRewards[from],
+				amount <= balanceOf(from),
 				"MorpherToken: transfer amount exceeds unlocked balance"
 			);
 		}
