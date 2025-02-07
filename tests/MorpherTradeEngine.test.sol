@@ -514,6 +514,75 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		assertEq(positionHash, expectedPositionHash);
 	}
 
+	function testProcessSimpleBuyOrderWithLockedRewards() public {
+		uint256 marketPrice = 50000 * PRECISION;
+		uint256 marketSpread = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		address user = address(0xff01);
+		
+		// Mint tokens and lock them as rewards
+		morpherToken.mint(user, 1001 * 10 ** 18);
+		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), address(this));
+		morpherToken.lockRewards(user, 1001 * 10 ** 18);
+
+		// Verify initial state
+		assertEq(morpherToken.balanceOf(user), 0); // Available balance should be 0
+		assertEq(morpherToken.getTradeableBalanceOf(user), 1001 * 10 ** 18); // But tradeable balance should be full amount
+		assertEq(morpherToken.getLockedRewards(user), 1001 * 10 ** 18);
+
+		vm.warp(SECOND_RATE_TS);
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderId = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			1001 * 10 ** 18,
+			true,
+			orderLeverage
+		);
+
+		vm.warp(SECOND_RATE_TS + 2);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderId, marketPrice, marketSpread, 0, SECOND_RATE_TS * 1000 + 1000);
+
+		(
+			uint256 lastUpdated,
+			uint256 longShares,
+			uint256 shortShares,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			uint256 liquidationPrice,
+			bytes32 positionHash
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		bytes32 expectedPositionHash = keccak256(
+			abi.encodePacked(
+				user,
+				keccak256("CRYPTO_BTC"),
+				uint(SECOND_RATE_TS * 1000 + 1000),
+				uint(2 * 10 ** 8),
+				uint(0),
+				uint(50000 * PRECISION),
+				uint(10 * PRECISION),
+				uint(5 * PRECISION),
+				uint(4001200000000)
+			)
+		);
+		
+		// Position should be opened successfully despite tokens being locked
+		assertEq(lastUpdated, SECOND_RATE_TS * 1000 + 1000);
+		assertEq(longShares, 2 * 10 ** 8);
+		assertEq(shortShares, 0);
+		assertEq(meanEntryPrice, uint(50000 * PRECISION));
+		assertEq(meanEntrySpread, uint(10 * PRECISION));
+		assertEq(meanEntryLeverage, uint(5 * PRECISION));
+		assertEq(liquidationPrice, 4001200000000);
+		assertEq(positionHash, expectedPositionHash);
+	}
+
 	function testProcessSimpleSellOrder() public {
 		uint256 marketPrice = 50000 * PRECISION;
 		uint256 marketSpread = 10 * PRECISION;
