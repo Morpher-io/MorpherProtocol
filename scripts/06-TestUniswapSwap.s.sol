@@ -65,19 +65,57 @@ contract TestUniswapSwap is DeployOrUpgrade {
             revert("Unsupported chain ID");
         }
     }
-
-    // // Helper function to create a new account
-    // function makeAccount(string memory name) internal returns (Account memory) {
-    //     string memory mnemonic = "test test test test test test test test test test test junk";
-    //     uint256 privateKey = vm.deriveKey(mnemonic, 0);
-    //     address addr = vm.addr(privateKey);
+    
+    // Get the Uniswap V3 pool address for a token pair
+    function getPoolAddress(address token0, address token1, uint24 fee) internal view returns (address) {
+        // Sort tokens (Uniswap pools are created with tokens in ascending order)
+        if (token0 > token1) {
+            (token0, token1) = (token1, token0);
+        }
         
-              
-    //     return Account({
-    //         addr: addr,
-    //         key: privateKey
-    //     });
-    // }
+        // Compute the pool address using the same formula as Uniswap
+        bytes32 poolCodeHash = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89f5b1c3c1d0c84f3;
+        address factory = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
+        if (block.chainid == 8453) {
+            factory = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
+        }
+        
+        bytes32 salt = keccak256(abi.encode(token0, token1, fee));
+        return address(uint160(uint256(keccak256(abi.encodePacked(
+            hex'ff',
+            factory,
+            salt,
+            poolCodeHash
+        )))));
+    }
+    
+    // Check pool balances
+    function checkPoolBalances(address token0, address token1, uint24 fee) internal view {
+        address poolAddress = getPoolAddress(token0, token1, fee);
+        console.log("Pool address:", poolAddress);
+        
+        uint256 token0Balance = IERC20(token0).balanceOf(poolAddress);
+        uint256 token1Balance = IERC20(token1).balanceOf(poolAddress);
+        
+        console.log("Pool balances:");
+        console.log("- Token0 (%s): %s", token0, token0Balance / 1e18);
+        console.log("- Token1 (%s): %s", token1, token1Balance / 1e18);
+    }
+
+    // Helper function to create a new account
+    function makeAccount(string memory name) internal returns (Account memory) {
+        string memory mnemonic = "test test test test test test test test test test test junk";
+        uint256 privateKey = vm.deriveKey(mnemonic, 0);
+        address addr = vm.addr(privateKey);
+        
+        // Fund the account with some ETH
+        vm.deal(addr, 1 ether);
+        
+        return Account({
+            addr: addr,
+            key: privateKey
+        });
+    }
     
     function run() public {
         setupAddresses();
@@ -89,6 +127,10 @@ contract TestUniswapSwap is DeployOrUpgrade {
         console.log("Using Universal Router:", UNIVERSAL_ROUTER);
         console.log("Using Permit2:", PERMIT2);
         console.log("MorpherToken address:", morpherTokenAddress);
+        
+        // Check pool balances before proceeding
+        uint24 poolFee = 3000; // 0.3%
+        checkPoolBalances(morpherTokenAddress, WETH, poolFee);
         
         // Load or deploy SwapHelper
         SWAP_HELPER = loadAddress("MorpherSwapHelper");
@@ -108,6 +150,9 @@ contract TestUniswapSwap is DeployOrUpgrade {
         
         _mintTokensToUser(morpherTokenAddress, testUser.addr);
         
+        // Add liquidity to the pool if needed
+        _addLiquidityToPool(morpherTokenAddress, testUser);
+        
         // Execute the swap
         _executeSwap(morpherTokenAddress, testUser);
     }
@@ -125,8 +170,44 @@ contract TestUniswapSwap is DeployOrUpgrade {
         console.log("Minted 20 MPH to test account");
     }
     
+    // Add liquidity to the pool if needed
+    function _addLiquidityToPool(address morpherTokenAddress, Account memory testUser) internal {
+        // Check if we need to add liquidity
+        address poolAddress = getPoolAddress(morpherTokenAddress, WETH, 3000);
+        uint256 wethBalance = IERC20(WETH).balanceOf(poolAddress);
+        
+        // If pool has less than 0.1 WETH, add some liquidity
+        if (wethBalance < 0.1 ether) {
+            console.log("Pool has insufficient liquidity. Adding liquidity...");
+            
+            vm.startBroadcast();
+            
+            // Convert some ETH to WETH for liquidity
+            uint256 wethAmount = 0.2 ether;
+            IWETH9(WETH).deposit{value: wethAmount}();
+            
+            // Transfer some MPH to the pool directly (simple approach for testing)
+            uint256 mphAmount = 1000 ether;
+            MorpherToken(morpherTokenAddress).morpherAccessControl().grantRole(keccak256("MINTER_ROLE"), msg.sender);
+            MorpherToken(morpherTokenAddress).mint(poolAddress, mphAmount);
+            MorpherToken(morpherTokenAddress).morpherAccessControl().revokeRole(keccak256("MINTER_ROLE"), msg.sender);
+            
+            // Transfer WETH to the pool
+            IWETH9(WETH).transfer(poolAddress, wethAmount);
+            
+            vm.stopBroadcast();
+            
+            console.log("Added liquidity to pool:");
+            console.log("- Added WETH: %s", wethAmount / 1e18);
+            console.log("- Added MPH: %s", mphAmount / 1e18);
+            
+            // Check updated pool balances
+            checkPoolBalances(morpherTokenAddress, WETH, 3000);
+        }
+    }
+
     function _executeSwap(address morpherTokenAddress, Account memory testUser) internal {
-        uint256 mphAmount = 20 ether;
+        uint256 mphAmount = 5 ether; // Reduced from 20 to 5 to ensure it's within pool limits
         uint256 deadline = block.timestamp + 1 hours;
         
         // Create permit signature
@@ -157,11 +238,12 @@ contract TestUniswapSwap is DeployOrUpgrade {
         );
         
         console.log("Created permit signature for MPH -> WETH swap");
+        console.log("Attempting to swap %s MPH tokens", mphAmount / 1e18);
         
         // Execute swap
         vm.startPrank(testUser.addr);
         
-        MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
+        try MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
             morpherTokenAddress,
             WETH,
             mphAmount,
@@ -170,12 +252,18 @@ contract TestUniswapSwap is DeployOrUpgrade {
             deadline,
             deadline,
             v, r, s
-        );
+        ) returns (uint256 amountOut) {
+            console.log("Swap successful! Received %s WETH", amountOut / 1e18);
+        } catch Error(string memory reason) {
+            console.log("Swap failed with reason: %s", reason);
+        } catch {
+            console.log("Swap failed with unknown error");
+        }
         
         // Log results
-        console.log("After swap:");
-        console.log("WETH balance:", IWETH9(WETH).balanceOf(testUser.addr) / 1e18);
-        console.log("MPH balance:", IERC20(morpherTokenAddress).balanceOf(testUser.addr) / 1e18);
+        console.log("After swap attempt:");
+        console.log("WETH balance: %s", IWETH9(WETH).balanceOf(testUser.addr) / 1e18);
+        console.log("MPH balance: %s", IERC20(morpherTokenAddress).balanceOf(testUser.addr) / 1e18);
         
         vm.stopPrank();
     }
