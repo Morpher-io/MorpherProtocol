@@ -7,6 +7,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
+import {MorpherToken} from "../contracts/MorpherToken.sol";
 
 // Uniswap interfaces
 interface IUniswapV3Factory {
@@ -50,7 +51,6 @@ interface IWETH9 {
     function approve(address guy, uint wad) external returns (bool);
 }
 
-import {MorpherToken} from "../contracts/MorpherToken.sol";
 
 contract CreateUniswapPool is DeployOrUpgrade {
     using stdJson for string;
