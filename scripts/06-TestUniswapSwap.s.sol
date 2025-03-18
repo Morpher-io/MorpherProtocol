@@ -13,6 +13,7 @@ import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {Commands} from "../lib/universal-router/contracts/libraries/Commands.sol";
 import {IUniversalRouter} from "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 import {IPermit2} from "../lib/permit2/src/interfaces/IPermit2.sol";
+import {MorpherSwapHelper} from "./MorpherSwapHelper.sol";
 
 // Uniswap V3 imports
 import {IV3SwapRouter} from "../lib/universal-router/contracts/interfaces/external/IV3SwapRouter.sol";
@@ -30,6 +31,7 @@ contract TestUniswapSwap is DeployOrUpgrade {
     address public UNIVERSAL_ROUTER;
     address public PERMIT2;
     address public WETH;
+    address public SWAP_HELPER;
 
     // Set up addresses based on the chain we're deploying to
     function setupAddresses() internal {
@@ -77,37 +79,54 @@ contract TestUniswapSwap is DeployOrUpgrade {
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
         console.log("WETH balance:", wethBalance);
         
-        // 3. Approve WETH to Permit2
-        IWETH9(WETH).approve(PERMIT2, swapAmount);
-        console.log("Approved WETH to Permit2");
-        
-        // 4. Approve Permit2 to Universal Router
-        IPermit2(PERMIT2).approve(WETH, UNIVERSAL_ROUTER, uint160(swapAmount), uint48(block.timestamp + 1 hours));
-        console.log("Approved Permit2 to Universal Router");
+        // Load SwapHelper address
+        SWAP_HELPER = loadAddress("MorpherSwapHelper");
+        if (SWAP_HELPER == address(0)) {
+            // If not deployed yet, deploy it
+            MorpherSwapHelper swapHelper = new MorpherSwapHelper(UNIVERSAL_ROUTER, PERMIT2);
+            SWAP_HELPER = address(swapHelper);
+            saveAddress("MorpherSwapHelper", SWAP_HELPER);
+            console.log("Deployed new MorpherSwapHelper at:", SWAP_HELPER);
+        } else {
+            console.log("Using existing MorpherSwapHelper at:", SWAP_HELPER);
+        }
 
-        // 5. Prepare the swap command
-        bytes memory commands = abi.encodePacked(uint8(Commands.V3_SWAP_EXACT_IN));
-        
-        // 6. Prepare the swap inputs
-        bytes[] memory inputs = new bytes[](1);
+        // 3. Approve WETH to SwapHelper
+        IWETH9(WETH).approve(SWAP_HELPER, swapAmount);
+        console.log("Approved WETH to SwapHelper");
         
         // Encode the path for the swap (WETH -> MPH)
-        // The path is encoded as a sequence of (tokenIn, fee, tokenOut)
         uint24 poolFee = 3000; // 0.3%
         bytes memory path = abi.encodePacked(WETH, poolFee, morpherTokenAddress);
         
-        // Encode the parameters for the V3_SWAP_EXACT_IN command
-        inputs[0] = abi.encode(
-            msg.sender,                  // recipient
-            swapAmount,                  // amountIn
-            0,                           // amountOutMinimum (0 for simplicity, but in production use a real value)
-            path,                        // path
-            true                         // payerIsUser - true means the tokens come from the caller via Permit2
-        );
+        // For testing purposes, we'll use a mock permit signature (all zeros)
+        // In a real scenario, this would be a valid signature
+        uint8 v = 0;
+        bytes32 r = bytes32(0);
+        bytes32 s = bytes32(0);
         
-        // 7. Execute the swap
+        // Execute the swap through the helper
+        // In a real scenario, we would use the permit signature
         uint256 deadline = block.timestamp + 1 hours;
-        IUniversalRouter(UNIVERSAL_ROUTER).execute(commands, inputs, deadline);
+        
+        // For testing, we'll directly approve the tokens instead of using permit
+        IWETH9(WETH).approve(SWAP_HELPER, swapAmount);
+        
+        // Transfer tokens to the helper
+        // Note: In production, this would be handled by the helper using the permit
+        IWETH9(WETH).transfer(SWAP_HELPER, swapAmount);
+        
+        // Execute the swap through the helper
+        MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
+            WETH,                       // inputToken
+            morpherTokenAddress,        // outputToken
+            swapAmount,                 // amountIn
+            0,                          // amountOutMin
+            path,                       // path
+            deadline,                   // deadline
+            deadline,                   // permitDeadline
+            v, r, s                     // signature components
+        );
         
         // 8. Check MPH balance after swap
         uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);

@@ -76,6 +76,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	// Universal Router addresses by chain
 	address public constant UNIVERSAL_ROUTER_BASE = 0x6ff5693b99212da76ad316178a184ab56d299b43;
 	address public constant UNIVERSAL_ROUTER_BASE_SEPOLIA = 0x492e6456d9528771018deb9e87ef7750ef184104;
+	
+	// MorpherSwapHelper addresses by chain
+	address public morpherSwapHelperAddress;
 
 	// solhint-disable-next-line var-name-mixedcase
 	bytes32 public constant _PERMIT_TYPEHASH =
@@ -708,6 +711,22 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			// Default to the SwapRouter for other chains
 			return UNISWAP_ROUTER;
 		}
+	}
+	
+	/**
+	 * @dev Set the MorpherSwapHelper address
+	 * @param _helperAddress Address of the MorpherSwapHelper contract
+	 */
+	function setMorpherSwapHelperAddress(address _helperAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+		morpherSwapHelperAddress = _helperAddress;
+	}
+	
+	/**
+	 * @dev Get the MorpherSwapHelper address
+	 * @return Address of the MorpherSwapHelper contract
+	 */
+	function getMorpherSwapHelperAddress() public view returns (address) {
+		return morpherSwapHelperAddress;
 	}
 
 	/**
