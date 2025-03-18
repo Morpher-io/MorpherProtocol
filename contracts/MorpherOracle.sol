@@ -19,6 +19,7 @@ import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/Sa
 
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
+import "@uniswap/universal-router/contracts/interfaces/IUniversalRouter.sol";
 
 // ----------------------------------------------------------------------------------
 // Morpher Oracle contract v 2.0
@@ -69,7 +70,12 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	bytes32 public constant _TYPE_HASH =
 		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
+	// SwapRouter address - used for direct swaps
 	address public constant UNISWAP_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+	
+	// Universal Router addresses by chain
+	address public constant UNIVERSAL_ROUTER_BASE = 0x6ff5693b99212da76ad316178a184ab56d299b43;
+	address public constant UNIVERSAL_ROUTER_BASE_SEPOLIA = 0x492e6456d9528771018deb9e87ef7750ef184104;
 
 	// solhint-disable-next-line var-name-mixedcase
 	bytes32 public constant _PERMIT_TYPEHASH =
@@ -688,6 +694,20 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	 */
 	function _EIP712VersionHash() internal view virtual returns (bytes32) {
 		return _HASHED_VERSION;
+	}
+	
+	/**
+	 * @dev Returns the appropriate Universal Router address based on the current chain
+	 */
+	function getUniversalRouterAddress() public view returns (address) {
+		if (block.chainid == 8453) {
+			return UNIVERSAL_ROUTER_BASE;
+		} else if (block.chainid == 84532) {
+			return UNIVERSAL_ROUTER_BASE_SEPOLIA;
+		} else {
+			// Default to the SwapRouter for other chains
+			return UNISWAP_ROUTER;
+		}
 	}
 
 	/**
