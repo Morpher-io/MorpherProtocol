@@ -6,6 +6,7 @@ import {console} from "forge-std/console.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
 import {MorpherToken} from "../contracts/MorpherToken.sol";
 
@@ -13,15 +14,23 @@ import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {Commands} from "../lib/universal-router/contracts/libraries/Commands.sol";
 import {IUniversalRouter} from "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 import {IPermit2} from "../lib/permit2/src/interfaces/IPermit2.sol";
-import {MorpherSwapHelper} from "./MorpherSwapHelper.sol";
+import {MorpherSwapHelper} from "../contracts/MorpherSwapHelper.sol";
 
 // Uniswap V3 imports
 import {IV3SwapRouter} from "../lib/universal-router/contracts/interfaces/external/IV3SwapRouter.sol";
+import {ECDSAUpgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 
 interface IWETH9 {
     function deposit() external payable;
     function approve(address guy, uint wad) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
+    function transfer(address dst, uint wad) external returns (bool);
+}
+
+// Helper struct for account management
+struct Account {
+    address addr;
+    uint256 key;
 }
 
 contract TestUniswapSwap is DeployOrUpgrade {
@@ -32,6 +41,12 @@ contract TestUniswapSwap is DeployOrUpgrade {
     address public PERMIT2;
     address public WETH;
     address public SWAP_HELPER;
+    
+    // EIP-712 constants for permit
+    bytes32 private constant _TYPE_HASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 private constant _PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     // Set up addresses based on the chain we're deploying to
     function setupAddresses() internal {
@@ -53,85 +68,139 @@ contract TestUniswapSwap is DeployOrUpgrade {
         }
     }
 
+    // Helper function to create a new account
+    function makeAccount(string memory name) internal returns (Account memory) {
+        string memory mnemonic = "test test test test test test test test test test test junk";
+        uint256 privateKey = vm.deriveKey(mnemonic, 0);
+        address addr = vm.addr(privateKey);
+        
+        // Fund the account with some ETH
+        vm.deal(addr, 1 ether);
+        
+        return Account({
+            addr: addr,
+            key: privateKey
+        });
+    }
+    
     function run() public {
         // Set up the correct addresses based on the chain
         setupAddresses();
-        
-        vm.startBroadcast();
-
-        console.log("Testing swap on chain ID:", uint256(block.chainid));
-        console.log("Using Universal Router:", UNIVERSAL_ROUTER);
-        console.log("Using Permit2:", PERMIT2);
         
         // Load MorpherToken address
         address morpherTokenAddress = loadAddress("MorpherToken");
         require(morpherTokenAddress != address(0), "MorpherToken must be deployed first");
         
+        console.log("Testing swap on chain ID:", uint256(block.chainid));
+        console.log("Using Universal Router:", UNIVERSAL_ROUTER);
+        console.log("Using Permit2:", PERMIT2);
         console.log("MorpherToken address:", morpherTokenAddress);
         console.log("WETH address:", WETH);
-
-        // Prepare for swap
-        // 1. Convert ETH to WETH
-        uint256 swapAmount = 0.005 ether;
-        IWETH9(WETH).deposit{value: swapAmount}();
         
-        // 2. Check WETH balance
-        uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
-        console.log("WETH balance:", wethBalance);
-        
-        // Load SwapHelper address
+        // Load or deploy SwapHelper
         SWAP_HELPER = loadAddress("MorpherSwapHelper");
         if (SWAP_HELPER == address(0)) {
-            // If not deployed yet, deploy it
+            vm.startBroadcast();
             MorpherSwapHelper swapHelper = new MorpherSwapHelper(UNIVERSAL_ROUTER, PERMIT2);
             SWAP_HELPER = address(swapHelper);
             saveAddress("MorpherSwapHelper", SWAP_HELPER);
+            vm.stopBroadcast();
             console.log("Deployed new MorpherSwapHelper at:", SWAP_HELPER);
         } else {
             console.log("Using existing MorpherSwapHelper at:", SWAP_HELPER);
         }
-
-        // 3. Approve WETH to SwapHelper
-        IWETH9(WETH).approve(SWAP_HELPER, swapAmount);
-        console.log("Approved WETH to SwapHelper");
         
-        // Encode the path for the swap (WETH -> MPH)
-        uint24 poolFee = 3000; // 0.3%
-        bytes memory path = abi.encodePacked(WETH, poolFee, morpherTokenAddress);
+        // Create a test account
+        Account memory testUser = makeAccount("testUser");
+        console.log("Created test account:", testUser.addr);
         
-        // For testing purposes, we'll use a mock permit signature (all zeros)
-        // In a real scenario, this would be a valid signature
-        uint8 v = 0;
-        bytes32 r = bytes32(0);
-        bytes32 s = bytes32(0);
+        // Mint some MPH tokens to the test account
+        vm.startBroadcast();
+        // Get admin role to mint tokens
+        bytes32 MINTER_ROLE = keccak256("MINTER_ROLE");
+        address accessControlAddress = loadAddress("MorpherAccessControl");
+        require(accessControlAddress != address(0), "MorpherAccessControl must be deployed");
         
-        // Execute the swap through the helper
-        // In a real scenario, we would use the permit signature
+        // Grant minter role to the deployer
+        MorpherToken(morpherTokenAddress).morpherAccessControl().grantRole(MINTER_ROLE, msg.sender);
+        
+        // Mint 20 MPH to the test user
+        uint256 mphAmount = 20 ether; // 20 MPH tokens
+        MorpherToken(morpherTokenAddress).mint(testUser.addr, mphAmount);
+        
+        // Revoke minter role
+        MorpherToken(morpherTokenAddress).morpherAccessControl().revokeRole(MINTER_ROLE, msg.sender);
+        vm.stopBroadcast();
+        
+        console.log("Minted", mphAmount / 1e18, "MPH to test account");
+        
+        // Now we'll perform the swap using the test account with a permit signature
+        
+        // 1. Create the permit signature
+        uint256 nonce = MorpherToken(morpherTokenAddress).nonces(testUser.addr);
         uint256 deadline = block.timestamp + 1 hours;
         
-        // For testing, we'll directly approve the tokens instead of using permit
-        IWETH9(WETH).approve(SWAP_HELPER, swapAmount);
+        // Create the permit signature
+        bytes32 structHash = keccak256(
+            abi.encode(
+                _PERMIT_TYPEHASH,
+                testUser.addr,
+                SWAP_HELPER,
+                mphAmount,
+                nonce,
+                deadline
+            )
+        );
         
-        // Transfer tokens to the helper
-        // Note: In production, this would be handled by the helper using the permit
-        IWETH9(WETH).transfer(SWAP_HELPER, swapAmount);
+        // Get domain separator for the token
+        bytes32 HASHED_NAME = keccak256("MorpherToken");
+        bytes32 HASHED_VERSION = keccak256("1");
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                _TYPE_HASH,
+                HASHED_NAME,
+                HASHED_VERSION,
+                block.chainid,
+                morpherTokenAddress
+            )
+        );
         
-        // Execute the swap through the helper
+        // Create the digest that will be signed
+        bytes32 digest = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+        
+        // Sign the digest with the test user's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(testUser.key, digest);
+        
+        console.log("Created permit signature for MPH -> WETH swap");
+        
+        // 2. Prepare the swap parameters
+        uint24 poolFee = 3000; // 0.3%
+        bytes memory path = abi.encodePacked(morpherTokenAddress, poolFee, WETH);
+        uint256 minAmountOut = 0; // In production, use a real minimum amount
+        
+        // 3. Execute the swap as the test user
+        vm.startPrank(testUser.addr);
+        
+        // Execute the swap through the helper with the permit signature
         MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
-            WETH,                       // inputToken
-            morpherTokenAddress,        // outputToken
-            swapAmount,                 // amountIn
-            0,                          // amountOutMin
+            morpherTokenAddress,        // inputToken
+            WETH,                       // outputToken
+            mphAmount,                  // amountIn
+            minAmountOut,               // amountOutMin
             path,                       // path
             deadline,                   // deadline
             deadline,                   // permitDeadline
             v, r, s                     // signature components
         );
         
-        // 8. Check MPH balance after swap
-        uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
-        console.log("MPH balance after swap:", mphBalance);
+        // Check balances after swap
+        uint256 wethBalance = IWETH9(WETH).balanceOf(testUser.addr);
+        uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(testUser.addr);
         
-        vm.stopBroadcast();
+        console.log("After swap:");
+        console.log("WETH balance:", wethBalance / 1e18);
+        console.log("MPH balance:", mphBalance / 1e18);
+        
+        vm.stopPrank();
     }
 }
