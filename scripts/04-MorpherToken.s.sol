@@ -63,6 +63,10 @@ contract DeployMorpherToken is DeployOrUpgrade {
             
             uint256 _mainChainMint = 425_000_000 ether;
             tokenContract.mint(treasuryAddress, _mainChainMint);
+            
+            // Mint additional tokens to the deployer for creating the Uniswap pool
+            uint256 poolTokens = 5000 ether; // 5000 MPH for the Uniswap pool
+            tokenContract.mint(msg.sender, poolTokens);
 
             // Configure State with token address
             if (stateAddress != address(0)) {
