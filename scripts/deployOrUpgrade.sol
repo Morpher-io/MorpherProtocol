@@ -65,7 +65,7 @@ abstract contract DeployOrUpgrade is Script {
 
     function saveAddress(string memory key, address value) internal {
         string memory path = getAddressesPath();
-         string memory jsonObj = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "proxyAdmin": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherUserBlocking": "0x0"}';
+         string memory jsonObj = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "proxyAdmin": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0"}';
 
         if (!vm.isFile(path)) {
             vm.writeFile(path, jsonObj);
@@ -89,7 +89,7 @@ abstract contract DeployOrUpgrade is Script {
 
     function saveAddresses(Addresses memory addrs) internal {
         string memory path = getAddressesPath();
-        string memory jsonObj = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "proxyAdmin": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherUserBlocking": "0x0"}';
+        string memory jsonObj = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "proxyAdmin": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0"}';
 
         if (!vm.isFile(path)) {
             vm.writeFile(path, jsonObj);
@@ -108,6 +108,7 @@ abstract contract DeployOrUpgrade is Script {
         vm.writeJson(vm.toString(addrs.staking), path, ".MorpherStaking");
         vm.writeJson(vm.toString(addrs.token), path, ".MorpherToken");
         vm.writeJson(vm.toString(addrs.tradeEngine), path, ".MorpherTradeEngine");
+        vm.writeJson(vm.toString(addrs.tradeEngine), path, ".MorpherSwapHelper");
         vm.writeJson(vm.toString(addrs.userBlocking), path, ".MorpherUserBlocking");
     }
 

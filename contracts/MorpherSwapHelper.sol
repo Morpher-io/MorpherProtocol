@@ -1,15 +1,15 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import "../lib/openzeppelin-contracts-5/contracts/token/ERC20/IERC20.sol";
+import "../lib/openzeppelin-contracts-5/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import "../lib/openzeppelin-contracts-5/contracts/access/Ownable.sol";
+import "../lib/openzeppelin-contracts-5/contracts/utils/ReentrancyGuard.sol";
 
 // Universal Router imports
 import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 import "../lib/universal-router/contracts/libraries/Commands.sol";
-import "../lib/permit2/src/interfaces/IPermit2.sol";
+import "../lib/universal-router/permit2/src/interfaces/IAllowanceTransfer.sol";
 
 /**
  * @title MorpherSwapHelper
@@ -77,7 +77,7 @@ contract MorpherSwapHelper is Ownable, ReentrancyGuard {
         IERC20(inputToken).approve(permit2, amountIn);
         
         // 4. Approve Permit2 to Universal Router
-        IPermit2(permit2).approve(
+        IAllowanceTransfer(permit2).approve(
             inputToken,
             universalRouter,
             uint160(amountIn),
