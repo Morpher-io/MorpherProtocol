@@ -80,25 +80,21 @@ contract TestUniswapSwap is DeployOrUpgrade {
     // }
     
     function run() public {
-        // Set up the correct addresses based on the chain
         setupAddresses();
         
-        // Load MorpherToken address
         address morpherTokenAddress = loadAddress("MorpherToken");
         require(morpherTokenAddress != address(0), "MorpherToken must be deployed first");
         
-        console.log("Testing swap on chain ID:", uint256(block.chainid));
+        console.log("Testing swap on chain ID:", block.chainid);
         console.log("Using Universal Router:", UNIVERSAL_ROUTER);
         console.log("Using Permit2:", PERMIT2);
         console.log("MorpherToken address:", morpherTokenAddress);
-        console.log("WETH address:", WETH);
         
         // Load or deploy SwapHelper
         SWAP_HELPER = loadAddress("MorpherSwapHelper");
         if (SWAP_HELPER == address(0)) {
             vm.startBroadcast();
-            MorpherSwapHelper swapHelper = new MorpherSwapHelper(UNIVERSAL_ROUTER, PERMIT2);
-            SWAP_HELPER = address(swapHelper);
+            SWAP_HELPER = address(new MorpherSwapHelper(UNIVERSAL_ROUTER, PERMIT2));
             saveAddress("MorpherSwapHelper", SWAP_HELPER);
             vm.stopBroadcast();
             console.log("Deployed new MorpherSwapHelper at:", SWAP_HELPER);
@@ -106,95 +102,80 @@ contract TestUniswapSwap is DeployOrUpgrade {
             console.log("Using existing MorpherSwapHelper at:", SWAP_HELPER);
         }
         
-        // Create a test account
+        // Create test account and mint tokens
         Account memory testUser = makeAccount("testUser");
         console.log("Created test account:", testUser.addr);
         
-        // Mint some MPH tokens to the test account
+        _mintTokensToUser(morpherTokenAddress, testUser.addr);
+        
+        // Execute the swap
+        _executeSwap(morpherTokenAddress, testUser);
+    }
+    
+    function _mintTokensToUser(address morpherTokenAddress, address userAddr) internal {
         vm.startBroadcast();
-        // Get admin role to mint tokens
         address accessControlAddress = loadAddress("MorpherAccessControl");
         require(accessControlAddress != address(0), "MorpherAccessControl must be deployed");
         
-        // Grant minter role to the deployer
         MorpherToken(morpherTokenAddress).morpherAccessControl().grantRole(keccak256("MINTER_ROLE"), msg.sender);
-        
-        // Mint 20 MPH to the test user
-        uint256 mphAmount = 20 ether; // 20 MPH tokens
-        MorpherToken(morpherTokenAddress).mint(testUser.addr, mphAmount);
-        
-        // Revoke minter role
+        MorpherToken(morpherTokenAddress).mint(userAddr, 20 ether);
         MorpherToken(morpherTokenAddress).morpherAccessControl().revokeRole(keccak256("MINTER_ROLE"), msg.sender);
         vm.stopBroadcast();
         
-        console.log("Minted", mphAmount / 1e18, "MPH to test account");
-        
-        // Now we'll perform the swap using the test account with a permit signature
-        
-        // 1. Create the permit signature
-        uint256 nonce = MorpherToken(morpherTokenAddress).nonces(testUser.addr);
+        console.log("Minted 20 MPH to test account");
+    }
+    
+    function _executeSwap(address morpherTokenAddress, Account memory testUser) internal {
+        uint256 mphAmount = 20 ether;
         uint256 deadline = block.timestamp + 1 hours;
         
-        // Create the permit signature
+        // Create permit signature
         bytes32 structHash = keccak256(
             abi.encode(
                 _PERMIT_TYPEHASH,
                 testUser.addr,
                 SWAP_HELPER,
                 mphAmount,
-                nonce,
+                MorpherToken(morpherTokenAddress).nonces(testUser.addr),
                 deadline
             )
         );
         
-        // Get domain separator for the token
-        bytes32 HASHED_NAME = keccak256("MorpherToken");
-        bytes32 HASHED_VERSION = keccak256("1");
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 _TYPE_HASH,
-                HASHED_NAME,
-                HASHED_VERSION,
+                keccak256("MorpherToken"),
+                keccak256("1"),
                 block.chainid,
                 morpherTokenAddress
             )
         );
         
-        // Create the digest that will be signed
-        bytes32 digest = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
-        
-        // Sign the digest with the test user's private key
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(testUser.key, digest);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            testUser.key, 
+            ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash)
+        );
         
         console.log("Created permit signature for MPH -> WETH swap");
         
-        // 2. Prepare the swap parameters
-        uint24 poolFee = 3000; // 0.3%
-        bytes memory path = abi.encodePacked(morpherTokenAddress, poolFee, WETH);
-        uint256 minAmountOut = 0; // In production, use a real minimum amount
-        
-        // 3. Execute the swap as the test user
+        // Execute swap
         vm.startPrank(testUser.addr);
         
-        // Execute the swap through the helper with the permit signature
         MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
-            morpherTokenAddress,        // inputToken
-            WETH,                       // outputToken
-            mphAmount,                  // amountIn
-            minAmountOut,               // amountOutMin
-            path,                       // path
-            deadline,                   // deadline
-            deadline,                   // permitDeadline
-            v, r, s                     // signature components
+            morpherTokenAddress,
+            WETH,
+            mphAmount,
+            0, // minAmountOut
+            abi.encodePacked(morpherTokenAddress, uint24(3000), WETH),
+            deadline,
+            deadline,
+            v, r, s
         );
         
-        // Check balances after swap
-        uint256 wethBalance = IWETH9(WETH).balanceOf(testUser.addr);
-        uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(testUser.addr);
-        
+        // Log results
         console.log("After swap:");
-        console.log("WETH balance:", wethBalance / 1e18);
-        console.log("MPH balance:", mphBalance / 1e18);
+        console.log("WETH balance:", IWETH9(WETH).balanceOf(testUser.addr) / 1e18);
+        console.log("MPH balance:", IERC20(morpherTokenAddress).balanceOf(testUser.addr) / 1e18);
         
         vm.stopPrank();
     }
