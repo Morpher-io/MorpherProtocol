@@ -151,16 +151,18 @@ contract CreateUniswapPool is DeployOrUpgrade {
             deadline: block.timestamp + 15 minutes
         });
         
-        (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = posManager.mint(params);
+        (uint256 tokenId, uint128 liquidity, uint256 amount0Mint, uint256 amount1Mint) = posManager.mint(params);
         
         console.log("Liquidity position created:");
         console.log("- Token ID:", tokenId);
         console.log("- Liquidity:", uint256(liquidity));
         console.log("- Amount token0 used:", amount0);
+        console.log("- Amount token0 minted:", amount0Mint);
         console.log("- Amount token1 used:", amount1);
+        console.log("- Amount token1 minted:", amount1Mint);
         
         // Save the pool address
-        saveAddress("UniswapV3Pool", poolAddress);
+        // saveAddress("UniswapV3Pool", poolAddress);
         
         vm.stopBroadcast();
     }

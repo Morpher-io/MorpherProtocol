@@ -45,6 +45,8 @@ contract DeployMorpherAirdrop is DeployOrUpgrade {
             ),
             "MorpherAirdrop.sol"
         );
+        saveAddress("MorpherAirdrop", airdrop);
+        console.log("MorpherAirdrop at:", airdrop);
 
         if(existingAirdrop == address(0x0)) {
             address existingToken = loadAddress("MorpherToken");
@@ -63,9 +65,6 @@ contract DeployMorpherAirdrop is DeployOrUpgrade {
             token.transfer(airdropAdmin, 100_000 ether);
 
         }
-        
-        saveAddress("MorpherAirdrop", airdrop);
-        console.log("MorpherAirdrop at:", airdrop);
         
         vm.stopBroadcast();
     }

@@ -11,6 +11,7 @@ import "./MorpherToken.sol";
 // Users have to claim their airdrop actively or Admin initiates transfer.
 // ----------------------------------------------------------------------------------
 
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAirdrop.sol:MorpherAirdrop
 contract MorpherAirdrop is Initializable, OwnableUpgradeable {
 
 
