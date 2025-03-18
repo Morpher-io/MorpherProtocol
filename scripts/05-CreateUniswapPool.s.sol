@@ -55,15 +55,42 @@ interface IWETH9 {
 contract CreateUniswapPool is DeployOrUpgrade {
     using stdJson for string;
 
-    // Uniswap V3 addresses on Base
-    address constant UNISWAP_V3_FACTORY = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
-    address constant NONFUNGIBLE_POSITION_MANAGER = 0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1;
-    address constant WETH = 0x4200000000000000000000000000000000000006;
+    // Uniswap V3 addresses - will be set based on chainId
+    address public UNISWAP_V3_FACTORY;
+    address public NONFUNGIBLE_POSITION_MANAGER;
+    address public WETH;
     uint24 constant FEE = 3000; // 0.3%
 
+    // Set up addresses based on the chain we're deploying to
+    function setupAddresses() internal {
+        uint256 chainId = block.chainid;
+    
+        // WETH is the same on both Base and Base Sepolia
+        WETH = 0x4200000000000000000000000000000000000006;
+    
+        if (chainId == 8453) {
+            // Base Mainnet
+            UNISWAP_V3_FACTORY = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
+            NONFUNGIBLE_POSITION_MANAGER = 0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1;
+        } else if (chainId == 84532) {
+            // Base Sepolia
+            UNISWAP_V3_FACTORY = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
+            NONFUNGIBLE_POSITION_MANAGER = 0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2;
+        } else {
+            revert("Unsupported chain ID");
+        }
+    }
+
     function run() public {
+        // Set up the correct addresses based on the chain
+        setupAddresses();
+        
         vm.startBroadcast();
 
+        console.log("Deploying on chain ID:", block.chainid);
+        console.log("Using Uniswap V3 Factory:", UNISWAP_V3_FACTORY);
+        console.log("Using Nonfungible Position Manager:", NONFUNGIBLE_POSITION_MANAGER);
+        
         // Load MorpherToken address
         address morpherTokenAddress = loadAddress("MorpherToken");
         require(morpherTokenAddress != address(0), "MorpherToken must be deployed first");
