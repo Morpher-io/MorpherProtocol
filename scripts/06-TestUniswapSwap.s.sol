@@ -13,11 +13,9 @@ import {MorpherToken} from "../contracts/MorpherToken.sol";
 // Universal Router imports
 import {Commands} from "../lib/universal-router/contracts/libraries/Commands.sol";
 import {IUniversalRouter} from "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
-import {IPermit2} from "../lib/permit2/src/interfaces/IPermit2.sol";
 import {MorpherSwapHelper} from "../contracts/MorpherSwapHelper.sol";
 
 // Uniswap V3 imports
-import {IV3SwapRouter} from "../lib/universal-router/contracts/interfaces/external/IV3SwapRouter.sol";
 import {ECDSAUpgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 
 interface IWETH9 {
@@ -57,31 +55,29 @@ contract TestUniswapSwap is DeployOrUpgrade {
     
         if (chainId == 8453) {
             // Base Mainnet
-            UNIVERSAL_ROUTER = 0x6ff5693b99212da76ad316178a184ab56d299b43;
+            UNIVERSAL_ROUTER = 0x6fF5693b99212Da76ad316178A184AB56D299b43;
             PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
         } else if (chainId == 84532) {
             // Base Sepolia
-            UNIVERSAL_ROUTER = 0x492e6456d9528771018deb9e87ef7750ef184104;
+            UNIVERSAL_ROUTER = 0x492E6456D9528771018DeB9E87ef7750EF184104;
             PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
         } else {
             revert("Unsupported chain ID");
         }
     }
 
-    // Helper function to create a new account
-    function makeAccount(string memory name) internal returns (Account memory) {
-        string memory mnemonic = "test test test test test test test test test test test junk";
-        uint256 privateKey = vm.deriveKey(mnemonic, 0);
-        address addr = vm.addr(privateKey);
+    // // Helper function to create a new account
+    // function makeAccount(string memory name) internal returns (Account memory) {
+    //     string memory mnemonic = "test test test test test test test test test test test junk";
+    //     uint256 privateKey = vm.deriveKey(mnemonic, 0);
+    //     address addr = vm.addr(privateKey);
         
-        // Fund the account with some ETH
-        vm.deal(addr, 1 ether);
-        
-        return Account({
-            addr: addr,
-            key: privateKey
-        });
-    }
+              
+    //     return Account({
+    //         addr: addr,
+    //         key: privateKey
+    //     });
+    // }
     
     function run() public {
         // Set up the correct addresses based on the chain
@@ -117,19 +113,18 @@ contract TestUniswapSwap is DeployOrUpgrade {
         // Mint some MPH tokens to the test account
         vm.startBroadcast();
         // Get admin role to mint tokens
-        bytes32 MINTER_ROLE = keccak256("MINTER_ROLE");
         address accessControlAddress = loadAddress("MorpherAccessControl");
         require(accessControlAddress != address(0), "MorpherAccessControl must be deployed");
         
         // Grant minter role to the deployer
-        MorpherToken(morpherTokenAddress).morpherAccessControl().grantRole(MINTER_ROLE, msg.sender);
+        MorpherToken(morpherTokenAddress).morpherAccessControl().grantRole(keccak256("MINTER_ROLE"), msg.sender);
         
         // Mint 20 MPH to the test user
         uint256 mphAmount = 20 ether; // 20 MPH tokens
         MorpherToken(morpherTokenAddress).mint(testUser.addr, mphAmount);
         
         // Revoke minter role
-        MorpherToken(morpherTokenAddress).morpherAccessControl().revokeRole(MINTER_ROLE, msg.sender);
+        MorpherToken(morpherTokenAddress).morpherAccessControl().revokeRole(keccak256("MINTER_ROLE"), msg.sender);
         vm.stopBroadcast();
         
         console.log("Minted", mphAmount / 1e18, "MPH to test account");
