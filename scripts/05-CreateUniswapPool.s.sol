@@ -87,7 +87,7 @@ contract CreateUniswapPool is DeployOrUpgrade {
         
         vm.startBroadcast();
 
-        console.log("Deploying on chain ID:", block.chainid);
+        console.log("Deploying on chain ID:", uint256(block.chainid));
         console.log("Using Uniswap V3 Factory:", UNISWAP_V3_FACTORY);
         console.log("Using Nonfungible Position Manager:", NONFUNGIBLE_POSITION_MANAGER);
         
