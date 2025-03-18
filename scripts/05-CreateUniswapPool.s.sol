@@ -90,18 +90,20 @@ contract CreateUniswapPool is DeployOrUpgrade {
         uint160 sqrtPriceX96;
         if (pool.token0() == morpherTokenAddress) {
             // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
-            sqrtPriceX96 = 79228162514264337593543; // sqrt(0.00001) * 2^96
+            // sqrt(0.00001) * 2^96
+            sqrtPriceX96 = 79228162514264337593543;
         } else {
             // If MPH is token1, price = MPH/WETH = 100000
-            sqrtPriceX96 = 7922816251426433759354395033; // sqrt(100000) * 2^96
+            // sqrt(100000) * 2^96
+            sqrtPriceX96 = 7922816251426433759354395033;
         }
         
         pool.initialize(sqrtPriceX96);
         console.log("Pool initialized with price");
 
-        // Prepare to add liquidity
-        uint256 ethAmount = 0.05 ether;
-        uint256 mphAmount = 5000 ether; // 5000 MPH tokens (with 18 decimals)
+        // Prepare to add liquidity - use smaller amounts to start
+        uint256 ethAmount = 0.01 ether;
+        uint256 mphAmount = 1000 ether; // 1000 MPH tokens (with 18 decimals)
         
         // Convert ETH to WETH
         IWETH9(WETH).deposit{value: ethAmount}();
@@ -111,44 +113,43 @@ contract CreateUniswapPool is DeployOrUpgrade {
         MorpherToken(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
         
         // Calculate ticks for the position
-        // For a full range position, we can use min and max ticks
-        int24 minTick = -887272;
-        int24 maxTick = 887272;
+        // Use a more reasonable tick range instead of the full range
+        int24 minTick = -46080; // Approximately 1/100 of the current price
+        int24 maxTick = 46080;  // Approximately 100x the current price
         
         // Add liquidity
         INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
         
-        INonfungiblePositionManager.MintParams memory params;
+        // Get the current tokens in the correct order
+        address token0 = pool.token0();
+        address token1 = pool.token1();
         
-        if (pool.token0() == morpherTokenAddress) {
-            params = INonfungiblePositionManager.MintParams({
-                token0: morpherTokenAddress,
-                token1: WETH,
-                fee: FEE,
-                tickLower: minTick,
-                tickUpper: maxTick,
-                amount0Desired: mphAmount,
-                amount1Desired: ethAmount,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: msg.sender,
-                deadline: block.timestamp + 15 minutes
-            });
+        // Determine which amounts go with which token
+        uint256 amount0;
+        uint256 amount1;
+        
+        if (token0 == morpherTokenAddress) {
+            amount0 = mphAmount;
+            amount1 = ethAmount;
         } else {
-            params = INonfungiblePositionManager.MintParams({
-                token0: WETH,
-                token1: morpherTokenAddress,
-                fee: FEE,
-                tickLower: minTick,
-                tickUpper: maxTick,
-                amount0Desired: ethAmount,
-                amount1Desired: mphAmount,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: msg.sender,
-                deadline: block.timestamp + 15 minutes
-            });
+            amount0 = ethAmount;
+            amount1 = mphAmount;
         }
+        
+        // Create the mint parameters
+        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+            token0: token0,
+            token1: token1,
+            fee: FEE,
+            tickLower: minTick,
+            tickUpper: maxTick,
+            amount0Desired: amount0,
+            amount1Desired: amount1,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: msg.sender,
+            deadline: block.timestamp + 15 minutes
+        });
         
         (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = posManager.mint(params);
         
