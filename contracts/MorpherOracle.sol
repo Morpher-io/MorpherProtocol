@@ -19,6 +19,7 @@ import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/Sa
 
 import "../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
+import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
 import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 
 // ----------------------------------------------------------------------------------
@@ -992,6 +993,75 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, position.shortShares, 0, true, 10 ** 8);
 		}
 		return _orderId;
+	}
+
+	/**
+	 * @dev Create an order using native ETH/gas token
+	 * @param createOrderParams The order parameters
+	 * @return orderId The ID of the created order
+	 */
+	function createOrderFromGasToken(
+		CreateOrderStruct memory createOrderParams
+	) public payable whenNotPaused returns (bytes32 orderId) {
+		require(msg.value > 0, "MorpherOracle: Must send ETH to swap");
+		
+		// Calculate gas for callback
+		uint256 ethForSwap = msg.value;
+		if (gasForCallback > 0) {
+			require(
+				msg.value > gasForCallback,
+				"MorpherOracle: Must transfer gas costs for Oracle Callback function."
+			);
+			callBackCollectionAddress.transfer(gasForCallback);
+			ethForSwap = msg.value - gasForCallback;
+		}
+		
+		// Wrap ETH to WETH
+		IWETH9(wMaticAddress).deposit{value: ethForSwap}();
+		
+		// Swap WETH for MPH
+		uint256 mphTokenAmount = swapWETHForMPH(ethForSwap, createOrderParams._openMPHTokenAmount);
+		
+		// Update the order params with the actual MPH amount received
+		createOrderParams._openMPHTokenAmount = mphTokenAmount;
+		
+		// Create the order
+		return createOrder(createOrderParams);
+	}
+
+	/**
+	 * @dev Swap WETH for MPH tokens
+	 * @param wethAmount Amount of WETH to swap
+	 * @param minMphAmount Minimum amount of MPH tokens to receive
+	 * @return amountOut Amount of MPH tokens received
+	 */
+	function swapWETHForMPH(uint256 wethAmount, uint256 minMphAmount) internal returns (uint256 amountOut) {
+		// Approve the router to spend WETH
+		IWETH9(wMaticAddress).approve(uniswapRouter, wethAmount);
+		
+		// Create the swap path
+		bytes memory path = abi.encodePacked(
+			wMaticAddress,
+			poolFee,
+			state.morpherTokenAddress()
+		);
+		
+		// Execute the swap
+		ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
+		ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
+			path: path,
+			recipient: _msgSender(),
+			deadline: block.timestamp,
+			amountIn: wethAmount,
+			amountOutMinimum: minMphAmount
+		});
+		
+		amountOut = swapRouter.exactInput(params);
+		
+		// Reset approvals
+		IWETH9(wMaticAddress).approve(uniswapRouter, 0);
+		
+		return amountOut;
 	}
 
 	/**
