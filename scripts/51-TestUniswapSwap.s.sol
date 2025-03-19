@@ -240,8 +240,8 @@ contract TestUniswapSwap is DeployOrUpgrade {
         
   
         // Switch to the test user's account for the swap
-        vm.stopBroadcast();
-        vm.startBroadcast(testUser.key);
+        // vm.stopBroadcast();
+        // vm.startBroadcast(testUser.key);
         
         try MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
             morpherTokenAddress,
@@ -260,7 +260,7 @@ contract TestUniswapSwap is DeployOrUpgrade {
             console.log("Swap failed with unknown error");
         }
 
-        vm.stopBroadcast();
+        // vm.stopBroadcast();
         
         // Log results
         console.log("After swap attempt:");
