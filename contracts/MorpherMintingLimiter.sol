@@ -84,6 +84,7 @@ contract MorpherMintingLimiter is Initializable {
     function mint(address _user, uint256 _tokenAmount) public onlyTradeEngine {
         uint256 mintingDay = block.timestamp / 1 days;
         if((mintingLimitDaily == 0 || dailyMintedTokens[mintingDay] + (_tokenAmount) <= mintingLimitDaily) && (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser )) {
+            // This will track the minted tokens in the token contract
             MorpherToken(state.morpherTokenAddress()).mint(_user, _tokenAmount);
             dailyMintedTokens[mintingDay] = dailyMintedTokens[mintingDay] + (_tokenAmount);
         } else {
