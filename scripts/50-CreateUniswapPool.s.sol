@@ -92,9 +92,23 @@ contract CreateUniswapPool is DeployOrUpgrade {
         console.log("MorpherToken address:", morpherTokenAddress);
         console.log("WETH address:", WETH);
 
+        // Initialize or get pool
+        address poolAddress = initializeOrGetPool(morpherTokenAddress);
+        
+        // Add liquidity to the pool
+        addLiquidityToPool(poolAddress, morpherTokenAddress);
+        
+        // Save the pool address
+        saveAddress("UniswapV3Pool", poolAddress);
+        
+        vm.stopBroadcast();
+    }
+    
+    // Initialize a new pool or get existing pool
+    function initializeOrGetPool(address morpherTokenAddress) internal returns (address poolAddress) {
         // Check if pool already exists
         IUniswapV3Factory factory = IUniswapV3Factory(UNISWAP_V3_FACTORY);
-        address poolAddress = factory.getPool(morpherTokenAddress, WETH, FEE);
+        poolAddress = factory.getPool(morpherTokenAddress, WETH, FEE);
         
         if (poolAddress == address(0)) {
             // Create a new pool if it doesn't exist
@@ -104,23 +118,16 @@ contract CreateUniswapPool is DeployOrUpgrade {
             // Initialize the pool with the price
             IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
             
-            // Determine token order (Uniswap sorts tokens by address)
-            address token0 = pool.token0();
-            address token1 = pool.token1();
-            
             // Price = 5000 MPH per 0.05 WETH = 100,000 MPH per 1 WETH
             // For Uniswap, we need sqrtPriceX96 = sqrt(price) * 2^96
-            // Where price is token1/token0 in the pool
             uint160 sqrtPriceX96;
             
-            if (token0 == morpherTokenAddress) {
+            if (pool.token0() == morpherTokenAddress) {
                 // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
-                // sqrt(0.00001) * 2^96
                 sqrtPriceX96 = 79228162514264337593543;
                 console.log("MPH is token0, WETH is token1");
             } else {
                 // If MPH is token1, price = MPH/WETH = 100000
-                // sqrt(100000) * 2^96
                 sqrtPriceX96 = 7922816251426433759354395033;
                 console.log("WETH is token0, MPH is token1");
             }
@@ -131,13 +138,16 @@ contract CreateUniswapPool is DeployOrUpgrade {
             console.log("Using existing pool at:", poolAddress);
             
             // Get current pool state
-            IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
-            (uint160 sqrtPriceX96, int24 tick, , , , , ) = pool.slot0();
+            (uint160 sqrtPriceX96, int24 tick, , , , , ) = IUniswapV3Pool(poolAddress).slot0();
             console.log("Current pool tick:", tick);
             console.log("Current sqrtPriceX96:", uint256(sqrtPriceX96));
         }
-
-        // Get the pool instance
+        
+        return poolAddress;
+    }
+    
+    // Add liquidity to the pool
+    function addLiquidityToPool(address poolAddress, address morpherTokenAddress) internal {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
         
         // Get token order
@@ -145,9 +155,6 @@ contract CreateUniswapPool is DeployOrUpgrade {
         address token1 = pool.token1();
         console.log("Pool token0:", token0);
         console.log("Pool token1:", token1);
-        
-        // Check if we need to burn any existing positions
-        INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
         
         // Prepare to add liquidity with the correct ratio
         // We want 5000 MPH = 0.05 WETH (ratio 100,000:1)
@@ -158,39 +165,25 @@ contract CreateUniswapPool is DeployOrUpgrade {
         IWETH9(WETH).deposit{value: ethAmount}();
         
         // Check WETH balance
-        uint256 wethBalance = IWETH9(WETH).balanceOf(address(this));
-        console.log("WETH balance:", wethBalance / 1e18);
+        console.log("WETH balance:", IWETH9(WETH).balanceOf(address(this)) / 1e18);
         
         // Approve tokens for the position manager
         IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
         MorpherToken(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
         
         // Calculate ticks for the position
-        // Use a more reasonable tick range instead of the full range
         int24 minTick = -46080; // Approximately 1/100 of the current price
         int24 maxTick = 46080;  // Approximately 100x the current price
         
-        // Determine which amounts go with which token
-        uint256 amount0;
-        uint256 amount1;
-        
-        if (token0 == morpherTokenAddress) {
-            amount0 = mphAmount;
-            amount1 = ethAmount;
-        } else {
-            amount0 = ethAmount;
-            amount1 = mphAmount;
-        }
-        
-        // Create the mint parameters
+        // Create the mint parameters with inline token amount determination
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: token0,
             token1: token1,
             fee: FEE,
             tickLower: minTick,
             tickUpper: maxTick,
-            amount0Desired: amount0,
-            amount1Desired: amount1,
+            amount0Desired: token0 == morpherTokenAddress ? mphAmount : ethAmount,
+            amount1Desired: token0 == morpherTokenAddress ? ethAmount : mphAmount,
             amount0Min: 0,
             amount1Min: 0,
             recipient: msg.sender,
@@ -198,18 +191,14 @@ contract CreateUniswapPool is DeployOrUpgrade {
         });
         
         // Mint the position
-        (uint256 tokenId, uint128 liquidity, uint256 amount0Mint, uint256 amount1Mint) = posManager.mint(params);
+        (uint256 tokenId, uint128 liquidity, uint256 amount0Mint, uint256 amount1Mint) = 
+            INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(params);
         
         console.log("Liquidity position created:");
         console.log("- Token ID:", tokenId);
         console.log("- Liquidity:", uint256(liquidity));
         console.log("- Amount token0 used:", amount0Mint);
         console.log("- Amount token1 used:", amount1Mint);
-        
-        // Save the pool address
-        saveAddress("UniswapV3Pool", poolAddress);
-        
-        vm.stopBroadcast();
     }
     
     // Helper function to burn a position if needed
@@ -220,34 +209,27 @@ contract CreateUniswapPool is DeployOrUpgrade {
         (,,,,,,,uint128 liquidity,,,,) = posManager.positions(tokenId);
         
         if (liquidity > 0) {
-            INonfungiblePositionManager.DecreaseLiquidityParams memory params = 
+            // Decrease liquidity and collect in one step
+            posManager.decreaseLiquidity(
                 INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: tokenId,
                     liquidity: liquidity,
                     amount0Min: 0,
                     amount1Min: 0,
                     deadline: block.timestamp + 15 minutes
-                });
-                
-            (uint256 amount0, uint256 amount1) = posManager.decreaseLiquidity(params);
-            console.log("Decreased liquidity from position:");
-            console.log("- Amount token0 received:", amount0);
-            console.log("- Amount token1 received:", amount1);
-        }
-        
-        // Then collect all fees and tokens
-        INonfungiblePositionManager.CollectParams memory collectParams = 
-            INonfungiblePositionManager.CollectParams({
-                tokenId: tokenId,
-                recipient: address(this),
-                amount0Max: type(uint128).max,
-                amount1Max: type(uint128).max
-            });
+                })
+            );
             
-        (uint256 collected0, uint256 collected1) = posManager.collect(collectParams);
-        console.log("Collected from position:");
-        console.log("- Amount token0 collected:", collected0);
-        console.log("- Amount token1 collected:", collected1);
+            // Collect all tokens
+            posManager.collect(
+                INonfungiblePositionManager.CollectParams({
+                    tokenId: tokenId,
+                    recipient: address(this),
+                    amount0Max: type(uint128).max,
+                    amount1Max: type(uint128).max
+                })
+            );
+        }
         
         // Finally burn the position
         posManager.burn(tokenId);
