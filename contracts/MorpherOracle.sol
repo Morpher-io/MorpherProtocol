@@ -70,8 +70,6 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	bytes32 public constant _TYPE_HASH =
 		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-	// SwapRouter address - used for direct swaps
-	address public uniswapRouter;
 	
 	
 	// solhint-disable-next-line var-name-mixedcase
@@ -121,6 +119,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	// MorpherSwapHelper addresses by chain
 	address public morpherSwapHelperAddress;
+
+
+	// SwapRouter address - used for direct swaps
+	address public uniswapRouter;
 
 
 	// ----------------------------------------------------------------------------------
