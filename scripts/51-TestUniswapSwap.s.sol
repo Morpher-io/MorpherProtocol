@@ -69,10 +69,10 @@ contract TestUniswapSwap is DeployOrUpgrade {
     // Get the Uniswap V3 pool address for a token pair
     function getPoolAddress(address token0, address token1, uint24 fee) internal view returns (address) {
         // Load the pool address from deployments
-        address poolAddress = loadAddress("UniswapV3Pool");
-        if (poolAddress != address(0)) {
-            return poolAddress;
-        }
+        // address poolAddress = loadAddress("UniswapV3Pool");
+        // if (poolAddress != address(0)) {
+        //     return poolAddress;
+        // }
         
         // If not saved, compute it
         // Sort tokens (Uniswap pools are created with tokens in ascending order)
