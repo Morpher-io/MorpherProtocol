@@ -68,26 +68,32 @@ contract TestUniswapSwap is DeployOrUpgrade {
     
     // Get the Uniswap V3 pool address for a token pair
     function getPoolAddress(address token0, address token1, uint24 fee) internal view returns (address) {
-        return 0x0b105A6321F6274C10b07bEE1126313B34589b4B;
-        // // Sort tokens (Uniswap pools are created with tokens in ascending order)
-        // if (token0 > token1) {
-        //     (token0, token1) = (token1, token0);
-        // }
+        // Load the pool address from deployments
+        address poolAddress = loadAddress("UniswapV3Pool");
+        if (poolAddress != address(0)) {
+            return poolAddress;
+        }
         
-        // // Compute the pool address using the same formula as Uniswap
-        // bytes32 poolCodeHash = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89f5b1c3c1d0c84f3;
-        // address factory = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
-        // if (block.chainid == 8453) {
-        //     factory = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
-        // }
+        // If not saved, compute it
+        // Sort tokens (Uniswap pools are created with tokens in ascending order)
+        if (token0 > token1) {
+            (token0, token1) = (token1, token0);
+        }
         
-        // bytes32 salt = keccak256(abi.encode(token0, token1, fee));
-        // return address(uint160(uint256(keccak256(abi.encodePacked(
-        //     hex'ff',
-        //     factory,
-        //     salt,
-        //     poolCodeHash
-        // )))));
+        // Compute the pool address using the same formula as Uniswap
+        bytes32 poolCodeHash = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89f5b1c3c1d0c84f3;
+        address factory = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
+        if (block.chainid == 8453) {
+            factory = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
+        }
+        
+        bytes32 salt = keccak256(abi.encode(token0, token1, fee));
+        return address(uint160(uint256(keccak256(abi.encodePacked(
+            hex'ff',
+            factory,
+            salt,
+            poolCodeHash
+        )))));
     }
     
     // Check pool balances
@@ -197,10 +203,10 @@ contract TestUniswapSwap is DeployOrUpgrade {
     }
 
     function _executeSwap(address morpherTokenAddress, Account memory testUser) internal {
-
-
         // vm.startBroadcast();
-        uint256 mphAmount = 5 ether; // Reduced from 20 to 5 to ensure it's within pool limits
+        
+        // Use a smaller amount for the swap to ensure it's within pool limits
+        uint256 mphAmount = 1 ether; // Swap 1 MPH token
         uint256 deadline = block.timestamp + 1 hours;
         
         // Create permit signature
