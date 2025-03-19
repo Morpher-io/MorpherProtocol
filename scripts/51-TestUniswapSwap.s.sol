@@ -221,25 +221,28 @@ contract TestUniswapSwap is DeployOrUpgrade {
             )
         );
         
-        bytes32 domainSeparator = keccak256(
-            abi.encode(
-                _TYPE_HASH,
-                keccak256("MorpherToken"),
-                keccak256("1"),
-                block.chainid,
-                morpherTokenAddress
-            )
-        );
+        // Get the domain separator directly from the token contract
+        bytes32 domainSeparator = MorpherToken(morpherTokenAddress).DOMAIN_SEPARATOR();
         
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            testUser.key, 
-            ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash)
-        );
+        bytes32 digest = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+        
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(testUser.key, digest);
         
         console.log("Created permit signature for MPH -> WETH swap");
+        console.log("Signer address: %s", testUser.addr);
+        console.log("Permit details:");
+        console.log("- Token: %s", morpherTokenAddress);
+        console.log("- Spender: %s", SWAP_HELPER);
+        console.log("- Amount: %s", mphAmount / 1e18);
+        console.log("- Deadline: %s", deadline);
+        console.log("- Nonce: %s", MorpherToken(morpherTokenAddress).nonces(testUser.addr));
         console.log("Attempting to swap %s MPH tokens", mphAmount / 1e18);
         
   
+        // Switch to the test user's account for the swap
+        vm.stopBroadcast();
+        vm.startBroadcast(testUser.key);
+        
         try MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
             morpherTokenAddress,
             WETH,
@@ -257,12 +260,11 @@ contract TestUniswapSwap is DeployOrUpgrade {
             console.log("Swap failed with unknown error");
         }
 
-        // vm.stopBroadcast();
+        vm.stopBroadcast();
         
         // Log results
         console.log("After swap attempt:");
         console.log("WETH balance: %s", IWETH9(WETH).balanceOf(testUser.addr) / 1e18);
         console.log("MPH balance: %s", IERC20(morpherTokenAddress).balanceOf(testUser.addr) / 1e18);
-        
     }
 }
