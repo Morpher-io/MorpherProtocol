@@ -76,16 +76,26 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 	function setUp() public override {
 		super.setUp();
 		morpherAccessControl.grantRole(morpherOracle.ADMINISTRATOR_ROLE(), address(this));
+		
+		// Setup mock Uniswap router
+		address mockUniswapRouter = address(0x1234567890123456789012345678901234567890);
 		bytes memory contractCode = type(MockUniswapRouter).runtimeCode;
-		vm.etch(UNISWAP_ROUTER, contractCode);
+		vm.etch(mockUniswapRouter, contractCode);
+		
+		// Create mock tokens
 		WMATIC = new MockERC20("wmatic", "WMATIC");
-		WMATIC.mint(UNISWAP_ROUTER, 100000 ether);
+		WMATIC.mint(mockUniswapRouter, 100000 ether);
 		OTHER_ERC20 = new MockERC20("test", "TEST");
-		OTHER_ERC20.mint(UNISWAP_ROUTER, 100000 ether);
+		OTHER_ERC20.mint(mockUniswapRouter, 100000 ether);
+		
+		// Mint tokens to the mock router
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
-		morpherToken.mint(UNISWAP_ROUTER, 100000 ether);
+		morpherToken.mint(mockUniswapRouter, 100000 ether);
 		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+		
+		// Configure the oracle
 		morpherOracle.setWmaticAddress(address(WMATIC));
+		morpherOracle.setUniswapRouter(mockUniswapRouter);
 		morpherToken.setRestrictTransfers(false);
 	}
 
@@ -409,21 +419,21 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		emit Transfer(owner.addr, address(morpherOracle), 50 ether);
 		// wmatic and mph from oracle to uniswap
 		vm.expectEmit(true, true, true, true);
-		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 50 ether);
+		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 50 ether);
 		vm.expectEmit(true, true, true, true);
-		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 100 ether);
+		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 100 ether);
 		// swap get executed (mocking contract)
 		vm.expectEmit(true, true, true, true);
-		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 0);
+		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 0);
 		vm.expectEmit(true, true, true, true);
-		emit Transfer(address(morpherOracle), UNISWAP_ROUTER, 50 ether); // -> wmatic
+		emit Transfer(address(morpherOracle), morpherOracle.uniswapRouter(), 50 ether); // -> wmatic
 		vm.expectEmit(true, true, true, true);
-		emit Transfer(UNISWAP_ROUTER, owner.addr, 100 ether); // -> mph
+		emit Transfer(morpherOracle.uniswapRouter(), owner.addr, 100 ether); // -> mph
 		// wmatic and mph from oracle to uniswap reset
 		vm.expectEmit(true, true, true, true);
-		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 0);
+		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 0);
 		vm.expectEmit(true, true, true, true);
-		emit Approval(address(morpherOracle), UNISWAP_ROUTER, 0);
+		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 0);
 		vm.expectEmit(true, true, true, true);
 		emit OrderIdRequested(expectedOrderId, owner.addr, keccak256("CRYPTO_BTC"), 0, 100 * 1e18, true, 2 * PRECISION);
 		vm.expectEmit(true, true, true, true);
@@ -452,8 +462,8 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(morpherToken.balanceOf(address(morpherOracle)), 0);
 		assertEq(WMATIC.balanceOf(owner.addr), 0);
 		assertEq(morpherToken.balanceOf(owner.addr), 100 ether);
-		assertEq(WMATIC.balanceOf(UNISWAP_ROUTER), 100050 ether);
-		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
+		assertEq(WMATIC.balanceOf(morpherOracle.uniswapRouter()), 100050 ether);
+		assertEq(morpherToken.balanceOf(morpherOracle.uniswapRouter()), 99900 ether);
 	}
 
 	function testCreateOpenOrderWithTokenWithOtherERC20() public {
@@ -520,9 +530,9 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(WMATIC.balanceOf(owner.addr), 0);
 		assertEq(OTHER_ERC20.balanceOf(owner.addr), 0);
 		assertEq(morpherToken.balanceOf(owner.addr), 100 ether);
-		assertEq(WMATIC.balanceOf(UNISWAP_ROUTER), 100000 ether);
-		assertEq(OTHER_ERC20.balanceOf(UNISWAP_ROUTER), 100050 ether);
-		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
+		assertEq(WMATIC.balanceOf(morpherOracle.uniswapRouter()), 100000 ether);
+		assertEq(OTHER_ERC20.balanceOf(morpherOracle.uniswapRouter()), 100050 ether);
+		assertEq(morpherToken.balanceOf(morpherOracle.uniswapRouter()), 99900 ether);
 	}
 
 	function testCreateOpenOrderWithTokenAndSignature() public {
@@ -610,8 +620,8 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(morpherToken.balanceOf(address(morpherOracle)), 0);
 		assertEq(WMATIC.balanceOf(owner.addr), 0);
 		assertEq(morpherToken.balanceOf(owner.addr), 100 ether);
-		assertEq(WMATIC.balanceOf(UNISWAP_ROUTER), 100050 ether);
-		assertEq(morpherToken.balanceOf(UNISWAP_ROUTER), 99900 ether);
+		assertEq(WMATIC.balanceOf(morpherOracle.uniswapRouter()), 100050 ether);
+		assertEq(morpherToken.balanceOf(morpherOracle.uniswapRouter()), 99900 ether);
 	}
 
 	function testInitiateCancelOrderWithSignature() public {
@@ -1037,6 +1047,48 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		morpherOracle.delistMarket(mId, false);
 	}
 
+	function testCreateOrderFromGasToken() public {
+		address user = address(0xff01);
+		vm.deal(user, 1 ether); // Give the user some ETH
+		
+		bytes32 expectedOrderId = keccak256(
+			abi.encodePacked(
+				user,
+				block.number,
+				keccak256("CRYPTO_BTC"),
+				uint(0),
+				uint(100 * 1e18),
+				true,
+				2 * PRECISION,
+				uint(1)
+			)
+		);
+		
+		vm.prank(user);
+		bytes32 orderId = morpherOracle.createOrderFromGasToken{value: 0.1 ether}(
+			CreateOrderStruct({
+				_marketId: keccak256("CRYPTO_BTC"),
+				_closeSharesAmount: 0,
+				_openMPHTokenAmount: 100 * 1e18,
+				_tradeDirection: true,
+				_orderLeverage: 2 * PRECISION,
+				_onlyIfPriceAbove: 90 * 1e18,
+				_onlyIfPriceBelow: 110 * 1e18,
+				_goodUntil: 999999999999999,
+				_goodFrom: 1
+			})
+		);
+		
+		assertEq(orderId, expectedOrderId);
+		assertEq(morpherOracle.priceAbove(orderId), 90 * 1e18);
+		assertEq(morpherOracle.priceBelow(orderId), 110 * 1e18);
+		assertEq(morpherOracle.goodFrom(orderId), 1);
+		assertEq(morpherOracle.goodUntil(orderId), 999999999999999);
+		
+		// Check that the user received MPH tokens
+		assertEq(morpherToken.balanceOf(user), 100 * 1e18);
+	}
+	
 	function testCheckOrderConditionsLogic() public {	
 		bytes32 orderId = morpherOracle.createOrder(
 			keccak256("CRYPTO_BTC"),
