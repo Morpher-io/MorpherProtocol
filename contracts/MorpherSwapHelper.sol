@@ -35,6 +35,7 @@ contract MorpherSwapHelper is Ownable, ReentrancyGuard {
     
     /**
      * @dev Execute a swap with a single permit
+     * @param userAddr Address of the user who owns the tokens and will receive the output
      * @param inputToken Address of the input token
      * @param outputToken Address of the output token
      * @param amountIn Amount of input tokens to swap
@@ -48,6 +49,7 @@ contract MorpherSwapHelper is Ownable, ReentrancyGuard {
      * @return amountOut Amount of output tokens received
      */
     function swapWithPermit(
+        address userAddr,
         address inputToken,
         address outputToken,
         uint256 amountIn,
@@ -61,7 +63,7 @@ contract MorpherSwapHelper is Ownable, ReentrancyGuard {
     ) external nonReentrant returns (uint256 amountOut) {
         // 1. Use the permit to get approval for this contract to spend user's tokens
         IERC20Permit(inputToken).permit(
-            msg.sender,
+            userAddr,
             address(this),
             amountIn,
             permitDeadline,
@@ -71,7 +73,7 @@ contract MorpherSwapHelper is Ownable, ReentrancyGuard {
         );
         
         // 2. Transfer tokens from user to this contract
-        IERC20(inputToken).transferFrom(msg.sender, address(this), amountIn);
+        IERC20(inputToken).transferFrom(userAddr, address(this), amountIn);
         
         // 3. Approve Permit2 to spend our tokens
         IERC20(inputToken).approve(permit2, amountIn);
@@ -92,24 +94,24 @@ contract MorpherSwapHelper is Ownable, ReentrancyGuard {
         
         // Encode the parameters for the V3_SWAP_EXACT_IN command
         inputs[0] = abi.encode(
-            msg.sender,          // recipient (send tokens directly to user)
+            userAddr,            // recipient (send tokens directly to user)
             amountIn,            // amountIn
             amountOutMin,        // amountOutMinimum
             path,                // path
-            true                // payerIsUser - false because tokens come from this contract
+            true                 // payerIsUser - false because tokens come from this contract
         );
         
         // 7. Record balance before swap to calculate output amount
-        uint256 balanceBefore = IERC20(outputToken).balanceOf(msg.sender);
+        uint256 balanceBefore = IERC20(outputToken).balanceOf(userAddr);
         
         // 8. Execute the swap
         IUniversalRouter(universalRouter).execute(commands, inputs, deadline);
         
         // 9. Calculate amount received
-        amountOut = IERC20(outputToken).balanceOf(msg.sender) - balanceBefore;
+        amountOut = IERC20(outputToken).balanceOf(userAddr) - balanceBefore;
         
         // 10. Emit event
-        emit SwapExecuted(msg.sender, inputToken, outputToken, amountIn, amountOut);
+        emit SwapExecuted(userAddr, inputToken, outputToken, amountIn, amountOut);
         
         return amountOut;
     }

@@ -244,6 +244,7 @@ contract TestUniswapSwap is DeployOrUpgrade {
         // vm.startBroadcast(testUser.key);
         
         try MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
+            testUser.addr,
             morpherTokenAddress,
             WETH,
             mphAmount,
