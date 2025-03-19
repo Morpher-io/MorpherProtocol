@@ -9,6 +9,7 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
 import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {INonfungiblePositionManager} from "../lib/uniswap-v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
+import {TickMath} from "../lib/uniswap-v3-core/contracts/libraries/TickMath.sol";
 
 // Uniswap interfaces
 interface IUniswapV3Factory {
@@ -92,6 +93,9 @@ contract CreateUniswapPool is DeployOrUpgrade {
         console.log("MorpherToken address:", morpherTokenAddress);
         console.log("WETH address:", WETH);
 
+        // Check for existing positions and burn them
+        checkAndBurnPositions();
+        
         // Initialize or get pool
         address poolAddress = initializeOrGetPool(morpherTokenAddress);
         
@@ -102,6 +106,23 @@ contract CreateUniswapPool is DeployOrUpgrade {
         saveAddress("UniswapV3Pool", poolAddress);
         
         vm.stopBroadcast();
+    }
+    
+    // Check for existing positions and burn them
+    function checkAndBurnPositions() internal {
+        INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
+        
+        // Get the balance of NFTs for this address
+        uint256 balance = posManager.balanceOf(msg.sender);
+        console.log("Found %d existing positions", balance);
+        
+        // Loop through and burn all positions
+        for (uint256 i = 0; i < balance; i++) {
+            // Always get the first token since the array shifts when we burn
+            uint256 tokenId = posManager.tokenOfOwnerByIndex(msg.sender, 0);
+            console.log("Burning position with token ID: %d", tokenId);
+            burnPosition(tokenId);
+        }
     }
     
     // Initialize a new pool or get existing pool
@@ -157,9 +178,9 @@ contract CreateUniswapPool is DeployOrUpgrade {
         console.log("Pool token1:", token1);
         
         // Prepare to add liquidity with the correct ratio
-        // We want 5000 MPH = 0.05 WETH (ratio 100,000:1)
-        uint256 ethAmount = 0.05 ether;
-        uint256 mphAmount = 5000 ether; // 5000 MPH tokens (with 18 decimals)
+        // We want 100,000 MPH = 1 WETH (ratio 100,000:1)
+        uint256 ethAmount = 1 ether;
+        uint256 mphAmount = 100000 ether; // 100,000 MPH tokens (with 18 decimals)
         
         // Convert ETH to WETH
         IWETH9(WETH).deposit{value: ethAmount}();
@@ -171,9 +192,9 @@ contract CreateUniswapPool is DeployOrUpgrade {
         IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
         MorpherToken(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
         
-        // Calculate ticks for the position
-        int24 minTick = -46080; // Approximately 1/100 of the current price
-        int24 maxTick = 46080;  // Approximately 100x the current price
+        // Use full tick range for maximum liquidity coverage
+        int24 minTick = TickMath.MIN_TICK;
+        int24 maxTick = TickMath.MAX_TICK;
         
         // Create the mint parameters with inline token amount determination
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
@@ -205,12 +226,32 @@ contract CreateUniswapPool is DeployOrUpgrade {
     function burnPosition(uint256 tokenId) internal {
         INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
         
-        // First decrease all liquidity
-        (,,,,,,,uint128 liquidity,,,,) = posManager.positions(tokenId);
+        // Get position details
+        (
+            ,
+            ,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            ,
+            ,
+            ,
+        ) = posManager.positions(tokenId);
+        
+        console.log("Position details:");
+        console.log("- Token0: %s", token0);
+        console.log("- Token1: %s", token1);
+        console.log("- Fee: %d", fee);
+        console.log("- Tick range: [%d, %d]", tickLower, tickUpper);
+        console.log("- Liquidity: %d", uint256(liquidity));
         
         if (liquidity > 0) {
-            // Decrease liquidity and collect in one step
-            posManager.decreaseLiquidity(
+            // Decrease liquidity
+            console.log("Decreasing liquidity...");
+            (uint256 amount0, uint256 amount1) = posManager.decreaseLiquidity(
                 INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: tokenId,
                     liquidity: liquidity,
@@ -220,8 +261,13 @@ contract CreateUniswapPool is DeployOrUpgrade {
                 })
             );
             
+            console.log("Liquidity removed:");
+            console.log("- Amount token0: %d", amount0);
+            console.log("- Amount token1: %d", amount1);
+            
             // Collect all tokens
-            posManager.collect(
+            console.log("Collecting tokens...");
+            (uint256 collected0, uint256 collected1) = posManager.collect(
                 INonfungiblePositionManager.CollectParams({
                     tokenId: tokenId,
                     recipient: address(this),
@@ -229,10 +275,14 @@ contract CreateUniswapPool is DeployOrUpgrade {
                     amount1Max: type(uint128).max
                 })
             );
+            
+            console.log("Tokens collected:");
+            console.log("- Amount token0: %d", collected0);
+            console.log("- Amount token1: %d", collected1);
         }
         
         // Finally burn the position
         posManager.burn(tokenId);
-        console.log("Burned position with token ID:", tokenId);
+        console.log("Position with token ID %d successfully burned", tokenId);
     }
 }
