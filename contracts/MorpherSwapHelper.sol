@@ -96,7 +96,7 @@ contract MorpherSwapHelper is Ownable, ReentrancyGuard {
             amountIn,            // amountIn
             amountOutMin,        // amountOutMinimum
             path,                // path
-            false                // payerIsUser - false because tokens come from this contract
+            true                // payerIsUser - false because tokens come from this contract
         );
         
         // 7. Record balance before swap to calculate output amount
