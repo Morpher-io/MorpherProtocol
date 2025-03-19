@@ -77,9 +77,23 @@ contract DeployMorpherOracle is DeployOrUpgrade {
             // Set Oracle in State
             MorpherState(stateAddress).setMorpherOracle(oracle);
 
-            // Set WMATIC address for Mumbai testnet
-            // oracleContract.setWmaticAddress(0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889);
-            oracleContract.setWmaticAddress(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14); //weth token on sepolia
+            // Set WETH address based on chain
+            if (block.chainid == 84532) {
+                // Base Sepolia
+                oracleContract.setWmaticAddress(0x4200000000000000000000000000000000000006);
+                // SwapRouter V2 on Base Sepolia
+                oracleContract.setUniswapRouter(0x8357227D4eDc78991Db6FDB9bD6ADE250536dE1d);
+            } else if (block.chainid == 8453) {
+                // Base Mainnet
+                oracleContract.setWmaticAddress(0x4200000000000000000000000000000000000006);
+                // SwapRouter V2 on Base Mainnet
+                oracleContract.setUniswapRouter(0x2626664c2603336E57B271c5C0b26F421741e481);
+            } else {
+                // Default to Sepolia
+                oracleContract.setWmaticAddress(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
+                // SwapRouter V1 on Ethereum
+                oracleContract.setUniswapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+            }
         }
         
         vm.stopBroadcast();

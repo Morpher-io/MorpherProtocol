@@ -71,7 +71,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
 	// SwapRouter address - used for direct swaps
-	address public constant UNISWAP_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+	address public uniswapRouter;
 	
 	
 	// solhint-disable-next-line var-name-mixedcase
@@ -194,6 +194,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	event LinkTradeEngine(address _address);
 	event LinkWMatic(address _address);
+	event LinkUniswapRouter(address _address);
 
 	event LinkMorpherState(address _address);
 
@@ -273,6 +274,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	function setWmaticAddress(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
 		wMaticAddress = _address;
 		emit LinkWMatic(_address);
+	}
+	
+	function setUniswapRouter(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
+		uniswapRouter = _address;
+		emit LinkUniswapRouter(_address);
 	}
 
 	function overrideGasForCallback(uint256 _gasForCallback) public onlyRole(ADMINISTRATOR_ROLE) {
@@ -526,8 +532,8 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		);
 
 		// Approve the router to spend the token.
-		IERC20Upgradeable(inputToken.tokenAddress).approve(address(UNISWAP_ROUTER), inputToken.value);
-		IERC20Upgradeable(state.morpherTokenAddress()).approve(address(UNISWAP_ROUTER), mphTokenAmount);
+		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, inputToken.value);
+		IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
 
 		bytes memory path;
 
@@ -543,7 +549,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			path = abi.encodePacked(wMaticAddress, poolFee, state.morpherTokenAddress()); //reversed path for exactOutput! FU oz!
 		}
 
-		ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
+		ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
 		ISwapRouter.ExactInputParams memory inputSwapParams = ISwapRouter.ExactInputParams({
 			path: path,
 			recipient: _msgSender(),
@@ -569,14 +575,14 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		// IERC20Upgradeable(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
 
 		//reset the approved amounts
-		IERC20Upgradeable(inputToken.tokenAddress).approve(address(UNISWAP_ROUTER), 0);
-		IERC20Upgradeable(state.morpherTokenAddress()).approve(address(UNISWAP_ROUTER), 0);
+		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, 0);
+		IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 	}
 
 	function convertMphAndPayout(bytes32 orderId, uint mphTokenAmount) internal {
 		//convert the MPH paid out by the close order back to the
 		if (closeOrderIdSwapToToken[orderId].tokenAddress != address(0)) {
-			ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
+			ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
 
 			TokenPermitEIP712Struct memory inputToken = closeOrderIdSwapToToken[orderId];
 			//increase allowance
@@ -608,7 +614,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			);
 
 			// Approve the router to spend the token.
-			IERC20Upgradeable(state.morpherTokenAddress()).approve(address(UNISWAP_ROUTER), mphTokenAmount);
+			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
 
 			// SafeERC20Upgradeable.safeApprove(
 			// 	IERC20Upgradeable(state.morpherTokenAddress()),
@@ -640,7 +646,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 			// swap the remaining token back
 			swapRouter.exactInput(backConvertParams);
-			IERC20Upgradeable(state.morpherTokenAddress()).approve(address(UNISWAP_ROUTER), 0);
+			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 		}
 	}
 
