@@ -135,4 +135,77 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		totalSupply = morpherToken.totalSupply();
 		assertEq(totalSupply, 2 ether);
 	}
+	
+	function testDailyMintedTransferLimit() public {
+		address user = address(0xabcdef);
+		address recipient = address(0x123456);
+		
+		// Set up MorpherMintingLimiter address in state
+		vm.mockCall(
+			address(morpherState),
+			abi.encodeWithSignature("morpherMintingLimiterAddress()"),
+			abi.encode(address(this))
+		);
+		
+		// Set daily transfer limit
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(5 ether);
+		vm.stopPrank();
+		
+		// Mint tokens as MintingLimiter (this will track them as minted tokens)
+		morpherToken.mint(user, 10 ether);
+		
+		// Check minted tokens balance
+		assertEq(morpherToken.getMintedTokens(user), 10 ether);
+		assertEq(morpherToken.balanceOf(user), 10 ether);
+		
+		// Try to transfer more than the daily limit
+		vm.startPrank(user);
+		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		morpherToken.transfer(recipient, 6 ether);
+		vm.stopPrank();
+		
+		// Transfer within the limit
+		vm.startPrank(user);
+		morpherToken.transfer(recipient, 4 ether);
+		vm.stopPrank();
+		
+		// Check balances after transfer
+		assertEq(morpherToken.balanceOf(user), 6 ether);
+		assertEq(morpherToken.balanceOf(recipient), 4 ether);
+		assertEq(morpherToken.getMintedTokens(user), 6 ether);
+		assertEq(morpherToken.getDailyMintedTransfers(user), 4 ether);
+		
+		// Try another transfer that would exceed the limit
+		vm.startPrank(user);
+		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		morpherToken.transfer(recipient, 2 ether);
+		vm.stopPrank();
+		
+		// Transfer exactly at the limit
+		vm.startPrank(user);
+		morpherToken.transfer(recipient, 1 ether);
+		vm.stopPrank();
+		
+		// Check final balances
+		assertEq(morpherToken.balanceOf(user), 5 ether);
+		assertEq(morpherToken.balanceOf(recipient), 5 ether);
+		assertEq(morpherToken.getMintedTokens(user), 5 ether);
+		assertEq(morpherToken.getDailyMintedTransfers(user), 5 ether);
+		
+		// Admin should be able to bypass the limit
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+		
+		assertEq(morpherToken.getMintedTokens(user), 15 ether);
+		
+		vm.startPrank(_admin);
+		morpherToken.transferFrom(user, recipient, 10 ether);
+		vm.stopPrank();
+		
+		// Check final balances after admin transfer
+		assertEq(morpherToken.balanceOf(user), 5 ether);
+		assertEq(morpherToken.balanceOf(recipient), 15 ether);
+	}
 }
