@@ -195,74 +195,104 @@ contract TestUniswapSwap is DeployOrUpgrade {
 		}
 	}
 
-	function _executeSwap(address morpherTokenAddress, Account memory testUser) internal {
-		// vm.startBroadcast();
+	// Helper function to create swap path
+	function _createSwapPath(address tokenIn, address tokenOut) internal pure returns (bytes memory) {
+		return abi.encodePacked(tokenIn, uint24(3000), tokenOut);
+	}
 
+	function _executeSwap(address morpherTokenAddress, Account memory testUser) internal {
 		// Use a smaller amount for the swap to ensure it's within pool limits
 		uint256 mphAmount = 1 ether; // Swap 1 MPH token
 		uint256 deadline = block.timestamp + 1 hours;
 
-		// Create permit signature
-		bytes32 structHash = keccak256(
-			abi.encode(
-				_PERMIT_TYPEHASH,
-				testUser.addr,
-				SWAP_HELPER,
-				mphAmount,
-				MorpherToken(morpherTokenAddress).nonces(testUser.addr),
-				deadline
-			)
+		// Get signature components for permit
+		(uint8 v, bytes32 r, bytes32 s) = _createPermitSignature(
+			morpherTokenAddress,
+			testUser,
+			SWAP_HELPER,
+			mphAmount,
+			deadline
 		);
 
-		// Get the domain separator directly from the token contract
-		bytes32 domainSeparator = MorpherToken(morpherTokenAddress).DOMAIN_SEPARATOR();
-
-		bytes32 digest = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
-
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(testUser.key, digest);
-
 		console.log("Created permit signature for MPH -> WETH swap");
-		console.log("Signer address: %s", testUser.addr);
-		console.log("Permit details:");
-		console.log("- Token: %s", morpherTokenAddress);
-		console.log("- Spender: %s", SWAP_HELPER);
-		console.log("- Amount: %s", mphAmount / 1e18);
-		console.log("- Deadline: %s", deadline);
-		console.log("- Nonce: %s", MorpherToken(morpherTokenAddress).nonces(testUser.addr));
 		console.log("Attempting to swap %s MPH tokens", mphAmount / 1e18);
 
-		// Switch to the test user's account for the swap
-		// vm.stopBroadcast();
-		// vm.startBroadcast(testUser.key);
-		{
-			try
-				MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
-					testUser.addr,
-					morpherTokenAddress,
-					WETH,
-					mphAmount,
-					0, // minAmountOut
-					abi.encodePacked(morpherTokenAddress, uint24(3000), WETH),
-					deadline,
-					deadline,
-					v,
-					r,
-					s
-				)
-			returns (uint256 amountOut) {
-				console.log("Swap successful! Received %s WETH", amountOut / 1e18);
-			} catch Error(string memory reason) {
-				console.log("Swap failed with reason: %s", reason);
-			} catch {
-				console.log("Swap failed with unknown error");
-			}
-		}
+		// Create swap path
+		bytes memory path = _createSwapPath(morpherTokenAddress, WETH);
 
-		// vm.stopBroadcast();
+		// Execute the swap
+		_executeSwapWithPermit(
+			testUser.addr,
+			morpherTokenAddress,
+			WETH,
+			mphAmount,
+			path,
+			deadline,
+			v, r, s
+		);
 
 		// Log results
 		console.log("After swap attempt:");
 		console.log("WETH balance: %s", IWETH9(WETH).balanceOf(testUser.addr) / 1e18);
 		console.log("MPH balance: %s", IERC20(morpherTokenAddress).balanceOf(testUser.addr) / 1e18);
+	}
+
+	// Helper function to create permit signature
+	function _createPermitSignature(
+		address token,
+		Account memory user,
+		address spender,
+		uint256 amount,
+		uint256 deadline
+	) internal returns (uint8 v, bytes32 r, bytes32 s) {
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_PERMIT_TYPEHASH,
+				user.addr,
+				spender,
+				amount,
+				MorpherToken(token).nonces(user.addr),
+				deadline
+			)
+		);
+
+		// Get the domain separator directly from the token contract
+		bytes32 domainSeparator = MorpherToken(token).DOMAIN_SEPARATOR();
+		bytes32 digest = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+
+		return vm.sign(user.key, digest);
+	}
+
+	// Helper function to execute the swap with permit
+	function _executeSwapWithPermit(
+		address userAddr,
+		address inputToken,
+		address outputToken,
+		uint256 amount,
+		bytes memory path,
+		uint256 deadline,
+		uint8 v,
+		bytes32 r,
+		bytes32 s
+	) internal {
+		try
+			MorpherSwapHelper(SWAP_HELPER).swapWithPermit(
+				userAddr,
+				inputToken,
+				outputToken,
+				amount,
+				0, // minAmountOut
+				path,
+				deadline,
+				deadline,
+				v, r, s
+			)
+		returns (uint256 amountOut) {
+			console.log("Swap successful! Received %s WETH", amountOut / 1e18);
+		} catch Error(string memory reason) {
+			console.log("Swap failed with reason: %s", reason);
+		} catch {
+			console.log("Swap failed with unknown error");
+		}
 	}
 }
