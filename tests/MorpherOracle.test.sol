@@ -78,9 +78,10 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		morpherAccessControl.grantRole(morpherOracle.ADMINISTRATOR_ROLE(), address(this));
 		
 		// Setup mock Uniswap router
-		address mockUniswapRouter = address(0x1234567890123456789012345678901234567890);
-		bytes memory contractCode = type(MockUniswapRouter).runtimeCode;
-		vm.etch(mockUniswapRouter, contractCode);
+		// address mockUniswapRouter = address(0x1234567890123456789012345678901234567890);
+		// bytes memory contractCode = type(MockUniswapRouter).runtimeCode;
+		// vm.etch(mockUniswapRouter, contractCode);
+		address mockUniswapRouter = address(new MockUniswapRouter());
 		
 		// Create mock tokens
 		WMATIC = new MockERC20("wmatic", "WMATIC");
@@ -450,6 +451,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			1,
 			999999999999999
 		);
+		vm.prank(owner.addr);
 		morpherOracle.createOrderFromToken(str, inputToken);
 
 		assertEq(morpherOracle.priceAbove(expectedOrderId), 90 * 1e18);
@@ -818,7 +820,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		Account memory owner = makeAccount("owner");
 
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
-		morpherToken.mint(owner.addr, 1001 * 10 ** 18);
+		morpherToken.mint(owner.addr, 1001 ether);
 		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
 
 		vm.warp(SECOND_RATE_TS);
@@ -828,7 +830,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			owner.addr,
 			keccak256("CRYPTO_BTC"),
 			0,
-			1001 * 10 ** 18,
+			1001 ether,
 			true,
 			5 * PRECISION
 		);

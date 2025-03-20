@@ -198,8 +198,8 @@ contract CreateUniswapPool is DeployOrUpgrade {
         
         // Use a more reasonable tick range instead of the full range
         // The full range is too extreme and can cause issues
-        int24 minTick = -887220; // A bit less than MIN_TICK to avoid edge issues
-        int24 maxTick = 887220;  // A bit less than MAX_TICK to avoid edge issues
+        int24 minTick = -12000; // A bit less than MIN_TICK to avoid edge issues
+        int24 maxTick = -minTick;  // A bit less than MAX_TICK to avoid edge issues
         
         // Create the mint parameters with inline token amount determination
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({

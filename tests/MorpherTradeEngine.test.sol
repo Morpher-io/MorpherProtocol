@@ -832,7 +832,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		// Verify transfer was successful and tracking was updated
 		assertEq(morpherToken.balanceOf(recipient), 4 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 4 ether);
-		assertEq(morpherToken.getMintedTokens(user), profit - 4 ether);
+		assertEq(morpherToken.getNetMintedTokens(user), profit - 4 ether);
 		
 		// Try another transfer at the limit
 		vm.prank(user);

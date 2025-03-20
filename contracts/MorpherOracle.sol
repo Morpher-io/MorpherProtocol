@@ -17,7 +17,7 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Per
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-import "../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import "../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
 import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
 import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
@@ -552,11 +552,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			path = abi.encodePacked(wMaticAddress, poolFee, state.morpherTokenAddress()); //reversed path for exactOutput! FU oz!
 		}
 
-		ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
-		ISwapRouter.ExactInputParams memory inputSwapParams = ISwapRouter.ExactInputParams({
+		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
+		IV3SwapRouter.ExactInputParams memory inputSwapParams = IV3SwapRouter.ExactInputParams({
 			path: path,
 			recipient: _msgSender(),
-			deadline: block.timestamp,
 			amountOutMinimum: mphTokenAmount,
 			amountIn: inputToken.value //safeguarded by the permit functionality.
 		});
@@ -585,7 +584,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	function convertMphAndPayout(bytes32 orderId, uint mphTokenAmount) internal {
 		//convert the MPH paid out by the close order back to the
 		if (closeOrderIdSwapToToken[orderId].tokenAddress != address(0)) {
-			ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
+			IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
 
 			TokenPermitEIP712Struct memory inputToken = closeOrderIdSwapToToken[orderId];
 			//increase allowance
@@ -639,10 +638,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 				path = abi.encodePacked(state.morpherTokenAddress(), poolFee, wMaticAddress);
 			}
 
-			ISwapRouter.ExactInputParams memory backConvertParams = ISwapRouter.ExactInputParams({
+			IV3SwapRouter.ExactInputParams memory backConvertParams = IV3SwapRouter.ExactInputParams({
 				path: path,
 				recipient: inputToken.owner,
-				deadline: block.timestamp,
 				amountIn: mphTokenAmount,
 				amountOutMinimum: inputToken.minOutValue
 			});
@@ -1047,11 +1045,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		);
 		
 		// Execute the swap
-		ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
-		ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
+		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
+		IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
 			path: path,
 			recipient: _msgSender(),
-			deadline: block.timestamp,
 			amountIn: wethAmount,
 			amountOutMinimum: minMphAmount
 		});

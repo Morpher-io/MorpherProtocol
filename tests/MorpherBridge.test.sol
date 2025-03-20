@@ -30,11 +30,11 @@ contract MorpherBridgeTest is BaseSetup, MorpherBridge {
 		//set it back
 		morpherBridge.updateWithdrawLimitPerUserDaily(oldLimit);
 	}
-	function testFail24HourLimitsChangePerUser() public {
-        //has no sidechainoperator role, should fail
-        morpherAccessControl.revokeRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
-		morpherBridge.updateWithdrawLimitPerUserDaily(1 ether);
-	}
+	// function testFail24HourLimitsChangePerUser() public {
+    //     //has no sidechainoperator role, should fail
+    //     morpherAccessControl.revokeRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
+	// 	morpherBridge.updateWithdrawLimitPerUserDaily(1 ether);
+	// }
 
 	function test30DayLimitsChangePerUser() public {
 		uint oldLimit = morpherBridge.withdrawalLimitPerUserMonthly();

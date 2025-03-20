@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.15;
 
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "../../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
+import "../../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
+import "../../lib/forge-std/src/console2.sol";
 
-contract MockUniswapRouter is ISwapRouter {
+contract MockUniswapRouter is IV3SwapRouter {
 	function exactInput(ExactInputParams calldata params) external payable override returns (uint256 amountOut) {
 		amountOut = params.amountOutMinimum;
 		(address start, address end) = extractFirstAndLastAddress(params.path);
