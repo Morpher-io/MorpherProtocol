@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
 contract MockUniswapRouter is ISwapRouter {
 	function exactInput(ExactInputParams calldata params) external payable override returns (uint256 amountOut) {

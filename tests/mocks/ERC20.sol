@@ -10,4 +10,15 @@ contract MockERC20 is ERC20, ERC20Permit {
 	function mint(address addr, uint256 value) public {
 		_mint(addr, value);
 	}
+	
+	// WETH9 interface functions
+	function deposit() external payable {
+		_mint(msg.sender, msg.value);
+	}
+	
+	function withdraw(uint wad) external {
+		require(balanceOf(msg.sender) >= wad, "MockERC20: insufficient balance");
+		_burn(msg.sender, wad);
+		payable(msg.sender).transfer(wad);
+	}
 }
