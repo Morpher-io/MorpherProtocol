@@ -817,9 +817,6 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		vm.prank(mintingLimiter);
 		morpherToken.mint(user, profit);
 		
-		// Verify minted tokens are tracked
-		assertEq(morpherToken.getNetMintedTokens(user), profit);
-		
 		// Try to transfer more than the daily limit
 		vm.prank(user);
 		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
@@ -832,7 +829,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		// Verify transfer was successful and tracking was updated
 		assertEq(morpherToken.balanceOf(recipient), 4 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 4 ether);
-		assertEq(morpherToken.getNetMintedTokens(user), profit - 4 ether);
+		assertEq(morpherToken.getTransferredInTokens(recipient), 4 ether);
 		
 		// Try another transfer at the limit
 		vm.prank(user);
@@ -841,6 +838,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		// Verify transfer was successful and tracking was updated
 		assertEq(morpherToken.balanceOf(recipient), 5 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 5 ether);
+		assertEq(morpherToken.getTransferredInTokens(recipient), 5 ether);
 		
 		// Try another transfer that would exceed the limit
 		vm.prank(user);
