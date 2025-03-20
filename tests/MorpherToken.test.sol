@@ -238,46 +238,103 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		
 		// TradeEngine burns tokens (opening a position)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
-		morpherToken.burn(user2, 8 ether);
+		morpherToken.burn(user2, 10 ether);
 		vm.stopPrank();
 		
 		// Check balances
-		assertEq(morpherToken.balanceOf(user2), 2 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 0); // Should still be 0
+		assertEq(morpherToken.balanceOf(user2), 0 ether);
+		assertEq(morpherToken.getTransferredInTokens(user2), 0); // All transferred-in tokens used
+		assertEq(morpherToken.getNetMintedTokens(user2), 0);
 		
-		// TradeEngine mints tokens back (closing a position)
+		// TradeEngine mints tokens back (closing a position with 50% profit)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
-		morpherToken.mint(user2, 8 ether);
+		morpherToken.mint(user2, 15 ether); // 10 original + 5 profit
 		vm.stopPrank();
 		
-		// Check balances - user should have 8 ether of net minted tokens now
-		assertEq(morpherToken.balanceOf(user2), 10 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 8 ether);
+		// Check balances - user should have 15 ether total, with 15 as net minted tokens
+		assertEq(morpherToken.balanceOf(user2), 15 ether);
+		assertEq(morpherToken.getNetMintedTokens(user2), 15 ether);
+		assertEq(morpherToken.getTransferredInTokens(user2), 0);
 		
-		// User2 should be able to transfer up to the daily limit of net minted tokens
+		// User2 should be able to transfer all tokens (10 original + 5 profit)
+		// The 5 profit is within the daily limit
 		vm.startPrank(user2);
-		morpherToken.transfer(user1, 5 ether); // Within limit
-		vm.stopPrank();
-		
-		// Check balances
-		assertEq(morpherToken.balanceOf(user2), 5 ether);
-		assertEq(morpherToken.balanceOf(user1), 5 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 3 ether); // 8 - 5
-		
-		// Try to transfer more than the remaining limit
-		vm.startPrank(user2);
-		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
-		morpherToken.transfer(user1, 4 ether); // Would exceed limit
-		vm.stopPrank();
-		
-		// Transfer exactly at the limit
-		vm.startPrank(user2);
-		morpherToken.transfer(user1, 3 ether); // Exactly at limit
+		morpherToken.transfer(user1, 15 ether);
 		vm.stopPrank();
 		
 		// Check final balances
-		assertEq(morpherToken.balanceOf(user2), 2 ether);
-		assertEq(morpherToken.balanceOf(user1), 8 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 0); // All net minted tokens transferred
+		assertEq(morpherToken.balanceOf(user2), 0 ether);
+		assertEq(morpherToken.balanceOf(user1), 15 ether);
+		assertEq(morpherToken.getNetMintedTokens(user2), 0);
+	}
+	function testPositionWithProfitAndTransferLimit() public {
+		address user1 = address(0xabcdef);
+		address user2 = address(0x123456);
+		
+		// Set daily transfer limit to 3 ether (less than the expected profit)
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(3 ether);
+		morpherToken.mint(user1, 10 ether);
+		vm.stopPrank();
+		
+		// User1 transfers to User2
+		vm.startPrank(user1);
+		morpherToken.transfer(user2, 10 ether);
+		vm.stopPrank();
+		
+		// Verify initial state
+		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
+		assertEq(morpherToken.getNetMintedTokens(user2), 0);
+		
+		// TradeEngine burns tokens (opening a position)
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
+		morpherToken.burn(user2, 10 ether);
+		vm.stopPrank();
+		
+		// Verify state after burning
+		assertEq(morpherToken.balanceOf(user2), 0);
+		assertEq(morpherToken.getTransferredInTokens(user2), 0);
+		assertEq(morpherToken.getNetMintedTokens(user2), 0);
+		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
+		
+		// TradeEngine mints tokens back (closing position with 100% profit)
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
+		morpherToken.mint(user2, 20 ether); // 10 original + 10 profit
+		vm.stopPrank();
+		
+		// Verify state after minting
+		assertEq(morpherToken.balanceOf(user2), 20 ether);
+		assertEq(morpherToken.getTransferredInTokens(user2), 0);
+		assertEq(morpherToken.getNetMintedTokens(user2), 20 ether);
+		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
+		
+		// User2 should be able to transfer original investment (10 ether) plus up to the daily limit (3 ether)
+		vm.startPrank(user2);
+		morpherToken.transfer(user1, 13 ether);
+		vm.stopPrank();
+		
+		// Verify state after first transfer
+		assertEq(morpherToken.balanceOf(user2), 7 ether);
+		assertEq(morpherToken.balanceOf(user1), 13 ether);
+		assertEq(morpherToken.getOriginalInvestment(user2), 0); // Original investment fully used
+		assertEq(morpherToken.getNetMintedTokens(user2), 7 ether); // 7 ether of profit remaining
+		assertEq(morpherToken.getDailyMintedTransfers(user2), 3 ether); // 3 ether counted toward daily limit
+		
+		// Try to transfer more than the remaining daily limit
+		vm.startPrank(user2);
+		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		morpherToken.transfer(user1, 4 ether); // Would exceed daily limit
+		vm.stopPrank();
+		
+		// Transfer exactly at the remaining limit
+		vm.startPrank(user2);
+		morpherToken.transfer(user1, 0 ether); // No more transfers allowed today
+		vm.stopPrank();
+		
+		// Verify final state
+		assertEq(morpherToken.balanceOf(user2), 7 ether);
+		assertEq(morpherToken.balanceOf(user1), 13 ether);
+		assertEq(morpherToken.getNetMintedTokens(user2), 7 ether); // 7 ether of profit still remaining
+		assertEq(morpherToken.getDailyMintedTransfers(user2), 3 ether);
 	}
 }

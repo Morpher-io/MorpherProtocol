@@ -32,10 +32,10 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	mapping(address => uint256) private _lockedRewards;
 	uint256 private _totalLockedRewards;
 	
-	// Mapping to track net minted tokens per user (minted - burned)
+	// Mapping to track net minted tokens per user (minted tokens that weren't transferred in)
 	mapping(address => uint256) private _netMintedTokens;
 	
-	// Mapping to track transferred in tokens per user
+	// Mapping to track transferred in tokens per user (tokens received from other users)
 	mapping(address => uint256) private _transferredInTokens;
 	
 	// Mapping to track daily transfers of net minted tokens
@@ -193,13 +193,22 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	function burn(address from, uint256 amount) public virtual {
 		require(morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()), "MorpherToken: must have burner role to burn");
 		
-		// Reduce net minted tokens when burning
+		// Track token burning for TradeEngine
 		if (_msgSender() == morpherState.morpherTradeEngineAddress()) {
-			uint256 burnAmount = amount;
-			if (_netMintedTokens[from] < burnAmount) {
-				burnAmount = _netMintedTokens[from];
+			uint256 remainingBurn = amount;
+			
+			// First burn from transferred-in tokens
+			if (_transferredInTokens[from] > 0) {
+				uint256 transferredInBurn = remainingBurn > _transferredInTokens[from] ? _transferredInTokens[from] : remainingBurn;
+				_transferredInTokens[from] -= transferredInBurn;
+				remainingBurn -= transferredInBurn;
 			}
-			_netMintedTokens[from] -= burnAmount;
+			
+			// Then burn from net minted tokens if needed
+			if (remainingBurn > 0 && _netMintedTokens[from] > 0) {
+				uint256 netMintedBurn = remainingBurn > _netMintedTokens[from] ? _netMintedTokens[from] : remainingBurn;
+				_netMintedTokens[from] -= netMintedBurn;
+			}
 		}
 		
 		_burn(from, amount);
@@ -312,6 +321,13 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	}
 	
 	/**
+	 * @dev Returns the original investment amount (transferred in tokens that were burned)
+	 */
+	function getOriginalInvestment(address account) public view returns (uint256) {
+		return _originalInvestment[account];
+	}
+	
+	/**
 	 * @dev Returns the amount of minted tokens transferred today for an account
 	 */
 	function getDailyMintedTransfers(address account) public view returns (uint256) {
@@ -352,27 +368,39 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 					emit TokensTransferredIn(to, amount);
 				}
 				
-				// Check daily minted token transfer limit
-				if (_dailyMintedTransferLimit > 0 && _netMintedTokens[from] > 0) {
+				// Determine how much of the transfer comes from transferred-in tokens vs net minted tokens
+				uint256 transferFromTransferredIn = 0;
+				uint256 transferFromNetMinted = 0;
+				
+				if (_transferredInTokens[from] > 0) {
+					transferFromTransferredIn = amount > _transferredInTokens[from] ? _transferredInTokens[from] : amount;
+					_transferredInTokens[from] -= transferFromTransferredIn;
+				}
+				
+				// Calculate remaining amount that needs to come from net minted tokens
+				uint256 remainingAmount = amount - transferFromTransferredIn;
+				
+				// Check daily minted token transfer limit if needed
+				if (remainingAmount > 0 && _dailyMintedTransferLimit > 0 && _netMintedTokens[from] > 0) {
 					uint256 today = block.timestamp / 1 days;
 					uint256 transferredToday = _dailyMintedTransfers[from][today];
 					
-					// Calculate how much of the transfer comes from net minted tokens
-					uint256 netMintedAmount = amount > _netMintedTokens[from] ? _netMintedTokens[from] : amount;
+					// Calculate how much of the remaining transfer comes from net minted tokens
+					transferFromNetMinted = remainingAmount > _netMintedTokens[from] ? _netMintedTokens[from] : remainingAmount;
 					
 					// Check if this would exceed the daily limit
 					require(
-						transferredToday + netMintedAmount <= _dailyMintedTransferLimit || 
+						transferredToday + transferFromNetMinted <= _dailyMintedTransferLimit || 
 						morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()),
 						"MorpherToken: daily minted token transfer limit exceeded"
 					);
 					
-					// Update the daily transfer amount
-					if (netMintedAmount > 0) {
-						_dailyMintedTransfers[from][today] += netMintedAmount;
-						_netMintedTokens[from] -= netMintedAmount;
+					// Update the daily transfer amount and reduce net minted tokens
+					if (transferFromNetMinted > 0) {
+						_dailyMintedTransfers[from][today] += transferFromNetMinted;
+						_netMintedTokens[from] -= transferFromNetMinted;
 						
-						emit MintedTokensTransferred(from, to, netMintedAmount);
+						emit MintedTokensTransferred(from, to, transferFromNetMinted);
 					}
 				}
 			} else {
