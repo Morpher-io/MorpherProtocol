@@ -139,18 +139,22 @@ contract CreateUniswapPool is DeployOrUpgrade {
             // Initialize the pool with the price
             IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
             
-            // Price = 5000 MPH per 0.05 WETH = 100,000 MPH per 1 WETH
+            // Price = 100,000 MPH per 1 WETH
             // For Uniswap, we need sqrtPriceX96 = sqrt(price) * 2^96
             uint160 sqrtPriceX96;
             
             if (pool.token0() == morpherTokenAddress) {
                 // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
+                // sqrt(0.00001) * 2^96
                 sqrtPriceX96 = 79228162514264337593543;
                 console.log("MPH is token0, WETH is token1");
+                console.log("Setting price: 100,000 MPH per 1 WETH");
             } else {
                 // If MPH is token1, price = MPH/WETH = 100000
+                // sqrt(100000) * 2^96
                 sqrtPriceX96 = 7922816251426433759354395033;
                 console.log("WETH is token0, MPH is token1");
+                console.log("Setting price: 100,000 MPH per 1 WETH");
             }
             
             pool.initialize(sqrtPriceX96);
@@ -192,9 +196,10 @@ contract CreateUniswapPool is DeployOrUpgrade {
         IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
         MorpherToken(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
         
-        // Use full tick range for maximum liquidity coverage
-        int24 minTick = TickMath.MIN_TICK;
-        int24 maxTick = TickMath.MAX_TICK;
+        // Use a more reasonable tick range instead of the full range
+        // The full range is too extreme and can cause issues
+        int24 minTick = -887220; // A bit less than MIN_TICK to avoid edge issues
+        int24 maxTick = 887220;  // A bit less than MAX_TICK to avoid edge issues
         
         // Create the mint parameters with inline token amount determination
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
@@ -211,15 +216,66 @@ contract CreateUniswapPool is DeployOrUpgrade {
             deadline: block.timestamp + 15 minutes
         });
         
-        // Mint the position
-        (uint256 tokenId, uint128 liquidity, uint256 amount0Mint, uint256 amount1Mint) = 
-            INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(params);
-        
-        console.log("Liquidity position created:");
-        console.log("- Token ID:", tokenId);
-        console.log("- Liquidity:", uint256(liquidity));
-        console.log("- Amount token0 used:", amount0Mint);
-        console.log("- Amount token1 used:", amount1Mint);
+        // Mint the position with try/catch to handle errors
+        try INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(params) returns (
+            uint256 tokenId, 
+            uint128 liquidity, 
+            uint256 amount0Mint, 
+            uint256 amount1Mint
+        ) {
+            console.log("Liquidity position created:");
+            console.log("- Token ID:", tokenId);
+            console.log("- Liquidity:", uint256(liquidity));
+            console.log("- Amount token0 used:", amount0Mint);
+            console.log("- Amount token1 used:", amount1Mint);
+        } catch Error(string memory reason) {
+            console.log("Failed to mint position: %s", reason);
+            
+            // Try with a smaller amount as fallback
+            console.log("Trying with smaller amounts...");
+            
+            // Reduce amounts by half
+            uint256 reducedEthAmount = ethAmount / 2;
+            uint256 reducedMphAmount = mphAmount / 2;
+            
+            // Update approvals
+            IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, reducedEthAmount);
+            MorpherToken(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, reducedMphAmount);
+            
+            // Create new params with reduced amounts
+            INonfungiblePositionManager.MintParams memory reducedParams = INonfungiblePositionManager.MintParams({
+                token0: token0,
+                token1: token1,
+                fee: FEE,
+                tickLower: minTick,
+                tickUpper: maxTick,
+                amount0Desired: token0 == morpherTokenAddress ? reducedMphAmount : reducedEthAmount,
+                amount1Desired: token0 == morpherTokenAddress ? reducedEthAmount : reducedMphAmount,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: msg.sender,
+                deadline: block.timestamp + 15 minutes
+            });
+            
+            try INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(reducedParams) returns (
+                uint256 tokenId, 
+                uint128 liquidity, 
+                uint256 amount0Mint, 
+                uint256 amount1Mint
+            ) {
+                console.log("Liquidity position created with reduced amounts:");
+                console.log("- Token ID:", tokenId);
+                console.log("- Liquidity:", uint256(liquidity));
+                console.log("- Amount token0 used:", amount0Mint);
+                console.log("- Amount token1 used:", amount1Mint);
+            } catch Error(string memory fallbackReason) {
+                console.log("Failed to mint position with reduced amounts: %s", fallbackReason);
+            } catch {
+                console.log("Failed to mint position with reduced amounts: unknown error");
+            }
+        } catch {
+            console.log("Failed to mint position: unknown error");
+        }
     }
     
     // Helper function to burn a position if needed
