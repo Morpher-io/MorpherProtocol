@@ -139,20 +139,6 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 	function testDailyMintedTransferLimit() public {
 		address user = address(0xabcdef);
 		address recipient = address(0x123456);
-		address tradeEngine = address(0x789abc);
-		
-		// Set up MorpherMintingLimiter and TradeEngine addresses in state
-		vm.mockCall(
-			address(morpherState),
-			abi.encodeWithSignature("morpherMintingLimiterAddress()"),
-			abi.encode(address(this))
-		);
-		
-		vm.mockCall(
-			address(morpherState),
-			abi.encodeWithSignature("morpherTradeEngineAddress()"),
-			abi.encode(tradeEngine)
-		);
 		
 		// Set daily transfer limit
 		vm.startPrank(_admin);
@@ -160,7 +146,9 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		vm.stopPrank();
 		
 		// Mint tokens as MintingLimiter (this will track them as net minted tokens)
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
 		
 		// Check net minted tokens balance
 		assertEq(morpherToken.getNetMintedTokens(user), 10 ether);
@@ -203,10 +191,12 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		assertEq(morpherToken.getTransferredInTokens(recipient), 5 ether);
 		
 		// Test burn/mint cycle with TradeEngine
-		vm.startPrank(tradeEngine);
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user, 3 ether);
 		assertEq(morpherToken.getNetMintedTokens(user), 2 ether);
-		
+		vm.stopPrank();
+
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 3 ether);
 		assertEq(morpherToken.getNetMintedTokens(user), 5 ether);
 		vm.stopPrank();
@@ -217,6 +207,8 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		vm.stopPrank();
 		
 		// Admin transfer should bypass limit
+		vm.prank(user);
+		morpherToken.approve(_admin, 10 ether);
 		vm.startPrank(_admin);
 		morpherToken.transferFrom(user, recipient, 10 ether);
 		vm.stopPrank();
@@ -228,14 +220,6 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 	function testTransferredInTokensWithBurnMintCycle() public {
 		address user1 = address(0xabcdef);
 		address user2 = address(0x123456);
-		address tradeEngine = address(0x789abc);
-		
-		// Set up TradeEngine address in state
-		vm.mockCall(
-			address(morpherState),
-			abi.encodeWithSignature("morpherTradeEngineAddress()"),
-			abi.encode(tradeEngine)
-		);
 		
 		// Set daily transfer limit
 		vm.startPrank(_admin);
@@ -253,7 +237,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		assertEq(morpherToken.getNetMintedTokens(user2), 0);
 		
 		// TradeEngine burns tokens (opening a position)
-		vm.startPrank(tradeEngine);
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user2, 8 ether);
 		vm.stopPrank();
 		
@@ -262,7 +246,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		assertEq(morpherToken.getNetMintedTokens(user2), 0); // Should still be 0
 		
 		// TradeEngine mints tokens back (closing a position)
-		vm.startPrank(tradeEngine);
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.mint(user2, 8 ether);
 		vm.stopPrank();
 		
