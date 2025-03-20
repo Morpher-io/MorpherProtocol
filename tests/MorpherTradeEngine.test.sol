@@ -818,7 +818,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		morpherToken.mint(user, profit);
 		
 		// Verify minted tokens are tracked
-		assertEq(morpherToken.getMintedTokens(user), profit);
+		assertEq(morpherToken.getNetMintedTokens(user), profit);
 		
 		// Try to transfer more than the daily limit
 		vm.prank(user);
