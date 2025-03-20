@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
-import {console} from "forge-std/console.sol";
+import {console2 as console} from "forge-std/console2.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -114,13 +114,13 @@ contract CreateUniswapPool is DeployOrUpgrade {
         
         // Get the balance of NFTs for this address
         uint256 balance = posManager.balanceOf(msg.sender);
-        console.log("Found %d existing positions", balance);
+        console.log("Found existing positions", balance);
         
         // Loop through and burn all positions
         for (uint256 i = 0; i < balance; i++) {
             // Always get the first token since the array shifts when we burn
             uint256 tokenId = posManager.tokenOfOwnerByIndex(msg.sender, 0);
-            console.log("Burning position with token ID: %d", tokenId);
+            console.log("Burning position with token ID: ", tokenId);
             burnPosition(tokenId);
         }
     }
@@ -245,7 +245,6 @@ contract CreateUniswapPool is DeployOrUpgrade {
         console.log("- Token0: %s", token0);
         console.log("- Token1: %s", token1);
         console.log("- Fee: %d", fee);
-        console.log("- Tick range: [%d, %d]", tickLower, tickUpper);
         console.log("- Liquidity: %d", uint256(liquidity));
         
         if (liquidity > 0) {
