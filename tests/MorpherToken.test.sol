@@ -235,16 +235,18 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		// Check that User2 has transferred in tokens
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
 		assertEq(morpherToken.getNetMintedTokens(user2), 0);
+		assertEq(morpherToken.getOriginalInvestment(user2), 0);
 		
 		// TradeEngine burns tokens (opening a position)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user2, 10 ether);
 		vm.stopPrank();
 		
-		// Check balances
+		// Check balances - transferred in tokens are now tracked as original investment
 		assertEq(morpherToken.balanceOf(user2), 0 ether);
-		assertEq(morpherToken.getTransferredInTokens(user2), 0); // All transferred-in tokens used
+		assertEq(morpherToken.getTransferredInTokens(user2), 0);
 		assertEq(morpherToken.getNetMintedTokens(user2), 0);
+		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
 		
 		// TradeEngine mints tokens back (closing a position with 50% profit)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
@@ -255,9 +257,11 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		assertEq(morpherToken.balanceOf(user2), 15 ether);
 		assertEq(morpherToken.getNetMintedTokens(user2), 15 ether);
 		assertEq(morpherToken.getTransferredInTokens(user2), 0);
+		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
 		
 		// User2 should be able to transfer all tokens (10 original + 5 profit)
-		// The 5 profit is within the daily limit
+		// The first 10 ether should be treated as original investment (not subject to limit)
+		// The 5 ether profit is within the daily limit
 		vm.startPrank(user2);
 		morpherToken.transfer(user1, 15 ether);
 		vm.stopPrank();
@@ -266,6 +270,8 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		assertEq(morpherToken.balanceOf(user2), 0 ether);
 		assertEq(morpherToken.balanceOf(user1), 15 ether);
 		assertEq(morpherToken.getNetMintedTokens(user2), 0);
+		assertEq(morpherToken.getOriginalInvestment(user2), 0);
+		assertEq(morpherToken.getDailyMintedTransfers(user2), 5 ether); // Only the profit counts toward the daily limit
 	}
 	function testPositionWithProfitAndTransferLimit() public {
 		address user1 = address(0xabcdef);
