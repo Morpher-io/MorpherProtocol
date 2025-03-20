@@ -32,14 +32,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	mapping(address => uint256) private _lockedRewards;
 	uint256 private _totalLockedRewards;
 	
-	// Mapping to track net minted tokens per user (minted tokens that weren't transferred in)
-	mapping(address => uint256) private _netMintedTokens;
-	
 	// Mapping to track transferred in tokens per user (tokens received from other users)
 	mapping(address => uint256) private _transferredInTokens;
-	
-	// Mapping to track original investment amount (transferred in tokens that were burned)
-	mapping(address => uint256) private _originalInvestment;
 	
 	// Mapping to track daily transfers of net minted tokens
 	mapping(address => mapping(uint256 => uint256)) private _dailyMintedTransfers;
@@ -174,13 +168,6 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	 */
 	function mint(address to, uint256 amount) public virtual {
 		require(morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()), "MorpherToken: must have minter role to mint");
-		
-		// Track net minted tokens if the caller is the MorpherMintingLimiter or TradeEngine
-		if (_msgSender() == morpherState.morpherMintingLimiterAddress() || 
-		    _msgSender() == morpherState.morpherTradeEngineAddress()) {
-			_netMintedTokens[to] += amount;
-		}
-		
 		_mint(to, amount);
 	}
 
@@ -195,26 +182,6 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	 */
 	function burn(address from, uint256 amount) public virtual {
 		require(morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()), "MorpherToken: must have burner role to burn");
-		
-		// Track token burning for TradeEngine
-		if (_msgSender() == morpherState.morpherTradeEngineAddress()) {
-			uint256 remainingBurn = amount;
-			
-			// First burn from transferred-in tokens and track as original investment
-			if (_transferredInTokens[from] > 0) {
-				uint256 transferredInBurn = remainingBurn > _transferredInTokens[from] ? _transferredInTokens[from] : remainingBurn;
-				_transferredInTokens[from] -= transferredInBurn;
-				_originalInvestment[from] += transferredInBurn;
-				remainingBurn -= transferredInBurn;
-			}
-			
-			// Then burn from net minted tokens if needed
-			if (remainingBurn > 0 && _netMintedTokens[from] > 0) {
-				uint256 netMintedBurn = remainingBurn > _netMintedTokens[from] ? _netMintedTokens[from] : remainingBurn;
-				_netMintedTokens[from] -= netMintedBurn;
-			}
-		}
-		
 		_burn(from, amount);
 	}
 
@@ -311,24 +278,10 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	}
 	
 	/**
-	 * @dev Returns the amount of net minted tokens for an account
-	 */
-	function getNetMintedTokens(address account) public view returns (uint256) {
-		return _netMintedTokens[account];
-	}
-	
-	/**
 	 * @dev Returns the amount of tokens transferred in for an account
 	 */
 	function getTransferredInTokens(address account) public view returns (uint256) {
 		return _transferredInTokens[account];
-	}
-	
-	/**
-	 * @dev Returns the original investment amount (transferred in tokens that were burned)
-	 */
-	function getOriginalInvestment(address account) public view returns (uint256) {
-		return _originalInvestment[account];
 	}
 	
 	/**
@@ -372,47 +325,31 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 					emit TokensTransferredIn(to, amount);
 				}
 				
-				// For transfers, we need to handle original investment and net minted tokens
+				// For transfers, first use transferred-in tokens
 				uint256 transferAmount = amount;
-				uint256 transferFromOriginalInvestment = 0;
-				uint256 transferFromNetMinted = 0;
 				
-				// First, use original investment amount (doesn't count toward daily limit)
-				if (_originalInvestment[from] > 0) {
-					transferFromOriginalInvestment = transferAmount > _originalInvestment[from] ? _originalInvestment[from] : transferAmount;
-					_originalInvestment[from] -= transferFromOriginalInvestment;
-					transferAmount -= transferFromOriginalInvestment;
-				}
-				
-				// Then, use transferred-in tokens
-				if (transferAmount > 0 && _transferredInTokens[from] > 0) {
+				// Use transferred-in tokens first (not subject to daily limit)
+				if (_transferredInTokens[from] > 0) {
 					uint256 transferFromTransferredIn = transferAmount > _transferredInTokens[from] ? _transferredInTokens[from] : transferAmount;
 					_transferredInTokens[from] -= transferFromTransferredIn;
 					transferAmount -= transferFromTransferredIn;
 				}
 				
-				// Finally, use net minted tokens (subject to daily limit)
-				if (transferAmount > 0 && _netMintedTokens[from] > 0) {
-					transferFromNetMinted = transferAmount > _netMintedTokens[from] ? _netMintedTokens[from] : transferAmount;
+				// Any remaining amount is subject to daily limit
+				if (transferAmount > 0 && _dailyMintedTransferLimit > 0) {
+					uint256 today = block.timestamp / 1 days;
+					uint256 transferredToday = _dailyMintedTransfers[from][today];
 					
-					// Check daily minted token transfer limit
-					if (_dailyMintedTransferLimit > 0) {
-						uint256 today = block.timestamp / 1 days;
-						uint256 transferredToday = _dailyMintedTransfers[from][today];
-						
-						// Check if this would exceed the daily limit
-						require(
-							transferredToday + transferFromNetMinted <= _dailyMintedTransferLimit || 
-							morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()),
-							"MorpherToken: daily minted token transfer limit exceeded"
-						);
-						
-						// Update the daily transfer amount
-						_dailyMintedTransfers[from][today] += transferFromNetMinted;
-					}
+					// Check if this would exceed the daily limit
+					require(
+						transferredToday + transferAmount <= _dailyMintedTransferLimit || 
+						morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()),
+						"MorpherToken: daily minted token transfer limit exceeded"
+					);
 					
-					_netMintedTokens[from] -= transferFromNetMinted;
-					emit MintedTokensTransferred(from, to, transferFromNetMinted);
+					// Update the daily transfer amount
+					_dailyMintedTransfers[from][today] += transferAmount;
+					emit MintedTokensTransferred(from, to, transferAmount);
 				}
 			} else {
 				require(

@@ -150,8 +150,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		morpherToken.mint(user, 10 ether);
 		vm.stopPrank();
 		
-		// Check net minted tokens balance
-		assertEq(morpherToken.getNetMintedTokens(user), 10 ether);
+		// Check balance
 		assertEq(morpherToken.balanceOf(user), 10 ether);
 		
 		// Try to transfer more than the daily limit
@@ -168,7 +167,6 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		// Check balances after transfer
 		assertEq(morpherToken.balanceOf(user), 6 ether);
 		assertEq(morpherToken.balanceOf(recipient), 4 ether);
-		assertEq(morpherToken.getNetMintedTokens(user), 6 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 4 ether);
 		assertEq(morpherToken.getTransferredInTokens(recipient), 4 ether);
 		
@@ -186,19 +184,16 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		// Check final balances
 		assertEq(morpherToken.balanceOf(user), 5 ether);
 		assertEq(morpherToken.balanceOf(recipient), 5 ether);
-		assertEq(morpherToken.getNetMintedTokens(user), 5 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 5 ether);
 		assertEq(morpherToken.getTransferredInTokens(recipient), 5 ether);
 		
 		// Test burn/mint cycle with TradeEngine
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user, 3 ether);
-		assertEq(morpherToken.getNetMintedTokens(user), 2 ether);
 		vm.stopPrank();
 
 		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 3 ether);
-		assertEq(morpherToken.getNetMintedTokens(user), 5 ether);
 		vm.stopPrank();
 		
 		// Admin should be able to bypass the limit
@@ -234,33 +229,28 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		
 		// Check that User2 has transferred in tokens
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 0);
-		assertEq(morpherToken.getOriginalInvestment(user2), 0);
 		
 		// TradeEngine burns tokens (opening a position)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user2, 10 ether);
 		vm.stopPrank();
 		
-		// Check balances - transferred in tokens are now tracked as original investment
+		// Check balances
 		assertEq(morpherToken.balanceOf(user2), 0 ether);
-		assertEq(morpherToken.getTransferredInTokens(user2), 0);
-		assertEq(morpherToken.getNetMintedTokens(user2), 0);
-		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
+		// Transferred in tokens remain the same even after burning
+		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
 		
 		// TradeEngine mints tokens back (closing a position with 50% profit)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.mint(user2, 15 ether); // 10 original + 5 profit
 		vm.stopPrank();
 		
-		// Check balances - user should have 15 ether total, with 15 as net minted tokens
+		// Check balances - user should have 15 ether total
 		assertEq(morpherToken.balanceOf(user2), 15 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 15 ether);
-		assertEq(morpherToken.getTransferredInTokens(user2), 0);
-		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
+		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
 		
 		// User2 should be able to transfer all tokens (10 original + 5 profit)
-		// The first 10 ether should be treated as original investment (not subject to limit)
+		// The first 10 ether should be from transferred-in tokens (not subject to limit)
 		// The 5 ether profit is within the daily limit
 		vm.startPrank(user2);
 		morpherToken.transfer(user1, 15 ether);
@@ -269,8 +259,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		// Check final balances
 		assertEq(morpherToken.balanceOf(user2), 0 ether);
 		assertEq(morpherToken.balanceOf(user1), 15 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 0);
-		assertEq(morpherToken.getOriginalInvestment(user2), 0);
+		assertEq(morpherToken.getTransferredInTokens(user2), 0);
 		assertEq(morpherToken.getDailyMintedTransfers(user2), 5 ether); // Only the profit counts toward the daily limit
 	}
 	function testPositionWithProfitAndTransferLimit() public {
@@ -290,18 +279,15 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		
 		// Verify initial state
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 0);
 		
 		// TradeEngine burns tokens (opening a position)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user2, 10 ether);
 		vm.stopPrank();
 		
-		// Verify state after burning
+		// Verify state after burning - transferred in tokens remain the same
 		assertEq(morpherToken.balanceOf(user2), 0);
-		assertEq(morpherToken.getTransferredInTokens(user2), 0);
-		assertEq(morpherToken.getNetMintedTokens(user2), 0);
-		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
+		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
 		
 		// TradeEngine mints tokens back (closing position with 100% profit)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
@@ -310,11 +296,9 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		
 		// Verify state after minting
 		assertEq(morpherToken.balanceOf(user2), 20 ether);
-		assertEq(morpherToken.getTransferredInTokens(user2), 0);
-		assertEq(morpherToken.getNetMintedTokens(user2), 20 ether);
-		assertEq(morpherToken.getOriginalInvestment(user2), 10 ether);
+		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
 		
-		// User2 should be able to transfer original investment (10 ether) plus up to the daily limit (3 ether)
+		// User2 should be able to transfer transferred-in tokens (10 ether) plus up to the daily limit (3 ether)
 		vm.startPrank(user2);
 		morpherToken.transfer(user1, 13 ether);
 		vm.stopPrank();
@@ -322,8 +306,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		// Verify state after first transfer
 		assertEq(morpherToken.balanceOf(user2), 7 ether);
 		assertEq(morpherToken.balanceOf(user1), 13 ether);
-		assertEq(morpherToken.getOriginalInvestment(user2), 0); // Original investment fully used
-		assertEq(morpherToken.getNetMintedTokens(user2), 7 ether); // 7 ether of profit remaining
+		assertEq(morpherToken.getTransferredInTokens(user2), 0); // Transferred-in tokens fully used
 		assertEq(morpherToken.getDailyMintedTransfers(user2), 3 ether); // 3 ether counted toward daily limit
 		
 		// Try to transfer more than the remaining daily limit
@@ -340,7 +323,6 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		// Verify final state
 		assertEq(morpherToken.balanceOf(user2), 7 ether);
 		assertEq(morpherToken.balanceOf(user1), 13 ether);
-		assertEq(morpherToken.getNetMintedTokens(user2), 7 ether); // 7 ether of profit still remaining
 		assertEq(morpherToken.getDailyMintedTransfers(user2), 3 ether);
 	}
 }
