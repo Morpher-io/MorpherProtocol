@@ -145,13 +145,14 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		morpherToken.setDailyMintedTransferLimit(5 ether);
 		vm.stopPrank();
 		
-		// Mint tokens as MintingLimiter (this will track them as net minted tokens)
+		// Mint tokens as MintingLimiter (these should not be tracked as transferred in)
 		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 10 ether);
 		vm.stopPrank();
 		
-		// Check balance
+		// Check balance and transferred in tokens
 		assertEq(morpherToken.balanceOf(user), 10 ether);
+		assertEq(morpherToken.getTransferredInTokens(user), 0 ether);
 		
 		// Try to transfer more than the daily limit
 		vm.startPrank(user);
@@ -262,6 +263,37 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		assertEq(morpherToken.getTransferredInTokens(user2), 0);
 		assertEq(morpherToken.getDailyMintedTransfers(user2), 5 ether); // Only the profit counts toward the daily limit
 	}
+	function testMintFromOtherSourcesTrackedAsTransferredIn() public {
+		address user = address(0xabcdef);
+		
+		// Mint tokens as admin (should be tracked as transferred in)
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+		
+		// Check balance and transferred in tokens
+		assertEq(morpherToken.balanceOf(user), 10 ether);
+		assertEq(morpherToken.getTransferredInTokens(user), 10 ether);
+		
+		// Mint tokens as MintingLimiter (should not be tracked as transferred in)
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
+		morpherToken.mint(user, 5 ether);
+		vm.stopPrank();
+		
+		// Check updated balance and transferred in tokens
+		assertEq(morpherToken.balanceOf(user), 15 ether);
+		assertEq(morpherToken.getTransferredInTokens(user), 10 ether); // Still 10 ether
+		
+		// Mint tokens as TradeEngine (should not be tracked as transferred in)
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
+		morpherToken.mint(user, 5 ether);
+		vm.stopPrank();
+		
+		// Check final balance and transferred in tokens
+		assertEq(morpherToken.balanceOf(user), 20 ether);
+		assertEq(morpherToken.getTransferredInTokens(user), 10 ether); // Still 10 ether
+	}
+	
 	function testPositionWithProfitAndTransferLimit() public {
 		address user1 = address(0xabcdef);
 		address user2 = address(0x123456);

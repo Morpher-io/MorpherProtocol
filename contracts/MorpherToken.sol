@@ -168,6 +168,14 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	 */
 	function mint(address to, uint256 amount) public virtual {
 		require(morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()), "MorpherToken: must have minter role to mint");
+		
+		// Track tokens as transferred in if not from MintingLimiter or TradeEngine
+		if (_msgSender() != morpherState.morpherMintingLimiterAddress() && 
+		    _msgSender() != morpherState.morpherTradeEngineAddress()) {
+			_transferredInTokens[to] += amount;
+			emit TokensTransferredIn(to, amount);
+		}
+		
 		_mint(to, amount);
 	}
 
