@@ -728,7 +728,8 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		);
 		
 		// Set daily transfer limit
-		vm.prank(_admin);
+		morpherAccessControl.grantRole(morpherState.ADMINISTRATOR_ROLE(), address(this));
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
 		morpherToken.setDailyMintedTransferLimit(5 ether);
 		
 		// Create a user and recipient
