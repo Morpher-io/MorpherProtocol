@@ -774,8 +774,8 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing;
         
         // Ensure ticks are within valid range
-        minTick = minTick < -887270 ? -887270 : minTick;
-        maxTick = maxTick > 887270 ? 887270 : maxTick;
+        minTick = minTick < -887270 ? int24(-887270) : minTick;
+        maxTick = maxTick > 887270 ? int24(887270) : maxTick;
         
         // Use minimal amounts
         uint256 minEthAmount = 0.001 ether;
