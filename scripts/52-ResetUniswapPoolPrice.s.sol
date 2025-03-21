@@ -339,6 +339,15 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     
     // Reset pool price directly by removing all liquidity and adding it back at target price
     function resetPoolPrice(address poolAddress, address morpherTokenAddress) internal {
+        // First remove all liquidity
+        removeAllLiquidityAndBurn();
+        
+        // Then add new liquidity at target price
+        addLiquidityAtTargetPrice(poolAddress, morpherTokenAddress);
+    }
+    
+    // Helper function to remove all liquidity and burn positions
+    function removeAllLiquidityAndBurn() internal {
         INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
         
         // Get the balance of NFTs for this address
@@ -403,8 +412,10 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             posManager.burn(tokenId);
             console.log("Position with token ID %d successfully burned", tokenId);
         }
-        
-        // Now create a new pool with the correct price
+    }
+    
+    // Helper function to add liquidity at target price
+    function addLiquidityAtTargetPrice(address poolAddress, address morpherTokenAddress) internal {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
         address token0 = pool.token0();
         address token1 = pool.token1();
@@ -436,6 +447,18 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
         IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
         
+        // Create and mint the position
+        createPositionAtTargetPrice(token0, token1, morpherTokenAddress, ethAmount, mphAmount);
+    }
+    
+    // Helper function to create position at target price
+    function createPositionAtTargetPrice(
+        address token0, 
+        address token1, 
+        address morpherTokenAddress,
+        uint256 ethAmount,
+        uint256 mphAmount
+    ) internal {
         // Use a reasonable tick range around the target price
         int24 targetTick = token0 == WETH ? int24(11513) : -11513;
         int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
@@ -447,6 +470,10 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- Min tick:", minTick);
         console.log("- Max tick:", maxTick);
         
+        // Determine token amounts based on token order
+        uint256 amount0 = token0 == morpherTokenAddress ? mphAmount : ethAmount;
+        uint256 amount1 = token0 == morpherTokenAddress ? ethAmount : mphAmount;
+        
         // Create the mint parameters
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: token0,
@@ -454,8 +481,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             fee: FEE,
             tickLower: minTick,
             tickUpper: maxTick,
-            amount0Desired: token0 == morpherTokenAddress ? mphAmount : ethAmount,
-            amount1Desired: token0 == morpherTokenAddress ? ethAmount : mphAmount,
+            amount0Desired: amount0,
+            amount1Desired: amount1,
             amount0Min: 0,
             amount1Min: 0,
             recipient: msg.sender,
@@ -659,15 +686,13 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     function addLiquidityToPool(address poolAddress, address morpherTokenAddress) internal {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
         
-        // Get token order
+        // Get token order and current tick
         address token0 = pool.token0();
         address token1 = pool.token1();
-        
-        // Get current price to determine the correct ratio
-        (uint160 sqrtPriceX96, int24 currentTick, , , , , ) = pool.slot0();
+        (,int24 currentTick,,,,,) = pool.slot0();
         console.log("Current tick after swap:", currentTick);
         
-        // Add substantial liquidity at the target price
+        // Prepare liquidity amounts
         uint256 ethAmount = 1 ether; // 1 WETH
         uint256 mphAmount = TARGET_MPH_PER_WETH * ethAmount / 1 ether; // 100,000 MPH
         
@@ -675,6 +700,15 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- WETH amount:", ethAmount / 1e18);
         console.log("- MPH amount:", mphAmount / 1e18);
         
+        // Ensure we have enough tokens
+        ensureTokenBalances(morpherTokenAddress, ethAmount, mphAmount);
+        
+        // Calculate tick range and create position
+        createPositionAtCurrentPrice(token0, token1, morpherTokenAddress, ethAmount, mphAmount, currentTick);
+    }
+    
+    // Helper function to ensure we have enough tokens
+    function ensureTokenBalances(address morpherTokenAddress, uint256 ethAmount, uint256 mphAmount) internal {
         // Ensure we have enough WETH
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
         if (wethBalance < ethAmount) {
@@ -693,7 +727,17 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         // Approve tokens for the position manager
         IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
         IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
-        
+    }
+    
+    // Helper function to create position at current price
+    function createPositionAtCurrentPrice(
+        address token0, 
+        address token1, 
+        address morpherTokenAddress,
+        uint256 ethAmount,
+        uint256 mphAmount,
+        int24 currentTick
+    ) internal {
         // Calculate a wider tick range around the current price for better liquidity distribution
         int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
         int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 20;
@@ -703,6 +747,10 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- Min tick:", minTick);
         console.log("- Max tick:", maxTick);
         
+        // Determine token amounts based on token order
+        uint256 amount0 = token0 == morpherTokenAddress ? mphAmount : ethAmount;
+        uint256 amount1 = token0 == morpherTokenAddress ? ethAmount : mphAmount;
+        
         // Create the mint parameters
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: token0,
@@ -710,8 +758,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             fee: FEE,
             tickLower: minTick,
             tickUpper: maxTick,
-            amount0Desired: token0 == morpherTokenAddress ? mphAmount : ethAmount,
-            amount1Desired: token0 == morpherTokenAddress ? ethAmount : mphAmount,
+            amount0Desired: amount0,
+            amount1Desired: amount1,
             amount0Min: 0,
             amount1Min: 0,
             recipient: msg.sender,
