@@ -573,7 +573,7 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 10;
         
         console.log("Using tick range around target:");
-        console.log("- Target tick:", targetTick);
+        // console.log("- Target tick:", targetTick);
         console.log("- Min tick:", minTick);
         console.log("- Max tick:", maxTick);
         
