@@ -19,70 +19,70 @@ import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
 
 contract DeployMorpherToken is DeployOrUpgrade {
-    using stdJson for string;
+	using stdJson for string;
 
-    function run() public {
-        vm.startBroadcast();
+	function run() public {
+		vm.startBroadcast();
 
-        // Load AccessControl address - required for Token initialization
-        address accessControlAddress = loadAddress("MorpherAccessControl");
-        address stateAddress = loadAddress("MorpherState");
-        require(accessControlAddress != address(0), "AccessControl must be deployed first");
-        require(stateAddress != address(0), "MorpherState must be deployed first");
+		// Load AccessControl address - required for Token initialization
+		address accessControlAddress = loadAddress("MorpherAccessControl");
+		address stateAddress = loadAddress("MorpherState");
+		require(accessControlAddress != address(0), "AccessControl must be deployed first");
+		require(stateAddress != address(0), "MorpherState must be deployed first");
 
-        // Deploy or upgrade MorpherToken
-        address existingToken = loadAddress("MorpherToken");
-        MorpherToken implementation = new MorpherToken();
-        
-        address token = deployOrUpgrade(
-            existingToken,
-            address(implementation),
-            abi.encodeCall(MorpherToken.initialize, (accessControlAddress, stateAddress)),
-            "MorpherToken.sol"
-        );
-        
-        saveAddress("MorpherToken", token);
-        console.log("MorpherToken at:", token);
+		// Deploy or upgrade MorpherToken
+		address existingToken = loadAddress("MorpherToken");
+		MorpherToken implementation = new MorpherToken();
 
-        // Only set roles and mint for new deployments
-        if (existingToken == address(0)) {
-            MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
-            MorpherToken tokenContract = MorpherToken(token);
-            
-            // Grant initial roles to deployer
-            accessControl.grantRole(implementation.PAUSER_ROLE(), msg.sender);
-            accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), msg.sender);
-            accessControl.grantRole(implementation.MINTER_ROLE(), msg.sender);
+		address token = deployOrUpgrade(
+			existingToken,
+			address(implementation),
+			abi.encodeCall(MorpherToken.initialize, (accessControlAddress, stateAddress)),
+			"MorpherToken.sol"
+		);
 
-            // Get treasury address from environment or use deployer
-            address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);
+		saveAddress("MorpherToken", token);
+		console.log("MorpherToken at:", token);
 
-            // Mint tokens and set other chain balance
-            // uint256 _sideChainMint = 575_000_000 ether;
-            // tokenContract.setTotalTokensOnOtherChain(_sideChainMint);
-            
-            uint256 _mainChainMint = 425_000_000 ether;
-            tokenContract.mint(treasuryAddress, _mainChainMint);
-            
-            // Mint additional tokens to the deployer for creating the Uniswap pool
-            uint256 poolTokens = 5000 ether; // 5000 MPH for the Uniswap pool
-            tokenContract.mint(msg.sender, poolTokens);
+		// Only set roles and mint for new deployments
+		if (existingToken == address(0)) {
+			MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+			MorpherToken tokenContract = MorpherToken(token);
 
-            // Configure State with token address
-            if (stateAddress != address(0)) {
-                MorpherState state = MorpherState(stateAddress);
-                state.setMorpherToken(token);
-            }
+			// Grant initial roles to deployer
+			accessControl.grantRole(implementation.PAUSER_ROLE(), msg.sender);
+			accessControl.grantRole(implementation.ADMINISTRATOR_ROLE(), msg.sender);
+			accessControl.grantRole(implementation.MINTER_ROLE(), msg.sender);
 
-            // Revoke minter role from deployer
-            accessControl.revokeRole(implementation.MINTER_ROLE(), msg.sender);
-        } else {
-            //update MorpherState if its not set yet
-            if(address(MorpherToken(existingToken).morpherState()) == address(0)) {
-                MorpherToken(existingToken).setMorpherStateAddress(stateAddress);
-            }
-        }
-        
-        vm.stopBroadcast();
-    }
+			// Get treasury address from environment or use deployer
+			address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);
+
+			// Mint tokens and set other chain balance
+			// uint256 _sideChainMint = 575_000_000 ether;
+			// tokenContract.setTotalTokensOnOtherChain(_sideChainMint);
+
+			uint256 _mainChainMint = 425_000_000 ether;
+			tokenContract.mint(treasuryAddress, _mainChainMint);
+
+			// Configure State with token address
+			if (stateAddress != address(0)) {
+				MorpherState state = MorpherState(stateAddress);
+				state.setMorpherToken(token);
+			}
+
+			tokenContract.setDailyMintedTransferLimit(200_000 ether);
+
+			// Revoke minter role from deployer
+			accessControl.revokeRole(implementation.MINTER_ROLE(), msg.sender);
+		} else {
+			//update MorpherState if its not set yet
+			if (address(MorpherToken(existingToken).morpherState()) == address(0)) {
+				MorpherToken(existingToken).setMorpherStateAddress(stateAddress);
+			}
+
+			MorpherToken(existingToken).setDailyMintedTransferLimit(200_000 ether);
+		}
+
+		vm.stopBroadcast();
+	}
 }

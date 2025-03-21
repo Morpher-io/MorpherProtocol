@@ -719,13 +719,6 @@ contract MorkpherTradingEngineTest is BaseSetup {
 	}
 	
 	function testMintedTokenTransferLimit() public {
-		// Set up MorpherMintingLimiter
-		address mintingLimiter = address(0x9876);
-		vm.mockCall(
-			address(morpherState),
-			abi.encodeWithSignature("morpherMintingLimiterAddress()"),
-			abi.encode(mintingLimiter)
-		);
 		
 		// Set daily transfer limit
 		morpherAccessControl.grantRole(morpherState.ADMINISTRATOR_ROLE(), address(this));
@@ -742,7 +735,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		uint256 orderLeverage = 5 * PRECISION;
 		
 		// Mint initial tokens for the user to open a position
-		morpherToken.mint(user, 1001 * 10 ** 18);
+		morpherToken.mint(user, 1001 ether);
 		
 		vm.warp(SECOND_RATE_TS);
 		
@@ -752,7 +745,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 			user,
 			keccak256("CRYPTO_BTC"),
 			0,
-			1001 * 10 ** 18,
+			1001 ether,
 			true,
 			orderLeverage
 		);
@@ -771,20 +764,9 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		
 		vm.warp(block.timestamp + 2);
 		
-		// Mock the MintingLimiter to track minted tokens
-		vm.mockCall(
-			address(morpherState),
-			abi.encodeWithSignature("morpherTradeEngineAddress()"),
-			abi.encode(address(morpherTradeEngine))
-		);
 		
 		// Pretend the TradeEngine is calling through MintingLimiter
 		vm.startPrank(address(morpherOracle));
-		vm.mockCall(
-			mintingLimiter,
-			abi.encodeWithSignature("mint(address,uint256)"),
-			abi.encode()
-		);
 		
 		// Process the order which will generate profit
 		morpherTradeEngine.processOrder(
@@ -814,31 +796,31 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		uint256 profit = expectedShareValue * 2 * 10 ** 8;
 		
 		// Manually mint tokens as if they came from MintingLimiter
-		vm.prank(mintingLimiter);
+		vm.prank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, profit);
 		
 		// Try to transfer more than the daily limit
 		vm.prank(user);
 		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
-		morpherToken.transfer(recipient, 6 ether);
+		morpherToken.transfer(recipient, 1007 ether);
 		
 		// Transfer within the limit
 		vm.prank(user);
-		morpherToken.transfer(recipient, 4 ether);
+		morpherToken.transfer(recipient, 1005 ether);
 		
 		// Verify transfer was successful and tracking was updated
-		assertEq(morpherToken.balanceOf(recipient), 4 ether);
+		assertEq(morpherToken.balanceOf(recipient), 1005 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 4 ether);
-		assertEq(morpherToken.getTransferredInTokens(recipient), 4 ether);
+		assertEq(morpherToken.getTransferredInTokens(recipient), 1005 ether);
 		
 		// Try another transfer at the limit
 		vm.prank(user);
 		morpherToken.transfer(recipient, 1 ether);
 		
 		// Verify transfer was successful and tracking was updated
-		assertEq(morpherToken.balanceOf(recipient), 5 ether);
+		assertEq(morpherToken.balanceOf(recipient), 1006 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 5 ether);
-		assertEq(morpherToken.getTransferredInTokens(recipient), 5 ether);
+		assertEq(morpherToken.getTransferredInTokens(recipient), 1006 ether);
 		
 		// Try another transfer that would exceed the limit
 		vm.prank(user);

@@ -32,14 +32,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	mapping(address => uint256) private _lockedRewards;
 	uint256 private _totalLockedRewards;
 	
-	// Mapping to track transferred in tokens per user (tokens received from other users)
-	mapping(address => uint256) private _transferredInTokens;
 	
-	// Mapping to track daily transfers of net minted tokens
-	mapping(address => mapping(uint256 => uint256)) private _dailyMintedTransfers;
-	
-	// Daily transfer limit for net minted tokens
-	uint256 private _dailyMintedTransferLimit;
 
 	event RewardsLocked(address indexed account, uint256 amount);
 	event RewardsUnlocked(address indexed account, uint256 amount);
@@ -66,6 +59,15 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	bytes32 private _PERMIT_TYPEHASH_DEPRECATED_SLOT;
 
 	MorpherState public morpherState;
+
+	// Mapping to track transferred in tokens per user (tokens received from other users)
+	mapping(address => uint256) private _transferredInTokens;
+	
+	// Mapping to track daily transfers of net minted tokens
+	mapping(address => mapping(uint256 => uint256)) private _dailyMintedTransfers;
+	
+	// Daily transfer limit for net minted tokens
+	uint256 private _dailyMintedTransferLimit;
 
 
 	event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);

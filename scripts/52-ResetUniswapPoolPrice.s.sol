@@ -169,11 +169,11 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             if (tick < 0) {
                 // For negative tick, price < 1, so MPH per WETH is small
                 // We'll use a simple approximation based on the tick
-                uint256 absTickDiv2300 = uint256(-tick) / 2300;
+                uint256 absTickDiv2300 = uint256(int256(-tick)) / 2300;
                 mphPerWeth = 10 ** absTickDiv2300; // Rough approximation
             } else {
                 // For positive tick, price > 1, so MPH per WETH is large
-                uint256 tickDiv2300 = uint256(tick) / 2300;
+                uint256 tickDiv2300 = uint256(int256(tick)) / 2300;
                 mphPerWeth = (10 ** tickDiv2300) * 10000; // Rough approximation
             }
             
@@ -205,11 +205,11 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             
             if (tick < 0) {
                 // For negative tick, WETH/MPH < 1, so MPH/WETH > 1
-                uint256 absTickDiv2300 = uint256(-tick) / 2300;
+                uint256 absTickDiv2300 = uint256(int256(-tick)) / 2300;
                 mphPerWeth = (10 ** absTickDiv2300) * 10000; // Rough approximation
             } else {
                 // For positive tick, WETH/MPH > 1, so MPH/WETH < 1
-                uint256 tickDiv2300 = uint256(tick) / 2300;
+                uint256 tickDiv2300 = uint256(int256(tick)) / 2300;
                 mphPerWeth = 10 ** tickDiv2300; // Rough approximation
             }
             
@@ -244,7 +244,7 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- Current tick: %d", tick);
         
         // Calculate how far we are from target
-        int24 targetTick = (token0 == WETH) ? 11513 : -11513;
+        int24 targetTick = (token0 == WETH) ? int24(11513) : -11513;
         console.log("- Tick difference from target: %d", targetTick - tick);
     }
     
