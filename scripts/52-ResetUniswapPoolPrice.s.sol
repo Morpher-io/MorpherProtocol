@@ -9,7 +9,7 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
 import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {INonfungiblePositionManager} from "../lib/uniswap-v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import {ISwapRouter} from "../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import {TickMath} from "../lib/uniswap-v3-core/contracts/libraries/TickMath.sol";
 
 // Uniswap interfaces
@@ -406,13 +406,12 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("WETH allowance for router:", allowance / 1e18);
         
         // Perform the swap with try/catch to handle errors
-        ISwapRouter router = ISwapRouter(SWAP_ROUTER);
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+        IV3SwapRouter router = IV3SwapRouter(SWAP_ROUTER);
+        IV3SwapRouter.ExactInputSingleParams memory params = IV3SwapRouter.ExactInputSingleParams({
             tokenIn: WETH,
             tokenOut: morpherTokenAddress,
             fee: fee,
             recipient: msg.sender,
-            deadline: block.timestamp + 15 minutes,
             amountIn: wethAmount,
             amountOutMinimum: 0, // No slippage protection for this purpose
             sqrtPriceLimitX96: 0 // No price limit
@@ -493,13 +492,12 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("MPH allowance for router:", allowance / 1e18);
         
         // Perform the swap with try/catch to handle errors
-        ISwapRouter router = ISwapRouter(SWAP_ROUTER);
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+        IV3SwapRouter router = IV3SwapRouter(SWAP_ROUTER);
+        IV3SwapRouter.ExactInputSingleParams memory params = IV3SwapRouter.ExactInputSingleParams({
             tokenIn: morpherTokenAddress,
             tokenOut: WETH,
             fee: fee,
             recipient: msg.sender,
-            deadline: block.timestamp + 15 minutes,
             amountIn: mphAmount,
             amountOutMinimum: 0, // No slippage protection for this purpose
             sqrtPriceLimitX96: 0 // No price limit
