@@ -112,6 +112,13 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         address poolAddress = getPoolAddress(morpherTokenAddress);
         console.log("Pool address:", poolAddress);
         
+        executeAdjustment(poolAddress, morpherTokenAddress);
+        
+        vm.stopBroadcast();
+    }
+    
+    // Execute the price adjustment process
+    function executeAdjustment(address poolAddress, address morpherTokenAddress) internal {
         // Check current price
         (int24 currentTick, bool wethIsToken0) = checkCurrentPrice(poolAddress);
         
@@ -121,62 +128,61 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         
         // Try a small test swap first to verify everything works
         console.log("Performing a small test swap to verify functionality...");
-        if (wethIsToken0) {
-            swapMphForWeth(morpherTokenAddress, 1 ether); // Swap 1 MPH for WETH
-        } else {
-            swapWethForMph(morpherTokenAddress, 0.0001 ether); // Swap 0.0001 WETH for MPH
-        }
+        uint256 testAmount = wethIsToken0 ? 1 ether : 0.0001 ether;
+        performSwap(morpherTokenAddress, wethIsToken0, true, testAmount);
         
         // Check if the test swap worked
         (int24 newTick, ) = checkCurrentPrice(poolAddress);
         if (newTick != currentTick) {
-            console.log("Test swap successful, proceeding with price adjustment");
-            
-            // Perform gradual swaps to adjust price
-            bool success = adjustPriceGradually(poolAddress, morpherTokenAddress, targetTick, wethIsToken0);
-            
-            if (success) {
-                console.log("Successfully adjusted price to near target!");
-                
-                // Final price check
-                console.log("Final price:");
-                checkCurrentPrice(poolAddress);
-            } else {
-                console.log("Failed to adjust price to target after maximum attempts");
-            }
+            handleSuccessfulTestSwap(poolAddress, morpherTokenAddress, targetTick, wethIsToken0);
         } else {
-            console.log("Test swap did not change the price, there may be an issue with the pool");
-            console.log("Trying with a different approach...");
-            
-            // Try a different approach with a single larger swap
-            uint256 swapAmount = wethIsToken0 ? 5 ether : 0.0005 ether;
-            
-            if (currentTick < targetTick) {
-                // Need to increase price
-                if (wethIsToken0) {
-                    console.log("Trying a single larger swap: MPH for WETH");
-                    swapMphForWeth(morpherTokenAddress, swapAmount);
-                } else {
-                    console.log("Trying a single larger swap: WETH for MPH");
-                    swapWethForMph(morpherTokenAddress, swapAmount);
-                }
-            } else {
-                // Need to decrease price
-                if (wethIsToken0) {
-                    console.log("Trying a single larger swap: WETH for MPH");
-                    swapWethForMph(morpherTokenAddress, swapAmount);
-                } else {
-                    console.log("Trying a single larger swap: MPH for WETH");
-                    swapMphForWeth(morpherTokenAddress, swapAmount);
-                }
-            }
+            handleFailedTestSwap(poolAddress, morpherTokenAddress, currentTick, targetTick, wethIsToken0);
+        }
+    }
+    
+    // Handle case when test swap was successful
+    function handleSuccessfulTestSwap(
+        address poolAddress, 
+        address morpherTokenAddress, 
+        int24 targetTick, 
+        bool wethIsToken0
+    ) internal {
+        console.log("Test swap successful, proceeding with price adjustment");
+        
+        // Perform gradual swaps to adjust price
+        bool success = adjustPriceGradually(poolAddress, morpherTokenAddress, targetTick, wethIsToken0);
+        
+        if (success) {
+            console.log("Successfully adjusted price to near target!");
             
             // Final price check
-            console.log("Final price after alternative approach:");
+            console.log("Final price:");
             checkCurrentPrice(poolAddress);
+        } else {
+            console.log("Failed to adjust price to target after maximum attempts");
         }
+    }
+    
+    // Handle case when test swap failed to move the price
+    function handleFailedTestSwap(
+        address poolAddress, 
+        address morpherTokenAddress, 
+        int24 currentTick, 
+        int24 targetTick, 
+        bool wethIsToken0
+    ) internal {
+        console.log("Test swap did not change the price, there may be an issue with the pool");
+        console.log("Trying with a different approach...");
         
-        vm.stopBroadcast();
+        // Try a different approach with a single larger swap
+        uint256 swapAmount = wethIsToken0 ? 5 ether : 0.0005 ether;
+        bool needToIncreasePrice = currentTick < targetTick;
+        
+        performSwap(morpherTokenAddress, wethIsToken0, needToIncreasePrice, swapAmount);
+        
+        // Final price check
+        console.log("Final price after alternative approach:");
+        checkCurrentPrice(poolAddress);
     }
     
     // Get the pool address
@@ -345,6 +351,57 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         }
     }
     
+    // Helper function to perform a swap based on direction and token order
+    function performSwap(
+        address morpherTokenAddress,
+        bool wethIsToken0,
+        bool needToIncreasePrice,
+        uint256 swapAmount
+    ) internal {
+        if (needToIncreasePrice) {
+            // To increase price (increase tick):
+            // - If WETH is token0: Swap MPH for WETH
+            // - If MPH is token0: Swap WETH for MPH
+            if (wethIsToken0) {
+                console.log("Swapping MPH for WETH to increase price");
+                swapMphForWeth(morpherTokenAddress, swapAmount);
+            } else {
+                console.log("Swapping WETH for MPH to increase price");
+                swapWethForMph(morpherTokenAddress, swapAmount);
+            }
+        } else {
+            // To decrease price (decrease tick):
+            // - If WETH is token0: Swap WETH for MPH
+            // - If MPH is token0: Swap MPH for WETH
+            if (wethIsToken0) {
+                console.log("Swapping WETH for MPH to decrease price");
+                swapWethForMph(morpherTokenAddress, swapAmount);
+            } else {
+                console.log("Swapping MPH for WETH to decrease price");
+                swapMphForWeth(morpherTokenAddress, swapAmount);
+            }
+        }
+    }
+    
+    // Calculate swap amount based on tick difference
+    function calculateSwapAmount(int24 tickDiff, bool needToIncreasePrice) internal pure returns (uint256) {
+        uint256 swapAmount;
+        if (Math.abs(tickDiff) > 50000) {
+            // Very far - use larger amount but still keep it small for safety
+            swapAmount = needToIncreasePrice ? 10 ether : 0.001 ether;
+        } else if (Math.abs(tickDiff) > 10000) {
+            // Far - use medium amount
+            swapAmount = needToIncreasePrice ? 5 ether : 0.0005 ether;
+        } else if (Math.abs(tickDiff) > 5000) {
+            // Getting closer - use smaller amount
+            swapAmount = needToIncreasePrice ? 2 ether : 0.0002 ether;
+        } else {
+            // Close - use tiny amount
+            swapAmount = needToIncreasePrice ? 1 ether : 0.0001 ether;
+        }
+        return swapAmount;
+    }
+    
     // Adjust price gradually with multiple small swaps
     function adjustPriceGradually(
         address poolAddress, 
@@ -355,23 +412,12 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
         
         // Get initial tick
-        uint160 sqrtPriceX96;
-        int24 currentTick;
-        uint16 observationIndex;
-        uint16 observationCardinality;
-        uint16 observationCardinalityNext;
-        uint8 feeProtocol;
-        bool unlocked;
-        
-        (sqrtPriceX96, currentTick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked) = pool.slot0();
+        (,int24 currentTick,,,,,bool unlocked) = pool.slot0();
         
         console.log("Starting gradual price adjustment:");
         console.log("- Current tick: %d", currentTick);
         console.log("- Target tick: %d", targetTick);
         console.log("- Pool unlocked: %s", unlocked ? "true" : "false");
-        
-        // Determine initial swap direction
-        bool needToIncreasePrice = currentTick < targetTick;
         
         // Calculate initial tick difference
         int24 tickDiff = targetTick - currentTick;
@@ -382,6 +428,21 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
             console.log("Current price is already within tolerance of target!");
             return true;
         }
+        
+        return executeSwapLoop(pool, morpherTokenAddress, targetTick, wethIsToken0);
+    }
+    
+    // Execute the loop of swaps to adjust price
+    function executeSwapLoop(
+        IUniswapV3Pool pool,
+        address morpherTokenAddress,
+        int24 targetTick,
+        bool wethIsToken0
+    ) internal returns (bool) {
+        int24 currentTick;
+        int24 tickDiff;
+        bool needToIncreasePrice;
+        int24 newTick;
         
         // Loop for multiple swap attempts
         for (uint256 i = 0; i < MAX_SWAP_ATTEMPTS; i++) {
@@ -402,106 +463,19 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
                 return true;
             }
             
-            // Calculate swap amount based on how far we are from target
-            // Use smaller amounts as we get closer
-            uint256 swapAmount;
-            if (Math.abs(tickDiff) > 50000) {
-                // Very far - use larger amount but still keep it small for safety
-                swapAmount = needToIncreasePrice ? 10 ether : 0.001 ether;
-            } else if (Math.abs(tickDiff) > 10000) {
-                // Far - use medium amount
-                swapAmount = needToIncreasePrice ? 5 ether : 0.0005 ether;
-            } else if (Math.abs(tickDiff) > 5000) {
-                // Getting closer - use smaller amount
-                swapAmount = needToIncreasePrice ? 2 ether : 0.0002 ether;
-            } else {
-                // Close - use tiny amount
-                swapAmount = needToIncreasePrice ? 1 ether : 0.0001 ether;
-            }
-            
-            // Perform the swap
-            if (needToIncreasePrice) {
-                // To increase price (increase tick):
-                // - If WETH is token0: Swap MPH for WETH
-                // - If MPH is token0: Swap WETH for MPH
-                if (wethIsToken0) {
-                    console.log("Swapping MPH for WETH to increase price");
-                    swapMphForWeth(morpherTokenAddress, swapAmount);
-                } else {
-                    console.log("Swapping WETH for MPH to increase price");
-                    swapWethForMph(morpherTokenAddress, swapAmount);
-                }
-            } else {
-                // To decrease price (decrease tick):
-                // - If WETH is token0: Swap WETH for MPH
-                // - If MPH is token0: Swap MPH for WETH
-                if (wethIsToken0) {
-                    console.log("Swapping WETH for MPH to decrease price");
-                    swapWethForMph(morpherTokenAddress, swapAmount);
-                } else {
-                    console.log("Swapping MPH for WETH to decrease price");
-                    swapMphForWeth(morpherTokenAddress, swapAmount);
-                }
-            }
+            // Calculate swap amount and perform swap
+            uint256 swapAmount = calculateSwapAmount(tickDiff, needToIncreasePrice);
+            performSwap(morpherTokenAddress, wethIsToken0, needToIncreasePrice, swapAmount);
             
             // Check new tick after swap
-            (,int24 newTick,,,,,) = pool.slot0();
+            (,newTick,,,,,) = pool.slot0();
             console.log("- New tick after swap: %d", newTick);
             console.log("- Tick change from this swap: %d", newTick - currentTick);
             
-            // If the price didn't move at all, try a different approach
+            // If the price didn't move, try alternative approaches
             if (newTick == currentTick) {
-                console.log("Price didn't move, trying a different amount");
-                
-                // Try with a different amount
-                swapAmount = needToIncreasePrice ? 5 ether : 0.0005 ether;
-                
-                if (needToIncreasePrice) {
-                    if (wethIsToken0) {
-                        swapMphForWeth(morpherTokenAddress, swapAmount);
-                    } else {
-                        swapWethForMph(morpherTokenAddress, swapAmount);
-                    }
-                } else {
-                    if (wethIsToken0) {
-                        swapWethForMph(morpherTokenAddress, swapAmount);
-                    } else {
-                        swapMphForWeth(morpherTokenAddress, swapAmount);
-                    }
-                }
-                
-                // Check if it moved now
-                (,newTick,,,,,) = pool.slot0();
-                console.log("- New tick after alternative swap: %d", newTick);
-                
-                // If still no movement, we might be stuck
-                if (newTick == currentTick) {
-                    console.log("Price still didn't move, might be stuck at this tick");
-                    
-                    // Try one more approach with a slightly larger amount, but still keep it reasonable
-                    swapAmount = needToIncreasePrice ? 20 ether : 0.002 ether;
-                    
-                    if (needToIncreasePrice) {
-                        if (wethIsToken0) {
-                            swapMphForWeth(morpherTokenAddress, swapAmount);
-                        } else {
-                            swapWethForMph(morpherTokenAddress, swapAmount);
-                        }
-                    } else {
-                        if (wethIsToken0) {
-                            swapWethForMph(morpherTokenAddress, swapAmount);
-                        } else {
-                            swapMphForWeth(morpherTokenAddress, swapAmount);
-                        }
-                    }
-                    
-                    // Final check
-                    (,newTick,,,,,) = pool.slot0();
-                    console.log("- New tick after large swap: %d", newTick);
-                    
-                    if (newTick == currentTick) {
-                        console.log("Price is completely stuck, trying to continue anyway");
-                    }
+                if (!tryAlternativeSwaps(pool, morpherTokenAddress, wethIsToken0, needToIncreasePrice, currentTick)) {
+                    console.log("Price is completely stuck, trying to continue anyway");
                 }
             }
         }
@@ -518,10 +492,44 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         return Math.abs(tickDiff) <= TICK_TOLERANCE;
     }
     
-    // Swap WETH for MPH
-    function swapWethForMph(address morpherTokenAddress, uint256 wethAmount) internal {
-        console.log("Swapping %s WETH for MPH", wethAmount / 1e18);
+    // Try alternative swap approaches when price doesn't move
+    function tryAlternativeSwaps(
+        IUniswapV3Pool pool,
+        address morpherTokenAddress,
+        bool wethIsToken0,
+        bool needToIncreasePrice,
+        int24 currentTick
+    ) internal returns (bool) {
+        console.log("Price didn't move, trying a different amount");
         
+        // Try with a different amount
+        uint256 swapAmount = needToIncreasePrice ? 5 ether : 0.0005 ether;
+        performSwap(morpherTokenAddress, wethIsToken0, needToIncreasePrice, swapAmount);
+        
+        // Check if it moved now
+        (,int24 newTick,,,,,) = pool.slot0();
+        console.log("- New tick after alternative swap: %d", newTick);
+        
+        if (newTick != currentTick) {
+            return true;
+        }
+        
+        // If still no movement, we might be stuck
+        console.log("Price still didn't move, might be stuck at this tick");
+        
+        // Try one more approach with a slightly larger amount
+        swapAmount = needToIncreasePrice ? 20 ether : 0.002 ether;
+        performSwap(morpherTokenAddress, wethIsToken0, needToIncreasePrice, swapAmount);
+        
+        // Final check
+        (,newTick,,,,,) = pool.slot0();
+        console.log("- New tick after large swap: %d", newTick);
+        
+        return newTick != currentTick;
+    }
+    
+    // Prepare WETH for swap
+    function prepareWethForSwap(uint256 wethAmount) internal returns (uint256) {
         // Ensure we have enough WETH
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
         console.log("Current WETH balance: %s", wethBalance / 1e18);
@@ -545,15 +553,25 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
             console.log("Limiting swap to 0.01 WETH for safety");
         }
         
-        // Approve the router to spend WETH (approve a large amount to avoid repeated approvals)
+        // Approve the router to spend WETH
         try IWETH9(WETH).approve(SWAP_ROUTER, type(uint256).max) {
             console.log("Successfully approved WETH for swap");
             uint256 allowance = IERC20(WETH).allowance(msg.sender, SWAP_ROUTER);
             console.log("WETH allowance for router: %s", allowance / 1e18);
         } catch {
             console.log("Failed to approve WETH");
-            return;
+            return 0;
         }
+        
+        return wethAmount;
+    }
+    
+    // Swap WETH for MPH
+    function swapWethForMph(address morpherTokenAddress, uint256 wethAmount) internal {
+        console.log("Swapping %s WETH for MPH", wethAmount / 1e18);
+        
+        wethAmount = prepareWethForSwap(wethAmount);
+        if (wethAmount == 0) return;
         
         // Get the pool to check if it exists
         address poolAddress = IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(WETH, morpherTokenAddress, FEE);
@@ -586,10 +604,8 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         }
     }
     
-    // Swap MPH for WETH
-    function swapMphForWeth(address morpherTokenAddress, uint256 mphAmount) internal {
-        console.log("Swapping %s MPH for WETH", mphAmount / 1e18);
-        
+    // Prepare MPH for swap
+    function prepareMphForSwap(address morpherTokenAddress, uint256 mphAmount) internal returns (uint256) {
         // Ensure we have enough MPH
         uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
         console.log("Current MPH balance: %s", mphBalance / 1e18);
@@ -613,15 +629,25 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
             console.log("Limiting swap to 10 MPH for safety");
         }
         
-        // Approve the router to spend MPH (approve a large amount to avoid repeated approvals)
+        // Approve the router to spend MPH
         try IERC20(morpherTokenAddress).approve(SWAP_ROUTER, type(uint256).max) {
             console.log("Successfully approved MPH for swap");
             uint256 allowance = IERC20(morpherTokenAddress).allowance(msg.sender, SWAP_ROUTER);
             console.log("MPH allowance for router: %s", allowance / 1e18);
         } catch {
             console.log("Failed to approve MPH");
-            return;
+            return 0;
         }
+        
+        return mphAmount;
+    }
+    
+    // Swap MPH for WETH
+    function swapMphForWeth(address morpherTokenAddress, uint256 mphAmount) internal {
+        console.log("Swapping %s MPH for WETH", mphAmount / 1e18);
+        
+        mphAmount = prepareMphForSwap(morpherTokenAddress, mphAmount);
+        if (mphAmount == 0) return;
         
         // Get the pool to check if it exists
         address poolAddress = IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(morpherTokenAddress, WETH, FEE);
