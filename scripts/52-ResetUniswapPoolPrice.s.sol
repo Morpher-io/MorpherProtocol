@@ -102,14 +102,23 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         // Reduce liquidity in existing positions to make price adjustment easier
         removeAllLiquidity();
         
+        // Check price after reducing liquidity
+        console.log("Price after reducing liquidity:");
+        checkCurrentPrice(poolAddress);
+        
         // Perform swap to adjust price
         adjustPriceWithSwap(poolAddress, morpherTokenAddress);
         
         // Check new price after swap
+        console.log("Price after swap:");
         checkCurrentPrice(poolAddress);
         
         // Add liquidity back at the new price
         addLiquidityToPool(poolAddress, morpherTokenAddress);
+        
+        // Final price check
+        console.log("Final price after adding liquidity:");
+        checkCurrentPrice(poolAddress);
         
         vm.stopBroadcast();
     }
@@ -136,56 +145,103 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- Tick:", tick);
         console.log("- SqrtPriceX96:", uint256(sqrtPriceX96));
         
-        // Calculate and display the price with more detailed logging
+        // For Uniswap V3, we can directly use the tick to understand the price
+        // price = 1.0001^tick
+        // For tick = -11135, price ≈ 0.33 (meaning 1 WETH is worth about 0.33 MPH)
+        // But we want to display MPH per WETH, which is 1/price ≈ 3.03
+        
+        // Calculate price from tick for better accuracy
+        // 1.0001^tick = price
+        // For large ticks, we use the approximation: price ≈ 1.0001^tick
+        
         if (token0 == WETH) {
             // WETH is token0, MPH is token1
-            // Price is MPH per WETH
+            // Price in Uniswap terms is token1/token0 = MPH/WETH
+            // This is what we want directly
+            
+            // Calculate price from tick: 1.0001^tick
+            // For negative tick, this gives us a price < 1
+            // For positive tick, this gives us a price > 1
+            
+            // For display purposes, we'll calculate an approximate value
+            uint256 mphPerWeth;
+            
+            if (tick < 0) {
+                // For negative tick, price < 1, so MPH per WETH is small
+                // We'll use a simple approximation based on the tick
+                mphPerWeth = uint256(10**((-tick) / 2300)); // Rough approximation
+            } else {
+                // For positive tick, price > 1, so MPH per WETH is large
+                mphPerWeth = uint256(10**(tick / 2300)) * 10000; // Rough approximation
+            }
+            
+            console.log("- Approximate price from tick: ~%d MPH per WETH", mphPerWeth);
+            
+            // Also calculate from sqrtPriceX96 for comparison
             uint256 price = 0;
             if (sqrtPriceX96 > 0) {
-                // Formula: price = (sqrtPriceX96^2) / 2^192 * 10^18
+                // Formula: price = (sqrtPriceX96^2) / 2^192
                 uint256 sqrtPriceSquared = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-                console.log("- SqrtPrice squared:", sqrtPriceSquared);
                 
-                // Avoid overflow by using two steps
-                uint256 shiftedPrice = sqrtPriceSquared / (1 << 96); // Divide by 2^96
-                price = (shiftedPrice * 1e18) / (1 << 96); // Multiply by 10^18 and divide by 2^96 again
+                // Avoid overflow by using multiple steps
+                uint256 divisor = 1 << 64; // 2^64
+                uint256 intermediate = sqrtPriceSquared / divisor; // Divide by 2^64
+                intermediate = intermediate / divisor; // Divide by 2^64 again
+                price = intermediate / divisor; // Divide by 2^64 a third time (total division by 2^192)
+                
+                // Convert to a more readable format
+                price = price * 1e18;
             }
-            console.log("- Current price: %d MPH per WETH", price / 1e18);
-            console.log("- Raw price value:", price);
+            console.log("- Calculated price: %d MPH per WETH", price / 1e18);
         } else {
             // MPH is token0, WETH is token1
-            // Price is WETH per MPH
-            uint256 wethPerMph = 0;
-            uint256 mphPerWeth = 0;
+            // Price in Uniswap terms is token1/token0 = WETH/MPH
+            // We need to invert this to get MPH/WETH
             
-            if (sqrtPriceX96 > 0) {
-                // Formula: price = 2^192 / (sqrtPriceX96^2) * 10^18
-                uint256 sqrtPriceSquared = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-                console.log("- SqrtPrice squared:", sqrtPriceSquared);
-                
-                if (sqrtPriceSquared > 0) {
-                    // Calculate WETH per MPH (direct price)
-                    uint256 factor = 1;
-                    uint256 divisor = 1;
-                    
-                    // Handle calculation in parts to avoid overflow
-                    factor = (1 << 96); // 2^96
-                    wethPerMph = (factor * 1e18) / sqrtPriceSquared;
-                    factor = (1 << 96); // 2^96
-                    wethPerMph = (wethPerMph * factor) / (1 << 32); // Adjust by multiplying by 2^(96-32)
-                    
-                    // Calculate MPH per WETH (inverted price)
-                    if (wethPerMph > 0) {
-                        mphPerWeth = (1e36 / wethPerMph);
-                    }
-                }
+            // Calculate price from tick: 1.0001^tick
+            uint256 mphPerWeth;
+            
+            if (tick < 0) {
+                // For negative tick, WETH/MPH < 1, so MPH/WETH > 1
+                mphPerWeth = uint256(10**((-tick) / 2300)) * 10000; // Rough approximation
+            } else {
+                // For positive tick, WETH/MPH > 1, so MPH/WETH < 1
+                mphPerWeth = uint256(10**(tick / 2300)); // Rough approximation
             }
             
-            console.log("- Current price: %d WETH per MPH", wethPerMph / 1e18);
-            console.log("- Raw WETH per MPH:", wethPerMph);
-            console.log("- Inverted: %d MPH per WETH", mphPerWeth / 1e18);
-            console.log("- Raw MPH per WETH:", mphPerWeth);
+            console.log("- Approximate price from tick: ~%d MPH per WETH", mphPerWeth);
+            
+            // Also calculate from sqrtPriceX96 for comparison
+            uint256 wethPerMph = 0;
+            if (sqrtPriceX96 > 0) {
+                // Formula for WETH/MPH: price = (sqrtPriceX96^2) / 2^192
+                uint256 sqrtPriceSquared = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
+                
+                // Avoid overflow by using multiple steps
+                uint256 divisor = 1 << 64; // 2^64
+                uint256 intermediate = sqrtPriceSquared / divisor; // Divide by 2^64
+                intermediate = intermediate / divisor; // Divide by 2^64 again
+                wethPerMph = intermediate / divisor; // Divide by 2^64 a third time (total division by 2^192)
+                
+                // Convert to a more readable format
+                wethPerMph = wethPerMph * 1e18;
+                
+                // Invert to get MPH/WETH
+                uint256 mphPerWethCalculated = 0;
+                if (wethPerMph > 0) {
+                    mphPerWethCalculated = 1e36 / wethPerMph;
+                }
+                console.log("- Calculated price: %d MPH per WETH", mphPerWethCalculated / 1e18);
+            }
         }
+        
+        // Most importantly, show the tick which is the most reliable indicator
+        console.log("- Target tick for 100,000 MPH per WETH: 11513 (or -11513 if MPH is token0)");
+        console.log("- Current tick: %d", tick);
+        
+        // Calculate how far we are from target
+        int24 targetTick = (token0 == WETH) ? 11513 : -11513;
+        console.log("- Tick difference from target: %d", targetTick - tick);
     }
     
     // Reduce liquidity in existing positions to a minimal amount
@@ -277,47 +333,29 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- Current tick:", tick);
         console.log("- Target MPH per WETH:", TARGET_MPH_PER_WETH);
         
-        // For simplicity, let's use the tick directly to determine swap direction
-        // The tick is related to the price by: price = 1.0001^tick
         // For our target of 100,000 MPH per WETH, the tick would be around 11513
         // (log base 1.0001 of 100,000)
         int24 targetTick = 11513;
         
-        if (token0 == morpherTokenAddress) {
-            // MPH is token0, WETH is token1
-            // In this case, a higher tick means a higher WETH/MPH price (lower MPH/WETH)
-            // So we need to invert our comparison
-            targetTick = -targetTick;
-            
-            console.log("- MPH is token0, target tick (inverted):", targetTick);
-            
-            if (tick < targetTick) {
-                // Current price has fewer MPH per WETH than target
-                // Need to swap WETH for MPH to increase MPH per WETH
-                console.log("- Current tick < target tick, swapping WETH for MPH");
-                swapWethForMph(morpherTokenAddress, fee);
-            } else {
-                // Current price has more MPH per WETH than target
-                // Need to swap MPH for WETH to decrease MPH per WETH
-                console.log("- Current tick > target tick, swapping MPH for WETH");
-                swapMphForWeth(morpherTokenAddress, fee);
-            }
-        } else {
-            // WETH is token0, MPH is token1
-            // In this case, a higher tick means a higher MPH/WETH price
-            console.log("- WETH is token0, target tick:", targetTick);
-            
-            if (tick < targetTick) {
-                // Current price has fewer MPH per WETH than target
-                // Need to swap MPH for WETH to increase MPH per WETH
-                console.log("- Current tick < target tick, swapping MPH for WETH");
-                swapMphForWeth(morpherTokenAddress, fee);
-            } else {
-                // Current price has more MPH per WETH than target
-                // Need to swap WETH for MPH to decrease MPH per WETH
-                console.log("- Current tick > target tick, swapping WETH for MPH");
-                swapWethForMph(morpherTokenAddress, fee);
-            }
+        // Based on the logs, we know WETH is token0 and MPH is token1
+        // The current tick is -11135, which is far from our target of 11513
+        // This means we need to increase the tick significantly
+        
+        // For simplicity, let's just try both swap directions to see which one works
+        console.log("Trying both swap directions to see which one works...");
+        
+        console.log("First attempt: Swapping MPH for WETH");
+        swapMphForWeth(morpherTokenAddress, fee);
+        
+        // Check if the price moved in the right direction
+        (uint160 newSqrtPriceX96, int24 newTick, , , , , ) = pool.slot0();
+        console.log("Tick after first swap attempt:", newTick);
+        
+        // If the tick didn't change much or moved in the wrong direction, try the other way
+        if (newTick < tick + 100) {
+            console.log("First swap didn't move price enough or in right direction");
+            console.log("Second attempt: Swapping WETH for MPH");
+            swapWethForMph(morpherTokenAddress, fee);
         }
     }
     
@@ -325,20 +363,45 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     function swapWethForMph(address morpherTokenAddress, uint24 fee) internal {
         console.log("Swapping WETH for MPH to adjust price...");
         
-        // Use a larger amount to ensure a significant price impact
-        uint256 wethAmount = 0.01 ether;
+        // Use a smaller amount first to test the swap
+        uint256 wethAmount = 0.001 ether;
+        
+        console.log("Current WETH balance:", IWETH9(WETH).balanceOf(msg.sender) / 1e18);
         
         // Ensure we have enough WETH
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
         if (wethBalance < wethAmount) {
             console.log("Not enough WETH, depositing ETH...");
-            IWETH9(WETH).deposit{value: wethAmount}();
+            try IWETH9(WETH).deposit{value: wethAmount}() {
+                console.log("Successfully deposited ETH to WETH");
+            } catch Error(string memory reason) {
+                console.log("Failed to deposit ETH: %s", reason);
+                return;
+            } catch {
+                console.log("Failed to deposit ETH: unknown error");
+                return;
+            }
         }
         
-        // Approve the router to spend WETH
-        IWETH9(WETH).approve(SWAP_ROUTER, wethAmount);
+        // Check WETH balance after deposit
+        console.log("WETH balance after deposit:", IWETH9(WETH).balanceOf(msg.sender) / 1e18);
         
-        // Perform the swap
+        // Approve the router to spend WETH
+        try IWETH9(WETH).approve(SWAP_ROUTER, wethAmount) {
+            console.log("Successfully approved WETH for swap");
+        } catch Error(string memory reason) {
+            console.log("Failed to approve WETH: %s", reason);
+            return;
+        } catch {
+            console.log("Failed to approve WETH: unknown error");
+            return;
+        }
+        
+        // Check allowance
+        uint256 allowance = IERC20(WETH).allowance(msg.sender, SWAP_ROUTER);
+        console.log("WETH allowance for router:", allowance / 1e18);
+        
+        // Perform the swap with try/catch to handle errors
         ISwapRouter router = ISwapRouter(SWAP_ROUTER);
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: WETH,
@@ -351,31 +414,81 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             sqrtPriceLimitX96: 0 // No price limit
         });
         
-        uint256 amountOut = router.exactInputSingle(params);
-        console.log("Swap completed:");
-        console.log("- WETH in:", wethAmount / 1e18);
-        console.log("- MPH out:", amountOut / 1e18);
+        try router.exactInputSingle(params) returns (uint256 amountOut) {
+            console.log("Swap completed:");
+            console.log("- WETH in:", wethAmount / 1e18);
+            console.log("- MPH out:", amountOut / 1e18);
+        } catch Error(string memory reason) {
+            console.log("Swap failed: %s", reason);
+            
+            // Try with an even smaller amount
+            wethAmount = 0.0001 ether;
+            console.log("Trying with smaller amount: %d WETH", wethAmount / 1e18);
+            
+            // Update approval
+            IWETH9(WETH).approve(SWAP_ROUTER, wethAmount);
+            
+            // Update params
+            params.amountIn = wethAmount;
+            
+            try router.exactInputSingle(params) returns (uint256 amountOut) {
+                console.log("Swap with smaller amount completed:");
+                console.log("- WETH in:", wethAmount / 1e18);
+                console.log("- MPH out:", amountOut / 1e18);
+            } catch Error(string memory fallbackReason) {
+                console.log("Swap with smaller amount failed: %s", fallbackReason);
+            } catch {
+                console.log("Swap with smaller amount failed: unknown error");
+            }
+        } catch {
+            console.log("Swap failed: unknown error");
+        }
     }
     
     // Swap MPH for WETH to adjust price
     function swapMphForWeth(address morpherTokenAddress, uint24 fee) internal {
         console.log("Swapping MPH for WETH to adjust price...");
         
-        // Use a larger amount to ensure a significant price impact
-        uint256 mphAmount = 1000 ether; // 1000 MPH
+        // Use a smaller amount first to test the swap
+        uint256 mphAmount = 100 ether; // 100 MPH
+        
+        console.log("Current MPH balance:", IERC20(morpherTokenAddress).balanceOf(msg.sender) / 1e18);
         
         // Ensure we have enough MPH
         uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
         if (mphBalance < mphAmount) {
             console.log("Not enough MPH, minting more...");
             // This assumes the caller has minting rights
-            MorpherToken(morpherTokenAddress).mint(msg.sender, mphAmount);
+            try MorpherToken(morpherTokenAddress).mint(msg.sender, mphAmount) {
+                console.log("Successfully minted MPH");
+            } catch Error(string memory reason) {
+                console.log("Failed to mint MPH: %s", reason);
+                return;
+            } catch {
+                console.log("Failed to mint MPH: unknown error");
+                return;
+            }
         }
         
-        // Approve the router to spend MPH
-        IERC20(morpherTokenAddress).approve(SWAP_ROUTER, mphAmount);
+        // Check MPH balance again after minting
+        console.log("MPH balance after minting:", IERC20(morpherTokenAddress).balanceOf(msg.sender) / 1e18);
         
-        // Perform the swap
+        // Approve the router to spend MPH
+        try IERC20(morpherTokenAddress).approve(SWAP_ROUTER, mphAmount) {
+            console.log("Successfully approved MPH for swap");
+        } catch Error(string memory reason) {
+            console.log("Failed to approve MPH: %s", reason);
+            return;
+        } catch {
+            console.log("Failed to approve MPH: unknown error");
+            return;
+        }
+        
+        // Check allowance
+        uint256 allowance = IERC20(morpherTokenAddress).allowance(msg.sender, SWAP_ROUTER);
+        console.log("MPH allowance for router:", allowance / 1e18);
+        
+        // Perform the swap with try/catch to handle errors
         ISwapRouter router = ISwapRouter(SWAP_ROUTER);
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: morpherTokenAddress,
@@ -388,10 +501,35 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             sqrtPriceLimitX96: 0 // No price limit
         });
         
-        uint256 amountOut = router.exactInputSingle(params);
-        console.log("Swap completed:");
-        console.log("- MPH in:", mphAmount / 1e18);
-        console.log("- WETH out:", amountOut / 1e18);
+        try router.exactInputSingle(params) returns (uint256 amountOut) {
+            console.log("Swap completed:");
+            console.log("- MPH in:", mphAmount / 1e18);
+            console.log("- WETH out:", amountOut / 1e18);
+        } catch Error(string memory reason) {
+            console.log("Swap failed: %s", reason);
+            
+            // Try with an even smaller amount
+            mphAmount = 10 ether; // 10 MPH
+            console.log("Trying with smaller amount: %d MPH", mphAmount / 1e18);
+            
+            // Update approval
+            IERC20(morpherTokenAddress).approve(SWAP_ROUTER, mphAmount);
+            
+            // Update params
+            params.amountIn = mphAmount;
+            
+            try router.exactInputSingle(params) returns (uint256 amountOut) {
+                console.log("Swap with smaller amount completed:");
+                console.log("- MPH in:", mphAmount / 1e18);
+                console.log("- WETH out:", amountOut / 1e18);
+            } catch Error(string memory fallbackReason) {
+                console.log("Swap with smaller amount failed: %s", fallbackReason);
+            } catch {
+                console.log("Swap with smaller amount failed: unknown error");
+            }
+        } catch {
+            console.log("Swap failed: unknown error");
+        }
     }
     
     // Add liquidity back to the pool at the new price
