@@ -157,15 +157,14 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
     function checkCurrentPrice(address poolAddress) internal view returns (int24 tick, bool wethIsToken0) {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
         
-        (
-            uint160 sqrtPriceX96,
-            tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
-        ) = pool.slot0();
+        uint160 sqrtPriceX96;
+        uint16 observationIndex;
+        uint16 observationCardinality;
+        uint16 observationCardinalityNext;
+        uint8 feeProtocol;
+        bool unlocked;
+        
+        (sqrtPriceX96, tick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked) = pool.slot0();
         
         address token0 = pool.token0();
         address token1 = pool.token1();
