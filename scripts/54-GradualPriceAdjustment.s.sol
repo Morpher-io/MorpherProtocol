@@ -115,31 +115,65 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         // Check current price
         (int24 currentTick, bool wethIsToken0) = checkCurrentPrice(poolAddress);
         
-        // Reduce liquidity in existing positions to make price adjustment easier
-        removeAllLiquidity();
-        
-        // Check price after reducing liquidity
-        console.log("Price after reducing liquidity:");
-        (currentTick, wethIsToken0) = checkCurrentPrice(poolAddress);
-        
         // Calculate target tick based on token order
         int24 targetTick = wethIsToken0 ? TARGET_TICK : -TARGET_TICK;
         console.log("Target tick:", targetTick);
         
-        // Perform gradual swaps to adjust price
-        bool success = adjustPriceGradually(poolAddress, morpherTokenAddress, targetTick, wethIsToken0);
+        // Try a small test swap first to verify everything works
+        console.log("Performing a small test swap to verify functionality...");
+        if (wethIsToken0) {
+            swapMphForWeth(morpherTokenAddress, 1 ether); // Swap 1 MPH for WETH
+        } else {
+            swapWethForMph(morpherTokenAddress, 0.0001 ether); // Swap 0.0001 WETH for MPH
+        }
         
-        if (success) {
-            console.log("Successfully adjusted price to near target!");
+        // Check if the test swap worked
+        (int24 newTick, ) = checkCurrentPrice(poolAddress);
+        if (newTick != currentTick) {
+            console.log("Test swap successful, proceeding with price adjustment");
             
-            // Add liquidity back at the new price
-            addLiquidityToPool(poolAddress, morpherTokenAddress);
+            // Perform gradual swaps to adjust price
+            bool success = adjustPriceGradually(poolAddress, morpherTokenAddress, targetTick, wethIsToken0);
+            
+            if (success) {
+                console.log("Successfully adjusted price to near target!");
+                
+                // Final price check
+                console.log("Final price:");
+                checkCurrentPrice(poolAddress);
+            } else {
+                console.log("Failed to adjust price to target after maximum attempts");
+            }
+        } else {
+            console.log("Test swap did not change the price, there may be an issue with the pool");
+            console.log("Trying with a different approach...");
+            
+            // Try a different approach with a single larger swap
+            uint256 swapAmount = wethIsToken0 ? 5 ether : 0.0005 ether;
+            
+            if (currentTick < targetTick) {
+                // Need to increase price
+                if (wethIsToken0) {
+                    console.log("Trying a single larger swap: MPH for WETH");
+                    swapMphForWeth(morpherTokenAddress, swapAmount);
+                } else {
+                    console.log("Trying a single larger swap: WETH for MPH");
+                    swapWethForMph(morpherTokenAddress, swapAmount);
+                }
+            } else {
+                // Need to decrease price
+                if (wethIsToken0) {
+                    console.log("Trying a single larger swap: WETH for MPH");
+                    swapWethForMph(morpherTokenAddress, swapAmount);
+                } else {
+                    console.log("Trying a single larger swap: MPH for WETH");
+                    swapMphForWeth(morpherTokenAddress, swapAmount);
+                }
+            }
             
             // Final price check
-            console.log("Final price after adding liquidity:");
+            console.log("Final price after alternative approach:");
             checkCurrentPrice(poolAddress);
-        } else {
-            console.log("Failed to adjust price to target after maximum attempts");
         }
         
         vm.stopBroadcast();
@@ -321,10 +355,20 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
         
         // Get initial tick
-        (,int24 currentTick,,,,,) = pool.slot0();
+        uint160 sqrtPriceX96;
+        int24 currentTick;
+        uint16 observationIndex;
+        uint16 observationCardinality;
+        uint16 observationCardinalityNext;
+        uint8 feeProtocol;
+        bool unlocked;
+        
+        (sqrtPriceX96, currentTick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked) = pool.slot0();
+        
         console.log("Starting gradual price adjustment:");
         console.log("- Current tick: %d", currentTick);
         console.log("- Target tick: %d", targetTick);
+        console.log("- Pool unlocked: %s", unlocked ? "true" : "false");
         
         // Determine initial swap direction
         bool needToIncreasePrice = currentTick < targetTick;
@@ -362,17 +406,17 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
             // Use smaller amounts as we get closer
             uint256 swapAmount;
             if (Math.abs(tickDiff) > 50000) {
-                // Very far - use larger amount
-                swapAmount = needToIncreasePrice ? 1000 ether : 0.01 ether;
+                // Very far - use larger amount but still keep it small for safety
+                swapAmount = needToIncreasePrice ? 10 ether : 0.001 ether;
             } else if (Math.abs(tickDiff) > 10000) {
                 // Far - use medium amount
-                swapAmount = needToIncreasePrice ? 100 ether : 0.005 ether;
+                swapAmount = needToIncreasePrice ? 5 ether : 0.0005 ether;
             } else if (Math.abs(tickDiff) > 5000) {
                 // Getting closer - use smaller amount
-                swapAmount = needToIncreasePrice ? 50 ether : 0.002 ether;
+                swapAmount = needToIncreasePrice ? 2 ether : 0.0002 ether;
             } else {
                 // Close - use tiny amount
-                swapAmount = needToIncreasePrice ? 10 ether : 0.001 ether;
+                swapAmount = needToIncreasePrice ? 1 ether : 0.0001 ether;
             }
             
             // Perform the swap
@@ -434,8 +478,8 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
                 if (newTick == currentTick) {
                     console.log("Price still didn't move, might be stuck at this tick");
                     
-                    // Try one more approach with a much larger amount
-                    swapAmount = needToIncreasePrice ? 10000 ether : 0.1 ether;
+                    // Try one more approach with a slightly larger amount, but still keep it reasonable
+                    swapAmount = needToIncreasePrice ? 20 ether : 0.002 ether;
                     
                     if (needToIncreasePrice) {
                         if (wethIsToken0) {
@@ -480,23 +524,44 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         
         // Ensure we have enough WETH
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
+        console.log("Current WETH balance: %s", wethBalance / 1e18);
+        
         if (wethBalance < wethAmount) {
             console.log("Not enough WETH, depositing ETH...");
             try IWETH9(WETH).deposit{value: wethAmount}() {
                 console.log("Successfully deposited ETH to WETH");
+                wethBalance = IWETH9(WETH).balanceOf(msg.sender);
+                console.log("New WETH balance: %s", wethBalance / 1e18);
             } catch {
                 console.log("Failed to deposit ETH, reducing swap amount");
                 wethAmount = wethBalance > 0 ? wethBalance : 0.001 ether;
+                console.log("Reduced swap amount to: %s WETH", wethAmount / 1e18);
             }
         }
         
-        // Approve the router to spend WETH
-        try IWETH9(WETH).approve(SWAP_ROUTER, wethAmount) {
+        // Use a smaller amount for the swap to ensure it succeeds
+        if (wethAmount > 0.01 ether) {
+            wethAmount = 0.01 ether;
+            console.log("Limiting swap to 0.01 WETH for safety");
+        }
+        
+        // Approve the router to spend WETH (approve a large amount to avoid repeated approvals)
+        try IWETH9(WETH).approve(SWAP_ROUTER, type(uint256).max) {
             console.log("Successfully approved WETH for swap");
+            uint256 allowance = IERC20(WETH).allowance(msg.sender, SWAP_ROUTER);
+            console.log("WETH allowance for router: %s", allowance / 1e18);
         } catch {
             console.log("Failed to approve WETH");
             return;
         }
+        
+        // Get the pool to check if it exists
+        address poolAddress = IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(WETH, morpherTokenAddress, FEE);
+        if (poolAddress == address(0)) {
+            console.log("Pool does not exist, cannot swap");
+            return;
+        }
+        console.log("Using pool at address: %s", poolAddress);
         
         // Perform the swap
         IV3SwapRouter router = IV3SwapRouter(SWAP_ROUTER);
@@ -527,23 +592,44 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         
         // Ensure we have enough MPH
         uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
+        console.log("Current MPH balance: %s", mphBalance / 1e18);
+        
         if (mphBalance < mphAmount) {
             console.log("Not enough MPH, minting more...");
             try MorpherToken(morpherTokenAddress).mint(msg.sender, mphAmount) {
                 console.log("Successfully minted MPH");
+                mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
+                console.log("New MPH balance: %s", mphBalance / 1e18);
             } catch {
                 console.log("Failed to mint MPH, reducing swap amount");
                 mphAmount = mphBalance > 0 ? mphBalance : 1 ether;
+                console.log("Reduced swap amount to: %s MPH", mphAmount / 1e18);
             }
         }
         
-        // Approve the router to spend MPH
-        try IERC20(morpherTokenAddress).approve(SWAP_ROUTER, mphAmount) {
+        // Use a smaller amount for the swap to ensure it succeeds
+        if (mphAmount > 10 ether) {
+            mphAmount = 10 ether;
+            console.log("Limiting swap to 10 MPH for safety");
+        }
+        
+        // Approve the router to spend MPH (approve a large amount to avoid repeated approvals)
+        try IERC20(morpherTokenAddress).approve(SWAP_ROUTER, type(uint256).max) {
             console.log("Successfully approved MPH for swap");
+            uint256 allowance = IERC20(morpherTokenAddress).allowance(msg.sender, SWAP_ROUTER);
+            console.log("MPH allowance for router: %s", allowance / 1e18);
         } catch {
             console.log("Failed to approve MPH");
             return;
         }
+        
+        // Get the pool to check if it exists
+        address poolAddress = IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(morpherTokenAddress, WETH, FEE);
+        if (poolAddress == address(0)) {
+            console.log("Pool does not exist, cannot swap");
+            return;
+        }
+        console.log("Using pool at address: %s", poolAddress);
         
         // Perform the swap
         IV3SwapRouter router = IV3SwapRouter(SWAP_ROUTER);
