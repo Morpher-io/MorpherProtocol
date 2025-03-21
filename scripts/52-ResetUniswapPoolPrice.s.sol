@@ -149,7 +149,7 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         }
     }
     
-    // Remove all liquidity from existing positions
+    // Reduce liquidity in existing positions to a minimal amount
     function removeAllLiquidity() internal {
         INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
         
@@ -157,11 +157,10 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         uint256 balance = posManager.balanceOf(msg.sender);
         console.log("Found existing positions:", balance);
         
-        // Loop through and remove liquidity from all positions
+        // Loop through and reduce liquidity from all positions
         for (uint256 i = 0; i < balance; i++) {
-            // Always get the first token since the array shifts when we burn
-            uint256 tokenId = posManager.tokenOfOwnerByIndex(msg.sender, 0);
-            console.log("Removing liquidity from position with token ID:", tokenId);
+            uint256 tokenId = posManager.tokenOfOwnerByIndex(msg.sender, i);
+            console.log("Reducing liquidity from position with token ID:", tokenId);
             
             // Get position details
             (
@@ -184,23 +183,30 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             console.log("- Liquidity:", uint256(liquidity));
             
             if (liquidity > 0) {
-                // Decrease liquidity
-                console.log("Decreasing liquidity...");
+                // Calculate how much liquidity to remove (99.9%)
+                uint128 liquidityToRemove = uint128((uint256(liquidity) * 999) / 1000);
+                
+                // Decrease liquidity but leave a tiny amount
+                console.log("Decreasing liquidity to 0.1% of original...");
+                console.log("- Original liquidity:", uint256(liquidity));
+                console.log("- Liquidity to remove:", uint256(liquidityToRemove));
+                console.log("- Liquidity to keep:", uint256(liquidity) - uint256(liquidityToRemove));
+                
                 (uint256 amount0, uint256 amount1) = posManager.decreaseLiquidity(
                     INonfungiblePositionManager.DecreaseLiquidityParams({
                         tokenId: tokenId,
-                        liquidity: liquidity,
+                        liquidity: liquidityToRemove,
                         amount0Min: 0,
                         amount1Min: 0,
                         deadline: block.timestamp + 15 minutes
                     })
                 );
                 
-                console.log("Liquidity removed:");
-                console.log("- Amount token0:", amount0);
-                console.log("- Amount token1:", amount1);
+                console.log("Liquidity reduced:");
+                console.log("- Amount token0 removed:", amount0);
+                console.log("- Amount token1 removed:", amount1);
                 
-                // Collect all tokens
+                // Collect the tokens
                 console.log("Collecting tokens...");
                 (uint256 collected0, uint256 collected1) = posManager.collect(
                     INonfungiblePositionManager.CollectParams({
@@ -215,10 +221,6 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
                 console.log("- Amount token0:", collected0);
                 console.log("- Amount token1:", collected1);
             }
-            
-            // Burn the position
-            posManager.burn(tokenId);
-            console.log("Position with token ID %d successfully burned", tokenId);
         }
     }
     
@@ -268,8 +270,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     function swapWethForMph(address morpherTokenAddress, uint24 fee) internal {
         console.log("Swapping WETH for MPH to adjust price...");
         
-        // Amount of WETH to swap - small amount to move price significantly
-        uint256 wethAmount = 0.01 ether;
+        // With minimal liquidity, we need an even smaller amount to move the price
+        uint256 wethAmount = 0.001 ether;
         
         // Ensure we have enough WETH
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
@@ -304,8 +306,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     function swapMphForWeth(address morpherTokenAddress, uint24 fee) internal {
         console.log("Swapping MPH for WETH to adjust price...");
         
-        // Amount of MPH to swap - small amount to move price significantly
-        uint256 mphAmount = 1000 ether; // 1,000 MPH
+        // With minimal liquidity, we need an even smaller amount to move the price
+        uint256 mphAmount = 100 ether; // 100 MPH
         
         // Ensure we have enough MPH
         uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
@@ -349,9 +351,9 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         (uint160 sqrtPriceX96, int24 currentTick, , , , , ) = pool.slot0();
         console.log("Current tick after swap:", currentTick);
         
-        // Prepare to add liquidity with the correct ratio based on current price
-        uint256 ethAmount = 0.1 ether; // 0.1 WETH
-        uint256 mphAmount = TARGET_MPH_PER_WETH * ethAmount / 1 ether; // 10,000 MPH
+        // Add substantial liquidity at the target price
+        uint256 ethAmount = 1 ether; // 1 WETH
+        uint256 mphAmount = TARGET_MPH_PER_WETH * ethAmount / 1 ether; // 100,000 MPH
         
         console.log("Adding liquidity with:");
         console.log("- WETH amount:", ethAmount / 1e18);
@@ -376,10 +378,10 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
         IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
         
-        // Calculate a reasonable tick range around the current price
+        // Calculate a wider tick range around the current price for better liquidity distribution
         int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
-        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 10;
-        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 10;
+        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 20;
+        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 20;
         
         console.log("Using tick range:");
         console.log("- Min tick:", minTick);
