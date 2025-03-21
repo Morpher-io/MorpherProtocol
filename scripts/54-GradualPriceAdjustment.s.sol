@@ -115,6 +115,13 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         // Check current price
         (int24 currentTick, bool wethIsToken0) = checkCurrentPrice(poolAddress);
         
+        // Reduce liquidity in existing positions to make price adjustment easier
+        removeAllLiquidity();
+        
+        // Check price after reducing liquidity
+        console.log("Price after reducing liquidity:");
+        (currentTick, wethIsToken0) = checkCurrentPrice(poolAddress);
+        
         // Calculate target tick based on token order
         int24 targetTick = wethIsToken0 ? TARGET_TICK : -TARGET_TICK;
         console.log("Target tick:", targetTick);
@@ -125,8 +132,11 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         if (success) {
             console.log("Successfully adjusted price to near target!");
             
+            // Add liquidity back at the new price
+            addLiquidityToPool(poolAddress, morpherTokenAddress);
+            
             // Final price check
-            console.log("Final price:");
+            console.log("Final price after adding liquidity:");
             checkCurrentPrice(poolAddress);
         } else {
             console.log("Failed to adjust price to target after maximum attempts");
@@ -146,7 +156,16 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
     // Check and display the current price, returns the current tick and whether WETH is token0
     function checkCurrentPrice(address poolAddress) internal view returns (int24 tick, bool wethIsToken0) {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
-        (uint160 sqrtPriceX96, tick, , , , , bool unlocked) = pool.slot0();
+        
+        (
+            uint160 sqrtPriceX96,
+            tick,
+            ,
+            ,
+            ,
+            ,
+            bool unlocked
+        ) = pool.slot0();
         
         address token0 = pool.token0();
         address token1 = pool.token1();
@@ -197,6 +216,101 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         return (tick, wethIsToken0);
     }
     
+    // Reduce liquidity in existing positions to a minimal amount
+    function removeAllLiquidity() internal {
+        INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
+        
+        // Get the balance of NFTs for this address
+        uint256 balance = posManager.balanceOf(msg.sender);
+        console.log("Found existing positions:", balance);
+        
+        if (balance == 0) {
+            console.log("No existing positions found, skipping liquidity removal");
+            return;
+        }
+        
+        // Loop through and reduce liquidity from all positions
+        for (uint256 i = 0; i < balance; i++) {
+            uint256 tokenId = posManager.tokenOfOwnerByIndex(msg.sender, 0); // Always get the first one as they shift when burned
+            console.log("Removing liquidity from position with token ID:", tokenId);
+            
+            // Get position details
+            (
+                ,
+                ,
+                address token0,
+                address token1,
+                ,
+                ,
+                ,
+                uint128 liquidity,
+                ,
+                ,
+                ,
+            ) = posManager.positions(tokenId);
+            
+            console.log("Position details:");
+            console.log("- Token0:", token0);
+            console.log("- Token1:", token1);
+            console.log("- Liquidity:", uint256(liquidity));
+            
+            if (liquidity > 0) {
+                // Decrease all liquidity
+                console.log("Decreasing all liquidity...");
+                
+                try posManager.decreaseLiquidity(
+                    INonfungiblePositionManager.DecreaseLiquidityParams({
+                        tokenId: tokenId,
+                        liquidity: liquidity,
+                        amount0Min: 0,
+                        amount1Min: 0,
+                        deadline: block.timestamp + 15 minutes
+                    })
+                ) returns (uint256 amount0, uint256 amount1) {
+                    console.log("Liquidity removed:");
+                    console.log("- Amount token0 removed:", amount0);
+                    console.log("- Amount token1 removed:", amount1);
+                    
+                    // Collect the tokens
+                    console.log("Collecting tokens...");
+                    (uint256 collected0, uint256 collected1) = posManager.collect(
+                        INonfungiblePositionManager.CollectParams({
+                            tokenId: tokenId,
+                            recipient: msg.sender,
+                            amount0Max: type(uint128).max,
+                            amount1Max: type(uint128).max
+                        })
+                    );
+                    
+                    console.log("Tokens collected:");
+                    console.log("- Amount token0:", collected0);
+                    console.log("- Amount token1:", collected1);
+                    
+                    // Burn the position
+                    try posManager.burn(tokenId) {
+                        console.log("Position with token ID %d successfully burned", tokenId);
+                    } catch Error(string memory reason) {
+                        console.log("Failed to burn position: %s", reason);
+                    } catch {
+                        console.log("Failed to burn position: unknown error");
+                    }
+                } catch Error(string memory reason) {
+                    console.log("Failed to decrease liquidity: %s", reason);
+                } catch {
+                    console.log("Failed to decrease liquidity: unknown error");
+                }
+            } else {
+                console.log("Position has no liquidity, attempting to burn directly");
+                try posManager.burn(tokenId) {
+                    console.log("Position with token ID %d successfully burned", tokenId);
+                } catch Error(string memory reason) {
+                    console.log("Failed to burn position: %s", reason);
+                } catch {
+                    console.log("Failed to burn position: unknown error");
+                }
+            }
+        }
+    }
     
     // Adjust price gradually with multiple small swaps
     function adjustPriceGradually(
@@ -250,16 +364,16 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
             uint256 swapAmount;
             if (Math.abs(tickDiff) > 50000) {
                 // Very far - use larger amount
-                swapAmount = needToIncreasePrice ? 5000 ether : 0.05 ether;
+                swapAmount = needToIncreasePrice ? 1000 ether : 0.01 ether;
             } else if (Math.abs(tickDiff) > 10000) {
                 // Far - use medium amount
-                swapAmount = needToIncreasePrice ? 1000 ether : 0.01 ether;
+                swapAmount = needToIncreasePrice ? 100 ether : 0.005 ether;
             } else if (Math.abs(tickDiff) > 5000) {
                 // Getting closer - use smaller amount
-                swapAmount = needToIncreasePrice ? 500 ether : 0.005 ether;
+                swapAmount = needToIncreasePrice ? 50 ether : 0.002 ether;
             } else {
                 // Close - use tiny amount
-                swapAmount = needToIncreasePrice ? 100 ether : 0.001 ether;
+                swapAmount = needToIncreasePrice ? 10 ether : 0.001 ether;
             }
             
             // Perform the swap
@@ -322,7 +436,7 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
                     console.log("Price still didn't move, might be stuck at this tick");
                     
                     // Try one more approach with a much larger amount
-                    swapAmount = needToIncreasePrice ? 50000 ether : 0.5 ether;
+                    swapAmount = needToIncreasePrice ? 10000 ether : 0.1 ether;
                     
                     if (needToIncreasePrice) {
                         if (wethIsToken0) {
@@ -455,4 +569,263 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         }
     }
     
+    // Add liquidity back to the pool at the new price
+    function addLiquidityToPool(address poolAddress, address morpherTokenAddress) internal {
+        IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
+        
+        // Get token order and current tick
+        address token0 = pool.token0();
+        address token1 = pool.token1();
+        (,int24 currentTick,,,,,) = pool.slot0();
+        console.log("Adding liquidity at current tick:", currentTick);
+        
+        // Use moderate amounts for liquidity
+        uint256 ethAmount = 0.05 ether; // 0.05 WETH
+        uint256 mphAmount = 5000 ether; // 5,000 MPH
+        
+        // Adjust the ratio based on the current price
+        bool wethIsToken0 = (token0 == WETH);
+        
+        // If we're close to the target price, use the target ratio
+        int24 targetTick = wethIsToken0 ? TARGET_TICK : -TARGET_TICK;
+        if (Math.abs(currentTick - targetTick) <= TICK_TOLERANCE) {
+            console.log("Using target price ratio for liquidity");
+            mphAmount = ethAmount * TARGET_MPH_PER_WETH;
+        } else {
+            // Otherwise, adjust based on current tick
+            if (Math.abs(currentTick) > 50000) {
+                console.log("Current tick is extreme, using a balanced ratio");
+                if (wethIsToken0) {
+                    if (currentTick < 0) {
+                        // More WETH needed
+                        ethAmount = 0.1 ether;
+                        mphAmount = 1000 ether;
+                    } else {
+                        // More MPH needed
+                        ethAmount = 0.01 ether;
+                        mphAmount = 10000 ether;
+                    }
+                } else {
+                    if (currentTick < 0) {
+                        // More MPH needed
+                        ethAmount = 0.01 ether;
+                        mphAmount = 10000 ether;
+                    } else {
+                        // More WETH needed
+                        ethAmount = 0.1 ether;
+                        mphAmount = 1000 ether;
+                    }
+                }
+            }
+        }
+        
+        console.log("Adding liquidity with:");
+        console.log("- WETH amount: %s", ethAmount / 1e18);
+        console.log("- MPH amount: %s", mphAmount / 1e18);
+        
+        // Ensure we have enough tokens
+        ensureTokenBalances(morpherTokenAddress, ethAmount, mphAmount);
+        
+        // Calculate tick range and create position
+        createPosition(token0, token1, morpherTokenAddress, ethAmount, mphAmount, currentTick);
+    }
+    
+    // Helper function to ensure we have enough tokens
+    function ensureTokenBalances(address morpherTokenAddress, uint256 ethAmount, uint256 mphAmount) internal {
+        // Ensure we have enough WETH
+        uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
+        if (wethBalance < ethAmount) {
+            console.log("Not enough WETH, depositing ETH...");
+            try IWETH9(WETH).deposit{value: ethAmount}() {
+                console.log("Successfully deposited ETH to WETH");
+            } catch {
+                console.log("Failed to deposit ETH");
+                return;
+            }
+        }
+        
+        // Ensure we have enough MPH
+        uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
+        if (mphBalance < mphAmount) {
+            console.log("Not enough MPH, minting more...");
+            try MorpherToken(morpherTokenAddress).mint(msg.sender, mphAmount) {
+                console.log("Successfully minted MPH");
+            } catch {
+                console.log("Failed to mint MPH");
+                return;
+            }
+        }
+        
+        // Approve tokens for the position manager
+        try IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount) {
+            console.log("Successfully approved WETH");
+        } catch {
+            console.log("Failed to approve WETH");
+        }
+        
+        try IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount) {
+            console.log("Successfully approved MPH");
+        } catch {
+            console.log("Failed to approve MPH");
+        }
+    }
+    
+    // Helper function to create position
+    function createPosition(
+        address token0, 
+        address token1, 
+        address morpherTokenAddress,
+        uint256 ethAmount,
+        uint256 mphAmount,
+        int24 currentTick
+    ) internal {
+        // Calculate a reasonable tick range around the current price
+        int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
+        
+        // Ensure the tick range is valid
+        int24 maxValidTick = 887270;
+        int24 minValidTick = -887270;
+        
+        // Ensure current tick is within valid range
+        currentTick = currentTick > maxValidTick ? maxValidTick : currentTick;
+        currentTick = currentTick < minValidTick ? minValidTick : currentTick;
+        
+        // Calculate tick range, ensuring we stay within valid bounds
+        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 5;
+        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 5;
+        
+        // Ensure ticks are within valid range
+        minTick = minTick < minValidTick ? minValidTick : minTick;
+        maxTick = maxTick > maxValidTick ? maxValidTick : maxTick;
+        
+        // Ensure min tick is less than max tick
+        if (minTick >= maxTick) {
+            minTick = maxTick - tickSpacing;
+        }
+        
+        console.log("Using tick range:");
+        console.log("- Min tick: %d", minTick);
+        console.log("- Max tick: %d", maxTick);
+        
+        // Determine token amounts based on token order
+        uint256 amount0 = token0 == morpherTokenAddress ? mphAmount : ethAmount;
+        uint256 amount1 = token0 == morpherTokenAddress ? ethAmount : mphAmount;
+        
+        // Ensure both amounts are non-zero
+        if (amount0 == 0) amount0 = 1;
+        if (amount1 == 0) amount1 = 1;
+        
+        console.log("Final amounts for position:");
+        console.log("- Amount0: %s", amount0);
+        console.log("- Amount1: %s", amount1);
+        
+        // Create the mint parameters
+        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+            token0: token0,
+            token1: token1,
+            fee: FEE,
+            tickLower: minTick,
+            tickUpper: maxTick,
+            amount0Desired: amount0,
+            amount1Desired: amount1,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: msg.sender,
+            deadline: block.timestamp + 15 minutes
+        });
+        
+        // Mint the position
+        try INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(params) returns (
+            uint256 tokenId, 
+            uint128 liquidity, 
+            uint256 amount0Mint, 
+            uint256 amount1Mint
+        ) {
+            console.log("Liquidity position created:");
+            console.log("- Token ID: %d", tokenId);
+            console.log("- Liquidity: %d", uint256(liquidity));
+            console.log("- Amount token0 used: %s", amount0Mint);
+            console.log("- Amount token1 used: %s", amount1Mint);
+        } catch Error(string memory reason) {
+            console.log("Failed to mint position: %s", reason);
+            
+            // Try with even smaller amounts and narrower range as a fallback
+            tryFallbackPosition(token0, token1, morpherTokenAddress, currentTick);
+        } catch {
+            console.log("Failed to mint position: unknown error");
+            
+            // Try with even smaller amounts and narrower range as a fallback
+            tryFallbackPosition(token0, token1, morpherTokenAddress, currentTick);
+        }
+    }
+    
+    // Try a fallback position with minimal values
+    function tryFallbackPosition(
+        address token0,
+        address token1,
+        address morpherTokenAddress,
+        int24 currentTick
+    ) internal {
+        console.log("Trying fallback position with minimal values");
+        
+        int24 tickSpacing = 60;
+        
+        // Use a very narrow range
+        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing;
+        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing;
+        
+        // Ensure ticks are within valid range
+        minTick = minTick < -887270 ? -887270 : minTick;
+        maxTick = maxTick > 887270 ? 887270 : maxTick;
+        
+        // Use minimal amounts
+        uint256 minEthAmount = 0.001 ether;
+        uint256 minMphAmount = 1 ether;
+        
+        // Ensure we have the tokens
+        ensureTokenBalances(morpherTokenAddress, minEthAmount, minMphAmount);
+        
+        // Determine token amounts based on token order
+        uint256 amount0 = token0 == morpherTokenAddress ? minMphAmount : minEthAmount;
+        uint256 amount1 = token0 == morpherTokenAddress ? minEthAmount : minMphAmount;
+        
+        console.log("Fallback position parameters:");
+        console.log("- Min tick: %d", minTick);
+        console.log("- Max tick: %d", maxTick);
+        console.log("- Amount0: %s", amount0);
+        console.log("- Amount1: %s", amount1);
+        
+        // Create the mint parameters
+        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+            token0: token0,
+            token1: token1,
+            fee: FEE,
+            tickLower: minTick,
+            tickUpper: maxTick,
+            amount0Desired: amount0,
+            amount1Desired: amount1,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: msg.sender,
+            deadline: block.timestamp + 15 minutes
+        });
+        
+        // Mint the position
+        try INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(params) returns (
+            uint256 tokenId, 
+            uint128 liquidity, 
+            uint256 amount0Mint, 
+            uint256 amount1Mint
+        ) {
+            console.log("Fallback liquidity position created:");
+            console.log("- Token ID: %d", tokenId);
+            console.log("- Liquidity: %d", uint256(liquidity));
+            console.log("- Amount token0 used: %s", amount0Mint);
+            console.log("- Amount token1 used: %s", amount1Mint);
+        } catch Error(string memory reason) {
+            console.log("Fallback position creation failed: %s", reason);
+        } catch {
+            console.log("Fallback position creation failed: unknown error");
+        }
+    }
 }
