@@ -12,6 +12,13 @@ import {INonfungiblePositionManager} from "../lib/uniswap-v3-periphery/contracts
 import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import {TickMath} from "../lib/uniswap-v3-core/contracts/libraries/TickMath.sol";
 
+// Simple Math library for absolute value
+library Math {
+    function abs(int24 x) internal pure returns (int24) {
+        return x >= 0 ? x : -x;
+    }
+}
+
 // Uniswap interfaces
 interface IUniswapV3Factory {
     function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool);
@@ -77,6 +84,9 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         }
     }
 
+    // Flag to track if we've done a direct price reset
+    bool private didDirectPriceReset = false;
+    
     function run() public {
         // Set up the correct addresses based on the chain
         setupAddresses();
@@ -113,12 +123,17 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("Price after swap:");
         checkCurrentPrice(poolAddress);
         
-        // Add liquidity back at the new price
-        addLiquidityToPool(poolAddress, morpherTokenAddress);
-        
-        // Final price check
-        console.log("Final price after adding liquidity:");
-        checkCurrentPrice(poolAddress);
+        // Add liquidity back at the new price only if we didn't do a direct reset
+        if (!didDirectPriceReset) {
+            console.log("Adding liquidity back at the current price...");
+            addLiquidityToPool(poolAddress, morpherTokenAddress);
+            
+            // Final price check
+            console.log("Final price after adding liquidity:");
+            checkCurrentPrice(poolAddress);
+        } else {
+            console.log("Skipping additional liquidity addition since we did a direct price reset");
+        }
         
         vm.stopBroadcast();
     }
@@ -145,99 +160,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- Tick:", tick);
         console.log("- SqrtPriceX96:", uint256(sqrtPriceX96));
         
-        // For Uniswap V3, we can directly use the tick to understand the price
-        // price = 1.0001^tick
-        // For tick = -11135, price ≈ 0.33 (meaning 1 WETH is worth about 0.33 MPH)
-        // But we want to display MPH per WETH, which is 1/price ≈ 3.03
-        
-        // Calculate price from tick for better accuracy
-        // 1.0001^tick = price
-        // For large ticks, we use the approximation: price ≈ 1.0001^tick
-        
-        if (token0 == WETH) {
-            // WETH is token0, MPH is token1
-            // Price in Uniswap terms is token1/token0 = MPH/WETH
-            // This is what we want directly
-            
-            // Calculate price from tick: 1.0001^tick
-            // For negative tick, this gives us a price < 1
-            // For positive tick, this gives us a price > 1
-            
-            // For display purposes, we'll calculate an approximate value
-            uint256 mphPerWeth;
-            
-            if (tick < 0) {
-                // For negative tick, price < 1, so MPH per WETH is small
-                // We'll use a simple approximation based on the tick
-                uint256 absTickDiv2300 = uint256(int256(-tick)) / 2300;
-                mphPerWeth = 10 ** absTickDiv2300; // Rough approximation
-            } else {
-                // For positive tick, price > 1, so MPH per WETH is large
-                uint256 tickDiv2300 = uint256(int256(tick)) / 2300;
-                mphPerWeth = (10 ** tickDiv2300) * 10000; // Rough approximation
-            }
-            
-            console.log("- Approximate price from tick: ~%d MPH per WETH", mphPerWeth);
-            
-            // Also calculate from sqrtPriceX96 for comparison
-            uint256 price = 0;
-            if (sqrtPriceX96 > 0) {
-                // Formula: price = (sqrtPriceX96^2) / 2^192
-                uint256 sqrtPriceSquared = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-                
-                // Avoid overflow by using multiple steps
-                uint256 divisor = 1 << 64; // 2^64
-                uint256 intermediate = sqrtPriceSquared / divisor; // Divide by 2^64
-                intermediate = intermediate / divisor; // Divide by 2^64 again
-                price = intermediate / divisor; // Divide by 2^64 a third time (total division by 2^192)
-                
-                // Convert to a more readable format
-                price = price * 1e18;
-            }
-            console.log("- Calculated price: %d MPH per WETH", price / 1e18);
-        } else {
-            // MPH is token0, WETH is token1
-            // Price in Uniswap terms is token1/token0 = WETH/MPH
-            // We need to invert this to get MPH/WETH
-            
-            // Calculate price from tick: 1.0001^tick
-            uint256 mphPerWeth;
-            
-            if (tick < 0) {
-                // For negative tick, WETH/MPH < 1, so MPH/WETH > 1
-                uint256 absTickDiv2300 = uint256(int256(-tick)) / 2300;
-                mphPerWeth = (10 ** absTickDiv2300) * 10000; // Rough approximation
-            } else {
-                // For positive tick, WETH/MPH > 1, so MPH/WETH < 1
-                uint256 tickDiv2300 = uint256(int256(tick)) / 2300;
-                mphPerWeth = 10 ** tickDiv2300; // Rough approximation
-            }
-            
-            console.log("- Approximate price from tick: ~%d MPH per WETH", mphPerWeth);
-            
-            // Also calculate from sqrtPriceX96 for comparison
-            uint256 wethPerMph = 0;
-            if (sqrtPriceX96 > 0) {
-                // Formula for WETH/MPH: price = (sqrtPriceX96^2) / 2^192
-                uint256 sqrtPriceSquared = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-                
-                // Avoid overflow by using multiple steps
-                uint256 divisor = 1 << 64; // 2^64
-                uint256 intermediate = sqrtPriceSquared / divisor; // Divide by 2^64
-                intermediate = intermediate / divisor; // Divide by 2^64 again
-                wethPerMph = intermediate / divisor; // Divide by 2^64 a third time (total division by 2^192)
-                
-                // Convert to a more readable format
-                wethPerMph = wethPerMph * 1e18;
-                
-                // Invert to get MPH/WETH
-                uint256 mphPerWethCalculated = 0;
-                if (wethPerMph > 0) {
-                    mphPerWethCalculated = 1e36 / wethPerMph;
-                }
-                console.log("- Calculated price: %d MPH per WETH", mphPerWethCalculated / 1e18);
-            }
-        }
+        // For Uniswap V3, the tick is the most reliable indicator of price
+        // We'll just use the tick to determine if we're close to our target
         
         // Most importantly, show the tick which is the most reliable indicator
         console.log("- Target tick for 100,000 MPH per WETH: 11513 (or -11513 if MPH is token0)");
@@ -246,6 +170,43 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         // Calculate how far we are from target
         int24 targetTick = (token0 == WETH) ? int24(11513) : -11513;
         console.log("- Tick difference from target: %d", targetTick - tick);
+        
+        // For display purposes, provide a rough estimate of the price
+        if (token0 == WETH) {
+            // WETH is token0, MPH is token1
+            if (tick < -50000 || tick > 50000) {
+                console.log("- Price is extreme (tick out of normal range)");
+            } else if (tick < 0) {
+                // For negative tick, price < 1
+                console.log("- Price: Less than 1 MPH per WETH");
+            } else {
+                // For positive tick, price > 1
+                console.log("- Price: More than 1 MPH per WETH");
+                
+                // Very rough approximation for display only
+                if (tick > 0 && tick < 20000) {
+                    uint256 approxPrice = uint256(1) << (uint256(tick) / 2300);
+                    console.log("- Approximate price: ~%d MPH per WETH", approxPrice);
+                }
+            }
+        } else {
+            // MPH is token0, WETH is token1
+            if (tick < -50000 || tick > 50000) {
+                console.log("- Price is extreme (tick out of normal range)");
+            } else if (tick < 0) {
+                // For negative tick, WETH/MPH < 1, so MPH/WETH > 1
+                console.log("- Price: More than 1 MPH per WETH");
+                
+                // Very rough approximation for display only
+                if (tick > -20000 && tick < 0) {
+                    uint256 approxPrice = uint256(1) << (uint256(-tick) / 2300);
+                    console.log("- Approximate price: ~%d MPH per WETH", approxPrice);
+                }
+            } else {
+                // For positive tick, WETH/MPH > 1, so MPH/WETH < 1
+                console.log("- Price: Less than 1 MPH per WETH");
+            }
+        }
     }
     
     // Reduce liquidity in existing positions to a minimal amount
@@ -341,25 +302,185 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         // (log base 1.0001 of 100,000)
         int24 targetTick = 11513;
         
-        // Based on the logs, we know WETH is token0 and MPH is token1
-        // The current tick is -11135, which is far from our target of 11513
-        // This means we need to increase the tick significantly
+        // Calculate the direction we need to move
+        bool needToIncreasePrice;
         
-        // For simplicity, let's just try both swap directions to see which one works
-        console.log("Trying both swap directions to see which one works...");
+        if (token0 == WETH) {
+            // WETH is token0, MPH is token1
+            // We need to increase the price (tick) to reach our target
+            needToIncreasePrice = tick < targetTick;
+        } else {
+            // MPH is token0, WETH is token1
+            // We need to decrease the price (tick) to reach our target
+            needToIncreasePrice = tick > -targetTick;
+        }
         
-        console.log("First attempt: Swapping MPH for WETH");
-        swapMphForWeth(morpherTokenAddress, fee);
+        if (needToIncreasePrice) {
+            console.log("Need to increase MPH/WETH price");
+            console.log("Swapping MPH for WETH to increase price");
+            swapMphForWeth(morpherTokenAddress, fee);
+        } else {
+            console.log("Need to decrease MPH/WETH price");
+            console.log("Swapping WETH for MPH to decrease price");
+            swapWethForMph(morpherTokenAddress, fee);
+        }
         
         // Check if the price moved in the right direction
         (uint160 newSqrtPriceX96, int24 newTick, , , , , ) = pool.slot0();
-        console.log("Tick after first swap attempt:", newTick);
+        console.log("Tick after swap:", newTick);
         
-        // If the tick didn't change much or moved in the wrong direction, try the other way
-        if (newTick < tick + 100) {
-            console.log("First swap didn't move price enough or in right direction");
-            console.log("Second attempt: Swapping WETH for MPH");
-            swapWethForMph(morpherTokenAddress, fee);
+        // If we're still far from target, try a direct price reset
+        int24 targetTickWithBuffer = token0 == WETH ? targetTick : -targetTick;
+        if (Math.abs(newTick - targetTickWithBuffer) > 5000) {
+            console.log("Still far from target price, trying direct price reset");
+            resetPoolPrice(poolAddress, morpherTokenAddress);
+        }
+    }
+    
+    // Reset pool price directly by removing all liquidity and adding it back at target price
+    function resetPoolPrice(address poolAddress, address morpherTokenAddress) internal {
+        INonfungiblePositionManager posManager = INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER);
+        
+        // Get the balance of NFTs for this address
+        uint256 balance = posManager.balanceOf(msg.sender);
+        console.log("Found positions for complete removal:", balance);
+        
+        // Loop through and remove all liquidity from positions
+        for (uint256 i = 0; i < balance; i++) {
+            // Always get the first token since the array shifts when we burn
+            uint256 tokenId = posManager.tokenOfOwnerByIndex(msg.sender, 0);
+            console.log("Removing all liquidity from position with token ID:", tokenId);
+            
+            // Get position details
+            (
+                ,
+                ,
+                address token0,
+                address token1,
+                ,
+                ,
+                ,
+                uint128 liquidity,
+                ,
+                ,
+                ,
+            ) = posManager.positions(tokenId);
+            
+            if (liquidity > 0) {
+                // Decrease all liquidity
+                console.log("Decreasing all liquidity...");
+                (uint256 amount0, uint256 amount1) = posManager.decreaseLiquidity(
+                    INonfungiblePositionManager.DecreaseLiquidityParams({
+                        tokenId: tokenId,
+                        liquidity: liquidity,
+                        amount0Min: 0,
+                        amount1Min: 0,
+                        deadline: block.timestamp + 15 minutes
+                    })
+                );
+                
+                console.log("Liquidity removed:");
+                console.log("- Amount token0:", amount0);
+                console.log("- Amount token1:", amount1);
+                
+                // Collect all tokens
+                console.log("Collecting tokens...");
+                (uint256 collected0, uint256 collected1) = posManager.collect(
+                    INonfungiblePositionManager.CollectParams({
+                        tokenId: tokenId,
+                        recipient: msg.sender,
+                        amount0Max: type(uint128).max,
+                        amount1Max: type(uint128).max
+                    })
+                );
+                
+                console.log("Tokens collected:");
+                console.log("- Amount token0:", collected0);
+                console.log("- Amount token1:", collected1);
+            }
+            
+            // Burn the position
+            posManager.burn(tokenId);
+            console.log("Position with token ID %d successfully burned", tokenId);
+        }
+        
+        // Now create a new pool with the correct price
+        IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
+        address token0 = pool.token0();
+        address token1 = pool.token1();
+        
+        // Add liquidity at the target price
+        uint256 ethAmount = 1 ether; // 1 WETH
+        uint256 mphAmount = TARGET_MPH_PER_WETH * ethAmount / 1 ether; // 100,000 MPH
+        
+        console.log("Adding liquidity with target ratio:");
+        console.log("- WETH amount:", ethAmount / 1e18);
+        console.log("- MPH amount:", mphAmount / 1e18);
+        
+        // Ensure we have enough WETH
+        uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
+        if (wethBalance < ethAmount) {
+            console.log("Not enough WETH, depositing ETH...");
+            IWETH9(WETH).deposit{value: ethAmount}();
+        }
+        
+        // Ensure we have enough MPH
+        uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
+        if (mphBalance < mphAmount) {
+            console.log("Not enough MPH, minting more...");
+            // This assumes the caller has minting rights
+            MorpherToken(morpherTokenAddress).mint(msg.sender, mphAmount);
+        }
+        
+        // Approve tokens for the position manager
+        IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
+        IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
+        
+        // Use a reasonable tick range around the target price
+        int24 targetTick = token0 == WETH ? 11513 : -11513;
+        int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
+        int24 minTick = (targetTick / tickSpacing) * tickSpacing - tickSpacing * 10;
+        int24 maxTick = (targetTick / tickSpacing) * tickSpacing + tickSpacing * 10;
+        
+        console.log("Using tick range around target:");
+        console.log("- Target tick:", targetTick);
+        console.log("- Min tick:", minTick);
+        console.log("- Max tick:", maxTick);
+        
+        // Create the mint parameters
+        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+            token0: token0,
+            token1: token1,
+            fee: FEE,
+            tickLower: minTick,
+            tickUpper: maxTick,
+            amount0Desired: token0 == morpherTokenAddress ? mphAmount : ethAmount,
+            amount1Desired: token0 == morpherTokenAddress ? ethAmount : mphAmount,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: msg.sender,
+            deadline: block.timestamp + 15 minutes
+        });
+        
+        // Mint the position
+        try INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(params) returns (
+            uint256 tokenId, 
+            uint128 liquidity, 
+            uint256 amount0Mint, 
+            uint256 amount1Mint
+        ) {
+            console.log("New liquidity position created at target price:");
+            console.log("- Token ID:", tokenId);
+            console.log("- Liquidity:", uint256(liquidity));
+            console.log("- Amount token0 used:", amount0Mint);
+            console.log("- Amount token1 used:", amount1Mint);
+            
+            // Set the flag to indicate we've done a direct price reset
+            didDirectPriceReset = true;
+        } catch Error(string memory reason) {
+            console.log("Failed to mint position at target price: %s", reason);
+        } catch {
+            console.log("Failed to mint position at target price: unknown error");
         }
     }
     
