@@ -298,9 +298,23 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         console.log("- Current tick:", tick);
         console.log("- Target MPH per WETH:", TARGET_MPH_PER_WETH);
         
-        // For our target of 100,000 MPH per WETH, the tick would be around 11513
-        // (log base 1.0001 of 100,000)
-        int24 targetTick = 11513;
+        // For our target of 100,000 MPH per WETH
+        // log base 1.0001 of 100,000 is approximately 11513
+        // But we need to be precise with this calculation
+        int24 targetTick;
+        
+        // Calculate the target tick more precisely
+        if (token0 == WETH) {
+            // If WETH is token0, we want a price of 100,000 MPH per WETH
+            // This is a positive tick
+            targetTick = 11513;
+        } else {
+            // If MPH is token0, we want a price of 1/100,000 WETH per MPH
+            // This is a negative tick
+            targetTick = -11513;
+        }
+        
+        console.log("Calculated target tick:", targetTick);
         
         // Calculate the direction we need to move
         bool needToIncreasePrice;
@@ -342,8 +356,69 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         // First remove all liquidity
         removeAllLiquidityAndBurn();
         
+        // Calculate the initial sqrt price for the target price
+        uint160 sqrtPriceX96 = calculateSqrtPriceX96ForTarget(poolAddress);
+        
+        // Initialize the pool with the target price
+        try IUniswapV3Pool(poolAddress).initialize(sqrtPriceX96) {
+            console.log("Pool initialized with target price");
+            console.log("Target sqrtPriceX96:", uint256(sqrtPriceX96));
+        } catch Error(string memory reason) {
+            console.log("Failed to initialize pool: %s", reason);
+            console.log("Pool may already be initialized, continuing with liquidity addition");
+        } catch {
+            console.log("Failed to initialize pool: unknown error");
+            console.log("Pool may already be initialized, continuing with liquidity addition");
+        }
+        
         // Then add new liquidity at target price
         addLiquidityAtTargetPrice(poolAddress, morpherTokenAddress);
+    }
+    
+    // Calculate the sqrtPriceX96 value for the target price
+    function calculateSqrtPriceX96ForTarget(address poolAddress) internal view returns (uint160) {
+        IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
+        address token0 = pool.token0();
+        
+        // Target price: 100,000 MPH per WETH
+        uint256 targetPrice;
+        
+        if (token0 == WETH) {
+            // If WETH is token0, price = MPH/WETH = 100,000
+            targetPrice = TARGET_MPH_PER_WETH;
+        } else {
+            // If MPH is token0, price = WETH/MPH = 1/100,000
+            targetPrice = (1e36 / TARGET_MPH_PER_WETH) / 1e18;
+        }
+        
+        console.log("Target price calculation:");
+        console.log("- WETH is token0:", token0 == WETH);
+        console.log("- Target price value:", targetPrice);
+        
+        // Calculate sqrtPriceX96 from the target price
+        // sqrtPriceX96 = sqrt(price) * 2^96
+        uint256 sqrtPrice = sqrt(targetPrice * 1e18); // Scale by 1e18 for precision
+        uint256 sqrtPriceX96 = (sqrtPrice * (1 << 96)) / 1e9; // Divide by 1e9 to account for the sqrt of 1e18
+        
+        console.log("- Sqrt of price:", sqrtPrice);
+        console.log("- SqrtPriceX96:", sqrtPriceX96);
+        
+        return uint160(sqrtPriceX96);
+    }
+    
+    // Square root function using Newton's method
+    function sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+        
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+        
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+        
+        return y;
     }
     
     // Helper function to remove all liquidity and burn positions
@@ -420,9 +495,36 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         address token0 = pool.token0();
         address token1 = pool.token1();
         
-        // Add liquidity at the target price
+        // Get the current price to determine the correct ratio
+        (uint160 sqrtPriceX96, int24 currentTick, , , , , ) = pool.slot0();
+        console.log("Current tick before adding liquidity:", currentTick);
+        
+        // Add liquidity at the target price with the correct ratio
         uint256 ethAmount = 1 ether; // 1 WETH
         uint256 mphAmount = TARGET_MPH_PER_WETH * ethAmount / 1 ether; // 100,000 MPH
+        
+        // Adjust the amounts based on the current price to ensure balanced liquidity
+        if (Math.abs(currentTick) > 50000) {
+            console.log("Current price is extreme, using a more balanced ratio");
+            // If the price is extreme, use a more balanced ratio
+            if (token0 == WETH) {
+                if (currentTick < 0) {
+                    // More WETH needed
+                    ethAmount = 2 ether;
+                } else {
+                    // More MPH needed
+                    mphAmount = 200000 ether;
+                }
+            } else {
+                if (currentTick < 0) {
+                    // More MPH needed
+                    mphAmount = 200000 ether;
+                } else {
+                    // More WETH needed
+                    ethAmount = 2 ether;
+                }
+            }
+        }
         
         console.log("Adding liquidity with target ratio:");
         console.log("- WETH amount:", ethAmount / 1e18);
@@ -459,11 +561,16 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         uint256 ethAmount,
         uint256 mphAmount
     ) internal {
-        // Use a reasonable tick range around the target price
-        int24 targetTick = token0 == WETH ? int24(11513) : -11513;
+        // Get the current tick after our price initialization
+        IUniswapV3Pool pool = IUniswapV3Pool(getPoolAddress(morpherTokenAddress));
+        (,int24 currentTick,,,,,) = pool.slot0();
+        
+        console.log("Current tick after price initialization:", currentTick);
+        
+        // Use a reasonable tick range around the current price
         int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
-        int24 minTick = (targetTick / tickSpacing) * tickSpacing - tickSpacing * 10;
-        int24 maxTick = (targetTick / tickSpacing) * tickSpacing + tickSpacing * 10;
+        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 10;
+        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 10;
         
         console.log("Using tick range around target:");
         console.log("- Target tick:", targetTick);
@@ -515,8 +622,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     function swapWethForMph(address morpherTokenAddress, uint24 fee) internal {
         console.log("Swapping WETH for MPH to adjust price...");
         
-        // Use a smaller amount first to test the swap
-        uint256 wethAmount = 0.001 ether;
+        // Use a very small amount to avoid extreme price movement
+        uint256 wethAmount = 0.0001 ether;
         
         console.log("Current WETH balance:", IWETH9(WETH).balanceOf(msg.sender) / 1e18);
         
@@ -600,8 +707,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     function swapMphForWeth(address morpherTokenAddress, uint24 fee) internal {
         console.log("Swapping MPH for WETH to adjust price...");
         
-        // Use a smaller amount first to test the swap
-        uint256 mphAmount = 100 ether; // 100 MPH
+        // Use a very small amount to avoid extreme price movement
+        uint256 mphAmount = 10 ether; // 10 MPH
         
         console.log("Current MPH balance:", IERC20(morpherTokenAddress).balanceOf(msg.sender) / 1e18);
         
