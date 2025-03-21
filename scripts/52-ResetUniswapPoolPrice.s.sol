@@ -100,7 +100,7 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         checkCurrentPrice(poolAddress);
         
         // Remove all liquidity from existing positions
-        removeAllLiquidity();
+        // removeAllLiquidity();
         
         // Perform swap to adjust price
         adjustPriceWithSwap(poolAddress, morpherTokenAddress);
@@ -184,10 +184,10 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             
             if (liquidity > 0) {
                 // Calculate how much liquidity to remove (99.9%)
-                uint128 liquidityToRemove = uint128((uint256(liquidity) * 999) / 1000);
+                uint128 liquidityToRemove = uint128((uint256(liquidity) * 9) / 10);
                 
                 // Decrease liquidity but leave a tiny amount
-                console.log("Decreasing liquidity to 0.1% of original...");
+                console.log("Decreasing liquidity to 10% of original...");
                 console.log("- Original liquidity:", uint256(liquidity));
                 console.log("- Liquidity to remove:", uint256(liquidityToRemove));
                 console.log("- Liquidity to keep:", uint256(liquidity) - uint256(liquidityToRemove));
