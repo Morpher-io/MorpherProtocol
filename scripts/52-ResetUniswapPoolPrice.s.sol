@@ -185,7 +185,7 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
                 
                 // Very rough approximation for display only
                 if (tick > 0 && tick < 20000) {
-                    uint256 approxPrice = uint256(1) << (uint256(tick) / 2300);
+                    uint256 approxPrice = uint256(1) << (uint256(int256(tick)) / 2300);
                     console.log("- Approximate price: ~%d MPH per WETH", approxPrice);
                 }
             }
@@ -199,7 +199,7 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
                 
                 // Very rough approximation for display only
                 if (tick > -20000 && tick < 0) {
-                    uint256 approxPrice = uint256(1) << (uint256(-tick) / 2300);
+                    uint256 approxPrice = uint256(1) << (uint256(int256(-tick)) / 2300);
                     console.log("- Approximate price: ~%d MPH per WETH", approxPrice);
                 }
             } else {
@@ -355,8 +355,8 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             (
                 ,
                 ,
-                address token0,
-                address token1,
+                ,
+                ,
                 ,
                 ,
                 ,
@@ -437,7 +437,7 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
         
         // Use a reasonable tick range around the target price
-        int24 targetTick = token0 == WETH ? 11513 : -11513;
+        int24 targetTick = token0 == WETH ? int24(11513) : -11513;
         int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
         int24 minTick = (targetTick / tickSpacing) * tickSpacing - tickSpacing * 10;
         int24 maxTick = (targetTick / tickSpacing) * tickSpacing + tickSpacing * 10;
