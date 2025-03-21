@@ -156,7 +156,7 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
     // Check and display the current price, returns the current tick and whether WETH is token0
     function checkCurrentPrice(address poolAddress) internal view returns (int24 tick, bool wethIsToken0) {
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
-        (uint160 sqrtPriceX96, tick, , , , , ) = pool.slot0();
+        (uint160 sqrtPriceX96, tick, , , , , bool unlocked) = pool.slot0();
         
         address token0 = pool.token0();
         address token1 = pool.token1();
