@@ -499,9 +499,26 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         (uint160 sqrtPriceX96, int24 currentTick, , , , , ) = pool.slot0();
         console.log("Current tick before adding liquidity:", currentTick);
         
-        // Add liquidity at the target price with the correct ratio
-        uint256 ethAmount = 1 ether; // 1 WETH
-        uint256 mphAmount = TARGET_MPH_PER_WETH * ethAmount / 1 ether; // 100,000 MPH
+        // Check if the tick is in a valid range
+        if (currentTick > 800000 || currentTick < -800000) {
+            console.log("Current tick is too extreme for adding liquidity");
+            // Try to reset the price to something more reasonable
+            tryResetPoolToReasonableTick(poolAddress, morpherTokenAddress);
+            
+            // Get the new tick after reset attempt
+            (,currentTick,,,,,) = pool.slot0();
+            console.log("Tick after reset attempt:", currentTick);
+            
+            // If still extreme, we can't add liquidity
+            if (currentTick > 800000 || currentTick < -800000) {
+                console.log("Tick is still too extreme, cannot add liquidity safely");
+                return;
+            }
+        }
+        
+        // Use smaller amounts for extreme ticks
+        uint256 ethAmount = 0.1 ether; // 0.1 WETH
+        uint256 mphAmount = 10000 ether; // 10,000 MPH
         
         // Adjust the amounts based on the current price to ensure balanced liquidity
         if (Math.abs(currentTick) > 50000) {
@@ -510,18 +527,22 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             if (token0 == WETH) {
                 if (currentTick < 0) {
                     // More WETH needed
-                    ethAmount = 2 ether;
+                    ethAmount = 0.2 ether;
+                    mphAmount = 5000 ether;
                 } else {
                     // More MPH needed
-                    mphAmount = 200000 ether;
+                    ethAmount = 0.05 ether;
+                    mphAmount = 20000 ether;
                 }
             } else {
                 if (currentTick < 0) {
                     // More MPH needed
-                    mphAmount = 200000 ether;
+                    ethAmount = 0.05 ether;
+                    mphAmount = 20000 ether;
                 } else {
                     // More WETH needed
-                    ethAmount = 2 ether;
+                    ethAmount = 0.2 ether;
+                    mphAmount = 5000 ether;
                 }
             }
         }
@@ -534,7 +555,15 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
         if (wethBalance < ethAmount) {
             console.log("Not enough WETH, depositing ETH...");
-            IWETH9(WETH).deposit{value: ethAmount}();
+            try IWETH9(WETH).deposit{value: ethAmount}() {
+                console.log("Successfully deposited ETH to WETH");
+            } catch Error(string memory reason) {
+                console.log("Failed to deposit ETH: %s", reason);
+                return;
+            } catch {
+                console.log("Failed to deposit ETH: unknown error");
+                return;
+            }
         }
         
         // Ensure we have enough MPH
@@ -542,12 +571,31 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         if (mphBalance < mphAmount) {
             console.log("Not enough MPH, minting more...");
             // This assumes the caller has minting rights
-            MorpherToken(morpherTokenAddress).mint(msg.sender, mphAmount);
+            try MorpherToken(morpherTokenAddress).mint(msg.sender, mphAmount) {
+                console.log("Successfully minted MPH");
+            } catch Error(string memory reason) {
+                console.log("Failed to mint MPH: %s", reason);
+                return;
+            } catch {
+                console.log("Failed to mint MPH: unknown error");
+                return;
+            }
         }
         
         // Approve tokens for the position manager
-        IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount);
-        IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount);
+        try IWETH9(WETH).approve(NONFUNGIBLE_POSITION_MANAGER, ethAmount) {
+            console.log("Successfully approved WETH");
+        } catch {
+            console.log("Failed to approve WETH");
+            return;
+        }
+        
+        try IERC20(morpherTokenAddress).approve(NONFUNGIBLE_POSITION_MANAGER, mphAmount) {
+            console.log("Successfully approved MPH");
+        } catch {
+            console.log("Failed to approve MPH");
+            return;
+        }
         
         // Create and mint the position
         createPositionAtTargetPrice(token0, token1, morpherTokenAddress, ethAmount, mphAmount);
@@ -567,19 +615,48 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         
         console.log("Current tick after price initialization:", currentTick);
         
-        // Use a reasonable tick range around the current price
+        // Ensure the tick is within valid range
+        if (currentTick > 887270) currentTick = 887270;
+        if (currentTick < -887270) currentTick = -887270;
+        
+        // Use a narrower tick range around the current price
         int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
-        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 10;
-        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 10;
+        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 5;
+        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 5;
+        
+        // Ensure ticks are within valid range
+        if (minTick < -887270) minTick = -887270;
+        if (maxTick > 887270) maxTick = 887270;
+        
+        // Ensure min tick is less than max tick
+        if (minTick >= maxTick) {
+            minTick = maxTick - tickSpacing;
+        }
         
         console.log("Using tick range around target:");
-        // console.log("- Target tick:", targetTick);
         console.log("- Min tick:", minTick);
         console.log("- Max tick:", maxTick);
+        
+        // Use smaller amounts for extreme ticks
+        if (Math.abs(currentTick) > 500000) {
+            ethAmount = 0.01 ether;
+            mphAmount = 1000 ether;
+            console.log("Using smaller amounts due to extreme tick:");
+            console.log("- WETH amount:", ethAmount / 1e18);
+            console.log("- MPH amount:", mphAmount / 1e18);
+        }
         
         // Determine token amounts based on token order
         uint256 amount0 = token0 == morpherTokenAddress ? mphAmount : ethAmount;
         uint256 amount1 = token0 == morpherTokenAddress ? ethAmount : mphAmount;
+        
+        // Ensure both amounts are non-zero
+        if (amount0 == 0) amount0 = 1;
+        if (amount1 == 0) amount1 = 1;
+        
+        console.log("Final amounts for position:");
+        console.log("- Amount0:", amount0);
+        console.log("- Amount1:", amount1);
         
         // Create the mint parameters
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
@@ -613,8 +690,14 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             didDirectPriceReset = true;
         } catch Error(string memory reason) {
             console.log("Failed to mint position at target price: %s", reason);
+            
+            // Try with even smaller amounts and narrower range as a fallback
+            tryFallbackPositionCreation(token0, token1, morpherTokenAddress, currentTick);
         } catch {
             console.log("Failed to mint position at target price: unknown error");
+            
+            // Try with even smaller amounts and narrower range as a fallback
+            tryFallbackPositionCreation(token0, token1, morpherTokenAddress, currentTick);
         }
     }
     
@@ -799,9 +882,26 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         (,int24 currentTick,,,,,) = pool.slot0();
         console.log("Current tick after swap:", currentTick);
         
-        // Prepare liquidity amounts
-        uint256 ethAmount = 1 ether; // 1 WETH
-        uint256 mphAmount = TARGET_MPH_PER_WETH * ethAmount / 1 ether; // 100,000 MPH
+        // Check if the tick is in a valid range
+        if (currentTick > 800000 || currentTick < -800000) {
+            console.log("Current tick is too extreme for adding liquidity, attempting to reset price first");
+            // Try to reset the price to something more reasonable
+            tryResetPoolToReasonableTick(poolAddress, morpherTokenAddress);
+            
+            // Get the new tick after reset attempt
+            (,currentTick,,,,,) = pool.slot0();
+            console.log("Tick after reset attempt:", currentTick);
+            
+            // If still extreme, we can't add liquidity
+            if (currentTick > 800000 || currentTick < -800000) {
+                console.log("Tick is still too extreme, cannot add liquidity safely");
+                return;
+            }
+        }
+        
+        // Prepare liquidity amounts - use smaller amounts for extreme ticks
+        uint256 ethAmount = 0.1 ether; // 0.1 WETH
+        uint256 mphAmount = 10000 ether; // 10,000 MPH
         
         console.log("Adding liquidity with:");
         console.log("- WETH amount:", ethAmount / 1e18);
@@ -812,6 +912,81 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
         
         // Calculate tick range and create position
         createPositionAtCurrentPrice(token0, token1, morpherTokenAddress, ethAmount, mphAmount, currentTick);
+    }
+    
+    // Try to reset the pool to a more reasonable tick
+    function tryResetPoolToReasonableTick(address poolAddress, address morpherTokenAddress) internal {
+        IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
+        address token0 = pool.token0();
+        address token1 = pool.token1();
+        
+        console.log("Attempting to reset pool to a more reasonable tick");
+        
+        // Try a small swap to move the price
+        if (token0 == WETH) {
+            // If WETH is token0, swap WETH for MPH to move price down
+            console.log("Swapping a tiny amount of WETH for MPH to normalize price");
+            uint256 tinyAmount = 0.0001 ether;
+            
+            // Ensure we have WETH
+            uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
+            if (wethBalance < tinyAmount) {
+                IWETH9(WETH).deposit{value: tinyAmount}();
+            }
+            
+            // Approve and swap
+            IWETH9(WETH).approve(SWAP_ROUTER, tinyAmount);
+            
+            try IV3SwapRouter(SWAP_ROUTER).exactInputSingle(
+                IV3SwapRouter.ExactInputSingleParams({
+                    tokenIn: WETH,
+                    tokenOut: morpherTokenAddress,
+                    fee: FEE,
+                    recipient: msg.sender,
+                    amountIn: tinyAmount,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+            ) returns (uint256 amountOut) {
+                console.log("Reset swap completed with output:", amountOut);
+            } catch {
+                console.log("Reset swap failed");
+            }
+        } else {
+            // If MPH is token0, swap MPH for WETH to move price down
+            console.log("Swapping a tiny amount of MPH for WETH to normalize price");
+            uint256 tinyAmount = 1 ether; // 1 MPH
+            
+            // Ensure we have MPH
+            uint256 mphBalance = IERC20(morpherTokenAddress).balanceOf(msg.sender);
+            if (mphBalance < tinyAmount) {
+                try MorpherToken(morpherTokenAddress).mint(msg.sender, tinyAmount) {
+                    console.log("Minted MPH for reset swap");
+                } catch {
+                    console.log("Failed to mint MPH for reset swap");
+                    return;
+                }
+            }
+            
+            // Approve and swap
+            IERC20(morpherTokenAddress).approve(SWAP_ROUTER, tinyAmount);
+            
+            try IV3SwapRouter(SWAP_ROUTER).exactInputSingle(
+                IV3SwapRouter.ExactInputSingleParams({
+                    tokenIn: morpherTokenAddress,
+                    tokenOut: WETH,
+                    fee: FEE,
+                    recipient: msg.sender,
+                    amountIn: tinyAmount,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+            ) returns (uint256 amountOut) {
+                console.log("Reset swap completed with output:", amountOut);
+            } catch {
+                console.log("Reset swap failed");
+            }
+        }
     }
     
     // Helper function to ensure we have enough tokens
@@ -847,16 +1022,50 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
     ) internal {
         // Calculate a wider tick range around the current price for better liquidity distribution
         int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
-        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 20;
-        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 20;
+        
+        // Ensure the tick range is valid
+        // Uniswap V3 has a max tick of 887272 and min tick of -887272
+        int24 maxValidTick = 887270;
+        int24 minValidTick = -887270;
+        
+        // Ensure current tick is within valid range
+        currentTick = currentTick > maxValidTick ? maxValidTick : currentTick;
+        currentTick = currentTick < minValidTick ? minValidTick : currentTick;
+        
+        // Calculate tick range, ensuring we stay within valid bounds
+        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing * 10;
+        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing * 10;
+        
+        // Ensure ticks are within valid range
+        minTick = minTick < minValidTick ? minValidTick : minTick;
+        maxTick = maxTick > maxValidTick ? maxValidTick : maxTick;
+        
+        // Ensure min tick is less than max tick
+        if (minTick >= maxTick) {
+            minTick = maxTick - tickSpacing;
+        }
         
         console.log("Using tick range:");
         console.log("- Min tick:", minTick);
         console.log("- Max tick:", maxTick);
         
+        // Ensure we have non-zero amounts for both tokens
+        if (mphAmount == 0) {
+            mphAmount = 10 ether; // Set a minimum of 10 MPH
+            console.log("MPH amount was 0, setting to minimum:", mphAmount / 1e18);
+        }
+        
         // Determine token amounts based on token order
         uint256 amount0 = token0 == morpherTokenAddress ? mphAmount : ethAmount;
         uint256 amount1 = token0 == morpherTokenAddress ? ethAmount : mphAmount;
+        
+        // Ensure both amounts are non-zero
+        if (amount0 == 0) amount0 = 1; // Set to minimum value
+        if (amount1 == 0) amount1 = 1; // Set to minimum value
+        
+        console.log("Final amounts for position:");
+        console.log("- Amount0:", amount0);
+        console.log("- Amount1:", amount1);
         
         // Create the mint parameters
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
@@ -887,8 +1096,84 @@ contract ResetUniswapPoolPrice is DeployOrUpgrade {
             console.log("- Amount token1 used:", amount1Mint);
         } catch Error(string memory reason) {
             console.log("Failed to mint position: %s", reason);
+            
+            // Try with even smaller amounts and narrower range as a fallback
+            tryFallbackPositionCreation(token0, token1, morpherTokenAddress, currentTick);
         } catch {
             console.log("Failed to mint position: unknown error");
+            
+            // Try with even smaller amounts and narrower range as a fallback
+            tryFallbackPositionCreation(token0, token1, morpherTokenAddress, currentTick);
+        }
+    }
+    
+    // Try a fallback position creation with minimal values
+    function tryFallbackPositionCreation(
+        address token0,
+        address token1,
+        address morpherTokenAddress,
+        int24 currentTick
+    ) internal {
+        console.log("Trying fallback position creation with minimal values");
+        
+        int24 tickSpacing = 60;
+        
+        // Use a very narrow range
+        int24 minTick = (currentTick / tickSpacing) * tickSpacing - tickSpacing;
+        int24 maxTick = (currentTick / tickSpacing) * tickSpacing + tickSpacing;
+        
+        // Ensure ticks are within valid range
+        minTick = minTick < -887270 ? -887270 : minTick;
+        maxTick = maxTick > 887270 ? 887270 : maxTick;
+        
+        // Use minimal amounts
+        uint256 minEthAmount = 0.001 ether;
+        uint256 minMphAmount = 1 ether;
+        
+        // Ensure we have the tokens
+        ensureTokenBalances(morpherTokenAddress, minEthAmount, minMphAmount);
+        
+        // Determine token amounts based on token order
+        uint256 amount0 = token0 == morpherTokenAddress ? minMphAmount : minEthAmount;
+        uint256 amount1 = token0 == morpherTokenAddress ? minEthAmount : minMphAmount;
+        
+        console.log("Fallback position parameters:");
+        console.log("- Min tick:", minTick);
+        console.log("- Max tick:", maxTick);
+        console.log("- Amount0:", amount0);
+        console.log("- Amount1:", amount1);
+        
+        // Create the mint parameters
+        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+            token0: token0,
+            token1: token1,
+            fee: FEE,
+            tickLower: minTick,
+            tickUpper: maxTick,
+            amount0Desired: amount0,
+            amount1Desired: amount1,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: msg.sender,
+            deadline: block.timestamp + 15 minutes
+        });
+        
+        // Mint the position
+        try INonfungiblePositionManager(NONFUNGIBLE_POSITION_MANAGER).mint(params) returns (
+            uint256 tokenId, 
+            uint128 liquidity, 
+            uint256 amount0Mint, 
+            uint256 amount1Mint
+        ) {
+            console.log("Fallback liquidity position created:");
+            console.log("- Token ID:", tokenId);
+            console.log("- Liquidity:", uint256(liquidity));
+            console.log("- Amount token0 used:", amount0Mint);
+            console.log("- Amount token1 used:", amount1Mint);
+        } catch Error(string memory reason) {
+            console.log("Fallback position creation failed: %s", reason);
+        } catch {
+            console.log("Fallback position creation failed: unknown error");
         }
     }
 }
