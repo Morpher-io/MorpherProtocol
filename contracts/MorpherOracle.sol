@@ -17,13 +17,14 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Per
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-import "../lib/uniswap-v4-periphery/contracts/interfaces/IV4Router.sol";
-import "../lib/uniswap-v4-periphery/contracts/libraries/Actions.sol";
-import "../lib/uniswap-v4-periphery/contracts/interfaces/external/IWETH9.sol";
-import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
-import "../lib/universal-router/contracts/libraries/Commands.sol";
-import "../lib/permit2/src/interfaces/IPermit2.sol";
-import "../lib/v4-core/src/types/PoolKey.sol";
+import { IV4Router } from "../lib/v4-periphery/src/interfaces/IV4Router.sol";
+import { Actions } from "../lib/v4-periphery/src/libraries/Actions.sol";
+import "../lib/v4-periphery/src/interfaces/external/IWETH9.sol";
+import { IUniversalRouter } from "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
+import { Commands } from "../lib/universal-router/contracts/libraries/Commands.sol";
+import { IPermit2 } from "../lib/permit2/src/interfaces/IPermit2.sol";
+import {PoolKey} from "../lib/v4-core/src/types/PoolKey.sol";
+import {IHooks} from "../lib/v4-core/src/interfaces/IHooks.sol";
 import "../lib/v4-core/src/types/Currency.sol";
 
 // ----------------------------------------------------------------------------------
@@ -655,7 +656,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			currency1: currency1,
 			fee: 3000, // 0.3% fee tier
 			tickSpacing: 60, // Standard tick spacing for 0.3% fee
-			hooks: address(0) // No hooks
+			hooks: IHooks(address(0x0)) // No hooks
 		});
 	}
 	
@@ -682,7 +683,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		bytes[] memory inputs = new bytes[](1);
 		
 		// Determine if we're swapping token0 for token1 or vice versa
-		bool zeroForOne = address(poolKey.currency0) == tokenIn;
+		bool zeroForOne = equals(poolKeyIn.currency0, Currency.wrap(tokenIn));
 		
 		// Encode V4Router actions
 		bytes memory actions = abi.encodePacked(
