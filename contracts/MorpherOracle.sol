@@ -17,15 +17,15 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Per
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-import { IV4Router } from "../lib/v4-periphery/src/interfaces/IV4Router.sol";
+import { IV4Router, PoolKey } from "../lib/v4-periphery/src/interfaces/IV4Router.sol";
 import { Actions } from "../lib/v4-periphery/src/libraries/Actions.sol";
 import "../lib/v4-periphery/src/interfaces/external/IWETH9.sol";
 import { IUniversalRouter } from "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 import { Commands } from "../lib/universal-router/contracts/libraries/Commands.sol";
 import { IPermit2 } from "../lib/permit2/src/interfaces/IPermit2.sol";
-import {PoolKey} from "../lib/v4-core/src/types/PoolKey.sol";
-import {IHooks} from "../lib/v4-core/src/interfaces/IHooks.sol";
-import "../lib/v4-core/src/types/Currency.sol";
+// import {PoolKey} from "../lib/v4-core/src/types/PoolKey.sol";
+import {IHooks} from "../lib/v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
+import "../lib/v4-periphery/lib/v4-core/src/types/Currency.sol";
 
 // ----------------------------------------------------------------------------------
 // Morpher Oracle contract v 2.0
@@ -683,7 +683,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		bytes[] memory inputs = new bytes[](1);
 		
 		// Determine if we're swapping token0 for token1 or vice versa
-		bool zeroForOne = CurrencyLibrary.unwrap(poolKey.currency0) == tokenIn;
+		bool zeroForOne = equals(poolKey.currency0, Currency.wrap(tokenIn));
 		
 		// Encode V4Router actions
 		bytes memory actions = abi.encodePacked(
