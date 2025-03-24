@@ -186,8 +186,8 @@ contract CreateUniswapPool is DeployOrUpgrade {
         uint256 ethAmount = 1 ether;
         uint256 mphAmount = 100000 ether; // 100,000 MPH tokens (with 18 decimals)
         
-        // Convert ETH to WETH
-        IWETH9(WETH).deposit{value: ethAmount}();
+        // // Convert ETH to WETH
+        // IWETH9(WETH).deposit{value: ethAmount}();
         
         // Check WETH balance
         console.log("WETH balance:", IWETH9(WETH).balanceOf(address(this)) / 1e18);
@@ -198,7 +198,7 @@ contract CreateUniswapPool is DeployOrUpgrade {
         
         // Use a more reasonable tick range instead of the full range
         // The full range is too extreme and can cause issues
-        int24 minTick = -12000; // A bit less than MIN_TICK to avoid edge issues
+        int24 minTick = -840000; // A bit less than MIN_TICK to avoid edge issues
         int24 maxTick = -minTick;  // A bit less than MAX_TICK to avoid edge issues
         
         // Create the mint parameters with inline token amount determination
