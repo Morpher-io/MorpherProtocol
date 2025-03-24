@@ -683,7 +683,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		bytes[] memory inputs = new bytes[](1);
 		
 		// Determine if we're swapping token0 for token1 or vice versa
-		bool zeroForOne = address(poolKey.currency0) == tokenIn;
+		bool zeroForOne = CurrencyLibrary.unwrap(poolKey.currency0) == tokenIn;
 		
 		// Encode V4Router actions
 		bytes memory actions = abi.encodePacked(
@@ -698,7 +698,13 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		// First parameter: swap configuration
 		params[0] = abi.encode(
 			IV4Router.ExactInputSingleParams({
-				poolKey: poolKey,
+				poolKey: PoolKey({
+					currency0: poolKey.currency0,
+					currency1: poolKey.currency1,
+					fee: poolKey.fee,
+					tickSpacing: poolKey.tickSpacing,
+					hooks: poolKey.hooks
+				}),
 				zeroForOne: zeroForOne,
 				amountIn: uint128(amountIn),
 				amountOutMinimum: uint128(amountOutMinimum),
@@ -707,10 +713,10 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		);
 		
 		// Second parameter: specify input tokens for the swap (SETTLE_ALL)
-		params[1] = abi.encode(Currency.wrap(tokenIn), amountIn);
+		params[1] = abi.encode(zeroForOne ? poolKey.currency0 : poolKey.currency1, amountIn);
 		
 		// Third parameter: specify output tokens from the swap (TAKE_ALL)
-		params[2] = abi.encode(Currency.wrap(tokenOut), amountOutMinimum);
+		params[2] = abi.encode(zeroForOne ? poolKey.currency1 : poolKey.currency0, amountOutMinimum);
 		
 		// Combine actions and params into inputs
 		inputs[0] = abi.encode(actions, params);
