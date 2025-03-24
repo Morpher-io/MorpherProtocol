@@ -683,7 +683,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		bytes[] memory inputs = new bytes[](1);
 		
 		// Determine if we're swapping token0 for token1 or vice versa
-		bool zeroForOne = equals(poolKeyIn.currency0, Currency.wrap(tokenIn));
+		bool zeroForOne = address(poolKey.currency0) == tokenIn;
 		
 		// Encode V4Router actions
 		bytes memory actions = abi.encodePacked(
