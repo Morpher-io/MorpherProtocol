@@ -291,6 +291,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	function setUniswapV4Pool(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
 		uniswapV4Pool = _address;
 		emit LinkUniswapV4Pool(_address);
+		
+		// Verify the pool exists
+		require(_address != address(0), "MorpherOracle: Pool address cannot be zero");
 	}
 
 	function overrideGasForCallback(uint256 _gasForCallback) public onlyRole(ADMINISTRATOR_ROLE) {

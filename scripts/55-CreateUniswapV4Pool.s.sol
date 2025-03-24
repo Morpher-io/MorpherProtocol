@@ -26,41 +26,44 @@ interface IPoolManager {
     ) external view returns (address pool);
 }
 
-interface IHooks {
-    function beforeInitialize(
-        address tokenA,
-        address tokenB,
-        uint24 fee,
-        uint160 sqrtPriceX96,
-        bytes calldata hookData
-    ) external returns (bytes4);
+interface IPositionManager {
+    function multicall(bytes[] calldata data) external payable returns (bytes[] memory results);
     
-    function afterInitialize(
-        address tokenA,
-        address tokenB,
-        uint24 fee,
-        uint160 sqrtPriceX96,
-        bytes calldata hookData
-    ) external returns (bytes4);
+    function modifyLiquidities(
+        bytes calldata data,
+        uint256 deadline
+    ) external payable returns (bytes memory result);
 }
 
-interface ILiquidityManager {
-    struct ModifyPositionParams {
-        address token0;
-        address token1;
-        uint24 fee;
-        int24 tickLower;
-        int24 tickUpper;
-        int256 liquidityDelta;
-        address recipient;
-        uint256 amount0Min;
-        uint256 amount1Min;
-        uint256 deadline;
-    }
-    
-    function modifyPosition(
-        ModifyPositionParams calldata params
-    ) external returns (uint256 amount0, uint256 amount1);
+interface IPoolInitializer {
+    function initializePool(
+        PoolKey calldata key,
+        uint160 sqrtPriceX96
+    ) external returns (address pool);
+}
+
+interface IPermit2 {
+    function approve(
+        address token,
+        address spender,
+        uint160 amount,
+        uint48 expiration
+    ) external;
+}
+
+// Uniswap v4 types
+struct PoolKey {
+    address currency0;
+    address currency1;
+    uint24 fee;
+    int24 tickSpacing;
+    address hooks;
+}
+
+// Enum for actions in modifyLiquidities
+enum Actions {
+    MINT_POSITION,
+    SETTLE_PAIR
 }
 
 interface IWETH9 {
@@ -74,9 +77,13 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
 
     // Uniswap V4 addresses - will be set based on chainId
     address public POOL_MANAGER;
-    address public LIQUIDITY_MANAGER;
+    address public POSITION_MANAGER;
+    address public UNIVERSAL_ROUTER;
+    address public PERMIT2;
     address public WETH;
+    address public HOOKS; // No hooks for this example
     uint24 constant FEE = 3000; // 0.3%
+    int24 constant TICK_SPACING = 60; // For 0.3% fee
 
     // Set up addresses based on the chain we're deploying to
     function setupAddresses() internal {
@@ -84,15 +91,20 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
     
         // WETH is the same on both Base and Base Sepolia
         WETH = 0x4200000000000000000000000000000000000006;
+        HOOKS = address(0); // No hooks for this example
     
         if (chainId == 8453) {
             // Base Mainnet
-            POOL_MANAGER = 0x1234567890123456789012345678901234567890; // Replace with actual address
-            LIQUIDITY_MANAGER = 0x1234567890123456789012345678901234567890; // Replace with actual address
+            POOL_MANAGER = 0x498581ff718922c3f8e6a244956af099b2652b2b;
+            POSITION_MANAGER = 0x7c5f5a4bbd8fd63184577525326123b519429bdc;
+            UNIVERSAL_ROUTER = 0x6ff5693b99212da76ad316178a184ab56d299b43;
+            PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3; // Standard permit2 address
         } else if (chainId == 84532) {
             // Base Sepolia
-            POOL_MANAGER = 0x1234567890123456789012345678901234567890; // Replace with actual address
-            LIQUIDITY_MANAGER = 0x1234567890123456789012345678901234567890; // Replace with actual address
+            POOL_MANAGER = 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408;
+            POSITION_MANAGER = 0x4b2c77d209d3405f41a037ec6c77f7f5b8e2ca80;
+            UNIVERSAL_ROUTER = 0x492e6456d9528771018deb9e87ef7750ef184104;
+            PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3; // Standard permit2 address
         } else {
             revert("Unsupported chain ID");
         }
@@ -106,7 +118,7 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
 
         console.log("Deploying Uniswap v4 pool on chain ID:", uint256(block.chainid));
         console.log("Using Pool Manager:", POOL_MANAGER);
-        console.log("Using Liquidity Manager:", LIQUIDITY_MANAGER);
+        console.log("Using Position Manager:", POSITION_MANAGER);
         
         // Load MorpherToken address
         address morpherTokenAddress = loadAddress("MorpherToken");
@@ -115,11 +127,8 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         console.log("MorpherToken address:", morpherTokenAddress);
         console.log("WETH address:", WETH);
 
-        // Initialize or get pool
-        address poolAddress = initializeOrGetPool(morpherTokenAddress);
-        
-        // Add liquidity to the pool
-        addLiquidityToPool(poolAddress, morpherTokenAddress);
+        // Create pool and add liquidity in one transaction
+        address poolAddress = createPoolAndAddLiquidity(morpherTokenAddress);
         
         // Save the pool address
         saveAddress("UniswapV4Pool", poolAddress);
@@ -127,67 +136,88 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         vm.stopBroadcast();
     }
     
-    // Initialize a new pool or get existing pool
-    function initializeOrGetPool(address morpherTokenAddress) internal returns (address poolAddress) {
-        // Check if pool already exists
-        IPoolManager poolManager = IPoolManager(POOL_MANAGER);
-        poolAddress = poolManager.getPool(morpherTokenAddress, WETH, FEE);
+    // Create pool and add liquidity in one transaction using multicall
+    function createPoolAndAddLiquidity(address morpherTokenAddress) internal returns (address poolAddress) {
+        // 1. Initialize the parameters for multicall
+        bytes[] memory params = new bytes[](2);
         
-        if (poolAddress == address(0)) {
-            // Create a new pool if it doesn't exist
-            // Price = 100,000 MPH per 1 WETH
-            // For Uniswap, we need sqrtPriceX96 = sqrt(price) * 2^96
-            uint160 sqrtPriceX96;
-            
-            // Determine token order (Uniswap v4 sorts tokens by address)
-            bool mphIsToken0 = morpherTokenAddress < WETH;
-            
-            if (mphIsToken0) {
-                // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
-                // sqrt(0.00001) * 2^96
-                sqrtPriceX96 = 79228162514264337593543;
-                console.log("MPH is token0, WETH is token1");
-                console.log("Setting price: 100,000 MPH per 1 WETH");
-            } else {
-                // If MPH is token1, price = MPH/WETH = 100000
-                // sqrt(100000) * 2^96
-                sqrtPriceX96 = 7922816251426433759354395033;
-                console.log("WETH is token0, MPH is token1");
-                console.log("Setting price: 100,000 MPH per 1 WETH");
-            }
-            
-            // Initialize the pool with empty hook data
-            bytes memory hookData = new bytes(0);
-            poolAddress = poolManager.initialize(
-                morpherTokenAddress,
-                WETH,
-                FEE,
-                sqrtPriceX96,
-                hookData
-            );
-            
-            console.log("New pool created at:", poolAddress);
+        // 2. Configure the pool
+        PoolKey memory pool = PoolKey({
+            currency0: morpherTokenAddress < WETH ? morpherTokenAddress : WETH,
+            currency1: morpherTokenAddress < WETH ? WETH : morpherTokenAddress,
+            fee: FEE,
+            tickSpacing: TICK_SPACING,
+            hooks: HOOKS
+        });
+        
+        console.log("Pool configuration:");
+        console.log("- Currency0:", pool.currency0);
+        console.log("- Currency1:", pool.currency1);
+        console.log("- Fee:", pool.fee);
+        console.log("- TickSpacing:", pool.tickSpacing);
+        
+        // 3. Encode initializePool parameters
+        // Price = 100,000 MPH per 1 WETH
+        uint160 sqrtPriceX96;
+        if (pool.currency0 == morpherTokenAddress) {
+            // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
+            sqrtPriceX96 = 79228162514264337593543;
+            console.log("MPH is token0, WETH is token1");
+            console.log("Setting price: 100,000 MPH per 1 WETH");
         } else {
-            console.log("Using existing pool at:", poolAddress);
+            // If MPH is token1, price = MPH/WETH = 100000
+            sqrtPriceX96 = 7922816251426433759354395033;
+            console.log("WETH is token0, MPH is token1");
+            console.log("Setting price: 100,000 MPH per 1 WETH");
         }
         
-        return poolAddress;
-    }
-    
-    // Add liquidity to the pool
-    function addLiquidityToPool(address poolAddress, address morpherTokenAddress) internal {
-        // Determine token order (Uniswap v4 sorts tokens by address)
-        address token0 = morpherTokenAddress < WETH ? morpherTokenAddress : WETH;
-        address token1 = morpherTokenAddress < WETH ? WETH : morpherTokenAddress;
+        params[0] = abi.encodeWithSelector(
+            IPoolInitializer.initializePool.selector,
+            pool,
+            sqrtPriceX96
+        );
         
-        console.log("Pool token0:", token0);
-        console.log("Pool token1:", token1);
+        // 4. Initialize mint-liquidity parameters
+        bytes memory actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR));
         
-        // Prepare to add liquidity with the correct ratio
-        // We want 100,000 MPH = 1 WETH (ratio 100,000:1)
+        // 5. Encode MINT_POSITION parameters
+        bytes[] memory mintParams = new bytes[](2);
+        
+        // Define liquidity parameters
+        int24 tickLower = -887272; // Full range
+        int24 maxTick = 887272;
+        uint128 liquidity = 1000000000000000000; // 1.0 in Uniswap liquidity units
         uint256 ethAmount = 1 ether;
-        uint256 mphAmount = 100000 ether; // 100,000 MPH tokens (with 18 decimals)
+        uint256 mphAmount = 100000 ether; // 100,000 MPH tokens
         
+        // Determine token amounts based on token order
+        uint256 amount0Max = pool.currency0 == morpherTokenAddress ? mphAmount : ethAmount;
+        uint256 amount1Max = pool.currency0 == morpherTokenAddress ? ethAmount : mphAmount;
+        
+        // Encode mint parameters
+        mintParams[0] = abi.encode(
+            pool,
+            tickLower,
+            maxTick,
+            liquidity,
+            amount0Max,
+            amount1Max,
+            msg.sender,
+            new bytes(0) // No hook data
+        );
+        
+        // 6. Encode SETTLE_PAIR parameters
+        mintParams[1] = abi.encode(pool.currency0, pool.currency1);
+        
+        // 7. Encode modifyLiquidities call
+        uint256 deadline = block.timestamp + 60;
+        params[1] = abi.encodeWithSelector(
+            IPositionManager.modifyLiquidities.selector,
+            abi.encode(actions, mintParams),
+            deadline
+        );
+        
+        // 8. Approve tokens
         // Ensure we have enough WETH
         uint256 wethBalance = IWETH9(WETH).balanceOf(msg.sender);
         if (wethBalance < ethAmount) {
@@ -195,79 +225,72 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
             IWETH9(WETH).deposit{value: ethAmount}();
         }
         
-        // Approve tokens for the liquidity manager
-        IWETH9(WETH).approve(LIQUIDITY_MANAGER, ethAmount);
-        MorpherToken(morpherTokenAddress).approve(LIQUIDITY_MANAGER, mphAmount);
+        // Approve tokens for Permit2
+        IERC20(WETH).approve(PERMIT2, type(uint256).max);
+        IERC20(morpherTokenAddress).approve(PERMIT2, type(uint256).max);
         
-        // Use a reasonable tick range
-        int24 tickSpacing = 60; // 0.3% fee tier has 60 tick spacing
-        int24 minTick = -887272 / tickSpacing * tickSpacing; // Round to nearest tick spacing
-        int24 maxTick = 887272 / tickSpacing * tickSpacing;
+        // Approve Position Manager via Permit2
+        IPermit2(PERMIT2).approve(WETH, POSITION_MANAGER, type(uint160).max, type(uint48).max);
+        IPermit2(PERMIT2).approve(morpherTokenAddress, POSITION_MANAGER, type(uint160).max, type(uint48).max);
         
-        // Create the modify position parameters
-        ILiquidityManager.ModifyPositionParams memory params = ILiquidityManager.ModifyPositionParams({
-            token0: token0,
-            token1: token1,
-            fee: FEE,
-            tickLower: minTick,
-            tickUpper: maxTick,
-            liquidityDelta: 1000000000000000000, // Positive value to add liquidity
-            recipient: msg.sender,
-            amount0Min: 0,
-            amount1Min: 0,
-            deadline: block.timestamp + 15 minutes
-        });
+        console.log("Tokens approved for Position Manager");
         
-        // Add liquidity with try/catch to handle errors
-        try ILiquidityManager(LIQUIDITY_MANAGER).modifyPosition(params) returns (
-            uint256 amount0, 
-            uint256 amount1
-        ) {
-            console.log("Liquidity position created:");
-            console.log("- Amount token0 used:", amount0);
-            console.log("- Amount token1 used:", amount1);
+        // 9. Execute the multicall
+        try IPositionManager(POSITION_MANAGER).multicall(params) returns (bytes[] memory results) {
+            console.log("Pool created and liquidity added successfully");
+            
+            // Get the pool address from the results
+            poolAddress = IPoolManager(POOL_MANAGER).getPool(
+                pool.currency0,
+                pool.currency1,
+                pool.fee
+            );
+            
+            console.log("Pool address:", poolAddress);
         } catch Error(string memory reason) {
-            console.log("Failed to add liquidity: %s", reason);
+            console.log("Failed to create pool and add liquidity: %s", reason);
             
-            // Try with a smaller amount as fallback
-            console.log("Trying with smaller amounts...");
+            // Try to create just the pool without liquidity as fallback
+            console.log("Trying to create just the pool without liquidity...");
             
-            // Reduce amounts by half
-            uint256 reducedEthAmount = ethAmount / 2;
-            uint256 reducedMphAmount = mphAmount / 2;
-            
-            // Update approvals
-            IWETH9(WETH).approve(LIQUIDITY_MANAGER, reducedEthAmount);
-            MorpherToken(morpherTokenAddress).approve(LIQUIDITY_MANAGER, reducedMphAmount);
-            
-            // Create new params with reduced amounts
-            ILiquidityManager.ModifyPositionParams memory reducedParams = ILiquidityManager.ModifyPositionParams({
-                token0: token0,
-                token1: token1,
-                fee: FEE,
-                tickLower: minTick,
-                tickUpper: maxTick,
-                liquidityDelta: 500000000000000000, // Half the original liquidity
-                recipient: msg.sender,
-                amount0Min: 0,
-                amount1Min: 0,
-                deadline: block.timestamp + 15 minutes
-            });
-            
-            try ILiquidityManager(LIQUIDITY_MANAGER).modifyPosition(reducedParams) returns (
-                uint256 amount0, 
-                uint256 amount1
-            ) {
-                console.log("Liquidity position created with reduced amounts:");
-                console.log("- Amount token0 used:", amount0);
-                console.log("- Amount token1 used:", amount1);
+            try IPoolInitializer(POSITION_MANAGER).initializePool(pool, sqrtPriceX96) returns (address _poolAddress) {
+                console.log("Pool created successfully at:", _poolAddress);
+                poolAddress = _poolAddress;
             } catch Error(string memory fallbackReason) {
-                console.log("Failed to add liquidity with reduced amounts: %s", fallbackReason);
+                console.log("Failed to create pool: %s", fallbackReason);
+                
+                // Check if pool already exists
+                poolAddress = IPoolManager(POOL_MANAGER).getPool(
+                    pool.currency0,
+                    pool.currency1,
+                    pool.fee
+                );
+                
+                if (poolAddress != address(0)) {
+                    console.log("Pool already exists at:", poolAddress);
+                } else {
+                    console.log("Could not create or find pool");
+                }
             } catch {
-                console.log("Failed to add liquidity with reduced amounts: unknown error");
+                console.log("Failed to create pool: unknown error");
             }
         } catch {
-            console.log("Failed to add liquidity: unknown error");
+            console.log("Failed to create pool and add liquidity: unknown error");
+            
+            // Check if pool already exists
+            poolAddress = IPoolManager(POOL_MANAGER).getPool(
+                pool.currency0,
+                pool.currency1,
+                pool.fee
+            );
+            
+            if (poolAddress != address(0)) {
+                console.log("Pool already exists at:", poolAddress);
+            } else {
+                console.log("Could not create or find pool");
+            }
         }
+        
+        return poolAddress;
     }
 }
