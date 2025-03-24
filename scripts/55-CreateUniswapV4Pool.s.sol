@@ -162,13 +162,13 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         if (pool.currency0 == morpherTokenAddress) {
             // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
             // sqrt(0.00001) * 2^96 = sqrt(1/100000) * 2^96
-            sqrtPriceX96 = 2505414483809435;
+            sqrtPriceX96 = 250541448375048000000000000;
             console.log("MPH is token0, WETH is token1");
             console.log("Setting price: 100,000 MPH per 1 WETH");
         } else {
             // If MPH is token1, price = MPH/WETH = 100000
             // sqrt(100000) * 2^96
-            sqrtPriceX96 = 25054144837438405210904448839064;
+            sqrtPriceX96 = 25054144837504800000000000000000;
             console.log("WETH is token0, MPH is token1");
             console.log("Setting price: 100,000 MPH per 1 WETH");
         }
