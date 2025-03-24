@@ -17,9 +17,9 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Per
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
-import "../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
-import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
+import "../lib/uniswap-v4-periphery/contracts/interfaces/ISwapRouter.sol";
+import "../lib/uniswap-v4-periphery/contracts/interfaces/IPeripheryPayments.sol";
+import "../lib/uniswap-v4-periphery/contracts/interfaces/external/IWETH9.sol";
 import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 
 // ----------------------------------------------------------------------------------
@@ -107,7 +107,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		bytes32 s;
 	}
 
-	uint24 public constant poolFee = 3000;
+	uint24 public constant poolFee = 3000; // 0.3% fee tier for v4 pools
 
 	mapping(bytes32 => TokenPermitEIP712Struct) closeOrderIdSwapToToken; //tokenAddress will be the target address, the permit needs to be for MPH and needs to be larger than the MPH amount to be closed otherwise it will fail.
 
@@ -124,6 +124,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	// SwapRouter address - used for direct swaps
 	address public uniswapRouter;
+	
+	// Uniswap v4 pool address
+	address public uniswapV4Pool;
 
 
 	// ----------------------------------------------------------------------------------
@@ -198,6 +201,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	event LinkTradeEngine(address _address);
 	event LinkWMatic(address _address);
 	event LinkUniswapRouter(address _address);
+	event LinkUniswapV4Pool(address _address);
 
 	event LinkMorpherState(address _address);
 
@@ -282,6 +286,11 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	function setUniswapRouter(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
 		uniswapRouter = _address;
 		emit LinkUniswapRouter(_address);
+	}
+	
+	function setUniswapV4Pool(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
+		uniswapV4Pool = _address;
+		emit LinkUniswapV4Pool(_address);
 	}
 
 	function overrideGasForCallback(uint256 _gasForCallback) public onlyRole(ADMINISTRATOR_ROLE) {
@@ -538,43 +547,49 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, inputToken.value);
 		IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
 
-		bytes memory path;
-
+		// Use Uniswap v4 swap router
+		ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
+		
 		if (inputToken.tokenAddress != wMaticAddress) {
-			path = abi.encodePacked( //reversed path for exactOutput! FU oz!
-					inputToken.tokenAddress,
-					poolFee,
-					wMaticAddress,
-					poolFee,
-					state.morpherTokenAddress()
-				);
+			// First swap input token to WETH
+			ISwapRouter.ExactInputSingleParams memory params1 = ISwapRouter.ExactInputSingleParams({
+				tokenIn: inputToken.tokenAddress,
+				tokenOut: wMaticAddress,
+				pool: uniswapV4Pool, // Use the v4 pool
+				recipient: address(this),
+				amountIn: inputToken.value,
+				amountOutMinimum: 0, // No slippage protection for simplicity
+				sqrtPriceLimitX96: 0
+			});
+			
+			uint256 wethAmount = swapRouter.exactInputSingle(params1);
+			
+			// Then swap WETH to MPH
+			ISwapRouter.ExactInputSingleParams memory params2 = ISwapRouter.ExactInputSingleParams({
+				tokenIn: wMaticAddress,
+				tokenOut: state.morpherTokenAddress(),
+				pool: uniswapV4Pool, // Use the v4 pool
+				recipient: _msgSender(),
+				amountIn: wethAmount,
+				amountOutMinimum: mphTokenAmount,
+				sqrtPriceLimitX96: 0
+			});
+			
+			amountOut = swapRouter.exactInputSingle(params2);
 		} else {
-			path = abi.encodePacked(wMaticAddress, poolFee, state.morpherTokenAddress()); //reversed path for exactOutput! FU oz!
+			// Direct swap from WETH to MPH
+			ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+				tokenIn: wMaticAddress,
+				tokenOut: state.morpherTokenAddress(),
+				pool: uniswapV4Pool, // Use the v4 pool
+				recipient: _msgSender(),
+				amountIn: inputToken.value,
+				amountOutMinimum: mphTokenAmount,
+				sqrtPriceLimitX96: 0
+			});
+			
+			amountOut = swapRouter.exactInputSingle(params);
 		}
-
-		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
-		IV3SwapRouter.ExactInputParams memory inputSwapParams = IV3SwapRouter.ExactInputParams({
-			path: path,
-			recipient: _msgSender(),
-			amountOutMinimum: mphTokenAmount,
-			amountIn: inputToken.value //safeguarded by the permit functionality.
-		});
-
-		amountOut = swapRouter.exactInput(inputSwapParams);
-
-		// ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
-		// ISwapRouter.ExactOutputParams memory outputSwapParams = ISwapRouter.ExactOutputParams({
-		// 	path: path,
-		// 	recipient: _msgSender(),
-		// 	deadline: block.timestamp,
-		// 	amountOut: mphTokenAmount,
-		// 	amountInMaximum: inputToken.value //safeguarded by the permit functionality.
-		// });
-
-		// uint amountIn = swapRouter.exactOutput(outputSwapParams);
-
-		// //TransferBack the remainder
-		// IERC20Upgradeable(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
 
 		//reset the approved amounts
 		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, 0);
@@ -584,7 +599,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	function convertMphAndPayout(bytes32 orderId, uint mphTokenAmount) internal {
 		//convert the MPH paid out by the close order back to the
 		if (closeOrderIdSwapToToken[orderId].tokenAddress != address(0)) {
-			IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
+			ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
 
 			TokenPermitEIP712Struct memory inputToken = closeOrderIdSwapToToken[orderId];
 			//increase allowance
@@ -599,9 +614,6 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			);
 			delete closeOrderIdSwapToToken[orderId];
 
-			// MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
-			// (, , , , , , , , , , , MorpherTradeEngine.OrderModifier memory oldOrder) = tradeEngine.orders(orderId);
-			// uint mphTokenAmount = oldOrder.balanceUp; //never try to transfer more than the user gave permission for
 			if (mphTokenAmount > inputToken.value) {
 				emit MphCloseOrderSoftFail(orderId, mphTokenAmount, inputToken.value);
 				return; //do nothing here, don't error out, just keep the MPH.
@@ -618,35 +630,47 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			// Approve the router to spend the token.
 			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
 
-			// SafeERC20Upgradeable.safeApprove(
-			// 	IERC20Upgradeable(state.morpherTokenAddress()),
-			// 	address(swapRouter),
-			// 	mphTokenAmount
-			// );
-
-			bytes memory path;
-
 			if (inputToken.tokenAddress != wMaticAddress) {
-				path = abi.encodePacked(
-					state.morpherTokenAddress(),
-					poolFee,
-					wMaticAddress,
-					poolFee,
-					inputToken.tokenAddress
-				);
+				// First swap MPH to WETH
+				ISwapRouter.ExactInputSingleParams memory params1 = ISwapRouter.ExactInputSingleParams({
+					tokenIn: state.morpherTokenAddress(),
+					tokenOut: wMaticAddress,
+					pool: uniswapV4Pool,
+					recipient: address(this),
+					amountIn: mphTokenAmount,
+					amountOutMinimum: 0, // No slippage protection for intermediate swap
+					sqrtPriceLimitX96: 0
+				});
+				
+				uint256 wethAmount = swapRouter.exactInputSingle(params1);
+				
+				// Then swap WETH to target token
+				ISwapRouter.ExactInputSingleParams memory params2 = ISwapRouter.ExactInputSingleParams({
+					tokenIn: wMaticAddress,
+					tokenOut: inputToken.tokenAddress,
+					pool: uniswapV4Pool,
+					recipient: inputToken.owner,
+					amountIn: wethAmount,
+					amountOutMinimum: inputToken.minOutValue,
+					sqrtPriceLimitX96: 0
+				});
+				
+				swapRouter.exactInputSingle(params2);
 			} else {
-				path = abi.encodePacked(state.morpherTokenAddress(), poolFee, wMaticAddress);
+				// Direct swap from MPH to WETH
+				ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+					tokenIn: state.morpherTokenAddress(),
+					tokenOut: wMaticAddress,
+					pool: uniswapV4Pool,
+					recipient: inputToken.owner,
+					amountIn: mphTokenAmount,
+					amountOutMinimum: inputToken.minOutValue,
+					sqrtPriceLimitX96: 0
+				});
+				
+				swapRouter.exactInputSingle(params);
 			}
-
-			IV3SwapRouter.ExactInputParams memory backConvertParams = IV3SwapRouter.ExactInputParams({
-				path: path,
-				recipient: inputToken.owner,
-				amountIn: mphTokenAmount,
-				amountOutMinimum: inputToken.minOutValue
-			});
-
-			// swap the remaining token back
-			swapRouter.exactInput(backConvertParams);
+			
 			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 		}
 	}
@@ -1028,7 +1052,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	}
 
 	/**
-	 * @dev Swap WETH for MPH tokens
+	 * @dev Swap WETH for MPH tokens using Uniswap v4
 	 * @param wethAmount Amount of WETH to swap
 	 * @param minMphAmount Minimum amount of MPH tokens to receive
 	 * @return amountOut Amount of MPH tokens received
@@ -1037,23 +1061,19 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		// Approve the router to spend WETH
 		IWETH9(wMaticAddress).approve(uniswapRouter, wethAmount);
 		
-		// Create the swap path
-		bytes memory path = abi.encodePacked(
-			wMaticAddress,
-			poolFee,
-			state.morpherTokenAddress()
-		);
-		
-		// Execute the swap
-		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
-		IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
-			path: path,
+		// Execute the swap using v4 router
+		ISwapRouter swapRouter = ISwapRouter(uniswapRouter);
+		ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+			tokenIn: wMaticAddress,
+			tokenOut: state.morpherTokenAddress(),
+			pool: uniswapV4Pool,
 			recipient: _msgSender(),
 			amountIn: wethAmount,
-			amountOutMinimum: minMphAmount
+			amountOutMinimum: minMphAmount,
+			sqrtPriceLimitX96: 0
 		});
 		
-		amountOut = swapRouter.exactInput(params);
+		amountOut = swapRouter.exactInputSingle(params);
 		
 		// Reset approvals
 		IWETH9(wMaticAddress).approve(uniswapRouter, 0);
