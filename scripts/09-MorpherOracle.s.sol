@@ -83,26 +83,18 @@ contract DeployMorpherOracle is DeployOrUpgrade {
 			// Base Sepolia
 			oracleContract.setWmaticAddress(0x4200000000000000000000000000000000000006);
 			// Universal Router on Base Sepolia
-			oracleContract.setUniversalRouter(0x492e6456d9528771018deb9e87ef7750ef184104);
+			oracleContract.setUniversalRouter(0x492E6456D9528771018DeB9E87ef7750EF184104);
 			// Permit2 address (same on all networks)
 			oracleContract.setPermit2Address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
-			// Set Uniswap V4 pool if available
-			address uniswapV4Pool = loadAddress("UniswapV4Pool");
-			if (uniswapV4Pool != address(0)) {
-				oracleContract.setUniswapV4Pool(uniswapV4Pool);
-			}
+			
 		} else if (block.chainid == 8453) {
 			// Base Mainnet
 			oracleContract.setWmaticAddress(0x4200000000000000000000000000000000000006);
 			// Universal Router on Base Mainnet
-			oracleContract.setUniversalRouter(0x6ff5693b99212da76ad316178a184ab56d299b43);
+			oracleContract.setUniversalRouter(0x6fF5693b99212Da76ad316178A184AB56D299b43);
 			// Permit2 address (same on all networks)
 			oracleContract.setPermit2Address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
-			// Set Uniswap V4 pool if available
-			address uniswapV4Pool = loadAddress("UniswapV4Pool");
-			if (uniswapV4Pool != address(0)) {
-				oracleContract.setUniswapV4Pool(uniswapV4Pool);
-			}
+			
 		} else {
 			// Default to Sepolia
 			oracleContract.setWmaticAddress(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);

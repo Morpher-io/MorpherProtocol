@@ -11,10 +11,11 @@ import {MorpherToken} from "../contracts/MorpherToken.sol";
 
 // Uniswap v4 imports
 import {PositionManager} from "../lib/v4-periphery/src/PositionManager.sol";
-import {PoolKey} from "../lib/v4-core/src/types/PoolKey.sol";
-import {CurrencyLibrary, Currency} from "../lib/v4-core/src/types/Currency.sol";
+import {PoolKey} from "../lib/v4-periphery/lib/v4-core/src/types/PoolKey.sol";
+import {IHooks} from "../lib/v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
+import {CurrencyLibrary, Currency} from "../lib/v4-periphery/lib/v4-core/src/types/Currency.sol";
 import {Actions} from "../lib/v4-periphery/src/libraries/Actions.sol";
-import {LiquidityAmounts} from "../lib/v4-core/test/utils/LiquidityAmounts.sol";
+import {LiquidityAmounts} from "../lib/v4-periphery/lib/v4-core/test/utils/LiquidityAmounts.sol";
 import {TickMath} from "../lib/v4-core/src/libraries/TickMath.sol";
 import {IPermit2} from "../lib/permit2/src/interfaces/IPermit2.sol";
 
@@ -27,7 +28,7 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
     address public POSITION_MANAGER;
     address public PERMIT2;
     address public WETH;
-    address public HOOKS; // No hooks for this example
+    IHooks public HOOKS; // No hooks for this example
     
     // Pool configuration
     uint24 constant FEE = 3000; // 0.3%
@@ -45,17 +46,17 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
     
         // WETH is the same on both Base and Base Sepolia
         WETH = 0x4200000000000000000000000000000000000006;
-        HOOKS = address(0); // No hooks for this example
+        HOOKS = IHooks(address(0)); // No hooks for this example
     
         if (chainId == 8453) {
             // Base Mainnet
-            POOL_MANAGER = 0x498581ff718922c3f8e6a244956af099b2652b2b;
-            POSITION_MANAGER = 0x7c5f5a4bbd8fd63184577525326123b519429bdc;
+            POOL_MANAGER = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+            POSITION_MANAGER = 0x7C5f5A4bBd8fD63184577525326123B519429bDc;
             PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3; // Standard permit2 address
         } else if (chainId == 84532) {
             // Base Sepolia
             POOL_MANAGER = 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408;
-            POSITION_MANAGER = 0x4b2c77d209d3405f41a037ec6c77f7f5b8e2ca80;
+            POSITION_MANAGER = 0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80;
             PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3; // Standard permit2 address
         } else {
             revert("Unsupported chain ID");
@@ -80,16 +81,13 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         console.log("WETH address:", WETH);
 
         // Create pool and add liquidity
-        address poolAddress = createPoolAndAddLiquidity(morpherTokenAddress);
-        
-        // Save the pool address
-        saveAddress("UniswapV4Pool", poolAddress);
+        createPoolAndAddLiquidity(morpherTokenAddress);
         
         vm.stopBroadcast();
     }
     
     // Create pool and add liquidity in one transaction using multicall
-    function createPoolAndAddLiquidity(address morpherTokenAddress) internal returns (address poolAddress) {
+    function createPoolAndAddLiquidity(address morpherTokenAddress) internal {
         // Ensure ticks are multiples of tickSpacing
         tickLower = (tickLower / TICK_SPACING) * TICK_SPACING;
         tickUpper = (tickUpper / TICK_SPACING) * TICK_SPACING;
@@ -121,23 +119,23 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         });
         
         console.log("Pool configuration:");
-        console.log("- Currency0:", address(currency0));
-        console.log("- Currency1:", address(currency1));
+        console.log("- Currency0:", Currency.unwrap(currency0));
+        console.log("- Currency1:", Currency.unwrap(currency1));
         console.log("- Fee:", pool.fee);
         console.log("- TickSpacing:", pool.tickSpacing);
-        console.log("- Tick range:", tickLower, "to", tickUpper);
+        console.log("- Tick range: %d", int(tickLower));
         
         // Calculate starting price (100,000 MPH per 1 WETH)
         uint160 startingPrice;
-        if (address(currency0) == morpherTokenAddress) {
+        if (Currency.unwrap(currency0) == morpherTokenAddress) {
             // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
             // sqrt(0.00001) * 2^96
-            startingPrice = 2505414483809435;
+            startingPrice = 250541448375048000000000000;
             console.log("MPH is token0, WETH is token1");
         } else {
             // If MPH is token1, price = MPH/WETH = 100000
             // sqrt(100000) * 2^96
-            startingPrice = 25054144837438405210904448839064;
+            startingPrice = 25054144837504800000000000000000;
             console.log("WETH is token0, MPH is token1");
         }
         console.log("Setting price: 100,000 MPH per 1 WETH");
@@ -147,8 +145,8 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
             startingPrice,
             TickMath.getSqrtPriceAtTick(tickLower),
             TickMath.getSqrtPriceAtTick(tickUpper),
-            address(currency0) == morpherTokenAddress ? mphAmount : ethAmount,
-            address(currency0) == morpherTokenAddress ? ethAmount : mphAmount
+            Currency.unwrap(currency0) == morpherTokenAddress ? mphAmount : ethAmount,
+            Currency.unwrap(currency0) == morpherTokenAddress ? ethAmount : mphAmount
         );
         
         console.log("Calculated liquidity:", uint256(liquidity));
@@ -159,7 +157,7 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         // Initialize pool
         bytes memory hookData = new bytes(0);
         params[0] = abi.encodeWithSelector(
-            PositionManager(POSITION_MANAGER).initializePool.selector,
+            PositionManager(payable(POSITION_MANAGER)).initializePool.selector,
             pool,
             startingPrice,
             hookData
@@ -171,15 +169,15 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
             tickLower,
             tickUpper,
             liquidity,
-            address(currency0) == morpherTokenAddress ? mphAmount + 1 : ethAmount + 1,
-            address(currency0) == morpherTokenAddress ? ethAmount + 1 : mphAmount + 1,
+            Currency.unwrap(currency0) == morpherTokenAddress ? mphAmount + 1 : ethAmount + 1,
+            Currency.unwrap(currency0) == morpherTokenAddress ? ethAmount + 1 : mphAmount + 1,
             msg.sender,
             hookData
         );
         
         // Encode modifyLiquidities call
         params[1] = abi.encodeWithSelector(
-            PositionManager(POSITION_MANAGER).modifyLiquidities.selector,
+            PositionManager(payable(POSITION_MANAGER)).modifyLiquidities.selector,
             abi.encode(actions, mintParams),
             block.timestamp + 60
         );
@@ -194,62 +192,17 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         }
         
         // Execute the multicall
-        try PositionManager(POSITION_MANAGER).multicall{value: valueToSend}(params) returns (bytes[] memory results) {
+        try PositionManager(payable(POSITION_MANAGER)).multicall{value: valueToSend}(params) returns (bytes[] memory results) {
             console.log("Pool created and liquidity added successfully");
             
-            // Get the pool address
-            poolAddress = PositionManager(POSITION_MANAGER).getPool(
-                address(currency0),
-                address(currency1),
-                FEE
-            );
-            
-            console.log("Pool address:", poolAddress);
         } catch Error(string memory reason) {
             console.log("Failed to create pool and add liquidity: %s", reason);
             
-            // Try to create just the pool without liquidity as fallback
-            console.log("Trying to create just the pool without liquidity...");
-            
-            try PositionManager(POSITION_MANAGER).initializePool(pool, startingPrice, hookData) returns (address _poolAddress) {
-                console.log("Pool created successfully at:", _poolAddress);
-                poolAddress = _poolAddress;
-            } catch Error(string memory fallbackReason) {
-                console.log("Failed to create pool: %s", fallbackReason);
-                
-                // Check if pool already exists
-                poolAddress = PositionManager(POSITION_MANAGER).getPool(
-                    address(currency0),
-                    address(currency1),
-                    FEE
-                );
-                
-                if (poolAddress != address(0)) {
-                    console.log("Pool already exists at:", poolAddress);
-                } else {
-                    console.log("Could not create or find pool");
-                }
-            } catch {
-                console.log("Failed to create pool: unknown error");
-            }
         } catch {
             console.log("Failed to create pool and add liquidity: unknown error");
             
-            // Check if pool already exists
-            poolAddress = PositionManager(POSITION_MANAGER).getPool(
-                address(currency0),
-                address(currency1),
-                FEE
-            );
-            
-            if (poolAddress != address(0)) {
-                console.log("Pool already exists at:", poolAddress);
-            } else {
-                console.log("Could not create or find pool");
-            }
         }
         
-        return poolAddress;
     }
     
     /// @dev Helper function for encoding mint liquidity operation
