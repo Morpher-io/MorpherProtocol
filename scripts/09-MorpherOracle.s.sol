@@ -82,18 +82,34 @@ contract DeployMorpherOracle is DeployOrUpgrade {
 		if (block.chainid == 84532) {
 			// Base Sepolia
 			oracleContract.setWmaticAddress(0x4200000000000000000000000000000000000006);
-			// SwapRouter V2 on Base Sepolia
-			oracleContract.setUniswapRouter(0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4);
+			// Universal Router on Base Sepolia
+			oracleContract.setUniversalRouter(0x492e6456d9528771018deb9e87ef7750ef184104);
+			// Permit2 address (same on all networks)
+			oracleContract.setPermit2Address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+			// Set Uniswap V4 pool if available
+			address uniswapV4Pool = loadAddress("UniswapV4Pool");
+			if (uniswapV4Pool != address(0)) {
+				oracleContract.setUniswapV4Pool(uniswapV4Pool);
+			}
 		} else if (block.chainid == 8453) {
 			// Base Mainnet
 			oracleContract.setWmaticAddress(0x4200000000000000000000000000000000000006);
-			// SwapRouter V2 on Base Mainnet
-			oracleContract.setUniswapRouter(0x2626664c2603336E57B271c5C0b26F421741e481);
+			// Universal Router on Base Mainnet
+			oracleContract.setUniversalRouter(0x6ff5693b99212da76ad316178a184ab56d299b43);
+			// Permit2 address (same on all networks)
+			oracleContract.setPermit2Address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+			// Set Uniswap V4 pool if available
+			address uniswapV4Pool = loadAddress("UniswapV4Pool");
+			if (uniswapV4Pool != address(0)) {
+				oracleContract.setUniswapV4Pool(uniswapV4Pool);
+			}
 		} else {
 			// Default to Sepolia
 			oracleContract.setWmaticAddress(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-			// SwapRouter V1 on Ethereum
-			oracleContract.setUniswapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+			// Universal Router on Ethereum
+			oracleContract.setUniversalRouter(0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD);
+			// Permit2 address (same on all networks)
+			oracleContract.setPermit2Address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 		}
 
 		vm.stopBroadcast();

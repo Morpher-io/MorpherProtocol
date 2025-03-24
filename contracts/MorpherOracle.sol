@@ -25,7 +25,7 @@ import { Commands } from "../lib/universal-router/contracts/libraries/Commands.s
 import { IPermit2 } from "../lib/permit2/src/interfaces/IPermit2.sol";
 // import {PoolKey} from "../lib/v4-core/src/types/PoolKey.sol";
 import {IHooks} from "../lib/v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
-import "../lib/v4-periphery/lib/v4-core/src/types/Currency.sol";
+import {CurrencyLibrary, Currency} from "../lib/v4-periphery/lib/v4-core/src/types/Currency.sol";
 
 // ----------------------------------------------------------------------------------
 // Morpher Oracle contract v 2.0
@@ -683,7 +683,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		bytes[] memory inputs = new bytes[](1);
 		
 		// Determine if we're swapping token0 for token1 or vice versa
-		bool zeroForOne = equals(poolKey.currency0, Currency.wrap(tokenIn));
+		bool zeroForOne = CurrencyLibrary.unwrap(poolKey.currency0) == tokenIn;
 		
 		// Encode V4Router actions
 		bytes memory actions = abi.encodePacked(
