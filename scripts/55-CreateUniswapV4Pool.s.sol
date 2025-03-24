@@ -195,6 +195,16 @@ contract CreateUniswapV4Pool is DeployOrUpgrade {
         try PositionManager(payable(POSITION_MANAGER)).multicall{value: valueToSend}(params) returns (bytes[] memory results) {
             console.log("Pool created and liquidity added successfully");
             
+            // Save the pool information
+            saveAddress("UniswapV4PoolManager", POOL_MANAGER);
+            
+            // Log the pool key information for reference
+            console.log("Pool created with the following key:");
+            console.log("- Currency0:", Currency.unwrap(pool.currency0));
+            console.log("- Currency1:", Currency.unwrap(pool.currency1));
+            console.log("- Fee:", pool.fee);
+            console.log("- TickSpacing:", pool.tickSpacing);
+            
         } catch Error(string memory reason) {
             console.log("Failed to create pool and add liquidity: %s", reason);
             

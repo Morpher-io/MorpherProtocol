@@ -86,6 +86,8 @@ contract DeployMorpherOracle is DeployOrUpgrade {
 			oracleContract.setUniversalRouter(0x492E6456D9528771018DeB9E87ef7750EF184104);
 			// Permit2 address (same on all networks)
 			oracleContract.setPermit2Address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+			// Pool Manager on Base Sepolia
+			oracleContract.setPoolManager(0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408);
 			
 		} else if (block.chainid == 8453) {
 			// Base Mainnet
@@ -94,6 +96,8 @@ contract DeployMorpherOracle is DeployOrUpgrade {
 			oracleContract.setUniversalRouter(0x6fF5693b99212Da76ad316178A184AB56D299b43);
 			// Permit2 address (same on all networks)
 			oracleContract.setPermit2Address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+			// Pool Manager on Base Mainnet
+			oracleContract.setPoolManager(0x498581fF718922c3f8e6A244956aF099B2652b2b);
 			
 		} else {
 			// Default to Sepolia

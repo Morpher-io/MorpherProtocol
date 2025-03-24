@@ -133,8 +133,8 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	// Permit2 address
 	address public permit2Address;
 	
-	// Uniswap v4 pool address
-	address public uniswapV4Pool;
+	// Uniswap V4 Pool Manager address
+	address public poolManagerAddress;
 
 
 	// ----------------------------------------------------------------------------------
@@ -210,7 +210,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	event LinkWMatic(address _address);
 	event LinkUniversalRouter(address _address);
 	event LinkPermit2(address _address);
-	event LinkUniswapV4Pool(address _address);
+	event LinkPoolManager(address _address);
 
 	event LinkMorpherState(address _address);
 
@@ -302,12 +302,12 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		emit LinkPermit2(_address);
 	}
 	
-	function setUniswapV4Pool(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
-		uniswapV4Pool = _address;
-		emit LinkUniswapV4Pool(_address);
+	function setPoolManager(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
+		poolManagerAddress = _address;
+		emit LinkPoolManager(_address);
 		
-		// Verify the pool exists
-		require(_address != address(0), "MorpherOracle: Pool address cannot be zero");
+		// Verify the pool manager exists
+		require(_address != address(0), "MorpherOracle: Pool Manager address cannot be zero");
 	}
 
 	function overrideGasForCallback(uint256 _gasForCallback) public onlyRole(ADMINISTRATOR_ROLE) {
@@ -642,7 +642,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	 * @param tokenB Second token address
 	 * @return key The PoolKey for the token pair
 	 */
-	function createPoolKey(address tokenA, address tokenB) internal pure returns (PoolKey memory key) {
+	function createPoolKey(address tokenA, address tokenB) internal view returns (PoolKey memory key) {
 		// Sort tokens by address
 		(address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 		
