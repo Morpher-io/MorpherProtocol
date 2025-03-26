@@ -262,6 +262,19 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         emit DelegateMigrationAuthorized(_msgSender(), _delegate, _authorized);
     }
     
+    // Position migration struct to avoid stack too deep errors
+    struct PositionMigrationData {
+        bytes32 marketId;
+        uint256 timeStamp;
+        uint256 longShares;
+        uint256 shortShares;
+        uint256 meanEntryPrice;
+        uint256 meanEntrySpread;
+        uint256 meanEntryLeverage;
+        uint256 liquidationPrice;
+        bytes32[] proof;
+    }
+    
     /**
      * Delegate migration of positions in batch with user authorization signature
      */
@@ -269,28 +282,9 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         address _user,
         bytes memory _userAuthSignature,
         bytes32 _merkleRoot,
-        bytes32[][] memory _proofs,
-        bytes32[] memory _marketIds,
-        uint256[] memory _timeStamps,
-        uint256[] memory _longShares,
-        uint256[] memory _shortShares,
-        uint256[] memory _meanEntryPrices,
-        uint256[] memory _meanEntrySpreads,
-        uint256[] memory _meanEntryLeverages,
-        uint256[] memory _liquidationPrices
+        PositionMigrationData[] memory _positions
     ) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
-        // Verify arrays have matching lengths
-        require(
-            _marketIds.length == _timeStamps.length &&
-            _timeStamps.length == _longShares.length &&
-            _longShares.length == _shortShares.length &&
-            _shortShares.length == _meanEntryPrices.length &&
-            _meanEntryPrices.length == _meanEntrySpreads.length &&
-            _meanEntrySpreads.length == _meanEntryLeverages.length &&
-            _meanEntryLeverages.length == _liquidationPrices.length &&
-            _liquidationPrices.length == _proofs.length,
-            "MorpherMigration: Array length mismatch"
-        );
+        require(_positions.length > 0, "MorpherMigration: No positions to migrate");
         
         // Verify user authorization signature
         bytes32 messageHash = keccak256(abi.encodePacked(
@@ -302,20 +296,22 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _userAuthSignature);
         require(signer == _user, "MorpherMigration: Invalid user authorization signature");
         
-        bytes32[] memory positionHashes = new bytes32[](_marketIds.length);
+        bytes32[] memory positionHashes = new bytes32[](_positions.length);
         
-        for (uint i = 0; i < _marketIds.length; i++) {
+        for (uint i = 0; i < _positions.length; i++) {
+            PositionMigrationData memory pos = _positions[i];
+            
             // Generate position hash
             bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
                 _user, 
-                _marketIds[i], 
-                _timeStamps[i], 
-                _longShares[i], 
-                _shortShares[i], 
-                _meanEntryPrices[i], 
-                _meanEntrySpreads[i], 
-                _meanEntryLeverages[i], 
-                _liquidationPrices[i]
+                pos.marketId, 
+                pos.timeStamp, 
+                pos.longShares, 
+                pos.shortShares, 
+                pos.meanEntryPrice, 
+                pos.meanEntrySpread, 
+                pos.meanEntryLeverage, 
+                pos.liquidationPrice
             );
             
             // Verify position hasn't been migrated already
@@ -323,7 +319,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
             
             // Verify Merkle proof against the provided merkle root
             require(
-                MerkleProofUpgradeable.verify(_proofs[i], _merkleRoot, positionHash),
+                MerkleProofUpgradeable.verify(pos.proof, _merkleRoot, positionHash),
                 "MorpherMigration: Invalid Merkle proof"
             );
             
@@ -336,28 +332,28 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
             // Set position in trade engine
             MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
                 _user,
-                _marketIds[i],
-                _timeStamps[i],
-                _longShares[i],
-                _shortShares[i],
-                _meanEntryPrices[i],
-                _meanEntrySpreads[i],
-                _meanEntryLeverages[i],
-                _liquidationPrices[i]
+                pos.marketId,
+                pos.timeStamp,
+                pos.longShares,
+                pos.shortShares,
+                pos.meanEntryPrice,
+                pos.meanEntrySpread,
+                pos.meanEntryLeverage,
+                pos.liquidationPrice
             );
             
             positionHashes[i] = positionHash;
         }
         
         // Update statistics
-        totalPositionsMigrated += _marketIds.length;
+        totalPositionsMigrated += _positions.length;
         
         // Mark user as having authorized migration (for future reference)
         userAuthorizedMigration[_user] = true;
         
         emit PositionsBatchMigrated(
             _user,
-            _marketIds.length,
+            _positions.length,
             positionHashes
         );
     }
@@ -414,25 +410,18 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         address _user,
         bytes32[] memory _proof,
         bytes32 _merkleRoot,
-        bytes32 _marketId,
-        uint256 _timeStamp,
-        uint256 _longShares,
-        uint256 _shortShares,
-        uint256 _meanEntryPrice,
-        uint256 _meanEntrySpread,
-        uint256 _meanEntryLeverage,
-        uint256 _liquidationPrice
+        PositionMigrationData memory _position
     ) public view returns (bool) {
         bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
             _user, 
-            _marketId, 
-            _timeStamp, 
-            _longShares, 
-            _shortShares, 
-            _meanEntryPrice, 
-            _meanEntrySpread, 
-            _meanEntryLeverage, 
-            _liquidationPrice
+            _position.marketId, 
+            _position.timeStamp, 
+            _position.longShares, 
+            _position.shortShares, 
+            _position.meanEntryPrice, 
+            _position.meanEntrySpread, 
+            _position.meanEntryLeverage, 
+            _position.liquidationPrice
         );
         
         return MerkleProofUpgradeable.verify(_proof, _merkleRoot, positionHash);
