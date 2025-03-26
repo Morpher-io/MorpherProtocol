@@ -180,233 +180,6 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         emit MigrationInitiated(_msgSender());
     }
     
-    /**
-     * Migrate a single position from plasma chain to Base L2 (operator-controlled)
-     */
-    function migratePosition(
-        address _user,
-        bytes32 _marketId,
-        uint256 _timeStamp,
-        uint256 _longShares,
-        uint256 _shortShares,
-        uint256 _meanEntryPrice,
-        uint256 _meanEntrySpread,
-        uint256 _meanEntryLeverage,
-        uint256 _liquidationPrice,
-        bytes memory _operatorSignature
-    ) public onlyRole(MIGRATION_OPERATOR_ROLE) activeMigrationPhase {
-        // Verify user has authorized migration
-        require(userAuthorizedMigration[_user], "MorpherMigration: User has not authorized migration");
-        
-        // Generate position hash
-        bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
-            _user, 
-            _marketId, 
-            _timeStamp, 
-            _longShares, 
-            _shortShares, 
-            _meanEntryPrice, 
-            _meanEntrySpread, 
-            _meanEntryLeverage, 
-            _liquidationPrice
-        );
-        
-        // Verify operator signature to confirm position was cleared on plasma chain
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            _user,
-            _marketId,
-            _timeStamp,
-            _longShares,
-            _shortShares,
-            _meanEntryPrice,
-            _meanEntrySpread,
-            _meanEntryLeverage,
-            _liquidationPrice,
-            positionHash,
-            "Position cleared on plasma chain"
-        ));
-        
-        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _operatorSignature);
-        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(MIGRATION_OPERATOR_ROLE, signer), 
-                "MorpherMigration: Invalid operator signature");
-        
-        // Verify position hasn't been migrated already
-        require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
-        
-        // Mark position as migrated
-        migratedPositions[positionHash] = true;
-        
-        // Store position ID for sequential migration
-        userPositionIds[_user].push(positionHash);
-        
-        // Set position in trade engine
-        MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
-            _user,
-            _marketId,
-            _timeStamp,
-            _longShares,
-            _shortShares,
-            _meanEntryPrice,
-            _meanEntrySpread,
-            _meanEntryLeverage,
-            _liquidationPrice
-        );
-        
-        // Update statistics
-        totalPositionsMigrated++;
-        
-        emit PositionMigrated(
-            _user,
-            _marketId,
-            _longShares,
-            _shortShares,
-            positionHash
-        );
-    }
-    
-    /**
-     * Legacy method for Merkle-based position migration (kept for compatibility)
-     */
-    function migratePositionWithMerkleProof(
-        bytes32[] memory _proof,
-        bytes32 _marketId,
-        uint256 _timeStamp,
-        uint256 _longShares,
-        uint256 _shortShares,
-        uint256 _meanEntryPrice,
-        uint256 _meanEntrySpread,
-        uint256 _meanEntryLeverage,
-        uint256 _liquidationPrice
-    ) public migrationActive userNotBlocked {
-        // Generate position hash
-        bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
-            _msgSender(), 
-            _marketId, 
-            _timeStamp, 
-            _longShares, 
-            _shortShares, 
-            _meanEntryPrice, 
-            _meanEntrySpread, 
-            _meanEntryLeverage, 
-            _liquidationPrice
-        );
-        
-        // Verify position hasn't been migrated already
-        require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
-        
-        // Verify Merkle proof
-        require(
-            MerkleProofUpgradeable.verify(_proof, plasmaStateRoot, positionHash),
-            "MorpherMigration: Invalid Merkle proof"
-        );
-        
-        // Mark position as migrated
-        migratedPositions[positionHash] = true;
-        
-        // Set position in trade engine
-        MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
-            _msgSender(),
-            _marketId,
-            _timeStamp,
-            _longShares,
-            _shortShares,
-            _meanEntryPrice,
-            _meanEntrySpread,
-            _meanEntryLeverage,
-            _liquidationPrice
-        );
-        
-        // Update statistics
-        totalPositionsMigrated++;
-        
-        emit PositionMigrated(
-            _msgSender(),
-            _marketId,
-            _longShares,
-            _shortShares,
-            positionHash
-        );
-    }
-    
-    /**
-     * Migrate multiple positions in a single transaction
-     */
-    function migratePositionsBatch(
-        bytes32[][] memory _proofs,
-        bytes32[] memory _marketIds,
-        uint256[] memory _timeStamps,
-        uint256[] memory _longShares,
-        uint256[] memory _shortShares,
-        uint256[] memory _meanEntryPrices,
-        uint256[] memory _meanEntrySpreads,
-        uint256[] memory _meanEntryLeverages,
-        uint256[] memory _liquidationPrices
-    ) public migrationActive userNotBlocked {
-        require(
-            _marketIds.length == _timeStamps.length &&
-            _timeStamps.length == _longShares.length &&
-            _longShares.length == _shortShares.length &&
-            _shortShares.length == _meanEntryPrices.length &&
-            _meanEntryPrices.length == _meanEntrySpreads.length &&
-            _meanEntrySpreads.length == _meanEntryLeverages.length &&
-            _meanEntryLeverages.length == _liquidationPrices.length &&
-            _liquidationPrices.length == _proofs.length,
-            "MorpherMigration: Array length mismatch"
-        );
-        
-        bytes32[] memory positionHashes = new bytes32[](_marketIds.length);
-        
-        for (uint i = 0; i < _marketIds.length; i++) {
-            // Generate position hash
-            bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
-                _msgSender(), 
-                _marketIds[i], 
-                _timeStamps[i], 
-                _longShares[i], 
-                _shortShares[i], 
-                _meanEntryPrices[i], 
-                _meanEntrySpreads[i], 
-                _meanEntryLeverages[i], 
-                _liquidationPrices[i]
-            );
-            
-            // Verify position hasn't been migrated already
-            require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
-            
-            // Verify Merkle proof
-            require(
-                MerkleProofUpgradeable.verify(_proofs[i], plasmaStateRoot, positionHash),
-                "MorpherMigration: Invalid Merkle proof"
-            );
-            
-            // Mark position as migrated
-            migratedPositions[positionHash] = true;
-            
-            // Set position in trade engine
-            MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
-                _msgSender(),
-                _marketIds[i],
-                _timeStamps[i],
-                _longShares[i],
-                _shortShares[i],
-                _meanEntryPrices[i],
-                _meanEntrySpreads[i],
-                _meanEntryLeverages[i],
-                _liquidationPrices[i]
-            );
-            
-            positionHashes[i] = positionHash;
-        }
-        
-        // Update statistics
-        totalPositionsMigrated += _marketIds.length;
-        
-        emit PositionsBatchMigrated(
-            _msgSender(),
-            _marketIds.length,
-            positionHashes
-        );
-    }
     
     /**
      * Migrate token balance from plasma chain to Base L2 during active migration phase
@@ -490,72 +263,102 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     /**
-     * Delegate migration of a position
+     * Delegate migration of positions in batch with user authorization signature
      */
-    function delegateMigratePosition(
+    function delegateMigratePositionsBatch(
         address _user,
-        bytes32[] memory _proof,
-        bytes32 _marketId,
-        uint256 _timeStamp,
-        uint256 _longShares,
-        uint256 _shortShares,
-        uint256 _meanEntryPrice,
-        uint256 _meanEntrySpread,
-        uint256 _meanEntryLeverage,
-        uint256 _liquidationPrice
-    ) public migrationActive {
+        bytes memory _userAuthSignature,
+        bytes32 _merkleRoot,
+        bytes32[][] memory _proofs,
+        bytes32[] memory _marketIds,
+        uint256[] memory _timeStamps,
+        uint256[] memory _longShares,
+        uint256[] memory _shortShares,
+        uint256[] memory _meanEntryPrices,
+        uint256[] memory _meanEntrySpreads,
+        uint256[] memory _meanEntryLeverages,
+        uint256[] memory _liquidationPrices
+    ) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
+        // Verify arrays have matching lengths
         require(
-            delegateMigrationAuthorized[_user][_msgSender()],
-            "MorpherMigration: Not authorized as delegate"
+            _marketIds.length == _timeStamps.length &&
+            _timeStamps.length == _longShares.length &&
+            _longShares.length == _shortShares.length &&
+            _shortShares.length == _meanEntryPrices.length &&
+            _meanEntryPrices.length == _meanEntrySpreads.length &&
+            _meanEntrySpreads.length == _meanEntryLeverages.length &&
+            _meanEntryLeverages.length == _liquidationPrices.length &&
+            _liquidationPrices.length == _proofs.length,
+            "MorpherMigration: Array length mismatch"
         );
         
-        // Generate position hash
-        bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
-            _user, 
-            _marketId, 
-            _timeStamp, 
-            _longShares, 
-            _shortShares, 
-            _meanEntryPrice, 
-            _meanEntrySpread, 
-            _meanEntryLeverage, 
-            _liquidationPrice
-        );
-        
-        // Verify position hasn't been migrated already
-        require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
-        
-        // Verify Merkle proof
-        require(
-            MerkleProofUpgradeable.verify(_proof, plasmaStateRoot, positionHash),
-            "MorpherMigration: Invalid Merkle proof"
-        );
-        
-        // Mark position as migrated
-        migratedPositions[positionHash] = true;
-        
-        // Set position in trade engine
-        MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
+        // Verify user authorization signature
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            "I authorize migration of all my positions from plasma chain to Base L2",
             _user,
-            _marketId,
-            _timeStamp,
-            _longShares,
-            _shortShares,
-            _meanEntryPrice,
-            _meanEntrySpread,
-            _meanEntryLeverage,
-            _liquidationPrice
-        );
+            block.chainid
+        ));
+        
+        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _userAuthSignature);
+        require(signer == _user, "MorpherMigration: Invalid user authorization signature");
+        
+        bytes32[] memory positionHashes = new bytes32[](_marketIds.length);
+        
+        for (uint i = 0; i < _marketIds.length; i++) {
+            // Generate position hash
+            bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
+                _user, 
+                _marketIds[i], 
+                _timeStamps[i], 
+                _longShares[i], 
+                _shortShares[i], 
+                _meanEntryPrices[i], 
+                _meanEntrySpreads[i], 
+                _meanEntryLeverages[i], 
+                _liquidationPrices[i]
+            );
+            
+            // Verify position hasn't been migrated already
+            require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
+            
+            // Verify Merkle proof against the provided merkle root
+            require(
+                MerkleProofUpgradeable.verify(_proofs[i], _merkleRoot, positionHash),
+                "MorpherMigration: Invalid Merkle proof"
+            );
+            
+            // Mark position as migrated
+            migratedPositions[positionHash] = true;
+            
+            // Store position ID for sequential migration
+            userPositionIds[_user].push(positionHash);
+            
+            // Set position in trade engine
+            MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
+                _user,
+                _marketIds[i],
+                _timeStamps[i],
+                _longShares[i],
+                _shortShares[i],
+                _meanEntryPrices[i],
+                _meanEntrySpreads[i],
+                _meanEntryLeverages[i],
+                _liquidationPrices[i]
+            );
+            
+            positionHashes[i] = positionHash;
+        }
         
         // Update statistics
-        totalPositionsMigrated++;
+        totalPositionsMigrated += _marketIds.length;
         
-        emit PositionMigrated(
+        // Mark user as having authorized migration (for future reference)
+        userAuthorizedMigration[_user] = true;
+        
+        emit PositionsBatchMigrated(
             _user,
-            _marketId,
-            _longShares,
-            _shortShares,
-            positionHash
+            _marketIds.length,
+            positionHashes
         );
     }
     
@@ -610,6 +413,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     function verifyPosition(
         address _user,
         bytes32[] memory _proof,
+        bytes32 _merkleRoot,
         bytes32 _marketId,
         uint256 _timeStamp,
         uint256 _longShares,
@@ -631,7 +435,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
             _liquidationPrice
         );
         
-        return MerkleProofUpgradeable.verify(_proof, plasmaStateRoot, positionHash);
+        return MerkleProofUpgradeable.verify(_proof, _merkleRoot, positionHash);
     }
     
     /**
@@ -647,95 +451,6 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         return MerkleProofUpgradeable.verify(_proof, plasmaStateRoot, balanceHash);
     }
     
-    /**
-     * Migrate positions in batches for a user
-     */
-    function migrateNextBatchOfPositions(
-        address _user, 
-        uint256 _batchSize,
-        bytes32[] memory _marketIds,
-        uint256[] memory _timeStamps,
-        uint256[] memory _longShares,
-        uint256[] memory _shortShares,
-        uint256[] memory _meanEntryPrices,
-        uint256[] memory _meanEntrySpreads,
-        uint256[] memory _meanEntryLeverages,
-        uint256[] memory _liquidationPrices,
-        bytes[] memory _operatorSignatures
-    ) public onlyRole(MIGRATION_OPERATOR_ROLE) activeMigrationPhase {
-        // Verify user has authorized migration
-        require(userAuthorizedMigration[_user], "MorpherMigration: User has not authorized migration");
-        require(_batchSize <= _marketIds.length, "MorpherMigration: Batch size exceeds array length");
-        
-        bytes32[] memory positionHashes = new bytes32[](_batchSize);
-        
-        for (uint i = 0; i < _batchSize; i++) {
-            // Generate position hash
-            bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
-                _user, 
-                _marketIds[i], 
-                _timeStamps[i], 
-                _longShares[i], 
-                _shortShares[i], 
-                _meanEntryPrices[i], 
-                _meanEntrySpreads[i], 
-                _meanEntryLeverages[i], 
-                _liquidationPrices[i]
-            );
-            
-            // Verify operator signature
-            bytes32 messageHash = keccak256(abi.encodePacked(
-                _user,
-                _marketIds[i],
-                _timeStamps[i],
-                _longShares[i],
-                _shortShares[i],
-                _meanEntryPrices[i],
-                _meanEntrySpreads[i],
-                _meanEntryLeverages[i],
-                _liquidationPrices[i],
-                positionHash,
-                "Position cleared on plasma chain"
-            ));
-            
-            address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _operatorSignatures[i]);
-            require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(MIGRATION_OPERATOR_ROLE, signer), 
-                    "MorpherMigration: Invalid operator signature");
-            
-            // Verify position hasn't been migrated already
-            require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
-            
-            // Mark position as migrated
-            migratedPositions[positionHash] = true;
-            
-            // Set position in trade engine
-            MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
-                _user,
-                _marketIds[i],
-                _timeStamps[i],
-                _longShares[i],
-                _shortShares[i],
-                _meanEntryPrices[i],
-                _meanEntrySpreads[i],
-                _meanEntryLeverages[i],
-                _liquidationPrices[i]
-            );
-            
-            positionHashes[i] = positionHash;
-        }
-        
-        // Update statistics
-        totalPositionsMigrated += _batchSize;
-        
-        // Update last migrated position index
-        lastMigratedPositionIndex[_user] += _batchSize;
-        
-        emit PositionsBatchMigrated(
-            _user,
-            _batchSize,
-            positionHashes
-        );
-    }
     
     /**
      * Liquidate remaining positions
