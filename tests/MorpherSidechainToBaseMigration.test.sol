@@ -90,9 +90,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     
     function testVerifyBalance() public {
         // Mock the MerkleProof verification
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(0),
-            abi.encodeWithSelector(MerkleProofUpgradeable.verify.selector),
+            abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
         
@@ -102,9 +103,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     
     function testDelegateMigrateBalance() public {
         // We need to mock the signature verification and merkle proof verification
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(0),
-            abi.encodeWithSelector(MerkleProofUpgradeable.verify.selector),
+            abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
         
@@ -180,9 +182,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
         
         // We need to mock the merkle proof verification
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(0),
-            abi.encodeWithSelector(MerkleProofUpgradeable.verify.selector),
+            abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
         
@@ -203,9 +206,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     
     function testCannotMigrateBalanceTwice() public {
         // First migration
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(0),
-            abi.encodeWithSelector(MerkleProofUpgradeable.verify.selector),
+            abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
         
@@ -236,9 +240,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     
     function testCannotMigratePositionTwice() public {
         // First migration
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(0),
-            abi.encodeWithSelector(MerkleProofUpgradeable.verify.selector),
+            abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
         
