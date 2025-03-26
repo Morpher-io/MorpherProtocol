@@ -181,53 +181,18 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     
-    /**
-     * Migrate token balance from plasma chain to Base L2 during active migration phase
-     */
-    function migrateBalance(
-        bytes32[] memory _proof,
-        uint256 _balance
-    ) public activeMigrationPhase userNotBlocked {
-        // Verify balance hasn't been migrated already
-        require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
-        
-        // Generate balance hash
-        bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance));
-        
-        // Verify Merkle proof
-        require(
-            MerkleProofUpgradeable.verify(_proof, plasmaStateRoot, balanceHash),
-            "MorpherMigration: Invalid Merkle proof"
-        );
-        
-        // Mark balance as migrated
-        migratedBalances[_msgSender()] = true;
-        
-        // Apply migration bonus if configured
-        uint256 amountToMint = _balance;
-        if (migrationBonus > 0) {
-            amountToMint += (_balance * migrationBonus) / 10000;
-        }
-        
-        // Mint tokens to user
-        MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), amountToMint);
-        
-        // Update statistics
-        totalBalancesMigrated++;
-        totalUsersMigrated++;
-        
-        emit BalanceMigrated(_msgSender(), amountToMint);
-    }
     
     /**
-     * Migrate token balance from plasma chain to Base L2 after active migration period
+     * Migrate token balance from plasma chain to Base L2 in self-service phase
+     * Uses the finalBalanceMerkleRoot which is set after the active migration period
      */
-    function migrateBalancePostActive(
+    function migrateBalanceSelfService(
         bytes32[] memory _proof,
         uint256 _balance
-    ) public postActiveMigrationPhase userNotBlocked {
+    ) public userNotBlocked {
         // Verify balance hasn't been migrated already
         require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
+        require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
         
         // Generate balance hash
         bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance));
@@ -241,7 +206,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         // Mark balance as migrated
         migratedBalances[_msgSender()] = true;
         
-        // No bonus for post-active migration
+        // No bonus for self-service migration
         uint256 amountToMint = _balance;
         
         // Mint tokens to user
@@ -449,10 +414,11 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     function verifyBalance(
         address _user,
         bytes32[] memory _proof,
+        bytes32 _merkleRoot,
         uint256 _balance
-    ) public view returns (bool) {
+    ) public pure returns (bool) {
         bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance));
-        return MerkleProofUpgradeable.verify(_proof, plasmaStateRoot, balanceHash);
+        return MerkleProofUpgradeable.verify(_proof, _merkleRoot, balanceHash);
     }
     
     
