@@ -359,17 +359,24 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     /**
-     * Delegate migration of token balance
+     * Delegate migration of token balance with operator role and custom merkle root
      */
     function delegateMigrateBalance(
         address _user,
+        bytes memory _userAuthSignature,
+        bytes32 _merkleRoot,
         bytes32[] memory _proof,
         uint256 _balance
-    ) public migrationActive {
-        require(
-            delegateMigrationAuthorized[_user][_msgSender()],
-            "MorpherMigration: Not authorized as delegate"
-        );
+    ) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
+        // Verify user authorization signature
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            "I authorize migration of all my positions from plasma chain to Base L2",
+            _user,
+            block.chainid
+        ));
+        
+        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _userAuthSignature);
+        require(signer == _user, "MorpherMigration: Invalid user authorization signature");
         
         // Verify balance hasn't been migrated already
         require(!migratedBalances[_user], "MorpherMigration: Balance already migrated");
@@ -377,9 +384,9 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         // Generate balance hash
         bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance));
         
-        // Verify Merkle proof
+        // Verify Merkle proof against the provided merkle root
         require(
-            MerkleProofUpgradeable.verify(_proof, plasmaStateRoot, balanceHash),
+            MerkleProofUpgradeable.verify(_proof, _merkleRoot, balanceHash),
             "MorpherMigration: Invalid Merkle proof"
         );
         
@@ -398,6 +405,9 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         // Update statistics
         totalBalancesMigrated++;
         totalUsersMigrated++;
+        
+        // Mark user as having authorized migration (for future reference)
+        userAuthorizedMigration[_user] = true;
         
         emit BalanceMigrated(_user, amountToMint);
     }
