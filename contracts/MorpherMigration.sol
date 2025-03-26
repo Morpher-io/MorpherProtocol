@@ -18,15 +18,12 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     
     MorpherState state;
     
-    // Migration window parameters
-    uint256 public migrationStartTime;
-    uint256 public migrationEndTime;
-    uint256 public activeMigrationEndTime; // End of active migration period
+    // Migration state
     bool public migrationPaused;
     
-    // Merkle roots for different phases
+    // Merkle roots
     bytes32 public plasmaStateRoot;
-    bytes32 public finalBalanceMerkleRoot; // For post-active period balance migration
+    bytes32 public finalBalanceMerkleRoot;
     
     // Track migrated positions and balances to prevent double-claiming
     mapping(bytes32 => bool) public migratedPositions;
@@ -37,9 +34,8 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     uint256 public totalBalancesMigrated;
     uint256 public totalUsersMigrated;
     
-    // Early migration incentives
-    uint256 public earlyMigrationEndTime;
-    uint256 public earlyMigrationBonus; // in basis points (e.g., 100 = 1%)
+    // Migration incentives
+    uint256 public migrationBonus; // in basis points (e.g., 100 = 1%)
     
     // Position migration authorization
     mapping(address => bool) public userAuthorizedMigration;
@@ -51,10 +47,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     bytes32 public constant MIGRATION_OPERATOR_ROLE = keccak256("MIGRATION_OPERATOR_ROLE");
     
     // Events
-    event MigrationStarted(uint256 startTime, uint256 endTime, uint256 activeMigrationEnd);
     event MigrationPaused(bool paused);
-    event MigrationWindowExtended(uint256 newEndTime);
-    event ActiveMigrationExtended(uint256 newEndTime);
     event PlasmaStateRootUpdated(bytes32 newRoot);
     event FinalBalanceMerkleRootSet(bytes32 newRoot);
     
@@ -96,23 +89,19 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     modifier migrationActive() {
-        require(block.timestamp >= migrationStartTime, "MorpherMigration: Migration has not started yet");
-        require(block.timestamp <= migrationEndTime, "MorpherMigration: Migration period has ended");
         require(!migrationPaused, "MorpherMigration: Migration is paused");
         _;
     }
     
+    // We'll use the same modifier for all migration phases
     modifier activeMigrationPhase() {
-        require(block.timestamp >= migrationStartTime, "MorpherMigration: Migration has not started yet");
-        require(block.timestamp <= activeMigrationEndTime, "MorpherMigration: Active migration period has ended");
         require(!migrationPaused, "MorpherMigration: Migration is paused");
         _;
     }
     
     modifier postActiveMigrationPhase() {
-        require(block.timestamp > activeMigrationEndTime, "MorpherMigration: Active migration period not over");
-        require(block.timestamp <= migrationEndTime, "MorpherMigration: Migration period has ended");
         require(!migrationPaused, "MorpherMigration: Migration is paused");
+        require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
         _;
     }
     
@@ -125,22 +114,13 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     function initialize(
         address _stateAddress,
         bytes32 _plasmaStateRoot,
-        uint256 _migrationDurationDays,
-        uint256 _activeMigrationDurationDays,
-        uint256 _earlyMigrationDurationDays,
-        uint256 _earlyMigrationBonusBps
+        uint256 _migrationBonusBps
     ) public initializer {
         state = MorpherState(_stateAddress);
         plasmaStateRoot = _plasmaStateRoot;
-        
-        migrationStartTime = block.timestamp;
-        migrationEndTime = block.timestamp + (_migrationDurationDays * 1 days);
-        activeMigrationEndTime = block.timestamp + (_activeMigrationDurationDays * 1 days);
-        earlyMigrationEndTime = block.timestamp + (_earlyMigrationDurationDays * 1 days);
-        earlyMigrationBonus = _earlyMigrationBonusBps;
+        migrationBonus = _migrationBonusBps;
         migrationPaused = false;
         
-        emit MigrationStarted(migrationStartTime, migrationEndTime, activeMigrationEndTime);
         emit PlasmaStateRootUpdated(_plasmaStateRoot);
     }
     
@@ -162,19 +142,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         emit MigrationPaused(_paused);
     }
     
-    function extendMigrationWindow(uint256 _additionalDays) public onlyRole(ADMINISTRATOR_ROLE) {
-        migrationEndTime += _additionalDays * 1 days;
-        emit MigrationWindowExtended(migrationEndTime);
-    }
-    
-    function extendActiveMigrationWindow(uint256 _additionalDays) public onlyRole(ADMINISTRATOR_ROLE) {
-        activeMigrationEndTime += _additionalDays * 1 days;
-        require(activeMigrationEndTime <= migrationEndTime, "MorpherMigration: Active period cannot exceed total migration period");
-        emit ActiveMigrationExtended(activeMigrationEndTime);
-    }
-    
     function setFinalBalanceMerkleRoot(bytes32 _root) public onlyRole(ADMINISTRATOR_ROLE) {
-        require(block.timestamp > activeMigrationEndTime, "MorpherMigration: Active migration period not over");
         finalBalanceMerkleRoot = _root;
         emit FinalBalanceMerkleRootSet(_root);
     }
@@ -462,10 +430,10 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         // Mark balance as migrated
         migratedBalances[_msgSender()] = true;
         
-        // Calculate bonus for early migration if applicable
+        // Apply migration bonus if configured
         uint256 amountToMint = _balance;
-        if (block.timestamp <= earlyMigrationEndTime && earlyMigrationBonus > 0) {
-            amountToMint += (_balance * earlyMigrationBonus) / 10000;
+        if (migrationBonus > 0) {
+            amountToMint += (_balance * migrationBonus) / 10000;
         }
         
         // Mint tokens to user
@@ -619,10 +587,10 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         // Mark balance as migrated
         migratedBalances[_user] = true;
         
-        // Calculate bonus for early migration if applicable
+        // Apply migration bonus if configured
         uint256 amountToMint = _balance;
-        if (block.timestamp <= earlyMigrationEndTime && earlyMigrationBonus > 0) {
-            amountToMint += (_balance * earlyMigrationBonus) / 10000;
+        if (migrationBonus > 0) {
+            amountToMint += (_balance * migrationBonus) / 10000;
         }
         
         // Mint tokens to user
@@ -770,11 +738,11 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     /**
-     * Liquidate remaining positions after active migration period
+     * Liquidate remaining positions
      */
     function liquidateRemainingPositions(
         address[] memory _users
-    ) public onlyRole(ADMINISTRATOR_ROLE) postActiveMigrationPhase {
+    ) public onlyRole(ADMINISTRATOR_ROLE) {
         for (uint256 i = 0; i < _users.length; i++) {
             // Mark user as having all positions liquidated
             // This is a placeholder - in a real implementation, you would
@@ -790,35 +758,18 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         uint256 _totalPositionsMigrated,
         uint256 _totalBalancesMigrated,
         uint256 _totalUsersMigrated,
-        uint256 _migrationTimeRemaining,
-        uint256 _activeMigrationTimeRemaining,
         bool _migrationActive,
-        bool _activeMigrationPhase
+        bool _finalBalanceRootSet
     ) {
-        uint256 timeRemaining = 0;
-        if (block.timestamp < migrationEndTime) {
-            timeRemaining = migrationEndTime - block.timestamp;
-        }
-        
-        uint256 activeTimeRemaining = 0;
-        if (block.timestamp < activeMigrationEndTime) {
-            activeTimeRemaining = activeMigrationEndTime - block.timestamp;
-        }
-        
-        bool active = block.timestamp >= migrationStartTime && 
-                     block.timestamp <= migrationEndTime && 
-                     !migrationPaused;
-                     
-        bool activePhase = active && block.timestamp <= activeMigrationEndTime;
+        bool active = !migrationPaused;
+        bool finalRootSet = finalBalanceMerkleRoot != bytes32(0);
         
         return (
             totalPositionsMigrated,
             totalBalancesMigrated,
             totalUsersMigrated,
-            timeRemaining,
-            activeTimeRemaining,
             active,
-            activePhase
+            finalRootSet
         );
     }
 }
