@@ -128,16 +128,16 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         
         // Try a small test swap first to verify everything works
         console.log("Performing a small test swap to verify functionality...");
-        uint256 testAmount = wethIsToken0 ? 1 ether : 0.0001 ether;
-        performSwap(morpherTokenAddress, wethIsToken0, true, testAmount);
+        uint256 testAmount = wethIsToken0 ? 10000 : 0.0001 ether;
+        performSwap(morpherTokenAddress, wethIsToken0, false, testAmount);
         
-        // Check if the test swap worked
-        (int24 newTick, ) = checkCurrentPrice(poolAddress);
-        if (newTick != currentTick) {
-            handleSuccessfulTestSwap(poolAddress, morpherTokenAddress, targetTick, wethIsToken0);
-        } else {
-            handleFailedTestSwap(poolAddress, morpherTokenAddress, currentTick, targetTick, wethIsToken0);
-        }
+    //     // Check if the test swap worked
+    //     (int24 newTick, ) = checkCurrentPrice(poolAddress);
+    //     if (newTick != currentTick) {
+    //         handleSuccessfulTestSwap(poolAddress, morpherTokenAddress, targetTick, wethIsToken0);
+    //     } else {
+    //         handleFailedTestSwap(poolAddress, morpherTokenAddress, currentTick, targetTick, wethIsToken0);
+    //     }
     }
     
     // Handle case when test swap was successful
@@ -548,9 +548,9 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         }
         
         // Use a smaller amount for the swap to ensure it succeeds
-        if (wethAmount > 0.01 ether) {
-            wethAmount = 0.01 ether;
-            console.log("Limiting swap to 0.01 WETH for safety");
+        if (wethAmount > 0.1 ether) {
+            wethAmount = 0.1 ether;
+            console.log("Limiting swap to 0.1 WETH for safety");
         }
         
         // Approve the router to spend WETH
@@ -624,8 +624,8 @@ contract GradualPriceAdjustment is DeployOrUpgrade {
         }
         
         // Use a smaller amount for the swap to ensure it succeeds
-        if (mphAmount > 10 ether) {
-            mphAmount = 10 ether;
+        if (mphAmount > 100 ether) {
+            mphAmount = 100 ether;
             console.log("Limiting swap to 10 MPH for safety");
         }
         

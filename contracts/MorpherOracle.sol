@@ -17,15 +17,10 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Per
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-import { IV4Router, PoolKey } from "../lib/v4-periphery/src/interfaces/IV4Router.sol";
-import { Actions } from "../lib/v4-periphery/src/libraries/Actions.sol";
-import "../lib/v4-periphery/src/interfaces/external/IWETH9.sol";
-import { IUniversalRouter } from "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
-import { Commands } from "../lib/universal-router/contracts/libraries/Commands.sol";
-import { IPermit2 } from "../lib/permit2/src/interfaces/IPermit2.sol";
-// import {PoolKey} from "../lib/v4-core/src/types/PoolKey.sol";
-import {IHooks} from "../lib/v4-periphery/lib/v4-core/src/interfaces/IHooks.sol";
-import {CurrencyLibrary, Currency} from "../lib/v4-periphery/lib/v4-core/src/types/Currency.sol";
+import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
+import "../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
+import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
+import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 
 // ----------------------------------------------------------------------------------
 // Morpher Oracle contract v 2.0
@@ -112,7 +107,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		bytes32 s;
 	}
 
-	uint24 public constant poolFee = 3000; // 0.3% fee tier for v4 pools
+	uint24 public constant poolFee = 3000;
 
 	mapping(bytes32 => TokenPermitEIP712Struct) closeOrderIdSwapToToken; //tokenAddress will be the target address, the permit needs to be for MPH and needs to be larger than the MPH amount to be closed otherwise it will fail.
 
@@ -127,14 +122,8 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	address public morpherSwapHelperAddress;
 
 
-	// Universal Router address - used for swaps
-	address public universalRouter;
-	
-	// Permit2 address
-	address public permit2Address;
-	
-	// Uniswap V4 Pool Manager address
-	address public poolManagerAddress;
+	// SwapRouter address - used for direct swaps
+	address public uniswapRouter;
 
 
 	// ----------------------------------------------------------------------------------
@@ -208,9 +197,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	event LinkTradeEngine(address _address);
 	event LinkWMatic(address _address);
-	event LinkUniversalRouter(address _address);
-	event LinkPermit2(address _address);
-	event LinkPoolManager(address _address);
+	event LinkUniswapRouter(address _address);
 
 	event LinkMorpherState(address _address);
 
@@ -292,22 +279,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		emit LinkWMatic(_address);
 	}
 	
-	function setUniversalRouter(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
-		universalRouter = _address;
-		emit LinkUniversalRouter(_address);
-	}
-	
-	function setPermit2Address(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
-		permit2Address = _address;
-		emit LinkPermit2(_address);
-	}
-	
-	function setPoolManager(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
-		poolManagerAddress = _address;
-		emit LinkPoolManager(_address);
-		
-		// Verify the pool manager exists
-		require(_address != address(0), "MorpherOracle: Pool Manager address cannot be zero");
+	function setUniswapRouter(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
+		uniswapRouter = _address;
+		emit LinkUniswapRouter(_address);
 	}
 
 	function overrideGasForCallback(uint256 _gasForCallback) public onlyRole(ADMINISTRATOR_ROLE) {
@@ -541,7 +515,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		TokenPermitEIP712Struct memory inputToken,
 		uint256 mphTokenAmount
 	) internal returns (uint amountOut) {
-		// Increase allowance with permit
+		//increase allowance
 		IERC20Permit(inputToken.tokenAddress).permit(
 			inputToken.owner,
 			address(this),
@@ -552,7 +526,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			inputToken.s
 		);
 
-		// Transfer input tokens to this contract
+		// Transfer `amountIn` of inputToken to this contract.
 		SafeERC20Upgradeable.safeTransferFrom(
 			IERC20Upgradeable(inputToken.tokenAddress),
 			inputToken.owner,
@@ -560,192 +534,58 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			inputToken.value
 		);
 
-		// Approve tokens for Permit2
-		IERC20Upgradeable(inputToken.tokenAddress).approve(permit2Address, type(uint256).max);
-		
-		// Approve Universal Router via Permit2
-		IPermit2(permit2Address).approve(
-			inputToken.tokenAddress,
-			universalRouter,
-			type(uint160).max,
-			type(uint48).max
-		);
-		
-		// Create PoolKey for the swap
-		PoolKey memory poolKey;
-		
-		// Determine if we need a two-hop swap or a direct swap
+		// Approve the router to spend the token.
+		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, inputToken.value);
+		IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
+
+		bytes memory path;
+
 		if (inputToken.tokenAddress != wMaticAddress) {
-			// Two-hop swap: First swap input token to WETH, then WETH to MPH
-			
-			// First swap: input token to WETH
-			// Create pool key for first swap (input token -> WETH)
-			poolKey = createPoolKey(inputToken.tokenAddress, wMaticAddress);
-			
-			// Execute first swap
-			uint256 wethAmount = executeSwap(
-				poolKey,
-				inputToken.tokenAddress,
-				wMaticAddress,
-				inputToken.value,
-				0, // No minimum for intermediate swap
-				address(this) // Receive WETH in this contract
-			);
-			
-			// Second swap: WETH to MPH
-			// Create pool key for second swap (WETH -> MPH)
-			poolKey = createPoolKey(wMaticAddress, state.morpherTokenAddress());
-			
-			// Approve WETH for Permit2
-			IERC20Upgradeable(wMaticAddress).approve(permit2Address, type(uint256).max);
-			
-			// Approve Universal Router via Permit2 for WETH
-			IPermit2(permit2Address).approve(
-				wMaticAddress,
-				universalRouter,
-				type(uint160).max,
-				type(uint48).max
-			);
-			
-			// Execute second swap
-			amountOut = executeSwap(
-				poolKey,
-				wMaticAddress,
-				state.morpherTokenAddress(),
-				wethAmount,
-				mphTokenAmount, // Minimum MPH to receive
-				_msgSender() // Send MPH directly to the user
-			);
+			path = abi.encodePacked( //reversed path for exactOutput! FU oz!
+					inputToken.tokenAddress,
+					poolFee,
+					wMaticAddress,
+					poolFee,
+					state.morpherTokenAddress()
+				);
 		} else {
-			// Direct swap from WETH to MPH
-			poolKey = createPoolKey(wMaticAddress, state.morpherTokenAddress());
-			
-			amountOut = executeSwap(
-				poolKey,
-				wMaticAddress,
-				state.morpherTokenAddress(),
-				inputToken.value,
-				mphTokenAmount, // Minimum MPH to receive
-				_msgSender() // Send MPH directly to the user
-			);
+			path = abi.encodePacked(wMaticAddress, poolFee, state.morpherTokenAddress()); //reversed path for exactOutput! FU oz!
 		}
 
-		// Reset approvals (optional, since we used max approval)
-		IERC20Upgradeable(inputToken.tokenAddress).approve(permit2Address, 0);
-		
-		return amountOut;
-	}
-	
-	/**
-	 * @dev Helper function to create a PoolKey for a token pair
-	 * @param tokenA First token address
-	 * @param tokenB Second token address
-	 * @return key The PoolKey for the token pair
-	 */
-	function createPoolKey(address tokenA, address tokenB) internal view returns (PoolKey memory key) {
-		// Sort tokens by address
-		(address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-		
-		// Create Currency objects
-		Currency currency0 = Currency.wrap(token0);
-		Currency currency1 = Currency.wrap(token1);
-		
-		// Create and return the PoolKey
-		return PoolKey({
-			currency0: currency0,
-			currency1: currency1,
-			fee: 3000, // 0.3% fee tier
-			tickSpacing: 60, // Standard tick spacing for 0.3% fee
-			hooks: IHooks(address(0x0)) // No hooks
+		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
+		IV3SwapRouter.ExactInputParams memory inputSwapParams = IV3SwapRouter.ExactInputParams({
+			path: path,
+			recipient: _msgSender(),
+			amountOutMinimum: mphTokenAmount,
+			amountIn: inputToken.value //safeguarded by the permit functionality.
 		});
-	}
-	
-	/**
-	 * @dev Execute a swap using Universal Router
-	 * @param poolKey The PoolKey for the pool to swap on
-	 * @param tokenIn Input token address
-	 * @param tokenOut Output token address
-	 * @param amountIn Amount of input tokens to swap
-	 * @param amountOutMinimum Minimum amount of output tokens to receive
-	 * @param recipient Address to receive the output tokens
-	 * @return amountOut Amount of output tokens received
-	 */
-	function executeSwap(
-		PoolKey memory poolKey,
-		address tokenIn,
-		address tokenOut,
-		uint256 amountIn,
-		uint256 amountOutMinimum,
-		address recipient
-	) internal returns (uint256 amountOut) {
-		// Encode the Universal Router command
-		bytes memory commands = abi.encodePacked(uint8(Commands.V4_SWAP));
-		bytes[] memory inputs = new bytes[](1);
-		
-		// Determine if we're swapping token0 for token1 or vice versa
-		bool zeroForOne = Currency.unwrap(poolKey.currency0) == tokenIn;
-		
-		// Encode V4Router actions
-		bytes memory actions = abi.encodePacked(
-			uint8(Actions.SWAP_EXACT_IN_SINGLE),
-			uint8(Actions.SETTLE_ALL),
-			uint8(Actions.TAKE_ALL)
-		);
-		
-		// Prepare parameters for each action
-		bytes[] memory params = new bytes[](3);
-		
-		// First parameter: swap configuration
-		params[0] = abi.encode(
-			IV4Router.ExactInputSingleParams({
-				poolKey: PoolKey({
-					currency0: poolKey.currency0,
-					currency1: poolKey.currency1,
-					fee: poolKey.fee,
-					tickSpacing: poolKey.tickSpacing,
-					hooks: poolKey.hooks
-				}),
-				zeroForOne: zeroForOne,
-				amountIn: uint128(amountIn),
-				amountOutMinimum: uint128(amountOutMinimum),
-				hookData: bytes("")
-			})
-		);
-		
-		// Second parameter: specify input tokens for the swap (SETTLE_ALL)
-		params[1] = abi.encode(zeroForOne ? poolKey.currency0 : poolKey.currency1, amountIn);
-		
-		// Third parameter: specify output tokens from the swap (TAKE_ALL)
-		params[2] = abi.encode(zeroForOne ? poolKey.currency1 : poolKey.currency0, amountOutMinimum);
-		
-		// Combine actions and params into inputs
-		inputs[0] = abi.encode(actions, params);
-		
-		// Get balance before swap to calculate actual output amount
-		uint256 balanceBefore = IERC20(tokenOut).balanceOf(recipient);
-		
-		// Execute the swap
-		IUniversalRouter(universalRouter).execute(
-			commands,
-			inputs,
-			block.timestamp + 15 minutes // 15 minute deadline
-		);
-		
-		// Calculate actual output amount
-		if (recipient == address(this)) {
-			amountOut = IERC20(tokenOut).balanceOf(recipient) - balanceBefore;
-		} else {
-			// For external recipient, we can't directly check the balance
-			// We assume the swap was successful if we got here (no revert)
-			amountOut = amountOutMinimum;
-		}
-		
-		return amountOut;
+
+		amountOut = swapRouter.exactInput(inputSwapParams);
+
+		// ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
+		// ISwapRouter.ExactOutputParams memory outputSwapParams = ISwapRouter.ExactOutputParams({
+		// 	path: path,
+		// 	recipient: _msgSender(),
+		// 	deadline: block.timestamp,
+		// 	amountOut: mphTokenAmount,
+		// 	amountInMaximum: inputToken.value //safeguarded by the permit functionality.
+		// });
+
+		// uint amountIn = swapRouter.exactOutput(outputSwapParams);
+
+		// //TransferBack the remainder
+		// IERC20Upgradeable(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
+
+		//reset the approved amounts
+		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, 0);
+		IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 	}
 
 	function convertMphAndPayout(bytes32 orderId, uint mphTokenAmount) internal {
 		//convert the MPH paid out by the close order back to the
 		if (closeOrderIdSwapToToken[orderId].tokenAddress != address(0)) {
+			IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
+
 			TokenPermitEIP712Struct memory inputToken = closeOrderIdSwapToToken[orderId];
 			//increase allowance
 			IERC20Permit(state.morpherTokenAddress()).permit(
@@ -759,6 +599,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			);
 			delete closeOrderIdSwapToToken[orderId];
 
+			// MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+			// (, , , , , , , , , , , MorpherTradeEngine.OrderModifier memory oldOrder) = tradeEngine.orders(orderId);
+			// uint mphTokenAmount = oldOrder.balanceUp; //never try to transfer more than the user gave permission for
 			if (mphTokenAmount > inputToken.value) {
 				emit MphCloseOrderSoftFail(orderId, mphTokenAmount, inputToken.value);
 				return; //do nothing here, don't error out, just keep the MPH.
@@ -772,70 +615,39 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 				mphTokenAmount
 			);
 
-			// Approve MPH for Permit2
-			IERC20Upgradeable(state.morpherTokenAddress()).approve(permit2Address, type(uint256).max);
-			
-			// Approve Universal Router via Permit2
-			IPermit2(permit2Address).approve(
-				state.morpherTokenAddress(),
-				universalRouter,
-				type(uint160).max,
-				type(uint48).max
-			);
+			// Approve the router to spend the token.
+			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
+
+			// SafeERC20Upgradeable.safeApprove(
+			// 	IERC20Upgradeable(state.morpherTokenAddress()),
+			// 	address(swapRouter),
+			// 	mphTokenAmount
+			// );
+
+			bytes memory path;
 
 			if (inputToken.tokenAddress != wMaticAddress) {
-				// Two-hop swap: First MPH to WETH, then WETH to target token
-				
-				// First swap: MPH to WETH
-				PoolKey memory poolKey1 = createPoolKey(state.morpherTokenAddress(), wMaticAddress);
-				
-				uint256 wethAmount = executeSwap(
-					poolKey1,
+				path = abi.encodePacked(
 					state.morpherTokenAddress(),
+					poolFee,
 					wMaticAddress,
-					mphTokenAmount,
-					0, // No minimum for intermediate swap
-					address(this) // Receive WETH in this contract
-				);
-				
-				// Approve WETH for Permit2
-				IERC20Upgradeable(wMaticAddress).approve(permit2Address, type(uint256).max);
-				
-				// Approve Universal Router via Permit2 for WETH
-				IPermit2(permit2Address).approve(
-					wMaticAddress,
-					universalRouter,
-					type(uint160).max,
-					type(uint48).max
-				);
-				
-				// Second swap: WETH to target token
-				PoolKey memory poolKey2 = createPoolKey(wMaticAddress, inputToken.tokenAddress);
-				
-				executeSwap(
-					poolKey2,
-					wMaticAddress,
-					inputToken.tokenAddress,
-					wethAmount,
-					inputToken.minOutValue, // Minimum output value
-					inputToken.owner // Send directly to the user
+					poolFee,
+					inputToken.tokenAddress
 				);
 			} else {
-				// Direct swap from MPH to WETH
-				PoolKey memory poolKey = createPoolKey(state.morpherTokenAddress(), wMaticAddress);
-				
-				executeSwap(
-					poolKey,
-					state.morpherTokenAddress(),
-					wMaticAddress,
-					mphTokenAmount,
-					inputToken.minOutValue, // Minimum output value
-					inputToken.owner // Send directly to the user
-				);
+				path = abi.encodePacked(state.morpherTokenAddress(), poolFee, wMaticAddress);
 			}
-			
-			// Reset approvals (optional, since we used max approval)
-			IERC20Upgradeable(state.morpherTokenAddress()).approve(permit2Address, 0);
+
+			IV3SwapRouter.ExactInputParams memory backConvertParams = IV3SwapRouter.ExactInputParams({
+				path: path,
+				recipient: inputToken.owner,
+				amountIn: mphTokenAmount,
+				amountOutMinimum: inputToken.minOutValue
+			});
+
+			// swap the remaining token back
+			swapRouter.exactInput(backConvertParams);
+			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 		}
 	}
 
@@ -1216,35 +1028,35 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	}
 
 	/**
-	 * @dev Swap WETH for MPH tokens using Universal Router
+	 * @dev Swap WETH for MPH tokens
 	 * @param wethAmount Amount of WETH to swap
 	 * @param minMphAmount Minimum amount of MPH tokens to receive
 	 * @return amountOut Amount of MPH tokens received
 	 */
 	function swapWETHForMPH(uint256 wethAmount, uint256 minMphAmount) internal returns (uint256 amountOut) {
-		// Approve WETH for Permit2
-		IWETH9(wMaticAddress).approve(permit2Address, type(uint256).max);
+		// Approve the router to spend WETH
+		IWETH9(wMaticAddress).approve(uniswapRouter, wethAmount);
 		
-		// Approve Universal Router via Permit2
-		IPermit2(permit2Address).approve(
+		// Create the swap path
+		bytes memory path = abi.encodePacked(
 			wMaticAddress,
-			universalRouter,
-			type(uint160).max,
-			type(uint48).max
+			poolFee,
+			state.morpherTokenAddress()
 		);
-		
-		// Create pool key for the swap
-		PoolKey memory poolKey = createPoolKey(wMaticAddress, state.morpherTokenAddress());
 		
 		// Execute the swap
-		amountOut = executeSwap(
-			poolKey,
-			wMaticAddress,
-			state.morpherTokenAddress(),
-			wethAmount,
-			minMphAmount,
-			_msgSender() // Send MPH directly to the user
-		);
+		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
+		IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
+			path: path,
+			recipient: _msgSender(),
+			amountIn: wethAmount,
+			amountOutMinimum: minMphAmount
+		});
+		
+		amountOut = swapRouter.exactInput(params);
+		
+		// Reset approvals
+		IWETH9(wMaticAddress).approve(uniswapRouter, 0);
 		
 		return amountOut;
 	}

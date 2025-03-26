@@ -60,7 +60,7 @@ contract QuoteUniswapPrice is DeployOrUpgrade {
         }
     }
 
-    function run() public view {
+    function run() public  {
         // Set up the correct addresses based on the chain
         setupAddresses();
 
@@ -139,7 +139,7 @@ contract QuoteUniswapPrice is DeployOrUpgrade {
         }
         
         // Also calculate from tick for verification
-        int24 targetTick = (token0 == WETH) ? 11513 : -11513; // Target tick for 100,000 MPH per WETH
+        int24 targetTick = (token0 == WETH) ? int24(11513) : -11513; // Target tick for 100,000 MPH per WETH
         console.log("Target price reference:");
         console.log("- Target tick for 100,000 MPH per WETH: 11513 (or -11513 if MPH is token0)");
         console.log("- Current tick: %d", tick);
@@ -148,7 +148,7 @@ contract QuoteUniswapPrice is DeployOrUpgrade {
         // Calculate approximate price from tick
         uint256 tickPrice = approximatePriceFromTick(tick, token0 == WETH);
         console.log("- Approximate price from tick: ~%d MPH per WETH", tickPrice);
-        console.log("- 0.1 WETH ≈ %d MPH (from tick)", (tickPrice * wethAmount / 1e18) / 1e18);
+        console.log("- 0.1 WETH is around %d MPH (from tick)", (tickPrice * wethAmount / 1e18) / 1e18);
     }
     
     // Calculate price from sqrtPriceX96 (when WETH is token0)

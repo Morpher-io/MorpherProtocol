@@ -202,7 +202,7 @@ contract TestUniswapSwap is DeployOrUpgrade {
 
 	function _executeSwap(address morpherTokenAddress, Account memory testUser) internal {
 		// Use a smaller amount for the swap to ensure it's within pool limits
-		uint256 mphAmount = 1 ether; // Swap 1 MPH token
+		uint256 mphAmount = 10 ether; // Swap 1 MPH token
 		uint256 deadline = block.timestamp + 1 hours;
 
 		// Get signature components for permit

@@ -87,14 +87,14 @@ contract CreateUniswapPool is DeployOrUpgrade {
         console.log("Using Nonfungible Position Manager:", NONFUNGIBLE_POSITION_MANAGER);
         
         // Load MorpherToken address
-        address morpherTokenAddress = loadAddress("MorpherToken");
+        address morpherTokenAddress = 0x036CbD53842c5426634e7929541eC2318f3dCF7e; //loadAddress("MorpherToken");
         require(morpherTokenAddress != address(0), "MorpherToken must be deployed first");
         
         console.log("MorpherToken address:", morpherTokenAddress);
         console.log("WETH address:", WETH);
 
         // Check for existing positions and burn them
-        checkAndBurnPositions();
+        // checkAndBurnPositions();
         
         // Initialize or get pool
         address poolAddress = initializeOrGetPool(morpherTokenAddress);
@@ -103,7 +103,7 @@ contract CreateUniswapPool is DeployOrUpgrade {
         addLiquidityToPool(poolAddress, morpherTokenAddress);
         
         // Save the pool address
-        saveAddress("UniswapV3Pool", poolAddress);
+        // saveAddress("UniswapV3Pool", poolAddress);
         
         vm.stopBroadcast();
     }
@@ -183,8 +183,8 @@ contract CreateUniswapPool is DeployOrUpgrade {
         
         // Prepare to add liquidity with the correct ratio
         // We want 100,000 MPH = 1 WETH (ratio 100,000:1)
-        uint256 ethAmount = 1 ether;
-        uint256 mphAmount = 100000 ether; // 100,000 MPH tokens (with 18 decimals)
+        uint256 ethAmount = 0.25 ether;
+        uint256 mphAmount = 500_000_000; // 100,000 MPH tokens (with 18 decimals)
         
         // // Convert ETH to WETH
         // IWETH9(WETH).deposit{value: ethAmount}();

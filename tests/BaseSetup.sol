@@ -15,7 +15,7 @@ import "../contracts/MorpherAdmin.sol";
 import "../contracts/MorpherAirdrop.sol";
 import "../contracts/MorpherInterestRateManager.sol";
 
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
 contract BaseSetup is Test {
 	using stdStorage for StdStorage;
