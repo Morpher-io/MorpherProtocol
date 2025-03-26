@@ -145,9 +145,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     
     function testDelegateMigratePositionsBatch() public {
         // We need to mock the signature verification and merkle proof verification
+         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(0),
-            abi.encodeWithSelector(MerkleProofUpgradeable.verify.selector),
+            abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
         
