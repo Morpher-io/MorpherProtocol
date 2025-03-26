@@ -20,7 +20,7 @@ import "./MorpherTradeEngine.sol";
 
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
+import "../lib/v4-periphery/src/interfaces/external/IWETH9.sol";
 import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 
 contract MorpherBridge is Initializable, ContextUpgradeable {
