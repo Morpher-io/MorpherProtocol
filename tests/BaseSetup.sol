@@ -14,6 +14,7 @@ import "../contracts/MorpherBridge.sol";
 import "../contracts/MorpherAdmin.sol";
 import "../contracts/MorpherAirdrop.sol";
 import "../contracts/MorpherInterestRateManager.sol";
+import "../contracts/MorpherSidechainToBaseMigration.sol";
 
 import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
@@ -38,6 +39,7 @@ contract BaseSetup is Test {
 	MorpherAdmin internal morpherAdmin;
 	MorpherInterestRateManager internal morpherInterestRateManager;
 	MorpherAirdrop internal morpherAirdrop;
+	MorpherSidechainToBaseMigration internal morpherMigration;
 
 	function setUp() public virtual {
 		//deploy Access Control
