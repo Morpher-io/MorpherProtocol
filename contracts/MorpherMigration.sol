@@ -21,10 +21,12 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     // Migration window parameters
     uint256 public migrationStartTime;
     uint256 public migrationEndTime;
+    uint256 public activeMigrationEndTime; // End of active migration period
     bool public migrationPaused;
     
-    // Merkle root of the final state of the plasma chain
+    // Merkle roots for different phases
     bytes32 public plasmaStateRoot;
+    bytes32 public finalBalanceMerkleRoot; // For post-active period balance migration
     
     // Track migrated positions and balances to prevent double-claiming
     mapping(bytes32 => bool) public migratedPositions;
@@ -39,15 +41,22 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     uint256 public earlyMigrationEndTime;
     uint256 public earlyMigrationBonus; // in basis points (e.g., 100 = 1%)
     
+    // Position migration authorization
+    mapping(address => bool) public userAuthorizedMigration;
+    mapping(address => uint256) public lastMigratedPositionIndex;
+    mapping(address => bytes32[]) public userPositionIds;
+    
     // Role-based access control
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant MIGRATION_OPERATOR_ROLE = keccak256("MIGRATION_OPERATOR_ROLE");
     
     // Events
-    event MigrationStarted(uint256 startTime, uint256 endTime);
+    event MigrationStarted(uint256 startTime, uint256 endTime, uint256 activeMigrationEnd);
     event MigrationPaused(bool paused);
     event MigrationWindowExtended(uint256 newEndTime);
+    event ActiveMigrationExtended(uint256 newEndTime);
     event PlasmaStateRootUpdated(bytes32 newRoot);
+    event FinalBalanceMerkleRootSet(bytes32 newRoot);
     
     event PositionMigrated(
         address indexed user, 
@@ -74,6 +83,9 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         bool authorized
     );
     
+    event MigrationAuthorized(address indexed user);
+    event MigrationInitiated(address indexed user);
+    
     // Delegate migration authorization
     mapping(address => mapping(address => bool)) public delegateMigrationAuthorized;
     
@@ -90,6 +102,20 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         _;
     }
     
+    modifier activeMigrationPhase() {
+        require(block.timestamp >= migrationStartTime, "MorpherMigration: Migration has not started yet");
+        require(block.timestamp <= activeMigrationEndTime, "MorpherMigration: Active migration period has ended");
+        require(!migrationPaused, "MorpherMigration: Migration is paused");
+        _;
+    }
+    
+    modifier postActiveMigrationPhase() {
+        require(block.timestamp > activeMigrationEndTime, "MorpherMigration: Active migration period not over");
+        require(block.timestamp <= migrationEndTime, "MorpherMigration: Migration period has ended");
+        require(!migrationPaused, "MorpherMigration: Migration is paused");
+        _;
+    }
+    
     modifier userNotBlocked {
         require(!MorpherUserBlocking(state.morpherUserBlockingAddress()).userIsBlocked(_msgSender()), 
                 "MorpherMigration: User is blocked");
@@ -100,6 +126,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         address _stateAddress,
         bytes32 _plasmaStateRoot,
         uint256 _migrationDurationDays,
+        uint256 _activeMigrationDurationDays,
         uint256 _earlyMigrationDurationDays,
         uint256 _earlyMigrationBonusBps
     ) public initializer {
@@ -108,11 +135,12 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         
         migrationStartTime = block.timestamp;
         migrationEndTime = block.timestamp + (_migrationDurationDays * 1 days);
+        activeMigrationEndTime = block.timestamp + (_activeMigrationDurationDays * 1 days);
         earlyMigrationEndTime = block.timestamp + (_earlyMigrationDurationDays * 1 days);
         earlyMigrationBonus = _earlyMigrationBonusBps;
         migrationPaused = false;
         
-        emit MigrationStarted(migrationStartTime, migrationEndTime);
+        emit MigrationStarted(migrationStartTime, migrationEndTime, activeMigrationEndTime);
         emit PlasmaStateRootUpdated(_plasmaStateRoot);
     }
     
@@ -139,14 +167,139 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         emit MigrationWindowExtended(migrationEndTime);
     }
     
+    function extendActiveMigrationWindow(uint256 _additionalDays) public onlyRole(ADMINISTRATOR_ROLE) {
+        activeMigrationEndTime += _additionalDays * 1 days;
+        require(activeMigrationEndTime <= migrationEndTime, "MorpherMigration: Active period cannot exceed total migration period");
+        emit ActiveMigrationExtended(activeMigrationEndTime);
+    }
+    
+    function setFinalBalanceMerkleRoot(bytes32 _root) public onlyRole(ADMINISTRATOR_ROLE) {
+        require(block.timestamp > activeMigrationEndTime, "MorpherMigration: Active migration period not over");
+        finalBalanceMerkleRoot = _root;
+        emit FinalBalanceMerkleRootSet(_root);
+    }
+    
     // ------------------------------------------------------------------------
     // Migration functions
     // ------------------------------------------------------------------------
     
     /**
-     * Migrate a single position from plasma chain to Base L2
+     * Authorize position migration with signature
+     */
+    function authorizePositionMigration(bytes memory _signature) public userNotBlocked activeMigrationPhase {
+        // User signs a message authorizing migration of all their positions
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            "I authorize migration of all my positions from plasma chain to Base L2",
+            _msgSender(),
+            block.chainid
+        ));
+        
+        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _signature);
+        require(signer == _msgSender(), "MorpherMigration: Invalid signature");
+        
+        userAuthorizedMigration[_msgSender()] = true;
+        emit MigrationAuthorized(_msgSender());
+    }
+    
+    /**
+     * Initiate full migration process
+     */
+    function initiateFullMigration(bytes memory _signature) public userNotBlocked activeMigrationPhase {
+        // Authorize position migration
+        authorizePositionMigration(_signature);
+        
+        // Emit event for backend to start migration process
+        emit MigrationInitiated(_msgSender());
+    }
+    
+    /**
+     * Migrate a single position from plasma chain to Base L2 (operator-controlled)
      */
     function migratePosition(
+        address _user,
+        bytes32 _marketId,
+        uint256 _timeStamp,
+        uint256 _longShares,
+        uint256 _shortShares,
+        uint256 _meanEntryPrice,
+        uint256 _meanEntrySpread,
+        uint256 _meanEntryLeverage,
+        uint256 _liquidationPrice,
+        bytes memory _operatorSignature
+    ) public onlyRole(MIGRATION_OPERATOR_ROLE) activeMigrationPhase {
+        // Verify user has authorized migration
+        require(userAuthorizedMigration[_user], "MorpherMigration: User has not authorized migration");
+        
+        // Generate position hash
+        bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
+            _user, 
+            _marketId, 
+            _timeStamp, 
+            _longShares, 
+            _shortShares, 
+            _meanEntryPrice, 
+            _meanEntrySpread, 
+            _meanEntryLeverage, 
+            _liquidationPrice
+        );
+        
+        // Verify operator signature to confirm position was cleared on plasma chain
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            _user,
+            _marketId,
+            _timeStamp,
+            _longShares,
+            _shortShares,
+            _meanEntryPrice,
+            _meanEntrySpread,
+            _meanEntryLeverage,
+            _liquidationPrice,
+            positionHash,
+            "Position cleared on plasma chain"
+        ));
+        
+        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _operatorSignature);
+        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(MIGRATION_OPERATOR_ROLE, signer), 
+                "MorpherMigration: Invalid operator signature");
+        
+        // Verify position hasn't been migrated already
+        require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
+        
+        // Mark position as migrated
+        migratedPositions[positionHash] = true;
+        
+        // Store position ID for sequential migration
+        userPositionIds[_user].push(positionHash);
+        
+        // Set position in trade engine
+        MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
+            _user,
+            _marketId,
+            _timeStamp,
+            _longShares,
+            _shortShares,
+            _meanEntryPrice,
+            _meanEntrySpread,
+            _meanEntryLeverage,
+            _liquidationPrice
+        );
+        
+        // Update statistics
+        totalPositionsMigrated++;
+        
+        emit PositionMigrated(
+            _user,
+            _marketId,
+            _longShares,
+            _shortShares,
+            positionHash
+        );
+    }
+    
+    /**
+     * Legacy method for Merkle-based position migration (kept for compatibility)
+     */
+    function migratePositionWithMerkleProof(
         bytes32[] memory _proof,
         bytes32 _marketId,
         uint256 _timeStamp,
@@ -288,12 +441,12 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     /**
-     * Migrate token balance from plasma chain to Base L2
+     * Migrate token balance from plasma chain to Base L2 during active migration phase
      */
     function migrateBalance(
         bytes32[] memory _proof,
         uint256 _balance
-    ) public migrationActive userNotBlocked {
+    ) public activeMigrationPhase userNotBlocked {
         // Verify balance hasn't been migrated already
         require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
         
@@ -314,6 +467,41 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         if (block.timestamp <= earlyMigrationEndTime && earlyMigrationBonus > 0) {
             amountToMint += (_balance * earlyMigrationBonus) / 10000;
         }
+        
+        // Mint tokens to user
+        MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), amountToMint);
+        
+        // Update statistics
+        totalBalancesMigrated++;
+        totalUsersMigrated++;
+        
+        emit BalanceMigrated(_msgSender(), amountToMint);
+    }
+    
+    /**
+     * Migrate token balance from plasma chain to Base L2 after active migration period
+     */
+    function migrateBalancePostActive(
+        bytes32[] memory _proof,
+        uint256 _balance
+    ) public postActiveMigrationPhase userNotBlocked {
+        // Verify balance hasn't been migrated already
+        require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
+        
+        // Generate balance hash
+        bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance));
+        
+        // Verify Merkle proof against final balance root
+        require(
+            MerkleProofUpgradeable.verify(_proof, finalBalanceMerkleRoot, balanceHash),
+            "MorpherMigration: Invalid Merkle proof"
+        );
+        
+        // Mark balance as migrated
+        migratedBalances[_msgSender()] = true;
+        
+        // No bonus for post-active migration
+        uint256 amountToMint = _balance;
         
         // Mint tokens to user
         MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), amountToMint);
@@ -492,6 +680,110 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     /**
+     * Migrate positions in batches for a user
+     */
+    function migrateNextBatchOfPositions(
+        address _user, 
+        uint256 _batchSize,
+        bytes32[] memory _marketIds,
+        uint256[] memory _timeStamps,
+        uint256[] memory _longShares,
+        uint256[] memory _shortShares,
+        uint256[] memory _meanEntryPrices,
+        uint256[] memory _meanEntrySpreads,
+        uint256[] memory _meanEntryLeverages,
+        uint256[] memory _liquidationPrices,
+        bytes[] memory _operatorSignatures
+    ) public onlyRole(MIGRATION_OPERATOR_ROLE) activeMigrationPhase {
+        // Verify user has authorized migration
+        require(userAuthorizedMigration[_user], "MorpherMigration: User has not authorized migration");
+        require(_batchSize <= _marketIds.length, "MorpherMigration: Batch size exceeds array length");
+        
+        bytes32[] memory positionHashes = new bytes32[](_batchSize);
+        
+        for (uint i = 0; i < _batchSize; i++) {
+            // Generate position hash
+            bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
+                _user, 
+                _marketIds[i], 
+                _timeStamps[i], 
+                _longShares[i], 
+                _shortShares[i], 
+                _meanEntryPrices[i], 
+                _meanEntrySpreads[i], 
+                _meanEntryLeverages[i], 
+                _liquidationPrices[i]
+            );
+            
+            // Verify operator signature
+            bytes32 messageHash = keccak256(abi.encodePacked(
+                _user,
+                _marketIds[i],
+                _timeStamps[i],
+                _longShares[i],
+                _shortShares[i],
+                _meanEntryPrices[i],
+                _meanEntrySpreads[i],
+                _meanEntryLeverages[i],
+                _liquidationPrices[i],
+                positionHash,
+                "Position cleared on plasma chain"
+            ));
+            
+            address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _operatorSignatures[i]);
+            require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(MIGRATION_OPERATOR_ROLE, signer), 
+                    "MorpherMigration: Invalid operator signature");
+            
+            // Verify position hasn't been migrated already
+            require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
+            
+            // Mark position as migrated
+            migratedPositions[positionHash] = true;
+            
+            // Set position in trade engine
+            MorpherTradeEngine(state.morpherTradeEngineAddress()).setPosition(
+                _user,
+                _marketIds[i],
+                _timeStamps[i],
+                _longShares[i],
+                _shortShares[i],
+                _meanEntryPrices[i],
+                _meanEntrySpreads[i],
+                _meanEntryLeverages[i],
+                _liquidationPrices[i]
+            );
+            
+            positionHashes[i] = positionHash;
+        }
+        
+        // Update statistics
+        totalPositionsMigrated += _batchSize;
+        
+        // Update last migrated position index
+        lastMigratedPositionIndex[_user] += _batchSize;
+        
+        emit PositionsBatchMigrated(
+            _user,
+            _batchSize,
+            positionHashes
+        );
+    }
+    
+    /**
+     * Liquidate remaining positions after active migration period
+     */
+    function liquidateRemainingPositions(
+        address[] memory _users
+    ) public onlyRole(ADMINISTRATOR_ROLE) postActiveMigrationPhase {
+        for (uint256 i = 0; i < _users.length; i++) {
+            // Mark user as having all positions liquidated
+            // This is a placeholder - in a real implementation, you would
+            // interact with the plasma chain to liquidate positions
+            userAuthorizedMigration[_users[i]] = false;
+        }
+    }
+    
+    /**
      * Get migration statistics
      */
     function getMigrationStats() public view returns (
@@ -499,23 +791,34 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
         uint256 _totalBalancesMigrated,
         uint256 _totalUsersMigrated,
         uint256 _migrationTimeRemaining,
-        bool _migrationActive
+        uint256 _activeMigrationTimeRemaining,
+        bool _migrationActive,
+        bool _activeMigrationPhase
     ) {
         uint256 timeRemaining = 0;
         if (block.timestamp < migrationEndTime) {
             timeRemaining = migrationEndTime - block.timestamp;
         }
         
+        uint256 activeTimeRemaining = 0;
+        if (block.timestamp < activeMigrationEndTime) {
+            activeTimeRemaining = activeMigrationEndTime - block.timestamp;
+        }
+        
         bool active = block.timestamp >= migrationStartTime && 
                      block.timestamp <= migrationEndTime && 
                      !migrationPaused;
+                     
+        bool activePhase = active && block.timestamp <= activeMigrationEndTime;
         
         return (
             totalPositionsMigrated,
             totalBalancesMigrated,
             totalUsersMigrated,
             timeRemaining,
-            active
+            activeTimeRemaining,
+            active,
+            activePhase
         );
     }
 }

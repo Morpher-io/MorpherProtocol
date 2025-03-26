@@ -406,7 +406,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // ------------------------------------------------------------------------
     function claimStagedTokensConvertAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
         // msg.sender must approve this contract
-        require(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid)).toEthSignedMessageHash().recover(_userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
+        require(ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid))), _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
         updateSideChainMerkleRoot(_rootHash);
         bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
@@ -468,7 +468,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     // ------------------------------------------------------------------------
     function claimStagedTokensAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
         // msg.sender must approve this contract
-        require(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid)).toEthSignedMessageHash().recover(_userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
+        require(ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid))), _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
         updateSideChainMerkleRoot(_rootHash);
         bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
