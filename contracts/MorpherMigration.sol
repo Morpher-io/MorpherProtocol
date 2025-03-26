@@ -1,5 +1,5 @@
 // ------------------------------------------------------------------------
-// MorpherMigration
+// MorpherSidechainToBaseMigration
 // Handles the migration of positions and balances from the plasma sidechain to Base L2
 // using Merkle proofs for verification.
 // ------------------------------------------------------------------------
@@ -14,7 +14,7 @@ import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initiali
 import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
 import "./MorpherTradeEngine.sol";
 
-contract MorpherMigration is Initializable, ContextUpgradeable {
+contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     
     MorpherState state;
     
