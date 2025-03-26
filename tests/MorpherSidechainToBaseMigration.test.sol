@@ -18,7 +18,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     bytes userSignature;
     
     // Position test data
-    MorpherSidechainToBaseMigration.PositionMigrationData[] positionData;
     bytes32 testMarketId;
     
     function setUp() public override {
@@ -39,19 +38,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         testMarketId = keccak256("CRYPTO_BTC");
         morpherState.activateMarket(testMarketId);
         
-        // Setup position data
-        positionData = new MorpherSidechainToBaseMigration.PositionMigrationData[](1);
-        positionData[0] = MorpherSidechainToBaseMigration.PositionMigrationData({
-            marketId: testMarketId,
-            timeStamp: block.timestamp,
-            longShares: 1 ether,
-            shortShares: 0,
-            meanEntryPrice: 50000 * 10**8,
-            meanEntrySpread: 100 * 10**8,
-            meanEntryLeverage: 1 * 10**8,
-            liquidationPrice: 0,
-            proof: testProof
-        });
+        // Create a test market ID
+        testMarketId = keccak256("CRYPTO_BTC");
+        morpherState.activateMarket(testMarketId);
         
         // Grant roles
         morpherAccessControl.grantRole(ADMINISTRATOR_ROLE, address(this));
@@ -145,7 +134,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     
     function testDelegateMigratePositionsBatch() public {
         // We need to mock the signature verification and merkle proof verification
-         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(0),
             abi.encodeWithSelector(verifySelector),
@@ -158,6 +147,22 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
             abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
             abi.encode(testUser)
         );
+        
+        // Create position data in memory
+        MorpherSidechainToBaseMigration.PositionMigrationData[] memory positionData = 
+            new MorpherSidechainToBaseMigration.PositionMigrationData[](1);
+        
+        positionData[0] = MorpherSidechainToBaseMigration.PositionMigrationData({
+            marketId: testMarketId,
+            timeStamp: block.timestamp,
+            longShares: 1 ether,
+            shortShares: 0,
+            meanEntryPrice: 50000 * 10**8,
+            meanEntrySpread: 100 * 10**8,
+            meanEntryLeverage: 1 * 10**8,
+            liquidationPrice: 0,
+            proof: testProof
+        });
         
         // Call the function
         morpherMigration.delegateMigratePositionsBatch(
@@ -240,6 +245,22 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testCannotMigratePositionTwice() public {
+        // Create position data in memory
+        MorpherSidechainToBaseMigration.PositionMigrationData[] memory positionData = 
+            new MorpherSidechainToBaseMigration.PositionMigrationData[](1);
+        
+        positionData[0] = MorpherSidechainToBaseMigration.PositionMigrationData({
+            marketId: testMarketId,
+            timeStamp: block.timestamp,
+            longShares: 1 ether,
+            shortShares: 0,
+            meanEntryPrice: 50000 * 10**8,
+            meanEntrySpread: 100 * 10**8,
+            meanEntryLeverage: 1 * 10**8,
+            liquidationPrice: 0,
+            proof: testProof
+        });
+        
         // First migration
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
