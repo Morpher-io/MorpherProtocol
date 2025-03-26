@@ -452,20 +452,7 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
     }
     
     
-    /**
-     * Liquidate remaining positions
-     */
-    function liquidateRemainingPositions(
-        address[] memory _users
-    ) public onlyRole(ADMINISTRATOR_ROLE) {
-        for (uint256 i = 0; i < _users.length; i++) {
-            // Mark user as having all positions liquidated
-            // This is a placeholder - in a real implementation, you would
-            // interact with the plasma chain to liquidate positions
-            userAuthorizedMigration[_users[i]] = false;
-        }
-    }
-    
+       
     /**
      * Get migration statistics
      */
