@@ -317,6 +317,11 @@ contract MorpherMigration is Initializable, ContextUpgradeable {
             // Verify position hasn't been migrated already
             require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
             
+            // Check if user already has a position for this market
+            MorpherTradeEngine.position memory existingPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(_user, pos.marketId);
+            require(existingPosition.longShares == 0 && existingPosition.shortShares == 0, 
+                    "MorpherMigration: User already has a position for this market");
+            
             // Verify Merkle proof against the provided merkle root
             require(
                 MerkleProofUpgradeable.verify(pos.proof, _merkleRoot, positionHash),
