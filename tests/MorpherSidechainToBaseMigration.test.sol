@@ -57,7 +57,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         vm.stopPrank();
     }
     
-    function testInitialization() public {
+    function testInitialization() public view {
         assertEq(address(morpherMigration.state()), address(morpherState));
         assertEq(morpherMigration.migrationBonus(), 500);
         assertEq(morpherMigration.migrationPaused(), false);
@@ -146,8 +146,11 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
             morpherMigration.getMigrationStats();
         
-        assertEq(balancesMigrated, 1);
-        assertEq(usersMigrated, 1);
+        assertEq(positionsMigrated, 0, "No positions should be migrated");
+        assertEq(balancesMigrated, 1, "One balance should be migrated");
+        assertEq(usersMigrated, 1, "One user should be migrated");
+        assertTrue(active, "Migration should be active");
+        assertTrue(finalRootSet, "Final root should not be set");
     }
     
     function testDelegateMigratePositionsBatch() public {
@@ -198,7 +201,11 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
             morpherMigration.getMigrationStats();
         
-        assertEq(positionsMigrated, 1);
+        assertEq(positionsMigrated, 1, "One position should be migrated");
+        assertEq(balancesMigrated, 0, "No balances should be migrated yet");
+        assertEq(usersMigrated, 0, "User count should not increase for position-only migration");
+        assertTrue(active, "Migration should be active");
+        assertFalse(finalRootSet, "Final root should not be set");
     }
     
     function testMigrateBalanceSelfService() public {
@@ -239,8 +246,11 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Verify migration statistics
         (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
             morpherMigration.getMigrationStats();
-        assertEq(balancesMigrated, 1);
-        assertEq(usersMigrated, 1);
+        assertEq(positionsMigrated, 0, "No positions should be migrated");
+        assertEq(balancesMigrated, 1, "One balance should be migrated");
+        assertEq(usersMigrated, 1, "One user should be migrated");
+        assertTrue(active, "Migration should be active");
+        assertTrue(finalRootSet, "Final root should be set");
     }
     
     function testCannotMigrateBalanceTwice() public {
@@ -462,5 +472,93 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Check that the migration was authorized
         assertTrue(morpherMigration.userAuthorizedMigration(testUser));
+    }
+    
+    function testFullMigrationFlow() public {
+        // 1. First migrate positions
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
+        vm.mockCall(
+            address(0),
+            abi.encodeWithSelector(verifySelector),
+            abi.encode(true)
+        );
+        
+        vm.mockCall(
+            address(0),
+            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
+            abi.encode(testUser)
+        );
+        
+        // Create position data
+        MorpherSidechainToBaseMigration.PositionMigrationData[] memory positionData = 
+            new MorpherSidechainToBaseMigration.PositionMigrationData[](1);
+        
+        positionData[0] = MorpherSidechainToBaseMigration.PositionMigrationData({
+            marketId: testMarketId,
+            timeStamp: block.timestamp,
+            longShares: 2 ether,
+            shortShares: 0,
+            meanEntryPrice: 50000 * 10**8,
+            meanEntrySpread: 100 * 10**8,
+            meanEntryLeverage: 1 * 10**8,
+            liquidationPrice: 0,
+            proof: testProof
+        });
+        
+        // Migrate positions
+        morpherMigration.delegateMigratePositionsBatch(
+            testUser,
+            userSignature,
+            testMerkleRoot,
+            positionData
+        );
+        
+        // 2. Then set final balance root and migrate balance
+        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
+        
+        // Migrate balance with partial lock
+        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        uint256 lockedAmount = testBalance / 4; // Lock 25% of the balance
+        uint256 lockDuration = 180 days;
+        
+        morpherMigration.delegateMigrateBalance(
+            testUser,
+            userSignature,
+            testMerkleRoot,
+            testProof,
+            testBalance,
+            lockedAmount,
+            lockDuration
+        );
+        
+        // 3. Verify everything was migrated correctly
+        
+        // Check position
+        MorpherTradeEngine.position memory position = morpherTradeEngine.getPosition(testUser, testMarketId);
+        assertEq(position.longShares, 2 ether, "Position longShares should be migrated correctly");
+        assertEq(position.shortShares, 0, "Position shortShares should be migrated correctly");
+        
+        // Check balance with bonus
+        uint256 expectedBalance = initialBalance + testBalance + (testBalance * 500 / 10000);
+        assertEq(morpherToken.getTradeableBalanceOf(testUser), expectedBalance, "Total balance should include bonus");
+        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedAmount, "Available balance should exclude locked tokens");
+        
+        // Check time lock
+        (uint256 actualLockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
+        assertEq(actualLockedAmount, lockedAmount, "Locked amount should match");
+        assertEq(lockedUntil, block.timestamp + lockDuration, "Lock duration should match");
+        
+        // Check migration status
+        assertTrue(morpherMigration.migratedBalances(testUser), "Balance should be marked as migrated");
+        assertTrue(morpherMigration.userAuthorizedMigration(testUser), "User should be marked as authorized");
+        
+        // Check final statistics
+        (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
+            morpherMigration.getMigrationStats();
+        assertEq(positionsMigrated, 1, "One position should be migrated");
+        assertEq(balancesMigrated, 1, "One balance should be migrated");
+        assertEq(usersMigrated, 1, "One user should be migrated");
+        assertTrue(active, "Migration should be active");
+        assertTrue(finalRootSet, "Final root should be set");
     }
 }
