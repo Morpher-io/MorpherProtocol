@@ -10,9 +10,11 @@ import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherAccessControl.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
 import "./MorpherTradeEngine.sol";
+import "./MorpherToken.sol";
 
 contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     
@@ -123,6 +125,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         bytes32 _plasmaStateRoot,
         uint256 _migrationBonusBps
     ) public initializer {
+        __Context_init();
         state = MorpherState(_stateAddress);
         plasmaStateRoot = _plasmaStateRoot;
         migrationBonus = _migrationBonusBps;

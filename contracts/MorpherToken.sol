@@ -67,6 +67,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	event RewardsUnlocked(address indexed account, uint256 amount);
 	event TokensLocked(address indexed account, uint256 amount, uint256 lockedUntil);
 	event TokensUnlocked(address indexed account, uint256 amount);
+	event MigrationTokensLocked(address indexed account, uint256 amount, uint256 lockedUntil);
 	event DailyMintedTransferLimitUpdated(uint256 oldLimit, uint256 newLimit);
 	event MintedTokensTransferred(address indexed from, address indexed to, uint256 amount);
 	event TokensTransferredIn(address indexed to, uint256 amount);
@@ -333,7 +334,12 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	 * @param amount Amount of tokens to lock
 	 * @param lockDuration Duration in seconds for which tokens will be locked
 	 */
-	function lockTokensForTime(address account, uint256 amount, uint256 lockDuration) public onlyRole(ADMINISTRATOR_ROLE) {
+	function lockTokensForTime(address account, uint256 amount, uint256 lockDuration) public {
+		require(
+			morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()) || 
+			_msgSender() == morpherState.morpherSidechainToBaseMigrationAddress(),
+			"MorpherToken: must have admin role or be migration contract to lock tokens"
+		);
 		require(balanceOf(account) >= amount, "MorpherToken: insufficient balance for locking");
 		
 		uint256 unlockTime = block.timestamp + lockDuration;
@@ -352,7 +358,12 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		
 		_totalTimeLocked += amount;
 		
-		emit TokensLocked(account, amount, unlockTime);
+		// Emit different event if called from migration contract
+		if (_msgSender() == morpherState.morpherSidechainToBaseMigrationAddress()) {
+			emit MigrationTokensLocked(account, amount, unlockTime);
+		} else {
+			emit TokensLocked(account, amount, unlockTime);
+		}
 	}
 
 	/**
