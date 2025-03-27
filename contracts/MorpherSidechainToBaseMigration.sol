@@ -190,46 +190,10 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     
     
     /**
-     * Migrate token balance from plasma chain to Base L2 in self-service phase
+     * Migrate token balance from plasma chain to Base L2 with time lock
      * Uses the finalBalanceMerkleRoot which is set after the active migration period
      */
     function migrateBalanceSelfService(
-        bytes32[] memory _proof,
-        uint256 _balance
-    ) public userNotBlocked {
-        // Verify balance hasn't been migrated already
-        require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
-        require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
-        
-        // Generate balance hash
-        bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance));
-        
-        // Verify Merkle proof against final balance root
-        require(
-            MerkleProofUpgradeable.verify(_proof, finalBalanceMerkleRoot, balanceHash),
-            "MorpherMigration: Invalid Merkle proof"
-        );
-        
-        // Mark balance as migrated
-        migratedBalances[_msgSender()] = true;
-        
-        // No bonus for self-service migration
-        uint256 amountToMint = _balance;
-        
-        // Mint tokens to user
-        MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), amountToMint);
-        
-        // Update statistics
-        totalBalancesMigrated++;
-        totalUsersMigrated++;
-        
-        emit BalanceMigrated(_msgSender(), amountToMint);
-    }
-    
-    /**
-     * Migrate token balance from plasma chain to Base L2 with time lock
-     */
-    function migrateBalanceWithTimeLock(
         bytes32[] memory _proof,
         uint256 _balance,
         uint256 _lockedAmount,
@@ -498,7 +462,11 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         // Mark user as having authorized migration (for future reference)
         userAuthorizedMigration[_user] = true;
         
-        emit BalanceMigratedWithTimeLock(_user, amountToMint, _lockedAmount, lockedUntil);
+        if (_lockedAmount > 0 && _lockDuration > 0) {
+            emit BalanceMigratedWithTimeLock(_user, amountToMint, _lockedAmount, lockedUntil);
+        } else {
+            emit BalanceMigrated(_user, amountToMint);
+        }
     }
     
     /**
@@ -534,9 +502,11 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         address _user,
         bytes32[] memory _proof,
         bytes32 _merkleRoot,
-        uint256 _balance
+        uint256 _balance,
+        uint256 _lockedAmount,
+        uint256 _lockDuration
     ) public pure returns (bool) {
-        bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance));
+        bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance, _lockedAmount, _lockDuration));
         return MerkleProofUpgradeable.verify(_proof, _merkleRoot, balanceHash);
     }
     
