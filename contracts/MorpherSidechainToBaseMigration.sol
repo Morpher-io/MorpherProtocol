@@ -70,6 +70,13 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         uint256 amount
     );
     
+    event BalanceMigratedWithTimeLock(
+        address indexed user,
+        uint256 amount,
+        uint256 lockedAmount,
+        uint256 lockedUntil
+    );
+    
     event DelegateMigrationAuthorized(
         address indexed user,
         address indexed delegate,
@@ -217,6 +224,53 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         totalUsersMigrated++;
         
         emit BalanceMigrated(_msgSender(), amountToMint);
+    }
+    
+    /**
+     * Migrate token balance from plasma chain to Base L2 with time lock
+     */
+    function migrateBalanceWithTimeLock(
+        bytes32[] memory _proof,
+        uint256 _balance,
+        uint256 _lockedAmount,
+        uint256 _lockDuration
+    ) public userNotBlocked {
+        // Verify balance hasn't been migrated already
+        require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
+        require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
+        require(_lockedAmount <= _balance, "MorpherMigration: Locked amount cannot exceed total balance");
+        
+        // Generate balance hash including lock information
+        bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance, _lockedAmount, _lockDuration));
+        
+        // Verify Merkle proof against final balance root
+        require(
+            MerkleProofUpgradeable.verify(_proof, finalBalanceMerkleRoot, balanceHash),
+            "MorpherMigration: Invalid Merkle proof"
+        );
+        
+        // Mark balance as migrated
+        migratedBalances[_msgSender()] = true;
+        
+        // No bonus for self-service migration
+        uint256 amountToMint = _balance;
+        
+        // Mint tokens to user
+        MorpherToken(state.morpherTokenAddress()).mint(_msgSender(), amountToMint);
+        
+        // Calculate unlock time
+        uint256 lockedUntil = block.timestamp + _lockDuration;
+        
+        // If there are tokens to be locked, lock them
+        if (_lockedAmount > 0 && _lockDuration > 0) {
+            MorpherToken(state.morpherTokenAddress()).lockTokensForTime(_msgSender(), _lockedAmount, _lockDuration);
+        }
+        
+        // Update statistics
+        totalBalancesMigrated++;
+        totalUsersMigrated++;
+        
+        emit BalanceMigratedWithTimeLock(_msgSender(), amountToMint, _lockedAmount, lockedUntil);
     }
     
     /**
@@ -380,6 +434,71 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         userAuthorizedMigration[_user] = true;
         
         emit BalanceMigrated(_user, amountToMint);
+    }
+    
+    /**
+     * Delegate migration of token balance with time lock
+     */
+    function delegateMigrateBalanceWithTimeLock(
+        address _user,
+        bytes memory _userAuthSignature,
+        bytes32 _merkleRoot,
+        bytes32[] memory _proof,
+        uint256 _balance,
+        uint256 _lockedAmount,
+        uint256 _lockDuration
+    ) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
+        // Verify user authorization signature
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            "I authorize migration of all my positions from plasma chain to Base L2",
+            _user,
+            block.chainid
+        ));
+        
+        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _userAuthSignature);
+        require(signer == _user, "MorpherMigration: Invalid user authorization signature");
+        
+        // Verify balance hasn't been migrated already
+        require(!migratedBalances[_user], "MorpherMigration: Balance already migrated");
+        require(_lockedAmount <= _balance, "MorpherMigration: Locked amount cannot exceed total balance");
+        
+        // Generate balance hash including lock information
+        bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance, _lockedAmount, _lockDuration));
+        
+        // Verify Merkle proof against the provided merkle root
+        require(
+            MerkleProofUpgradeable.verify(_proof, _merkleRoot, balanceHash),
+            "MorpherMigration: Invalid Merkle proof"
+        );
+        
+        // Mark balance as migrated
+        migratedBalances[_user] = true;
+        
+        // Apply migration bonus if configured
+        uint256 amountToMint = _balance;
+        if (migrationBonus > 0) {
+            amountToMint += (_balance * migrationBonus) / 10000;
+        }
+        
+        // Mint tokens to user
+        MorpherToken(state.morpherTokenAddress()).mint(_user, amountToMint);
+        
+        // Calculate unlock time
+        uint256 lockedUntil = block.timestamp + _lockDuration;
+        
+        // If there are tokens to be locked, lock them
+        if (_lockedAmount > 0 && _lockDuration > 0) {
+            MorpherToken(state.morpherTokenAddress()).lockTokensForTime(_user, _lockedAmount, _lockDuration);
+        }
+        
+        // Update statistics
+        totalBalancesMigrated++;
+        totalUsersMigrated++;
+        
+        // Mark user as having authorized migration (for future reference)
+        userAuthorizedMigration[_user] = true;
+        
+        emit BalanceMigratedWithTimeLock(_user, amountToMint, _lockedAmount, lockedUntil);
     }
     
     /**

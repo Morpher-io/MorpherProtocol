@@ -136,6 +136,113 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		assertEq(totalSupply, 2 ether);
 	}
 	
+	function testTimeLockTokens() public {
+		address user = address(0xabcdef);
+		
+		// Mint tokens to user
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 10 ether);
+		
+		// Lock 5 ether for 180 days
+		uint256 lockDuration = 180 days;
+		morpherToken.lockTokensForTime(user, 5 ether, lockDuration);
+		vm.stopPrank();
+		
+		// Check balances
+		assertEq(morpherToken.getTradeableBalanceOf(user), 10 ether);
+		assertEq(morpherToken.balanceOf(user), 5 ether); // Only 5 ether available
+		
+		// Get time lock info
+		(uint256 lockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(user);
+		assertEq(lockedAmount, 5 ether);
+		assertEq(lockedUntil, block.timestamp + lockDuration);
+		
+		// Try to transfer more than available balance
+		vm.startPrank(user);
+		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
+		morpherToken.transfer(address(0x123), 6 ether);
+		
+		// Transfer within available balance
+		morpherToken.transfer(address(0x123), 4 ether);
+		vm.stopPrank();
+		
+		// Check balances after transfer
+		assertEq(morpherToken.getTradeableBalanceOf(user), 6 ether);
+		assertEq(morpherToken.balanceOf(user), 1 ether);
+		
+		// Fast forward past lock period
+		vm.warp(block.timestamp + lockDuration + 1);
+		
+		// Check that tokens are now available
+		(lockedAmount, lockedUntil) = morpherToken.getTimeLock(user);
+		assertEq(lockedAmount, 0); // Lock has expired
+		assertEq(lockedUntil, 0);
+		
+		// Balances should reflect unlocked tokens
+		assertEq(morpherToken.balanceOf(user), 6 ether);
+		
+		// Manually trigger unlock
+		vm.prank(user);
+		morpherToken.unlockExpiredTokens(user);
+		
+		// Check total time locked
+		assertEq(morpherToken.getTotalTimeLocked(), 0);
+	}
+	
+	function testTimeLockAndRewardsLock() public {
+		address user = address(0xabcdef);
+		
+		// Grant AIRDROPADMIN_ROLE to admin for reward locking
+		vm.startPrank(_admin);
+		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), _admin);
+		
+		// Mint tokens to user
+		morpherToken.mint(user, 10 ether);
+		
+		// Lock 3 ether as rewards
+		morpherToken.lockRewards(user, 3 ether);
+		
+		// Lock 4 ether with time lock
+		uint256 lockDuration = 30 days;
+		morpherToken.lockTokensForTime(user, 4 ether, lockDuration);
+		vm.stopPrank();
+		
+		// Check balances
+		assertEq(morpherToken.getTradeableBalanceOf(user), 10 ether);
+		assertEq(morpherToken.balanceOf(user), 3 ether); // 10 - 3 (rewards) - 4 (time lock)
+		
+		// Try to transfer more than available balance
+		vm.startPrank(user);
+		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
+		morpherToken.transfer(address(0x123), 4 ether);
+		
+		// Transfer within available balance
+		morpherToken.transfer(address(0x123), 2 ether);
+		vm.stopPrank();
+		
+		// Check balances after transfer
+		assertEq(morpherToken.getTradeableBalanceOf(user), 8 ether);
+		assertEq(morpherToken.balanceOf(user), 1 ether);
+		
+		// Fast forward past time lock period
+		vm.warp(block.timestamp + lockDuration + 1);
+		
+		// Check balances - time lock should be expired but rewards lock remains
+		assertEq(morpherToken.balanceOf(user), 5 ether); // 8 - 3 (rewards)
+		
+		// Manually trigger unlock
+		vm.prank(user);
+		morpherToken.unlockExpiredTokens(user);
+		
+		// Unlock rewards
+		vm.startPrank(_admin);
+		morpherToken.unlockRewards(user, 3 ether);
+		vm.stopPrank();
+		
+		// Check final balance - all locks removed
+		assertEq(morpherToken.balanceOf(user), 8 ether);
+	}
+	
 	function testDailyMintedTransferLimit() public {
 		address user = address(0xabcdef);
 		address recipient = address(0x123456);

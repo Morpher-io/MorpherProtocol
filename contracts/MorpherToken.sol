@@ -51,10 +51,22 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	mapping(address => uint256) private _lockedRewards;
 	uint256 private _totalLockedRewards;
 	
-	
+	// Structure to track time-locked tokens
+	struct TokenLock {
+		uint256 amount;      // Amount of tokens locked
+		uint256 lockedUntil; // Timestamp until which tokens are locked
+	}
 
+	// Mapping to track locked tokens per user
+	mapping(address => TokenLock) private _timeLocks;
+
+	// Total amount of time-locked tokens across all users
+	uint256 private _totalTimeLocked;
+	
 	event RewardsLocked(address indexed account, uint256 amount);
 	event RewardsUnlocked(address indexed account, uint256 amount);
+	event TokensLocked(address indexed account, uint256 amount, uint256 lockedUntil);
+	event TokensUnlocked(address indexed account, uint256 amount);
 	event DailyMintedTransferLimitUpdated(uint256 oldLimit, uint256 newLimit);
 	event MintedTokensTransferred(address indexed from, address indexed to, uint256 amount);
 	event TokensTransferredIn(address indexed to, uint256 amount);
@@ -156,17 +168,18 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	}
 
 	/**
-	 * @dev Returns the full balance including locked rewards, used for trading
+	 * @dev Returns the full balance including locked rewards and time-locked tokens, used for trading
 	 */
 	function getTradeableBalanceOf(address account) public view returns (uint256) {
 		return super.balanceOf(account);
 	}
 
 	/**
-	 * @dev Override balanceOf to subtract locked rewards
+	 * @dev Override balanceOf to subtract locked rewards and time-locked tokens
 	 */
 	function balanceOf(address account) public view virtual override returns (uint256) {
-		return super.balanceOf(account) - _lockedRewards[account];
+		(uint256 timeLockedAmount, ) = getTimeLock(account);
+		return super.balanceOf(account) - _lockedRewards[account] - timeLockedAmount;
 	}
 
 	function deposit(address user, bytes calldata depositData) external onlyRole(POLYGONMINTER_ROLE) {
@@ -261,6 +274,30 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	function getTotalLockedRewards() public view returns (uint256) {
 		return _totalLockedRewards;
 	}
+	
+	/**
+	 * @dev Returns the amount of time-locked tokens for an account
+	 * @param account Address to check
+	 * @return amount Amount of locked tokens
+	 * @return lockedUntil Timestamp until which tokens are locked
+	 */
+	function getTimeLock(address account) public view returns (uint256 amount, uint256 lockedUntil) {
+		TokenLock memory lock = _timeLocks[account];
+		
+		// If lock has expired, return zeros
+		if (lock.amount > 0 && block.timestamp >= lock.lockedUntil) {
+			return (0, 0);
+		}
+		
+		return (lock.amount, lock.lockedUntil);
+	}
+
+	/**
+	 * @dev Returns the total amount of time-locked tokens across all users
+	 */
+	function getTotalTimeLocked() public view returns (uint256) {
+		return _totalTimeLocked;
+	}
 
 	/**
 	 * @dev Locks tokens as rewards for an account
@@ -288,6 +325,53 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		_totalLockedRewards -= amount;
 		
 		emit RewardsUnlocked(account, amount);
+	}
+	
+	/**
+	 * @dev Locks tokens for a specific time period
+	 * @param account Address to lock tokens for
+	 * @param amount Amount of tokens to lock
+	 * @param lockDuration Duration in seconds for which tokens will be locked
+	 */
+	function lockTokensForTime(address account, uint256 amount, uint256 lockDuration) public onlyRole(ADMINISTRATOR_ROLE) {
+		require(balanceOf(account) >= amount, "MorpherToken: insufficient balance for locking");
+		
+		uint256 unlockTime = block.timestamp + lockDuration;
+		
+		// If tokens are already locked, ensure we're not reducing the lock time
+		if (_timeLocks[account].amount > 0) {
+			require(unlockTime >= _timeLocks[account].lockedUntil, "MorpherToken: cannot reduce existing lock time");
+			
+			// Add to existing lock
+			_timeLocks[account].amount += amount;
+			_timeLocks[account].lockedUntil = unlockTime;
+		} else {
+			// Create new lock
+			_timeLocks[account] = TokenLock(amount, unlockTime);
+		}
+		
+		_totalTimeLocked += amount;
+		
+		emit TokensLocked(account, amount, unlockTime);
+	}
+
+	/**
+	 * @dev Manually unlocks tokens if the lock period has expired
+	 * @param account Address to unlock tokens for
+	 */
+	function unlockExpiredTokens(address account) public {
+		TokenLock storage lock = _timeLocks[account];
+		
+		if (lock.amount > 0 && block.timestamp >= lock.lockedUntil) {
+			uint256 amountToUnlock = lock.amount;
+			_totalTimeLocked -= amountToUnlock;
+			
+			// Clear the lock
+			lock.amount = 0;
+			lock.lockedUntil = 0;
+			
+			emit TokensUnlocked(account, amountToUnlock);
+		}
 	}
 	
 	/**
@@ -343,6 +427,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		// Skip check for minting and if sender is trade engine
 		if (from != address(0)) { // Skip check for minting
 			if (_msgSender() != morpherState.morpherTradeEngineAddress()) {
+				(uint256 timeLockedAmount, ) = getTimeLock(from);
 				require(
 					amount <= balanceOf(from),
 					"MorpherToken: transfer amount exceeds unlocked balance"
