@@ -1,6 +1,39 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.15;
 
+/**
+*  
+*  
+*  ███╗   ███╗ ██████╗ ██████╗ ██████╗ ██╗  ██╗███████╗██████╗ 
+*  ████╗ ████║██╔═══██╗██╔══██╗██╔══██╗██║  ██║██╔════╝██╔══██╗
+*  ██╔████╔██║██║   ██║██████╔╝██████╔╝███████║█████╗  ██████╔╝
+*  ██║╚██╔╝██║██║   ██║██╔══██╗██╔═══╝ ██╔══██║██╔══╝  ██╔══██╗
+*  ██║ ╚═╝ ██║╚██████╔╝██║  ██║██║     ██║  ██║███████╗██║  ██║
+*  ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+*                                                              
+*  Website: https://www.morpher.com - Operating Since 2021
+*  
+*  This is the Morpher Oracle, a contract that allows anyone to trade synthetic markets directly on-chain.
+*
+*  Positions can be opened using MPH or a number of ERC20 tokens which are converted transparently via 
+*  uniswap to MPH. Trades can also be made in ETH (gas tokens), which are auto-wrapped into WETH and then 
+*  converted via uniswap to MPH.
+*
+*  Positions are created via the Morpher Trade Engine and held in your own wallet until closed.
+*
+*  This means: 
+*  Your keys - your money. You own it. No bureaucracy. No paperwork. No backdoors. Audited and proven. 
+*  Transparent with verified sources on-chain.
+*  
+*  Margin: You can never go into debt. No separate margin account needed. Trade with up to 10x leverage. 
+*
+*  Trade Stocks, Crypto, Commodities, Forex and some really unique markets without the complexity and 
+*  without the platform risk. 
+*
+*  Join the trading revolution today! Open your first position at https://www.morpher.com
+*  
+**/
+
 import "./MorpherTradeEngine.sol";
 import "./MorpherState.sol";
 import "./MorpherAccessControl.sol";

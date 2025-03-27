@@ -1,6 +1,26 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.15;
 
+/**
+*  
+*  
+*  ███╗   ███╗ ██████╗ ██████╗ ██████╗ ██╗  ██╗███████╗██████╗ 
+*  ████╗ ████║██╔═══██╗██╔══██╗██╔══██╗██║  ██║██╔════╝██╔══██╗
+*  ██╔████╔██║██║   ██║██████╔╝██████╔╝███████║█████╗  ██████╔╝
+*  ██║╚██╔╝██║██║   ██║██╔══██╗██╔═══╝ ██╔══██║██╔══╝  ██╔══██╗
+*  ██║ ╚═╝ ██║╚██████╔╝██║  ██║██║     ██║  ██║███████╗██║  ██║
+*  ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+*                                                              
+*  Website: https://morpher.com
+*
+*  This is the Morpher Trade Engine, a contract used to settle trades on-chain. 
+*  The entrypoint is via the Morpher Oracle, this is a helper contract.  
+*  
+*  Trade hundreds of markets: Stocks, Crypto, Commodities, Forex and some really unique markets. 
+*  Join our community of 200k+ happy traders today!
+*  
+**/
+
 import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
 

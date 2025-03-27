@@ -16,7 +16,7 @@ import "./MorpherTradeEngine.sol";
 
 contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     
-    MorpherState state;
+    MorpherState public state;
     
     // Migration state
     bool public migrationPaused;
