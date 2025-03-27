@@ -86,7 +86,14 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
             abi.encode(true)
         );
         
-        bool result = morpherMigration.verifyBalance(testUser, testProof, testMerkleRoot, testBalance);
+        // Test with no lock
+        bool result = morpherMigration.verifyBalance(testUser, testProof, testMerkleRoot, testBalance, 0, 0);
+        assertTrue(result);
+        
+        // Test with lock
+        uint256 lockedAmount = 500 ether;
+        uint256 lockDuration = 30 days;
+        result = morpherMigration.verifyBalance(testUser, testProof, testMerkleRoot, testBalance, lockedAmount, lockDuration);
         assertTrue(result);
     }
     
@@ -228,6 +235,12 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         (uint256 actualLockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
         assertEq(actualLockedAmount, lockedAmount);
         assertEq(lockedUntil, block.timestamp + lockDuration);
+        
+        // Verify migration statistics
+        (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
+            morpherMigration.getMigrationStats();
+        assertEq(balancesMigrated, 1);
+        assertEq(usersMigrated, 1);
     }
     
     function testCannotMigrateBalanceTwice() public {
@@ -369,5 +382,85 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Check that the user is marked as migrated
         assertTrue(morpherMigration.migratedBalances(testUser));
+    }
+    
+    function testMigrateBalanceWithPartialLock() public {
+        // Set the final balance merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
+        
+        // We need to mock the merkle proof verification
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
+        vm.mockCall(
+            address(0),
+            abi.encodeWithSelector(verifySelector),
+            abi.encode(true)
+        );
+        
+        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        uint256 lockedAmount = testBalance / 2; // Lock half the balance
+        uint256 lockDuration = 90 days;
+        
+        // Call the function as the test user
+        vm.startPrank(testUser);
+        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration);
+        vm.stopPrank();
+        
+        // Check that the balance was migrated with partial lock
+        uint256 expectedBalance = initialBalance + testBalance;
+        assertEq(morpherToken.getTradeableBalanceOf(testUser), expectedBalance);
+        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedAmount);
+        
+        // Verify time lock
+        (uint256 actualLockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
+        assertEq(actualLockedAmount, lockedAmount);
+        assertEq(lockedUntil, block.timestamp + lockDuration);
+    }
+    function testDelegateMigrateBalanceWithLock() public {
+        // We need to mock the signature verification and merkle proof verification
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
+        vm.mockCall(
+            address(0),
+            abi.encodeWithSelector(verifySelector),
+            abi.encode(true)
+        );
+        
+        // Mock the ECDSA recovery to return our test user
+        vm.mockCall(
+            address(0),
+            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
+            abi.encode(testUser)
+        );
+        
+        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        uint256 lockedAmount = testBalance;  // Lock the entire balance
+        uint256 lockDuration = 365 days;     // Lock for a year
+        
+        // Call the function
+        morpherMigration.delegateMigrateBalance(
+            testUser,
+            userSignature,
+            testMerkleRoot,
+            testProof,
+            testBalance,
+            lockedAmount,
+            lockDuration
+        );
+        
+        // Check that the balance was migrated with bonus
+        uint256 expectedBalance = initialBalance + testBalance + (testBalance * 500 / 10000);
+        // Locked tokens are still part of the total balance but not available for transfer
+        assertEq(morpherToken.getTradeableBalanceOf(testUser), expectedBalance);
+        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedAmount);
+        
+        // Verify time lock
+        (uint256 actualLockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
+        assertEq(actualLockedAmount, lockedAmount);
+        assertEq(lockedUntil, block.timestamp + lockDuration);
+        
+        // Check that the user is marked as migrated
+        assertTrue(morpherMigration.migratedBalances(testUser));
+        
+        // Check that the migration was authorized
+        assertTrue(morpherMigration.userAuthorizedMigration(testUser));
     }
 }
