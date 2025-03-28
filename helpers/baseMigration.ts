@@ -1,13 +1,16 @@
-import { createWalletClient, createPublicClient, http, parseEther } from 'viem';
+import { createWalletClient, createPublicClient, http, parseEther, encodeFunctionData, Hex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { MerkleTree } from 'merkletreejs';
 import { keccak256 } from 'ethereumjs-util';
-import { User, Position, Portfolio } from '../database/models';
-import { Sequelize, Op } from 'sequelize';
+import { Position } from '../database/models';
+import { Op } from 'sequelize';
 import to from 'await-to-js';
 import { Logger } from './winston';
 import { PublishCommand } from '@aws-sdk/client-sns';
 import { SNS } from './aws';
+import axios from 'axios';
+import BN from 'bn.js';
 
 // Import ABIs
 import { morpherSidechainToBaseMigrationAbi } from './blockchain/abis';
@@ -15,6 +18,9 @@ import { morpherSidechainToBaseMigrationAbi } from './blockchain/abis';
 // Configuration (to be set from environment variables)
 const MIGRATION_CONTRACT_ADDRESS = process.env.MORPHER_MIGRATION_CONTRACT_BASE || '';
 const RPC_URL = process.env.BASE_HTTPS_ENDPOINT || 'https://mainnet.base.org';
+const CHAIN_ID = Number(process.env.BASE_CHAIN_ID || 8453);
+const SIDECHAIN_ID = Number(process.env.SIDECHAIN_ID || 1001);
+const BATCH_SIZE = 10; // Maximum positions to migrate in a single transaction
 
 // Initialize clients
 const publicClient = createPublicClient({
@@ -36,97 +42,72 @@ interface PositionMigrationData {
 }
 
 /**
- * Calculate Merkle root and proofs for positions and balances
- * @param chainId The chain ID to filter positions and balances
- * @param currentTimestamp Current timestamp for the Merkle tree
+ * Fetch user positions from the database
+ * @param ethAddress The user's Ethereum address
+ * @param chainId The chain ID to filter positions
  */
-export async function calculateBaseMigrationMerkleRoot(chainId: number, currentTimestamp: number) {
+export async function fetchUserPositions(ethAddress: string, chainId: number = SIDECHAIN_ID) {
   Logger.info({
-    source: 'baseMigration.calculateBaseMigrationMerkleRoot',
-    message: `Calculating Merkle root for chain ID ${chainId}`
+    source: 'baseMigration.fetchUserPositions',
+    message: `Fetching positions for user ${ethAddress} on chain ${chainId}`
   });
   
-  // Initialize arrays for leaves
-  const leaves: string[] = [];
-  const positionMap = new Map<string, any>(); // Map to store position data by hash
-  const balanceMap = new Map<string, any>(); // Map to store balance data by hash
-  
-  // Get current date for filtering
-  const date = new Date();
-  date.setMinutes(59, 59, 999);
-  const currentDate = date.getTime();
-  
-  // Fetch positions from database
-  const allPositions = await Position.findAll({
-    raw: true,
-    attributes: ['eth_address', 'hash', 'market_id', 'timestamp', 'long_shares', 'short_shares', 
-                'mean_entry_price', 'mean_entry_spread', 'mean_entry_leverage', 'liquidation_price'],
-    where: {
-      hash: { [Op.ne]: null },
-      chain_id: chainId
-    }
-  });
-  
-  // Fetch portfolios (for balances) from database
-  const allPortfolios = await Portfolio.findAll({
-    raw: false,
-    attributes: ['eth_address', 'cash_balance', 'cash_balance_hash'],
-    where: {
-      user_id: { [Op.ne]: null },
-      chain_id: chainId,
-      cash_balance_hash: { [Op.ne]: null },
-      [Op.and]: [
-        Sequelize.literal(`exists(
-          Select * from "User" 
-          where "User".payload->>'merkle' is null 
-          and "User".eth_address = "Portfolio".eth_address 
-          and "User".eth_address is not null 
-          and (withdrawal_unblock_date is null or withdrawal_unblock_date < ${currentDate}) 
-          and withdrawal_blocked = false 
-          and "User".status = 'confirmed'
-        )`)
-      ]
-    }
-  });
-  
-  // Add position hashes to leaves array and store position data
-  if (allPositions && allPositions.length > 0) {
-    for (const position of allPositions) {
-      if (position.hash !== null) {
-        leaves.push(position.hash);
-        positionMap.set(position.hash, {
-          eth_address: position.eth_address,
-          market_id: position.market_id,
-          timestamp: position.timestamp,
-          long_shares: position.long_shares,
-          short_shares: position.short_shares,
-          mean_entry_price: position.mean_entry_price,
-          mean_entry_spread: position.mean_entry_spread,
-          mean_entry_leverage: position.mean_entry_leverage,
-          liquidation_price: position.liquidation_price
-        });
+  try {
+    // Fetch positions from database
+    const userPositions = await Position.findAll({
+      raw: true,
+      attributes: [
+        'eth_address', 
+        'hash', 
+        'market_id', 
+        'timestamp', 
+        'long_shares', 
+        'short_shares', 
+        'mean_entry_price', 
+        'mean_entry_spread', 
+        'mean_entry_leverage', 
+        'liquidation_price'
+      ],
+      where: {
+        eth_address: ethAddress,
+        hash: { [Op.ne]: null },
+        chain_id: chainId,
+        // Only include positions with non-zero shares
+        [Op.or]: [
+          { long_shares: { [Op.gt]: 0 } },
+          { short_shares: { [Op.gt]: 0 } }
+        ]
       }
-    }
+    });
+    
+    Logger.info({
+      source: 'baseMigration.fetchUserPositions',
+      message: `Found ${userPositions.length} positions for user ${ethAddress}`
+    });
+    
+    return userPositions;
+  } catch (error) {
+    Logger.error({
+      source: 'baseMigration.fetchUserPositions',
+      message: `Error fetching positions for user ${ethAddress}: ${error}`
+    });
+    throw error;
+  }
+}
+
+/**
+ * Generate Merkle tree and proofs for user positions
+ * @param positions Array of user positions
+ */
+export function generatePositionMerkleTree(positions: any[]) {
+  // Extract position hashes
+  const leaves = positions.map(position => position.hash).filter(hash => hash !== null);
+  
+  if (leaves.length === 0) {
+    return { merkleTree: null, merkleRoot: null };
   }
   
-  // Add portfolio balance hashes to leaves array and store balance data
-  if (allPortfolios && allPortfolios.length > 0) {
-    for (const portfolio of allPortfolios) {
-      if (portfolio.cash_balance_hash !== null) {
-        leaves.push(portfolio.cash_balance_hash);
-        
-        // Default to no locking for migration
-        balanceMap.set(portfolio.cash_balance_hash, {
-          eth_address: portfolio.eth_address,
-          balance: portfolio.cash_balance,
-          lockedAmount: 0, // Default to no locking
-          lockDuration: 0  // Default to no locking
-        });
-      }
-    }
-  }
-  
-  // Sort leaves alphabetically
+  // Sort leaves alphabetically for deterministic tree
   leaves.sort();
   
   // Create Merkle tree
@@ -134,41 +115,169 @@ export async function calculateBaseMigrationMerkleRoot(chainId: number, currentT
   const merkleRoot = '0x' + merkleTree.getRoot().toString('hex');
   
   Logger.info({
-    source: 'baseMigration.calculateBaseMigrationMerkleRoot',
-    message: `Generated Merkle root: ${merkleRoot}`
+    source: 'baseMigration.generatePositionMerkleTree',
+    message: `Generated Merkle root: ${merkleRoot} for ${leaves.length} positions`
   });
   
-  return {
-    merkleRoot,
-    merkleTree,
-    positionMap,
-    balanceMap,
-    leaves
-  };
+  return { merkleTree, merkleRoot };
 }
 
 /**
- * Generate proof for a specific leaf in the Merkle tree
+ * Generate proof for a specific position hash in the Merkle tree
  * @param merkleTree The Merkle tree
- * @param leaf The leaf to generate proof for
+ * @param positionHash The position hash to generate proof for
  */
-export function generateProof(merkleTree: any, leaf: string): `0x${string}`[] {
-  const proof = merkleTree.getHexProof(leaf);
+export function generatePositionProof(merkleTree: any, positionHash: string): `0x${string}`[] {
+  if (!merkleTree) return [];
+  const proof = merkleTree.getHexProof(positionHash);
   return proof as `0x${string}`[];
 }
 
 /**
- * Update the Base migration contract with the new Merkle root
- * @param merkleRoot The new Merkle root to set
+ * Prepare position data for migration
+ * @param positions User positions from database
+ * @param merkleTree Merkle tree for generating proofs
  */
-export async function updateBaseMigrationMerkleRoot(merkleRoot: string) {
+export function preparePositionMigrationData(positions: any[], merkleTree: any): PositionMigrationData[] {
+  return positions.map(position => {
+    // Generate proof for this position
+    const proof = generatePositionProof(merkleTree, position.hash);
+    
+    // Convert values to appropriate formats for the contract
+    return {
+      marketId: position.market_id as `0x${string}`,
+      timeStamp: BigInt(position.timestamp),
+      longShares: BigInt(position.long_shares),
+      shortShares: BigInt(position.short_shares),
+      meanEntryPrice: BigInt(position.mean_entry_price),
+      meanEntrySpread: BigInt(position.mean_entry_spread),
+      meanEntryLeverage: BigInt(position.mean_entry_leverage),
+      liquidationPrice: BigInt(position.liquidation_price),
+      proof: proof
+    };
+  });
+}
+
+/**
+ * Migrate user positions in batches
+ * @param ethAddress User's Ethereum address
+ * @param userSignature User's signature authorizing migration
+ */
+export async function migrateUserPositions(ethAddress: string, userSignature: string) {
+  try {
+    Logger.info({
+      source: 'baseMigration.migrateUserPositions',
+      message: `Starting position migration for user ${ethAddress}`
+    });
+    
+    // 1. Fetch user positions
+    const positions = await fetchUserPositions(ethAddress);
+    
+    if (positions.length === 0) {
+      Logger.info({
+        source: 'baseMigration.migrateUserPositions',
+        message: `No positions found for user ${ethAddress}`
+      });
+      return { success: true, message: 'No positions to migrate', txHashes: [] };
+    }
+    
+    // 2. Generate Merkle tree and root
+    const { merkleTree, merkleRoot } = generatePositionMerkleTree(positions);
+    
+    if (!merkleTree || !merkleRoot) {
+      Logger.error({
+        source: 'baseMigration.migrateUserPositions',
+        message: `Failed to generate Merkle tree for user ${ethAddress}`
+      });
+      return { success: false, message: 'Failed to generate Merkle tree', txHashes: [] };
+    }
+    
+    // 3. Prepare position data for migration
+    const positionData = preparePositionMigrationData(positions, merkleTree);
+    
+    // 4. Split positions into batches of BATCH_SIZE
+    const batches = [];
+    for (let i = 0; i < positionData.length; i += BATCH_SIZE) {
+      batches.push(positionData.slice(i, i + BATCH_SIZE));
+    }
+    
+    Logger.info({
+      source: 'baseMigration.migrateUserPositions',
+      message: `Migrating ${positionData.length} positions in ${batches.length} batches for user ${ethAddress}`
+    });
+    
+    // 5. Migrate each batch
+    const txHashes = [];
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const txHash = await sendMigrationTransaction(ethAddress, userSignature, merkleRoot as `0x${string}`, batch);
+      txHashes.push(txHash);
+      
+      Logger.info({
+        source: 'baseMigration.migrateUserPositions',
+        message: `Batch ${i+1}/${batches.length} migration transaction sent: ${txHash}`
+      });
+      
+      // Wait a bit between batches to avoid nonce issues
+      if (i < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+    
+    return { 
+      success: true, 
+      message: `Successfully migrated ${positionData.length} positions in ${batches.length} batches`, 
+      txHashes 
+    };
+    
+  } catch (error) {
+    Logger.error({
+      source: 'baseMigration.migrateUserPositions',
+      message: `Error migrating positions for user ${ethAddress}: ${error}`
+    });
+    
+    // Send notification about the error
+    const notification = {
+      message: error.toString(),
+      description: `Position migration failed for user ${ethAddress}`,
+      logs: 'https://app.datadoghq.eu/logs'
+    };
+    
+    const params = {
+      Subject: `Position Migration Failed ${process.env.ENVIRONMENT}`,
+      Message: JSON.stringify(notification),
+      TopicArn: process.env.SNS_DEVELOPERS
+    };
+    
+    const command = new PublishCommand(params);
+    await SNS.send(command);
+    
+    return { success: false, message: `Error: ${error.message}`, txHashes: [] };
+  }
+}
+
+/**
+ * Send transaction to migrate a batch of positions
+ * @param userAddress User's Ethereum address
+ * @param userSignature User's signature authorizing migration
+ * @param merkleRoot Merkle root for position verification
+ * @param positionBatch Batch of positions to migrate
+ */
+async function sendMigrationTransaction(
+  userAddress: string, 
+  userSignature: string, 
+  merkleRoot: `0x${string}`, 
+  positionBatch: PositionMigrationData[]
+): Promise<string> {
   return new Promise(async (resolve, reject) => {
     try {
-      const EthereumTx = require('ethereumjs-tx');
-      const privateKey = Buffer.from(process.env.CALLBACK_ACCOUNT_1_KEY, 'hex');
-      
       const Web3 = require('web3');
-      const web3 = new Web3(process.env.BASE_HTTPS_ENDPOINT);
+      const web3 = new Web3(RPC_URL);
+      const EthereumTx = require('ethereumjs-tx').Transaction;
+      
+      // Get private key from environment
+      const privateKey = Buffer.from(process.env.CALLBACK_ACCOUNT_1_KEY, 'hex');
+      const fromAddress = process.env.CALLBACK_ACCOUNT_1;
       
       // Get gas price
       const [error, result] = await to(axios.get('https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey='+process.env.ETHERSCAN_KEY));
@@ -176,9 +285,7 @@ export async function updateBaseMigrationMerkleRoot(merkleRoot: string) {
       let gasPrice = web3.utils.toWei(process.env.BASE_MAX_GAS || '10', 'gwei');
       let apiGasPrice;
       
-      // @ts-ignore
       if (result && !isNaN(result.data.result.ProposeGasPrice)) {
-        // @ts-ignore
         apiGasPrice = web3.utils.toWei(String(result.data.result.ProposeGasPrice), 'gwei');
       }
       
@@ -189,29 +296,44 @@ export async function updateBaseMigrationMerkleRoot(merkleRoot: string) {
       // Create contract instance
       const migrationContract = new web3.eth.Contract(
         morpherSidechainToBaseMigrationAbi,
-        process.env.MORPHER_MIGRATION_CONTRACT_BASE
+        MIGRATION_CONTRACT_ADDRESS
       );
       
       // Prepare transaction data
-      const data = migrationContract.methods.updatePlasmaStateRoot(merkleRoot);
-      
-      const nonce = await web3.eth.getTransactionCount(
-        process.env.CALLBACK_ACCOUNT_1,
-        'pending'
+      const data = migrationContract.methods.delegateMigratePositionsBatch(
+        userAddress,
+        userSignature,
+        merkleRoot,
+        positionBatch
       );
       
-      const gasLimit = await data.estimateGas({ 
-        nonce, 
-        from: process.env.CALLBACK_ACCOUNT_1 
-      });
+      const nonce = await web3.eth.getTransactionCount(fromAddress, 'pending');
+      
+      // Estimate gas with a buffer
+      let gasLimit;
+      try {
+        gasLimit = await data.estimateGas({ 
+          nonce, 
+          from: fromAddress 
+        });
+        // Add 20% buffer for safety
+        gasLimit = Math.ceil(gasLimit * 1.2);
+      } catch (error) {
+        Logger.error({
+          source: 'baseMigration.sendMigrationTransaction',
+          message: `Gas estimation failed: ${error.message}. Using default gas limit.`
+        });
+        // Use a high default if estimation fails
+        gasLimit = 5000000;
+      }
       
       const transactionData = {
-        chainId: Number(process.env.BASE_CHAIN_ID || 8453),
+        chainId: CHAIN_ID,
         nonce,
-        gas: gasLimit * 2,
-        gasPrice: web3.utils.numberToHex(gasPrice),
-        from: process.env.CALLBACK_ACCOUNT_1,
-        to: process.env.MORPHER_MIGRATION_CONTRACT_BASE,
+        gasLimit: web3.utils.toHex(gasLimit),
+        gasPrice: web3.utils.toHex(gasPrice),
+        from: fromAddress,
+        to: MIGRATION_CONTRACT_ADDRESS,
         data: data.encodeABI()
       };
       
@@ -224,141 +346,89 @@ export async function updateBaseMigrationMerkleRoot(merkleRoot: string) {
       web3.eth.sendSignedTransaction(raw)
         .once('transactionHash', (hash) => {
           Logger.info({
-            source: 'baseMigration.updateBaseMigrationMerkleRoot',
-            message: `Migration contract root update pending [${hash}]`,
+            source: 'baseMigration.sendMigrationTransaction',
+            message: `Position migration transaction sent [${hash}]`,
             hash
           });
-          return resolve(hash);
+          resolve(hash);
         })
         .catch(err => {
           Logger.error({
-            source: 'baseMigration.updateBaseMigrationMerkleRoot',
-            data: {},
-            message: `Error updating migration contract: ${err.toString()}`
+            source: 'baseMigration.sendMigrationTransaction',
+            message: `Error sending migration transaction: ${err.toString()}`
           });
-          
-          let notification = {
-            message: err.toString(),
-            description: 'SNS Notification Base migration update failed',
-            logs: 'https://app.datadoghq.eu/logs'
-          };
-          
-          const params = {
-            Subject: `Base Migration Update Failed ${process.env.ENVIRONMENT}`,
-            Message: JSON.stringify(notification),
-            TopicArn: process.env.SNS_DEVELOPERS
-          };
-          
-          const command = new PublishCommand(params);
-          SNS.send(command);
-          
-          return reject(err);
+          reject(err);
         });
       
-      Logger.info({
-        source: 'baseMigration.updateBaseMigrationMerkleRoot',
-        message: 'Migration contract root update sent to chain.'
-      });
     } catch (err) {
       Logger.error({
-        source: 'baseMigration.updateBaseMigrationMerkleRoot',
-        data: {},
-        message: `Error updating migration contract: ${err.toString()}`
+        source: 'baseMigration.sendMigrationTransaction',
+        message: `Error preparing migration transaction: ${err.toString()}`
       });
-      
-      let notification = {
-        message: err.toString(),
-        description: 'SNS Notification Base migration update failed',
-        logs: 'https://app.datadoghq.eu/logs'
-      };
-      
-      const params = {
-        Subject: `Base Migration Update Failed ${process.env.ENVIRONMENT}`,
-        Message: JSON.stringify(notification),
-        TopicArn: process.env.SNS_DEVELOPERS
-      };
-      
-      const command = new PublishCommand(params);
-      await SNS.send(command);
-      
       reject(err);
     }
   });
 }
 
 /**
- * Calculate and update the Merkle root for Base migration
- * @param force Force update even if recently updated
+ * Verify if a user's signature is valid for migration authorization
+ * @param ethAddress User's Ethereum address
+ * @param signature User's signature
  */
-export async function calculateAndUpdateBaseMigrationRoot(force = false) {
+export function verifyUserSignature(ethAddress: string, signature: string): boolean {
   try {
-    const { redis, redisGet, redisSet } = require('../helpers/functions/ioredis');
+    const Web3 = require('web3');
+    const web3 = new Web3();
     
-    const migration_root_updating = await redisGet('base', 'migration_root_updating');
+    // Recreate the message that was signed
+    const message = `I authorize migration of all my positions from plasma chain to Base L2${ethAddress}${CHAIN_ID}`;
     
-    if (migration_root_updating !== true) {
-      await redisSet('base', 'migration_root_updating', true);
-      
-      const last_update = await redisGet('base', 'migration_root_last_update');
-      const one_day_ago = Date.now() - (1000 * 60 * 60 * 24);
-      
-      if (!last_update || last_update <= one_day_ago || force) {
-        const currentTimestamp = Date.now();
-        const chainId = Number(process.env.SIDECHAIN_ID || 1001);
-        
-        const result = await calculateBaseMigrationMerkleRoot(chainId, currentTimestamp);
-        
-        if (result.leaves.length > 0) {
-          await updateBaseMigrationMerkleRoot(result.merkleRoot);
-          
-          await redisSet('base', 'migration_root_last_update', Date.now());
-          Logger.info({
-            source: 'baseMigration.calculateAndUpdateBaseMigrationRoot',
-            message: 'Base migration Merkle root updated.'
-          });
-        } else {
-          Logger.info({
-            source: 'baseMigration.calculateAndUpdateBaseMigrationRoot',
-            message: 'No leaves found for Merkle tree, skipping update.'
-          });
-        }
-      } else {
-        Logger.info({
-          source: 'baseMigration.calculateAndUpdateBaseMigrationRoot',
-          message: 'Base migration Merkle root update skipped - new root already exists.'
-        });
-      }
-      
-      await redisSet('base', 'migration_root_updating', false);
-    } else {
-      Logger.info({
-        source: 'baseMigration.calculateAndUpdateBaseMigrationRoot',
-        message: 'Base migration Merkle root update skipped - already updating.'
-      });
-    }
-  } catch (err) {
-    const { redisSet } = require('../helpers/functions/ioredis');
-    await redisSet('base', 'migration_root_updating', false);
+    // Hash the message as it would be in the contract
+    const messageHash = web3.utils.keccak256(
+      web3.utils.encodePacked(message)
+    );
     
+    // Prefix the hash as per EIP-191
+    const prefixedHash = web3.utils.keccak256(
+      web3.utils.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
+    );
+    
+    // Recover the signer address
+    const recoveredAddress = web3.eth.accounts.recover(prefixedHash, signature);
+    
+    // Check if the recovered address matches the expected user address
+    return recoveredAddress.toLowerCase() === ethAddress.toLowerCase();
+  } catch (error) {
     Logger.error({
-      source: 'baseMigration.calculateAndUpdateBaseMigrationRoot',
-      data: {},
-      message: `Error updating Base migration Merkle root: ${err.toString()}`
+      source: 'baseMigration.verifyUserSignature',
+      message: `Error verifying signature: ${error}`
     });
-    
-    let notification = {
-      message: err.toString(),
-      description: 'SNS Notification Base migration update failed',
-      logs: 'https://app.datadoghq.eu/logs'
-    };
-    
-    const params = {
-      Subject: `Base Migration Update Failed ${process.env.ENVIRONMENT}`,
-      Message: JSON.stringify(notification),
-      TopicArn: process.env.SNS_DEVELOPERS
-    };
-    
-    const command = new PublishCommand(params);
-    SNS.send(command);
+    return false;
   }
+}
+
+/**
+ * Main function to handle user position migration
+ * @param ethAddress User's Ethereum address
+ * @param signature User's signature authorizing migration
+ */
+export async function handleUserPositionMigration(ethAddress: string, signature: string) {
+  // 1. Verify the signature
+  const isSignatureValid = verifyUserSignature(ethAddress, signature);
+  
+  if (!isSignatureValid) {
+    Logger.error({
+      source: 'baseMigration.handleUserPositionMigration',
+      message: `Invalid signature for user ${ethAddress}`
+    });
+    return { 
+      success: false, 
+      message: 'Invalid signature. Migration authorization failed.' 
+    };
+  }
+  
+  // 2. Migrate the user's positions
+  const result = await migrateUserPositions(ethAddress, signature);
+  
+  return result;
 }
