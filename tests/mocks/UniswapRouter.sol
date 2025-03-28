@@ -16,15 +16,15 @@ contract MockUniswapRouter is IV3SwapRouter {
 		tokenOut.transfer(params.recipient, amountOut);
 	}
 
-	function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut) {
+	function exactInputSingle(ExactInputSingleParams calldata /*unused*/) external payable returns (uint256 amountOut) { 
 		amountOut = 0;
 	}
 
-	function exactOutput(ExactOutputParams calldata params) external payable returns (uint256 amountIn) {
+	function exactOutput(ExactOutputParams calldata  /*unused*/) external payable returns (uint256 amountIn) {
 		amountIn = 0;
 	}
 
-	function exactOutputSingle(ExactOutputSingleParams calldata params) external payable returns (uint256 amountIn) {
+	function exactOutputSingle(ExactOutputSingleParams calldata /*unused*/) external payable returns (uint256 amountIn) {
 		amountIn = 0;
 	}
 

@@ -57,11 +57,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		uint256 lockedUntil; // Timestamp until which tokens are locked
 	}
 
-	// Mapping to track locked tokens per user
-	mapping(address => TokenLock) private _timeLocks;
-
-	// Total amount of time-locked tokens across all users
-	uint256 private _totalTimeLocked;
+	
 	
 	event RewardsLocked(address indexed account, uint256 amount);
 	event RewardsUnlocked(address indexed account, uint256 amount);
@@ -100,6 +96,12 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	
 	// Daily transfer limit for net minted tokens
 	uint256 private _dailyMintedTransferLimit;
+
+	// Mapping to track locked tokens per user
+	mapping(address => TokenLock) private _timeLocks;
+
+	// Total amount of time-locked tokens across all users
+	uint256 private _totalTimeLocked;
 
 
 	event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);
@@ -353,12 +355,9 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		
 		_totalTimeLocked += amount;
 		
-		// Check if caller is the migration contract to emit the appropriate event
-		if (_msgSender() == morpherState.morpherSidechainToBaseMigrationAddress()) {
-			emit MigrationTokensLocked(account, amount, unlockTime);
-		} else {
-			emit TokensLocked(account, amount, unlockTime);
-		}
+		
+		emit TokensLocked(account, amount, unlockTime);
+		
 	}
 
 	/**
@@ -433,7 +432,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		// Skip check for minting and if sender is trade engine
 		if (from != address(0)) { // Skip check for minting
 			if (_msgSender() != morpherState.morpherTradeEngineAddress()) {
-				(uint256 timeLockedAmount, ) = getTimeLock(from);
+
 				require(
 					amount <= balanceOf(from),
 					"MorpherToken: transfer amount exceeds unlocked balance"

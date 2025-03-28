@@ -11,4 +11,10 @@ contract MorpherAccessControl is AccessControlEnumerableUpgradeable {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
+    function grantRoleBatch(bytes32 role, address[] calldata accounts) public onlyRole(getRoleAdmin(role))  {
+        for(uint256 i = 0; i < accounts.length; i++) {
+            grantRole(role, accounts[i]);
+        }
+    }
+
 }

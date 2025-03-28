@@ -133,7 +133,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		morpherOracle.setStateAddress(address(0x03));
 	}
 
-	function testGetTradeEngineFromOrderId() public {
+	function testGetTradeEngineFromOrderId() public view {
 		address res = morpherOracle.getTradeEngineFromOrderId(0);
 		assertEq(res, address(morpherTradeEngine));
 	}
@@ -523,9 +523,10 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		);
 
 		vm.prank(owner.addr);
-		morpherOracle.createOrderFromToken(str, inputToken);
+		bytes32 realOrderId = morpherOracle.createOrderFromToken(str, inputToken);
 
 		// check balances
+        assertEq(realOrderId, expectedOrderId);
 		assertEq(WMATIC.balanceOf(address(morpherOracle)), 0);
 		assertEq(OTHER_ERC20.balanceOf(address(morpherOracle)), 0);
 		assertEq(morpherToken.balanceOf(address(morpherOracle)), 0);

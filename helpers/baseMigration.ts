@@ -14,12 +14,9 @@ import { MerkleTree } from 'merkletreejs';
 import { keccak256 } from 'ethereumjs-util';
 import { Position } from '../database/models';
 import { Op } from 'sequelize';
-import to from 'await-to-js';
 import { Logger } from './winston';
 import { PublishCommand } from '@aws-sdk/client-sns';
 import { SNS } from './aws';
-import axios from 'axios';
-import BN from 'bn.js';
 
 // Import ABIs
 import { morpherSidechainToBaseMigrationAbi } from './blockchain/abis';

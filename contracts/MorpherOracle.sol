@@ -499,15 +499,16 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	function createOrderFromToken(
 		CreateOrderStruct memory createOrderParams, //_openMphTokenAmount is the minimum swap amount (including slippage). the Actual token amount will be overwritten by the swapped output amount
 		TokenPermitEIP712Struct memory inputToken
-	) public {
+	) public returns(bytes32) {
 		if (createOrderParams._openMPHTokenAmount > 0) {
 			uint mphTokenAmountAfterSwap = permitTransferAndSwap(inputToken, createOrderParams._openMPHTokenAmount);
 			createOrderParams._openMPHTokenAmount = mphTokenAmountAfterSwap; //overriding this as its exactInput for UI reasons
 			// require(createOrderParams.openMPHTokenAmount <= amountOut, "MorpherOracle: OpenMPHTokenAmount bigger than conversion amount, aborting"); //it does not matter, because total balance of MPH counts here more
-			createOrder(createOrderParams);
+			return createOrder(createOrderParams);
 		} else {
 			bytes32 orderId = createOrder(createOrderParams);
 			closeOrderIdSwapToToken[orderId] = inputToken;
+			return orderId;
 		}
 	}
 

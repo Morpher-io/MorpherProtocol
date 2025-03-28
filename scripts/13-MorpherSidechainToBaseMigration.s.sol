@@ -34,7 +34,7 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgrade {
 		bytes32 initialPlasmaStateRoot = vm.envOr("INITIAL_PLASMA_STATE_ROOT", bytes32(0));
 		
 		// Get migration bonus in basis points (default 500 = 5%)
-		uint256 migrationBonus = vm.envOr("MIGRATION_BONUS_BPS", uint256(500));
+		uint256 migrationBonus = vm.envOr("MIGRATION_BONUS_BPS", uint256(0));
 
 		// Deploy or upgrade MorpherSidechainToBaseMigration
 		address existingMigration = loadAddress("MorpherSidechainToBaseMigration");
@@ -60,9 +60,9 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgrade {
 			// Grant migration operator role to deployer
 			accessControl.grantRole(keccak256("MIGRATION_OPERATOR_ROLE"), msg.sender);
 			
-			// Configure State with migration address if needed
-			MorpherState state = MorpherState(stateAddress);
-			state.setMorpherSidechainToBaseMigrationAddress(migration);
+			// // Configure State with migration address if needed
+			// MorpherState state = MorpherState(stateAddress);
+			// state.setMorpherSidechainToBaseMigrationAddress(migration);
 			
 			console.log("Granted ADMINISTRATOR_ROLE to migration contract");
 			console.log("Granted MIGRATION_OPERATOR_ROLE to deployer");
