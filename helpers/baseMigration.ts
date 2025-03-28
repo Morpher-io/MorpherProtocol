@@ -205,7 +205,7 @@ export async function migrateUserPositions(ethAddress: string, userSignature: st
     const positionData = preparePositionMigrationData(positions, merkleTree);
     
     // 4. Split positions into batches of BATCH_SIZE
-    const batches = [];
+    const batches: PositionMigrationData[][] = [];
     for (let i = 0; i < positionData.length; i += BATCH_SIZE) {
       batches.push(positionData.slice(i, i + BATCH_SIZE));
     }
