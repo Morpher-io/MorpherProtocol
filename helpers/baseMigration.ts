@@ -216,7 +216,7 @@ export async function migrateUserPositions(ethAddress: string, userSignature: st
     });
     
     // 5. Migrate each batch
-    const txHashes = [];
+    const txHashes: string[] = [];
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       const txHash = await sendMigrationTransaction(ethAddress, userSignature, merkleRoot as `0x${string}`, batch);
