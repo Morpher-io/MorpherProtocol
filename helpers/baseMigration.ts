@@ -288,11 +288,6 @@ async function sendMigrationTransaction(
       transport: http(RPC_URL)
     });
     
-    // Get gas price from Etherscan API
-    const [error, result] = await to(axios.get(
-      `https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${process.env.ETHERSCAN_KEY}`
-    ));
-    
     // Prepare function data for the contract call
     const functionData = encodeFunctionData({
       abi: morpherSidechainToBaseMigrationAbi,
@@ -300,17 +295,9 @@ async function sendMigrationTransaction(
       args: [userAddress, userSignature, merkleRoot, positionBatch]
     });
     
-    // Get gas price (either from API or fallback to environment variable)
-    let maxFeePerGas;
-    if (result && result.data && result.data.result && !isNaN(result.data.result.ProposeGasPrice)) {
-      // Convert gwei to wei and add 10% buffer
-      const proposedGasPrice = parseFloat(result.data.result.ProposeGasPrice);
-      maxFeePerGas = BigInt(Math.floor(proposedGasPrice * 1.1 * 1e9));
-    } else {
-      // Fallback to environment variable or default
-      const maxGasGwei = process.env.BASE_MAX_GAS || '10';
-      maxFeePerGas = parseEther(maxGasGwei, 'gwei');
-    }
+    // Use environment variable for max fee per gas or default to 10 gwei
+    const maxGasGwei = process.env.BASE_MAX_GAS || '10';
+    const maxFeePerGas = parseEther(maxGasGwei, 'gwei');
     
     // Estimate gas with public client
     let gasLimit;
@@ -364,9 +351,6 @@ async function sendMigrationTransaction(
  */
 export function verifyUserSignature(ethAddress: string, signature: string): boolean {
   try {
-    // Import viem utilities for signature verification
-    import { hashMessage, recoverAddress, toBytes } from 'viem';
-    
     // Recreate the message that was signed
     const message = `I authorize migration of all my positions from plasma chain to Base L2${ethAddress}${CHAIN_ID}`;
     
