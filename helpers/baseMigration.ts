@@ -1,4 +1,13 @@
-import { createWalletClient, createPublicClient, http, parseEther, encodeFunctionData, Hex } from 'viem';
+import { 
+  createWalletClient, 
+  createPublicClient, 
+  http, 
+  parseEther, 
+  encodeFunctionData, 
+  hashMessage, 
+  recoverAddress, 
+  toBytes 
+} from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { MerkleTree } from 'merkletreejs';
@@ -257,7 +266,7 @@ export async function migrateUserPositions(ethAddress: string, userSignature: st
 }
 
 /**
- * Send transaction to migrate a batch of positions
+ * Send transaction to migrate a batch of positions using viem
  * @param userAddress User's Ethereum address
  * @param userSignature User's signature authorizing migration
  * @param merkleRoot Merkle root for position verification
@@ -269,105 +278,83 @@ async function sendMigrationTransaction(
   merkleRoot: `0x${string}`, 
   positionBatch: PositionMigrationData[]
 ): Promise<string> {
-  return new Promise(async (resolve, reject) => {
+  try {
+    // Create wallet client with private key from environment
+    const account = privateKeyToAccount(`0x${process.env.CALLBACK_ACCOUNT_1_KEY}` as `0x${string}`);
+    
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http(RPC_URL)
+    });
+    
+    // Get gas price from Etherscan API
+    const [error, result] = await to(axios.get(
+      `https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${process.env.ETHERSCAN_KEY}`
+    ));
+    
+    // Prepare function data for the contract call
+    const functionData = encodeFunctionData({
+      abi: morpherSidechainToBaseMigrationAbi,
+      functionName: 'delegateMigratePositionsBatch',
+      args: [userAddress, userSignature, merkleRoot, positionBatch]
+    });
+    
+    // Get gas price (either from API or fallback to environment variable)
+    let maxFeePerGas;
+    if (result && result.data && result.data.result && !isNaN(result.data.result.ProposeGasPrice)) {
+      // Convert gwei to wei and add 10% buffer
+      const proposedGasPrice = parseFloat(result.data.result.ProposeGasPrice);
+      maxFeePerGas = BigInt(Math.floor(proposedGasPrice * 1.1 * 1e9));
+    } else {
+      // Fallback to environment variable or default
+      const maxGasGwei = process.env.BASE_MAX_GAS || '10';
+      maxFeePerGas = parseEther(maxGasGwei, 'gwei');
+    }
+    
+    // Estimate gas with public client
+    let gasLimit;
     try {
-      const Web3 = require('web3');
-      const web3 = new Web3(RPC_URL);
-      const EthereumTx = require('ethereumjs-tx').Transaction;
+      gasLimit = await publicClient.estimateGas({
+        account,
+        to: MIGRATION_CONTRACT_ADDRESS as `0x${string}`,
+        data: functionData,
+        value: BigInt(0)
+      });
       
-      // Get private key from environment
-      const privateKey = Buffer.from(process.env.CALLBACK_ACCOUNT_1_KEY, 'hex');
-      const fromAddress = process.env.CALLBACK_ACCOUNT_1;
-      
-      // Get gas price
-      const [error, result] = await to(axios.get('https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey='+process.env.ETHERSCAN_KEY));
-      
-      let gasPrice = web3.utils.toWei(process.env.BASE_MAX_GAS || '10', 'gwei');
-      let apiGasPrice;
-      
-      if (result && !isNaN(result.data.result.ProposeGasPrice)) {
-        apiGasPrice = web3.utils.toWei(String(result.data.result.ProposeGasPrice), 'gwei');
-      }
-      
-      if (apiGasPrice !== undefined && new BN(gasPrice).gte(new BN(apiGasPrice))) {
-        gasPrice = apiGasPrice;
-      }
-      
-      // Create contract instance
-      const migrationContract = new web3.eth.Contract(
-        morpherSidechainToBaseMigrationAbi,
-        MIGRATION_CONTRACT_ADDRESS
-      );
-      
-      // Prepare transaction data
-      const data = migrationContract.methods.delegateMigratePositionsBatch(
-        userAddress,
-        userSignature,
-        merkleRoot,
-        positionBatch
-      );
-      
-      const nonce = await web3.eth.getTransactionCount(fromAddress, 'pending');
-      
-      // Estimate gas with a buffer
-      let gasLimit;
-      try {
-        gasLimit = await data.estimateGas({ 
-          nonce, 
-          from: fromAddress 
-        });
-        // Add 20% buffer for safety
-        gasLimit = Math.ceil(gasLimit * 1.2);
-      } catch (error) {
-        Logger.error({
-          source: 'baseMigration.sendMigrationTransaction',
-          message: `Gas estimation failed: ${error.message}. Using default gas limit.`
-        });
-        // Use a high default if estimation fails
-        gasLimit = 5000000;
-      }
-      
-      const transactionData = {
-        chainId: CHAIN_ID,
-        nonce,
-        gasLimit: web3.utils.toHex(gasLimit),
-        gasPrice: web3.utils.toHex(gasPrice),
-        from: fromAddress,
-        to: MIGRATION_CONTRACT_ADDRESS,
-        data: data.encodeABI()
-      };
-      
-      // Sign and send transaction
-      const tx = new EthereumTx(transactionData);
-      tx.sign(privateKey);
-      
-      const raw = '0x' + tx.serialize().toString('hex');
-      
-      web3.eth.sendSignedTransaction(raw)
-        .once('transactionHash', (hash) => {
-          Logger.info({
-            source: 'baseMigration.sendMigrationTransaction',
-            message: `Position migration transaction sent [${hash}]`,
-            hash
-          });
-          resolve(hash);
-        })
-        .catch(err => {
-          Logger.error({
-            source: 'baseMigration.sendMigrationTransaction',
-            message: `Error sending migration transaction: ${err.toString()}`
-          });
-          reject(err);
-        });
-      
-    } catch (err) {
+      // Add 20% buffer for safety
+      gasLimit = (gasLimit * BigInt(120)) / BigInt(100);
+    } catch (error) {
       Logger.error({
         source: 'baseMigration.sendMigrationTransaction',
-        message: `Error preparing migration transaction: ${err.toString()}`
+        message: `Gas estimation failed: ${error.message}. Using default gas limit.`
       });
-      reject(err);
+      // Use a high default if estimation fails
+      gasLimit = BigInt(5000000);
     }
-  });
+    
+    // Send transaction
+    const hash = await walletClient.sendTransaction({
+      to: MIGRATION_CONTRACT_ADDRESS as `0x${string}`,
+      data: functionData,
+      gas: gasLimit,
+      maxFeePerGas
+    });
+    
+    Logger.info({
+      source: 'baseMigration.sendMigrationTransaction',
+      message: `Position migration transaction sent [${hash}]`,
+      hash
+    });
+    
+    return hash;
+  } catch (error) {
+    Logger.error({
+      source: 'baseMigration.sendMigrationTransaction',
+      message: `Error sending migration transaction: ${error.toString()}`
+    });
+    throw error;
+  }
 }
 
 /**
@@ -377,24 +364,20 @@ async function sendMigrationTransaction(
  */
 export function verifyUserSignature(ethAddress: string, signature: string): boolean {
   try {
-    const Web3 = require('web3');
-    const web3 = new Web3();
+    // Import viem utilities for signature verification
+    import { hashMessage, recoverAddress, toBytes } from 'viem';
     
     // Recreate the message that was signed
     const message = `I authorize migration of all my positions from plasma chain to Base L2${ethAddress}${CHAIN_ID}`;
     
-    // Hash the message as it would be in the contract
-    const messageHash = web3.utils.keccak256(
-      web3.utils.encodePacked(message)
-    );
-    
-    // Prefix the hash as per EIP-191
-    const prefixedHash = web3.utils.keccak256(
-      web3.utils.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
-    );
+    // Hash the message
+    const messageHash = hashMessage(message);
     
     // Recover the signer address
-    const recoveredAddress = web3.eth.accounts.recover(prefixedHash, signature);
+    const recoveredAddress = recoverAddress({
+      hash: messageHash,
+      signature: signature as `0x${string}`
+    });
     
     // Check if the recovered address matches the expected user address
     return recoveredAddress.toLowerCase() === ethAddress.toLowerCase();
