@@ -351,11 +351,12 @@ async function sendMigrationTransaction(
  */
 export function verifyUserSignature(ethAddress: string, signature: string): boolean {
   try {
-    // Recreate the message that was signed
-    const message = `I authorize migration of all my positions from plasma chain to Base L2${ethAddress}${CHAIN_ID}`;
+    // Recreate the message that was signed - must match exactly how it's done in the contract
+    const message = "I authorize migration of all my positions from plasma chain to Base L2";
     
-    // Hash the message
-    const messageHash = hashMessage(message);
+    // In the contract, the message is packed with address and chainId
+    // We need to hash it the same way
+    const messageHash = hashMessage(message + ethAddress + CHAIN_ID);
     
     // Recover the signer address
     const recoveredAddress = recoverAddress({
