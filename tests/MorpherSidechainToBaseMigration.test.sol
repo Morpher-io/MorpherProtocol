@@ -111,14 +111,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testDelegateMigrateBalance() public {
-        // We only need to mock the merkle proof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
         uint256 initialBalance = morpherToken.balanceOf(testUser);
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
