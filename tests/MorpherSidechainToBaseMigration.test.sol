@@ -534,8 +534,21 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create leaf for the user's balance
         bytes32 balanceLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
         
+        // Create a dummy leaf to ensure we have at least two leaves
+        bytes32 dummyLeaf = keccak256(abi.encodePacked("dummy"));
+        
+        // Create a Merkle tree with two leaves
+        bytes32[] memory leaves = new bytes32[](2);
+        leaves[0] = balanceLeaf;
+        leaves[1] = dummyLeaf;
+        
+        // Create the Merkle tree
+        bytes32 merkleRoot = keccak256(abi.encodePacked(
+            keccak256(abi.encodePacked(balanceLeaf, dummyLeaf))
+        ));
+        
         // Set the final balance Merkle root
-        morpherMigration.setFinalBalanceMerkleRoot(balanceLeaf);
+        morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
         
         // Migrate balance with partial lock
         uint256 initialBalance = morpherToken.balanceOf(testUser);
