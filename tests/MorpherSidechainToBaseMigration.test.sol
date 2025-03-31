@@ -146,43 +146,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Check that the migration was authorized
         assertTrue(morpherMigration.userAuthorizedMigration(testUser));
-    }
-        uint256 lockedAmount = 500 ether;
-        uint256 lockDuration = 30 days;
-        
-        // Call the function
-        morpherMigration.delegateMigrateBalance(
-            testUser,
-            userSignature,
-            testBalance,
-            lockedAmount,
-            lockDuration,
-            0 // No locked rewards
-        );
-        
-        // Check that the balance was migrated with bonus
-        uint256 expectedBalance = initialBalance + testBalance + (testBalance * 500 / 10000);
-        // Locked tokens are still part of the total balance but not available for transfer
-        assertEq(morpherToken.getTradeableBalanceOf(testUser), expectedBalance);
-        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedAmount);
-        
-        // Check that the user is marked as migrated
-        assertTrue(morpherMigration.migratedBalances(testUser));
-        
-        // Verify time lock
-        (uint256 actualLockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
-        assertEq(actualLockedAmount, lockedAmount);
-        assertEq(lockedUntil, block.timestamp + lockDuration);
-        
-        // Check statistics
-        (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
-            morpherMigration.getMigrationStats();
-        
-        assertEq(positionsMigrated, 0, "No positions should be migrated");
-        assertEq(balancesMigrated, 1, "One balance should be migrated");
-        assertEq(usersMigrated, 1, "One user should be migrated");
-        assertTrue(active, "Migration should be active");
-        assertTrue(finalRootSet, "Final root should not be set");
+
     }
     
     function testDelegateMigratePositionsBatch() public {

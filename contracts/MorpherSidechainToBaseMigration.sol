@@ -87,10 +87,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     
     event MigrationAuthorized(address indexed user);
     event MigrationInitiated(address indexed user);
-    
-    // Delegate migration authorization
-    mapping(address => mapping(address => bool)) public delegateMigrationAuthorized;
-    
+        
     modifier onlyRole(bytes32 role) {
         require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(role, _msgSender()), 
                 "MorpherMigration: Permission denied.");
@@ -246,13 +243,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         emit BalanceMigratedWithTimeLock(_msgSender(), amountToMint, _lockedAmount, lockedUntil);
     }
     
-    /**
-     * Authorize a delegate to migrate on behalf of the user
-     */
-    function authorizeDelegateMigration(address _delegate, bool _authorized) public userNotBlocked {
-        delegateMigrationAuthorized[_msgSender()][_delegate] = _authorized;
-        emit DelegateMigrationAuthorized(_msgSender(), _delegate, _authorized);
-    }
+  
     
     // Position migration struct to avoid stack too deep errors
     struct PositionMigrationData {
