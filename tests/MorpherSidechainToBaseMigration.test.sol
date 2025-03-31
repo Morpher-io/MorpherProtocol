@@ -23,6 +23,8 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     function setUp() public override {
         super.setUp();
         
+		morpherAccessControl.grantRole(morpherOracle.ADMINISTRATOR_ROLE(), address(this));
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
         // Deploy the migration contract
         morpherMigration = new MorpherSidechainToBaseMigration();
         morpherMigration.initialize(address(morpherState), bytes32(0), 500); // 5% bonus
@@ -52,9 +54,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         userSignature = abi.encodePacked(bytes32(0), bytes32(0), bytes1(0));
         
         // Fund the test user with some tokens for testing
-        vm.startPrank(address(this));
+
         morpherToken.mint(testUser, 10 ether);
-        vm.stopPrank();
+
     }
     
     function testInitialization() public view {
@@ -299,8 +301,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
             meanEntryPrice: 50000 * 10**8,
             meanEntrySpread: 100 * 10**8,
             meanEntryLeverage: 1 * 10**8,
-            liquidationPrice: 0,
-            proof: testProof
+            liquidationPrice: 0
         });
         
         // First migration
@@ -545,11 +546,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateBalance(
             testUser,
             userSignature,
-            testMerkleRoot,
-            testProof,
             testBalance,
             lockedAmount,
-            lockDuration
+            lockDuration,
+            0
         );
         
         // 3. Verify everything was migrated correctly
