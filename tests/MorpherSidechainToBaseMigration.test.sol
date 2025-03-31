@@ -117,8 +117,36 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
     }
     
-    function testDelegateMigrateBalance() public {
+    function testDelegateMigrateBalanceWithLockedRewards() public {
         uint256 initialBalance = morpherToken.balanceOf(testUser);
+        uint256 lockedRewardAmount = testBalance / 2;  // Lock half as rewards
+        
+        // Call the function
+        morpherMigration.delegateMigrateBalance(
+            testUser,
+            userSignature,
+            testBalance,
+            0,
+            0,
+            lockedRewardAmount
+        );
+        
+        // Check that the balance was migrated with bonus
+        uint256 expectedBalance = initialBalance + testBalance + (testBalance * 500 / 10000);
+        // Locked rewards are still part of the total balance but not available for transfer
+        assertEq(morpherToken.getTradeableBalanceOf(testUser), expectedBalance);
+        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedRewardAmount);
+        
+        // Verify locked rewards
+        uint256 actualLockedRewards = morpherToken.getLockedRewards(testUser);
+        assertEq(actualLockedRewards, lockedRewardAmount);
+        
+        // Check that the user is marked as migrated
+        assertTrue(morpherMigration.migratedBalances(testUser));
+        
+        // Check that the migration was authorized
+        assertTrue(morpherMigration.userAuthorizedMigration(testUser));
+    }
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
         
