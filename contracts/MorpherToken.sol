@@ -117,8 +117,20 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	}
 
 	modifier onlyRole(bytes32 role) {
-		require(morpherAccessControl.hasRole(role, _msgSender()), "MorpherToken: Permission denied.");
+		require(morpherAccessControl.hasRole(role, _msgSender()), 
+			string(abi.encodePacked("MorpherToken: Missing required role ", _bytes32ToString(role))));
 		_;
+	}
+	
+	/**
+	 * @dev Helper function to convert bytes32 to string for error messages
+	 */
+	function _bytes32ToString(bytes32 _bytes32) internal pure returns (string memory) {
+		bytes memory bytesArray = new bytes(32);
+		for (uint256 i; i < 32; i++) {
+			bytesArray[i] = _bytes32[i];
+		}
+		return string(bytesArray);
 	}
 
     function setHashedName(string memory _name) public onlyRole(ADMINISTRATOR_ROLE) {
