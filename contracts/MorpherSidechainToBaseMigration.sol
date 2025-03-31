@@ -412,44 +412,20 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     }
     
     /**
-     * Verify if a position is valid without migrating it
-     * This is a view function that can be used by frontends to verify positions before migration
-     */
-    function verifyPosition(
-        address _user,
-        bytes32[] memory _proof,
-        bytes32 _merkleRoot,
-        PositionMigrationData memory _position
-    ) public view returns (bool) {
-        bytes32 positionHash = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPositionHash(
-            _user, 
-            _position.marketId, 
-            _position.timeStamp, 
-            _position.longShares, 
-            _position.shortShares, 
-            _position.meanEntryPrice, 
-            _position.meanEntrySpread, 
-            _position.meanEntryLeverage, 
-            _position.liquidationPrice
-        );
-        
-        return MerkleProofUpgradeable.verify(_proof, _merkleRoot, positionHash);
-    }
-    
-    /**
-     * Verify if a balance is valid without migrating it
+     * Verify if a balance is valid for self-service migration
      * This is a view function that can be used by frontends to verify balances before migration
      */
-    function verifyBalance(
+    function verifyBalanceSelfService(
         address _user,
         bytes32[] memory _proof,
-        bytes32 _merkleRoot,
         uint256 _balance,
         uint256 _lockedAmount,
-        uint256 _lockDuration
-    ) public pure returns (bool) {
-        bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance, _lockedAmount, _lockDuration));
-        return MerkleProofUpgradeable.verify(_proof, _merkleRoot, balanceHash);
+        uint256 _lockDuration,
+        uint256 _lockedRewardAmount
+    ) public view returns (bool) {
+        require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
+        bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance, _lockedAmount, _lockDuration, _lockedRewardAmount));
+        return MerkleProofUpgradeable.verify(_proof, finalBalanceMerkleRoot, balanceHash);
     }
     
     

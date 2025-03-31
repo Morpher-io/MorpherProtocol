@@ -90,7 +90,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(morpherMigration.finalBalanceMerkleRoot(), newRoot);
     }
     
-    function testVerifyBalance() public {
+    function testVerifyBalanceSelfService() public {
+        // Set the final balance merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
+        
         // Mock the MerkleProof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
@@ -100,14 +103,20 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         );
         
         // Test with no lock
-        bool result = morpherMigration.verifyBalance(testUser, testProof, testMerkleRoot, testBalance, 0, 0);
+        bool result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, 0, 0, 0);
         assertTrue(result);
         
         // Test with lock
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
-        result = morpherMigration.verifyBalance(testUser, testProof, testMerkleRoot, testBalance, lockedAmount, lockDuration);
+        uint256 lockedRewardAmount = 200 ether;
+        result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         assertTrue(result);
+        
+        // Test with invalid merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(bytes32(0));
+        vm.expectRevert("MorpherMigration: Final balance root not set");
+        morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, 0, 0, 0);
     }
     
     function testDelegateMigrateBalance() public {
