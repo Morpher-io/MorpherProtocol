@@ -341,8 +341,8 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(morpherToken.balanceOf(testUser), expectedBalance);
         
         // Verify no time lock was created
-        (uint256 lockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
-        assertEq(lockedAmount, 0);
+        (uint256 lockedAmountContract, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
+        assertEq(lockedAmountContract, 0);
         assertEq(lockedUntil, 0);
         
         // Check that the user is marked as migrated
@@ -504,8 +504,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Migrate balance with partial lock
         uint256 initialBalance = morpherToken.balanceOf(testUser);
-        uint256 lockedAmount = testBalance / 4; // Lock 25% of the balance
-        uint256 lockDuration = 180 days;
+       
         
         morpherMigration.delegateMigrateBalance(
             testUser,
