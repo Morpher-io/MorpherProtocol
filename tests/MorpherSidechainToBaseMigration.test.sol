@@ -56,21 +56,18 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Fund the test user with some tokens for testing
         morpherToken.mint(testUser, 10 ether);
         
-        // Setup global mocks for ECDSA recovery
-        bytes4 recoverSelector = bytes4(keccak256("recover(bytes32,bytes)"));
-        vm.mockCall(
-            address(ECDSAUpgradeable),
-            abi.encodeWithSelector(recoverSelector),
-            abi.encode(testUser)
-        );
+        // Create a private key for the test user
+        uint256 testUserPrivateKey = 0xA11CE;
+        testUser = vm.addr(testUserPrivateKey);
         
-        // Mock the toEthSignedMessageHash function
-        bytes4 toEthSignedMessageHashSelector = bytes4(keccak256("toEthSignedMessageHash(bytes32)"));
-        vm.mockCall(
-            address(ECDSAUpgradeable),
-            abi.encodeWithSelector(toEthSignedMessageHashSelector),
-            abi.encode(bytes32(0))
-        );
+        // Create the message that will be signed
+        string memory message = "I authorize migration of all my positions from plasma chain to Base L2";
+        bytes32 messageHash = keccak256(abi.encodePacked(message, testUser, block.chainid));
+        bytes32 ethSignedMessageHash = ECDSAUpgradeable.toEthSignedMessageHash(messageHash);
+        
+        // Sign the message with the test user's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(testUserPrivateKey, ethSignedMessageHash);
+        userSignature = abi.encodePacked(r, s, v);
     }
     
     function testInitialization() public view {
@@ -114,7 +111,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testDelegateMigrateBalance() public {
-        // We need to mock the merkle proof verification
+        // We only need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(MerkleProofUpgradeable),
@@ -162,7 +159,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testDelegateMigratePositionsBatch() public {
-        // We need to mock the merkle proof verification
+        // We only need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
             address(MerkleProofUpgradeable),
@@ -325,13 +322,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Pause migration
         morpherMigration.pauseMigration(true);
         
-        // Try to migrate - should revert
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
-            abi.encode(testUser)
-        );
-        
         vm.expectRevert("MorpherMigration: Migration is paused");
         morpherMigration.delegateMigrateBalance(
             testUser,
@@ -407,12 +397,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(lockedUntil, block.timestamp + lockDuration);
     }
     function testDelegateMigrateBalanceWithLock() public {
-        // Mock the ECDSA recovery to return our test user
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
-            abi.encode(testUser)
-        );
         
         uint256 initialBalance = morpherToken.balanceOf(testUser);
         uint256 lockedAmount = testBalance;  // Lock the entire balance
