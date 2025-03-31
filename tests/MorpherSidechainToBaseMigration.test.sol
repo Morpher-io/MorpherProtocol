@@ -59,26 +59,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Sign the message with the test user's private key
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(testUserPrivateKey, ethSignedMessageHash);
         userSignature = abi.encodePacked(r, s, v);
-        
-        // Generate actual Merkle root and proof for self-service migration
-        // Create leaf for the user's balance
-        uint256 lockedAmount = 500 ether;
-        uint256 lockDuration = 30 days;
-        uint256 lockedRewardAmount = 200 ether;
-        bytes32 balanceLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
-        
-        // Create a simple Merkle tree with just one leaf
-        bytes32[] memory leaves = new bytes32[](1);
-        leaves[0] = balanceLeaf;
-        
-        // The Merkle root is the leaf itself since we have only one leaf
-        testMerkleRoot = balanceLeaf;
-        
-        // The proof is empty since we have only one leaf
-        testProof = new bytes32[](0);
-        
-        // Set the final balance Merkle root
-        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
     }
     
     function testInitialization() public view {
@@ -102,21 +82,39 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testVerifyBalanceSelfService() public {
-        // Test with the values used to generate the Merkle root
+        // Generate Merkle root and proof for self-service migration
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
         uint256 lockedRewardAmount = 200 ether;
-        bool result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
+        
+        // Create leaf for the user's balance
+        bytes32 balanceLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
+        
+        // Create a simple Merkle tree with just one leaf
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = balanceLeaf;
+        
+        // The Merkle root is the leaf itself since we have only one leaf
+        bytes32 merkleRoot = balanceLeaf;
+        
+        // The proof is empty since we have only one leaf
+        bytes32[] memory proof = new bytes32[](0);
+        
+        // Set the final balance Merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
+        
+        // Test with the values used to generate the Merkle root
+        bool result = morpherMigration.verifyBalanceSelfService(testUser, proof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         assertTrue(result);
         
         // Test with different values (should fail)
-        result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, 0, 0, 0);
+        result = morpherMigration.verifyBalanceSelfService(testUser, proof, testBalance, 0, 0, 0);
         assertFalse(result);
         
         // Test with invalid merkle root
         morpherMigration.setFinalBalanceMerkleRoot(bytes32(0));
         vm.expectRevert("MorpherMigration: Final balance root not set");
-        morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
+        morpherMigration.verifyBalanceSelfService(testUser, proof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
     }
     
     function testDelegateMigrateBalanceWithLockedRewards() public {
@@ -187,14 +185,32 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testMigrateBalanceSelfService() public {
-        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        // Generate Merkle root and proof for self-service migration
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
         uint256 lockedRewardAmount = 200 ether;
         
+        // Create leaf for the user's balance
+        bytes32 balanceLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
+        
+        // Create a simple Merkle tree with just one leaf
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = balanceLeaf;
+        
+        // The Merkle root is the leaf itself since we have only one leaf
+        bytes32 merkleRoot = balanceLeaf;
+        
+        // The proof is empty since we have only one leaf
+        bytes32[] memory proof = new bytes32[](0);
+        
+        // Set the final balance Merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
+        
+        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        
         // Call the function as the test user
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
+        morpherMigration.migrateBalanceSelfService(proof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         vm.stopPrank();
         
         // Check that the balance was migrated (no bonus in self-service)
@@ -292,15 +308,32 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testMigrateBalanceWithZeroLock() public {
-        // Create a new Merkle root for zero lock
-        bytes32 zeroLockLeaf = keccak256(abi.encodePacked(testUser, testBalance, uint256(0), uint256(0), uint256(0)));
-        morpherMigration.setFinalBalanceMerkleRoot(zeroLockLeaf);
+        // Generate Merkle root and proof for zero lock
+        uint256 lockedAmount = 0;
+        uint256 lockDuration = 0;
+        uint256 lockedRewardAmount = 0;
+        
+        // Create leaf for the user's balance with zero lock
+        bytes32 zeroLockLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
+        
+        // Create a simple Merkle tree with just one leaf
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = zeroLockLeaf;
+        
+        // The Merkle root is the leaf itself since we have only one leaf
+        bytes32 merkleRoot = zeroLockLeaf;
+        
+        // The proof is empty since we have only one leaf
+        bytes32[] memory proof = new bytes32[](0);
+        
+        // Set the final balance Merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
         
         uint256 initialBalance = morpherToken.balanceOf(testUser);
         
         // Call the function as the test user with zero lock
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(new bytes32[](0), testBalance, 0, 0, 0);
+        morpherMigration.migrateBalanceSelfService(proof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         vm.stopPrank();
         
         // Check that the balance was migrated with no lock
@@ -317,17 +350,32 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testMigrateBalanceWithPartialLock() public {
-        // Create a new Merkle root for partial lock
+        // Generate Merkle root and proof for partial lock
         uint256 lockedAmount = testBalance / 2; // Lock half the balance
         uint256 lockDuration = 90 days;
-        bytes32 partialLockLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, uint256(0)));
-        morpherMigration.setFinalBalanceMerkleRoot(partialLockLeaf);
+        uint256 lockedRewardAmount = 0;
+        
+        // Create leaf for the user's balance with partial lock
+        bytes32 partialLockLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
+        
+        // Create a simple Merkle tree with just one leaf
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = partialLockLeaf;
+        
+        // The Merkle root is the leaf itself since we have only one leaf
+        bytes32 merkleRoot = partialLockLeaf;
+        
+        // The proof is empty since we have only one leaf
+        bytes32[] memory proof = new bytes32[](0);
+        
+        // Set the final balance Merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
         
         uint256 initialBalance = morpherToken.balanceOf(testUser);
         
         // Call the function as the test user
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(new bytes32[](0), testBalance, lockedAmount, lockDuration, 0);
+        morpherMigration.migrateBalanceSelfService(proof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         vm.stopPrank();
         
         // Check that the balance was migrated with partial lock
@@ -373,15 +421,32 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testSelfServiceMigrationWithLockedRewards() public {
-        // We're already set up with the correct Merkle root from setUp()
-        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        // Generate Merkle root and proof for migration with locked rewards
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
         uint256 lockedRewardAmount = 200 ether;
         
+        // Create leaf for the user's balance with locked rewards
+        bytes32 balanceLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
+        
+        // Create a simple Merkle tree with just one leaf
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = balanceLeaf;
+        
+        // The Merkle root is the leaf itself since we have only one leaf
+        bytes32 merkleRoot = balanceLeaf;
+        
+        // The proof is empty since we have only one leaf
+        bytes32[] memory proof = new bytes32[](0);
+        
+        // Set the final balance Merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
+        
+        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        
         // Call the function as the test user
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
+        morpherMigration.migrateBalanceSelfService(proof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         vm.stopPrank();
         
         // Check that the balance was migrated with partial lock
@@ -426,8 +491,16 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
             positionData
         );
         
-        // 2. Then set final balance root and migrate balance
-        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
+        // 2. Generate Merkle root for balance migration
+        uint256 lockedAmount = testBalance / 4; // Lock 25% of the balance
+        uint256 lockDuration = 180 days;
+        uint256 lockedRewardAmount = 0;
+        
+        // Create leaf for the user's balance
+        bytes32 balanceLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
+        
+        // Set the final balance Merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(balanceLeaf);
         
         // Migrate balance with partial lock
         uint256 initialBalance = morpherToken.balanceOf(testUser);
