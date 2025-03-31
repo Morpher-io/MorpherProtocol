@@ -121,11 +121,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateBalance(
             testUser,
             userSignature,
-            testMerkleRoot,
-            testProof,
             testBalance,
             lockedAmount,
-            lockDuration
+            lockDuration,
+            0 // No locked rewards
         );
         
         // Check that the balance was migrated with bonus
@@ -181,15 +180,13 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
             meanEntryPrice: 50000 * 10**8,
             meanEntrySpread: 100 * 10**8,
             meanEntryLeverage: 1 * 10**8,
-            liquidationPrice: 0,
-            proof: testProof
+            liquidationPrice: 0
         });
         
         // Call the function
         morpherMigration.delegateMigratePositionsBatch(
             testUser,
             userSignature,
-            testMerkleRoot,
             positionData
         );
         
@@ -226,7 +223,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Call the function as the test user
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration);
+        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, 0);
         vm.stopPrank();
         
         // Check that the balance was migrated (no bonus in self-service)
@@ -271,9 +268,8 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateBalance(
             testUser,
             userSignature,
-            testMerkleRoot,
-            testProof,
             testBalance,
+            0,
             0,
             0
         );
@@ -283,9 +279,8 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateBalance(
             testUser,
             userSignature,
-            testMerkleRoot,
-            testProof,
             testBalance,
+            0,
             0,
             0
         );
@@ -325,7 +320,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigratePositionsBatch(
             testUser,
             userSignature,
-            testMerkleRoot,
             positionData
         );
         
@@ -334,7 +328,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigratePositionsBatch(
             testUser,
             userSignature,
-            testMerkleRoot,
             positionData
         );
     }
@@ -354,9 +347,8 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateBalance(
             testUser,
             userSignature,
-            testMerkleRoot,
-            testProof,
             testBalance,
+            0,
             0,
             0
         );
@@ -378,7 +370,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Call the function as the test user with zero lock
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, 0, 0);
+        morpherMigration.migrateBalanceSelfService(testProof, testBalance, 0, 0, 0);
         vm.stopPrank();
         
         // Check that the balance was migrated with no lock
@@ -412,7 +404,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Call the function as the test user
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration);
+        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, 0);
         vm.stopPrank();
         
         // Check that the balance was migrated with partial lock
@@ -449,11 +441,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateBalance(
             testUser,
             userSignature,
-            testMerkleRoot,
-            testProof,
             testBalance,
             lockedAmount,
-            lockDuration
+            lockDuration,
+            0
         );
         
         // Check that the balance was migrated with bonus
@@ -474,6 +465,46 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertTrue(morpherMigration.userAuthorizedMigration(testUser));
     }
     
+    function testSelfServiceMigrationWithLockedRewards() public {
+        // Set the final balance merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
+        
+        // We need to mock the merkle proof verification
+        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
+        vm.mockCall(
+            address(0),
+            abi.encodeWithSelector(verifySelector),
+            abi.encode(true)
+        );
+        
+        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        uint256 lockedAmount = testBalance / 4; // Lock 25% with time lock
+        uint256 lockDuration = 90 days;
+        uint256 lockedRewardAmount = testBalance / 4; // Lock 25% as rewards
+        
+        // Call the function as the test user
+        vm.startPrank(testUser);
+        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
+        vm.stopPrank();
+        
+        // Check that the balance was migrated with partial lock
+        uint256 expectedBalance = initialBalance + testBalance;
+        assertEq(morpherToken.getTradeableBalanceOf(testUser), expectedBalance);
+        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedAmount - lockedRewardAmount);
+        
+        // Verify time lock
+        (uint256 actualLockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(testUser);
+        assertEq(actualLockedAmount, lockedAmount);
+        assertEq(lockedUntil, block.timestamp + lockDuration);
+        
+        // Verify locked rewards
+        uint256 actualLockedRewards = morpherToken.getLockedRewards(testUser);
+        assertEq(actualLockedRewards, lockedRewardAmount);
+        
+        // Check that the user is marked as migrated
+        assertTrue(morpherMigration.migratedBalances(testUser));
+    }
+
     function testFullMigrationFlow() public {
         // 1. First migrate positions
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
@@ -501,15 +532,13 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
             meanEntryPrice: 50000 * 10**8,
             meanEntrySpread: 100 * 10**8,
             meanEntryLeverage: 1 * 10**8,
-            liquidationPrice: 0,
-            proof: testProof
+            liquidationPrice: 0
         });
         
         // Migrate positions
         morpherMigration.delegateMigratePositionsBatch(
             testUser,
             userSignature,
-            testMerkleRoot,
             positionData
         );
         

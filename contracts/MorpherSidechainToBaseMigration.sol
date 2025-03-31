@@ -193,22 +193,23 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     
     
     /**
-     * Migrate token balance from plasma chain to Base L2 with time lock
+     * Migrate token balance from plasma chain to Base L2 with time lock and locked rewards
      * Uses the finalBalanceMerkleRoot which is set after the active migration period
      */
     function migrateBalanceSelfService(
         bytes32[] memory _proof,
         uint256 _balance,
         uint256 _lockedAmount,
-        uint256 _lockDuration
+        uint256 _lockDuration,
+        uint256 _lockedRewardAmount
     ) public userNotBlocked {
         // Verify balance hasn't been migrated already
         require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
         require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
-        require(_lockedAmount <= _balance, "MorpherMigration: Locked amount cannot exceed total balance");
+        require(_lockedAmount + _lockedRewardAmount <= _balance, "MorpherMigration: Locked amounts cannot exceed total balance");
         
         // Generate balance hash including lock information
-        bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance, _lockedAmount, _lockDuration));
+        bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance, _lockedAmount, _lockDuration, _lockedRewardAmount));
         
         // Verify Merkle proof against final balance root
         require(
@@ -231,6 +232,11 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         // If there are tokens to be locked, lock them
         if (_lockedAmount > 0 && _lockDuration > 0) {
             MorpherToken(state.morpherTokenAddress()).lockTokensForTime(_msgSender(), _lockedAmount, _lockDuration);
+        }
+        
+        // If there are rewards to be locked, lock them
+        if (_lockedRewardAmount > 0) {
+            MorpherToken(state.morpherTokenAddress()).lockRewards(_msgSender(), _lockedRewardAmount);
         }
         
         // Update statistics
@@ -258,7 +264,6 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         uint256 meanEntrySpread;
         uint256 meanEntryLeverage;
         uint256 liquidationPrice;
-        bytes32[] proof;
     }
     
     /**
@@ -267,7 +272,6 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     function delegateMigratePositionsBatch(
         address _user,
         bytes memory _userAuthSignature,
-        bytes32 _merkleRoot,
         PositionMigrationData[] memory _positions
     ) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
         require(_positions.length > 0, "MorpherMigration: No positions to migrate");
@@ -308,12 +312,6 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
             require(existingPosition.longShares == 0 && existingPosition.shortShares == 0, 
                     "MorpherMigration: User already has a position for this market");
             
-            // Verify Merkle proof against the provided merkle root
-            require(
-                MerkleProofUpgradeable.verify(pos.proof, _merkleRoot, positionHash),
-                "MorpherMigration: Invalid Merkle proof"
-            );
-            
             // Mark position as migrated
             migratedPositions[positionHash] = true;
             
@@ -350,16 +348,15 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     }
     
     /**
-     * Delegate migration of token balance with time lock
+     * Delegate migration of token balance with time lock and locked rewards
      */
     function delegateMigrateBalance(
         address _user,
         bytes memory _userAuthSignature,
-        bytes32 _merkleRoot,
-        bytes32[] memory _proof,
         uint256 _balance,
         uint256 _lockedAmount,
-        uint256 _lockDuration
+        uint256 _lockDuration,
+        uint256 _lockedRewardAmount
     ) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
         // Verify user authorization signature
         bytes32 messageHash = keccak256(abi.encodePacked(
@@ -373,16 +370,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         
         // Verify balance hasn't been migrated already
         require(!migratedBalances[_user], "MorpherMigration: Balance already migrated");
-        require(_lockedAmount <= _balance, "MorpherMigration: Locked amount cannot exceed total balance");
-        
-        // Generate balance hash including lock information
-        bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance, _lockedAmount, _lockDuration));
-        
-        // Verify Merkle proof against the provided merkle root
-        require(
-            MerkleProofUpgradeable.verify(_proof, _merkleRoot, balanceHash),
-            "MorpherMigration: Invalid Merkle proof"
-        );
+        require(_lockedAmount + _lockedRewardAmount <= _balance, "MorpherMigration: Locked amounts cannot exceed total balance");
         
         // Mark balance as migrated
         migratedBalances[_user] = true;
@@ -402,6 +390,11 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         // If there are tokens to be locked, lock them
         if (_lockedAmount > 0 && _lockDuration > 0) {
             MorpherToken(state.morpherTokenAddress()).lockTokensForTime(_user, _lockedAmount, _lockDuration);
+        }
+        
+        // If there are rewards to be locked, lock them
+        if (_lockedRewardAmount > 0) {
+            MorpherToken(state.morpherTokenAddress()).lockRewards(_user, _lockedRewardAmount);
         }
         
         // Update statistics
