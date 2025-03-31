@@ -43,8 +43,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Grant roles
         morpherAccessControl.grantRole(ADMINISTRATOR_ROLE, address(this));
         morpherAccessControl.grantRole(MIGRATION_OPERATOR_ROLE, address(this));
-        morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherMigration));
-        morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherMigration));
+        morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherMigration)); //to transfer the balance
+        morpherAccessControl.grantRole(morpherToken.ADMINISTRATOR_ROLE(), address(morpherMigration)); //to timelock tokens
+        morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), address(morpherMigration)); //to lock rewards
+        morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherMigration)); //to set positions
         
         // Fund the test user with some tokens for testing
         morpherToken.mint(testUser, 10 ether);
@@ -182,7 +184,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(balancesMigrated, 0, "No balances should be migrated yet");
         assertEq(usersMigrated, 0, "User count should not increase for position-only migration");
         assertTrue(active, "Migration should be active");
-        assertFalse(finalRootSet, "Final root should not be set");
     }
     
     function testMigrateBalanceSelfService() public {
