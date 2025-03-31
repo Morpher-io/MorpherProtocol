@@ -39,8 +39,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     // Migration incentives
     uint256 public migrationBonus; // in basis points (e.g., 100 = 1%)
     
-    // Position migration authorization
-    mapping(address => bool) public userAuthorizedMigration;
+    // Position migration tracking
     mapping(address => uint256) public lastMigratedPositionIndex;
     mapping(address => bytes32[]) public userPositionIds;
     
@@ -85,7 +84,6 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         bool authorized
     );
     
-    event MigrationAuthorized(address indexed user);
     event MigrationInitiated(address indexed user);
         
     modifier onlyRole(bytes32 role) {
@@ -159,10 +157,10 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     // ------------------------------------------------------------------------
     
     /**
-     * Authorize position migration with signature
+     * Initiate full migration process
      */
-    function authorizePositionMigration(bytes memory _signature) public userNotBlocked activeMigrationPhase {
-        // User signs a message authorizing migration of all their positions
+    function initiateFullMigration(bytes memory _signature) public userNotBlocked activeMigrationPhase {
+        // Verify user's signature
         bytes32 messageHash = keccak256(abi.encodePacked(
             "I authorize migration of all my positions from plasma chain to Base L2",
             _msgSender(),
@@ -171,17 +169,6 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         
         address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _signature);
         require(signer == _msgSender(), "MorpherMigration: Invalid signature");
-        
-        userAuthorizedMigration[_msgSender()] = true;
-        emit MigrationAuthorized(_msgSender());
-    }
-    
-    /**
-     * Initiate full migration process
-     */
-    function initiateFullMigration(bytes memory _signature) public userNotBlocked activeMigrationPhase {
-        // Authorize position migration
-        authorizePositionMigration(_signature);
         
         // Emit event for backend to start migration process
         emit MigrationInitiated(_msgSender());
@@ -328,8 +315,6 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         // Update statistics
         totalPositionsMigrated += _positions.length;
         
-        // Mark user as having authorized migration (for future reference)
-        userAuthorizedMigration[_user] = true;
         
         emit PositionsBatchMigrated(
             _user,
@@ -392,8 +377,6 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         totalBalancesMigrated++;
         totalUsersMigrated++;
         
-        // Mark user as having authorized migration (for future reference)
-        userAuthorizedMigration[_user] = true;
         
         if (_lockedAmount > 0 && _lockDuration > 0) {
             emit BalanceMigratedWithTimeLock(_user, amountToMint, _lockedAmount, lockedUntil);

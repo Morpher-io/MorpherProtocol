@@ -144,8 +144,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Check that the user is marked as migrated
         assertTrue(morpherMigration.migratedBalances(testUser));
         
-        // Check that the migration was authorized
-        assertTrue(morpherMigration.userAuthorizedMigration(testUser));
 
     }
     
@@ -371,8 +369,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Check that the user is marked as migrated
         assertTrue(morpherMigration.migratedBalances(testUser));
         
-        // Check that the migration was authorized
-        assertTrue(morpherMigration.userAuthorizedMigration(testUser));
     }
     
     function testSelfServiceMigrationWithLockedRewards() public {
@@ -465,7 +461,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         
         // Check migration status
         assertTrue(morpherMigration.migratedBalances(testUser), "Balance should be marked as migrated");
-        assertTrue(morpherMigration.userAuthorizedMigration(testUser), "User should be marked as authorized");
         
         // Check final statistics
         (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
