@@ -418,14 +418,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(lockedUntil, block.timestamp + lockDuration);
     }
     function testDelegateMigrateBalanceWithLock() public {
-        // We need to mock the signature verification and merkle proof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
         // Mock the ECDSA recovery to return our test user
         vm.mockCall(
             address(0),
