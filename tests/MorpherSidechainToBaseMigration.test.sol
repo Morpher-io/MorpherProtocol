@@ -54,9 +54,23 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         userSignature = abi.encodePacked(bytes32(0), bytes32(0), bytes1(0));
         
         // Fund the test user with some tokens for testing
-
         morpherToken.mint(testUser, 10 ether);
-
+        
+        // Setup global mocks for ECDSA recovery
+        bytes4 recoverSelector = bytes4(keccak256("recover(bytes32,bytes)"));
+        vm.mockCall(
+            address(ECDSAUpgradeable),
+            abi.encodeWithSelector(recoverSelector),
+            abi.encode(testUser)
+        );
+        
+        // Mock the toEthSignedMessageHash function
+        bytes4 toEthSignedMessageHashSelector = bytes4(keccak256("toEthSignedMessageHash(bytes32)"));
+        vm.mockCall(
+            address(ECDSAUpgradeable),
+            abi.encodeWithSelector(toEthSignedMessageHashSelector),
+            abi.encode(bytes32(0))
+        );
     }
     
     function testInitialization() public view {
@@ -83,7 +97,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Mock the MerkleProof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
@@ -100,19 +114,12 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testDelegateMigrateBalance() public {
-        // We need to mock the signature verification and merkle proof verification
+        // We need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
-        );
-        
-        // Mock the ECDSA recovery to return our test user
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
-            abi.encode(testUser)
         );
         
         uint256 initialBalance = morpherToken.balanceOf(testUser);
@@ -155,19 +162,12 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testDelegateMigratePositionsBatch() public {
-        // We need to mock the signature verification and merkle proof verification
+        // We need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
-        );
-        
-        // Mock the ECDSA recovery to return our test user
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
-            abi.encode(testUser)
         );
         
         // Create position data in memory
@@ -214,7 +214,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // We need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
@@ -256,15 +256,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // First migration
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
-        );
-        
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
-            abi.encode(testUser)
         );
         
         morpherMigration.delegateMigrateBalance(
@@ -307,15 +301,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // First migration
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
-        );
-        
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
-            abi.encode(testUser)
         );
         
         morpherMigration.delegateMigratePositionsBatch(
@@ -362,7 +350,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // We need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
@@ -394,7 +382,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // We need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
@@ -465,7 +453,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // We need to mock the merkle proof verification
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
         );
@@ -502,15 +490,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // 1. First migrate positions
         bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
         vm.mockCall(
-            address(0),
+            address(MerkleProofUpgradeable),
             abi.encodeWithSelector(verifySelector),
             abi.encode(true)
-        );
-        
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(bytes4(keccak256("recover(bytes32,bytes)"))),
-            abi.encode(testUser)
         );
         
         // Create position data
