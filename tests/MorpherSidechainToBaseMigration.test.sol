@@ -29,16 +29,12 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration = new MorpherSidechainToBaseMigration();
         morpherMigration.initialize(address(morpherState), bytes32(0), 500); // 5% bonus
         
-        // Setup test data
-        testUser = address(0x1234);
-        testBalance = 1000 ether;
-        testMerkleRoot = bytes32(uint256(1));
-        testProof = new bytes32[](1);
-        testProof[0] = bytes32(uint256(2));
+        // Create a private key for the test user
+        uint256 testUserPrivateKey = 0xA11CE;
+        testUser = vm.addr(testUserPrivateKey);
         
-        // Create a test market ID
-        testMarketId = keccak256("CRYPTO_BTC");
-        morpherState.activateMarket(testMarketId);
+        // Setup test data
+        testBalance = 1000 ether;
         
         // Create a test market ID
         testMarketId = keccak256("CRYPTO_BTC");
@@ -50,15 +46,8 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherMigration));
         morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherMigration));
         
-        // Create a mock signature (in a real test we would use proper signing)
-        userSignature = abi.encodePacked(bytes32(0), bytes32(0), bytes1(0));
-        
         // Fund the test user with some tokens for testing
         morpherToken.mint(testUser, 10 ether);
-        
-        // Create a private key for the test user
-        uint256 testUserPrivateKey = 0xA11CE;
-        testUser = vm.addr(testUserPrivateKey);
         
         // Create the message that will be signed
         string memory message = "I authorize migration of all my positions from plasma chain to Base L2";
@@ -68,6 +57,26 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Sign the message with the test user's private key
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(testUserPrivateKey, ethSignedMessageHash);
         userSignature = abi.encodePacked(r, s, v);
+        
+        // Generate actual Merkle root and proof for self-service migration
+        // Create leaf for the user's balance
+        uint256 lockedAmount = 500 ether;
+        uint256 lockDuration = 30 days;
+        uint256 lockedRewardAmount = 200 ether;
+        bytes32 balanceLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, lockedRewardAmount));
+        
+        // Create a simple Merkle tree with just one leaf
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = balanceLeaf;
+        
+        // The Merkle root is the leaf itself since we have only one leaf
+        testMerkleRoot = balanceLeaf;
+        
+        // The proof is empty since we have only one leaf
+        testProof = new bytes32[](0);
+        
+        // Set the final balance Merkle root
+        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
     }
     
     function testInitialization() public view {
@@ -91,32 +100,21 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testVerifyBalanceSelfService() public {
-        // Set the final balance merkle root
-        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
-        
-        // Mock the MerkleProof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
-        // Test with no lock
-        bool result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, 0, 0, 0);
-        assertTrue(result);
-        
-        // Test with lock
+        // Test with the values used to generate the Merkle root
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
         uint256 lockedRewardAmount = 200 ether;
-        result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
+        bool result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         assertTrue(result);
+        
+        // Test with different values (should fail)
+        result = morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, 0, 0, 0);
+        assertFalse(result);
         
         // Test with invalid merkle root
         morpherMigration.setFinalBalanceMerkleRoot(bytes32(0));
         vm.expectRevert("MorpherMigration: Final balance root not set");
-        morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, 0, 0, 0);
+        morpherMigration.verifyBalanceSelfService(testUser, testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
     }
     
     function testDelegateMigrateBalance() public {
@@ -160,14 +158,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testDelegateMigratePositionsBatch() public {
-        // We only need to mock the merkle proof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
         // Create position data in memory
         MorpherSidechainToBaseMigration.PositionMigrationData[] memory positionData = 
             new MorpherSidechainToBaseMigration.PositionMigrationData[](1);
@@ -206,24 +196,14 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testMigrateBalanceSelfService() public {
-        // Set the final balance merkle root
-        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
-        
-        // We need to mock the merkle proof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
         uint256 initialBalance = morpherToken.balanceOf(testUser);
         uint256 lockedAmount = 500 ether;
         uint256 lockDuration = 30 days;
+        uint256 lockedRewardAmount = 200 ether;
         
         // Call the function as the test user
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, 0);
+        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, lockedRewardAmount);
         vm.stopPrank();
         
         // Check that the balance was migrated (no bonus in self-service)
@@ -252,13 +232,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     
     function testCannotMigrateBalanceTwice() public {
         // First migration
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
         morpherMigration.delegateMigrateBalance(
             testUser,
             userSignature,
@@ -297,13 +270,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         });
         
         // First migration
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
         morpherMigration.delegateMigratePositionsBatch(
             testUser,
             userSignature,
@@ -335,22 +301,15 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testMigrateBalanceWithZeroLock() public {
-        // Set the final balance merkle root
-        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
-        
-        // We need to mock the merkle proof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
+        // Create a new Merkle root for zero lock
+        bytes32 zeroLockLeaf = keccak256(abi.encodePacked(testUser, testBalance, uint256(0), uint256(0), uint256(0)));
+        morpherMigration.setFinalBalanceMerkleRoot(zeroLockLeaf);
         
         uint256 initialBalance = morpherToken.balanceOf(testUser);
         
         // Call the function as the test user with zero lock
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, 0, 0, 0);
+        morpherMigration.migrateBalanceSelfService(new bytes32[](0), testBalance, 0, 0, 0);
         vm.stopPrank();
         
         // Check that the balance was migrated with no lock
@@ -367,24 +326,17 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testMigrateBalanceWithPartialLock() public {
-        // Set the final balance merkle root
-        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
-        
-        // We need to mock the merkle proof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
-        uint256 initialBalance = morpherToken.balanceOf(testUser);
+        // Create a new Merkle root for partial lock
         uint256 lockedAmount = testBalance / 2; // Lock half the balance
         uint256 lockDuration = 90 days;
+        bytes32 partialLockLeaf = keccak256(abi.encodePacked(testUser, testBalance, lockedAmount, lockDuration, uint256(0)));
+        morpherMigration.setFinalBalanceMerkleRoot(partialLockLeaf);
+        
+        uint256 initialBalance = morpherToken.balanceOf(testUser);
         
         // Call the function as the test user
         vm.startPrank(testUser);
-        morpherMigration.migrateBalanceSelfService(testProof, testBalance, lockedAmount, lockDuration, 0);
+        morpherMigration.migrateBalanceSelfService(new bytes32[](0), testBalance, lockedAmount, lockDuration, 0);
         vm.stopPrank();
         
         // Check that the balance was migrated with partial lock
@@ -432,21 +384,11 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     }
     
     function testSelfServiceMigrationWithLockedRewards() public {
-        // Set the final balance merkle root
-        morpherMigration.setFinalBalanceMerkleRoot(testMerkleRoot);
-        
-        // We need to mock the merkle proof verification
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
+        // We're already set up with the correct Merkle root from setUp()
         uint256 initialBalance = morpherToken.balanceOf(testUser);
-        uint256 lockedAmount = testBalance / 4; // Lock 25% with time lock
-        uint256 lockDuration = 90 days;
-        uint256 lockedRewardAmount = testBalance / 4; // Lock 25% as rewards
+        uint256 lockedAmount = 500 ether;
+        uint256 lockDuration = 30 days;
+        uint256 lockedRewardAmount = 200 ether;
         
         // Call the function as the test user
         vm.startPrank(testUser);
@@ -473,13 +415,6 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
 
     function testFullMigrationFlow() public {
         // 1. First migrate positions
-        bytes4 verifySelector = bytes4(keccak256("verify(bytes32[],bytes32,bytes32)"));
-        vm.mockCall(
-            address(MerkleProofUpgradeable),
-            abi.encodeWithSelector(verifySelector),
-            abi.encode(true)
-        );
-        
         // Create position data
         MorpherSidechainToBaseMigration.PositionMigrationData[] memory positionData = 
             new MorpherSidechainToBaseMigration.PositionMigrationData[](1);
