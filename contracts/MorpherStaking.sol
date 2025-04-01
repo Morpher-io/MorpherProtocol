@@ -3,7 +3,8 @@ pragma solidity ^0.8.20; // Update pragma if needed
 
 // --- V5 Imports ---
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
-// Remove ContextUpgradeable, EIP712Upgradeable, ECDSAUpgradeable, CountersUpgradeable if only used for permit
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Add Context back
+// Remove EIP712Upgradeable, ECDSAUpgradeable, CountersUpgradeable if only used for permit
 // import {CountersUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/CountersUpgradeable.sol";
 
 import "./MorpherState.sol"; // Use adapted v5 interface
@@ -19,7 +20,7 @@ import "./MorpherInterestRateManager.sol";
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherStaking.sol:MorpherStaking
-contract MorpherStaking is UUPSUpgradeable { // Inherit UUPSUpgradeable
+contract MorpherStaking is UUPSUpgradeable, ContextUpgradeable { // Inherit UUPSUpgradeable and ContextUpgradeable
     // using CountersUpgradeable for CountersUpgradeable.Counter; // Keep only if Counters are used elsewhere
 
     MorpherState public morpherState;
@@ -93,7 +94,7 @@ contract MorpherStaking is UUPSUpgradeable { // Inherit UUPSUpgradeable
     // --- Updated Initializer ---
     function initialize(address _morpherStateAddress) public initializer {
         __UUPSUpgradeable_init(); // Initialize UUPS
-        // Remove Context init: __Context_init();
+        __Context_init(); // Initialize Context
 
         morpherState = MorpherState(_morpherStateAddress);
         lastReward = block.timestamp;
