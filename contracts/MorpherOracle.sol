@@ -48,8 +48,8 @@ import {NoncesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/cont
 import {ECDSAUpgradeable} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Use non-upgradeable ECDSA
 import {IERC20Permit} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/extensions/IERC20Permit.sol"; // Use non-upgradeable interface
 
-import {IERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/IERC20Upgradeable.sol";
-import {SafeERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IERC20} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol"; // Keep external interface
 import "../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
@@ -596,16 +596,16 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		);
 
 		// Transfer `amountIn` of inputToken to this contract.
-		SafeERC20Upgradeable.safeTransferFrom(
-			IERC20Upgradeable(inputToken.tokenAddress),
+		SafeERC20.safeTransferFrom(
+			IERC20(inputToken.tokenAddress),
 			inputToken.owner,
 			address(this),
 			inputToken.value
 		);
 
 		// Approve the router to spend the token.
-		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, inputToken.value);
-		IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
+		IERC20(inputToken.tokenAddress).approve(uniswapRouter, inputToken.value);
+		IERC20(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
 
 		bytes memory path;
 
@@ -643,11 +643,11 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		// uint amountIn = swapRouter.exactOutput(outputSwapParams);
 
 		// //TransferBack the remainder
-		// IERC20Upgradeable(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
+		// IERC20(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
 
 		//reset the approved amounts
-		IERC20Upgradeable(inputToken.tokenAddress).approve(uniswapRouter, 0);
-		IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, 0);
+		IERC20(inputToken.tokenAddress).approve(uniswapRouter, 0);
+		IERC20(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 	}
 
 	function convertMphAndPayout(bytes32 orderId, uint mphTokenAmount) internal {
@@ -677,18 +677,18 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 			}
 
 			// Transfer `MPH payout` of Close position to this contract.
-			SafeERC20Upgradeable.safeTransferFrom(
-				IERC20Upgradeable(state.morpherTokenAddress()),
+			SafeERC20.safeTransferFrom(
+				IERC20(state.morpherTokenAddress()),
 				inputToken.owner,
 				address(this),
 				mphTokenAmount
 			);
 
 			// Approve the router to spend the token.
-			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
+			IERC20(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
 
-			// SafeERC20Upgradeable.safeApprove(
-			// 	IERC20Upgradeable(state.morpherTokenAddress()),
+			// SafeERC20.safeApprove(
+			// 	IERC20(state.morpherTokenAddress()),
 			// 	address(swapRouter),
 			// 	mphTokenAmount
 			// );
@@ -716,7 +716,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 
 			// swap the remaining token back
 			swapRouter.exactInput(backConvertParams);
-			IERC20Upgradeable(state.morpherTokenAddress()).approve(uniswapRouter, 0);
+			IERC20(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 		}
 	}
 
@@ -911,7 +911,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		require(checkOrderConditions(_orderId, _price), "MorpherOracle Error: Order Conditions are not met");
 		(address positionOwnerAddress, , , , , , , , , , , ) = MorpherTradeEngine(state.morpherTradeEngineAddress())
 			.orders(_orderId);
-		uint balanceBeforeClose = IERC20Upgradeable(state.morpherTokenAddress()).balanceOf(positionOwnerAddress);
+		uint balanceBeforeClose = IERC20(state.morpherTokenAddress()).balanceOf(positionOwnerAddress);
 
 		createdPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(
 			_orderId,
@@ -938,7 +938,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		);
 		setGasForCallback(_gasForNextCallback);
 
-		uint balanceBeforeAfter = IERC20Upgradeable(state.morpherTokenAddress()).balanceOf(positionOwnerAddress);
+		uint balanceBeforeAfter = IERC20(state.morpherTokenAddress()).balanceOf(positionOwnerAddress);
 		if (balanceBeforeAfter > balanceBeforeClose) {
 			convertMphAndPayout(_orderId, balanceBeforeAfter - balanceBeforeClose);
 		}
