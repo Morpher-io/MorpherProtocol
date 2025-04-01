@@ -9,17 +9,22 @@ import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transpar
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
-import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
+// --- Import and Inherit from DeployOrUpgradeV5 ---
+import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 
 //morpher contracts
-import {MorpherState} from "../contracts/MorpherState.sol";
-import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
-import {MorpherSidechainToBaseMigration} from "../contracts/MorpherSidechainToBaseMigration.sol";
+import {MorpherState} from "../contracts/MorpherState.sol"; // Use adapted v5 contract
+import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // Use adapted v5 contract
+import {MorpherSidechainToBaseMigration} from "../contracts/MorpherSidechainToBaseMigration.sol"; // Use adapted v5 contract
 
-contract DeployMorpherSidechainToBaseMigration is DeployOrUpgrade {
-	using stdJson for string;
+// --- Inherit from DeployOrUpgradeV5 ---
+contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
+
+	string constant CONTRACT_KEY = "MorpherSidechainToBaseMigration";
+	// Use fully qualified name or filename as required by the upgrades plugin
+	string constant CONTRACT_NAME = "contracts/MorpherSidechainToBaseMigration.sol:MorpherSidechainToBaseMigration";
 
 	function run() public {
 		vm.startBroadcast();
@@ -36,39 +41,49 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgrade {
 		// Get migration bonus in basis points (default 500 = 5%)
 		uint256 migrationBonus = vm.envOr("MIGRATION_BONUS_BPS", uint256(0));
 
-		// Deploy or upgrade MorpherSidechainToBaseMigration
-		address existingMigration = loadAddress("MorpherSidechainToBaseMigration");
-		MorpherSidechainToBaseMigration implementation = new MorpherSidechainToBaseMigration();
+		// Check if deploying fresh
+		address existingProxy = loadAddress(CONTRACT_KEY);
+		bool isNewDeployment = existingProxy == address(0);
 
-		address migration = deployOrUpgrade(
-			existingMigration,
-			address(implementation),
+		vm.startBroadcast();
+
+		// Deploy or upgrade using the V5 UUPS logic
+		address migrationProxy = deployOrUpgradeV5(
+			CONTRACT_KEY,
+			CONTRACT_NAME,
+			// Ensure initializer signature matches the adapted v5 contract
 			abi.encodeCall(MorpherSidechainToBaseMigration.initialize, (stateAddress, initialPlasmaStateRoot, migrationBonus)),
-			"MorpherSidechainToBaseMigration.sol"
+			bytes("") // No upgrade call data needed for this example
 		);
 
-		saveAddress("MorpherSidechainToBaseMigration", migration);
-		console.log("MorpherSidechainToBaseMigration at:", migration);
+		saveAddress(CONTRACT_KEY, migrationProxy);
+		console.log("MorpherSidechainToBaseMigration V5 Proxy at:", migrationProxy);
 
 		// Only set roles for new deployments
-		if (existingMigration == address(0)) {
+		if (isNewDeployment) {
 			MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
-			
-			// Grant roles to the migration contract
-			accessControl.grantRole(keccak256("ADMINISTRATOR_ROLE"), migration);
-			
-			// Grant migration operator role to deployer
-			accessControl.grantRole(keccak256("MIGRATION_OPERATOR_ROLE"), msg.sender);
-			
-			// // Configure State with migration address if needed
-			// MorpherState state = MorpherState(stateAddress);
-			// state.setMorpherSidechainToBaseMigrationAddress(migration);
-			
-			console.log("Granted ADMINISTRATOR_ROLE to migration contract");
-			console.log("Granted MIGRATION_OPERATOR_ROLE to deployer");
-			console.log("Set migration address in MorpherState");
+			MorpherSidechainToBaseMigration migrationContract = MorpherSidechainToBaseMigration(migrationProxy); // Use proxy address
+
+			// Define roles using constants from the contract *type* or keccak256
+			bytes32 adminRole = migrationContract.ADMINISTRATOR_ROLE();
+			bytes32 migrationOperatorRole = migrationContract.MIGRATION_OPERATOR_ROLE();
+
+			// Grant ADMINISTRATOR_ROLE to the migration contract proxy itself? Or to an external admin?
+			// Assuming external admin for now.
+			address envAdmin = vm.envOr("MIGRATION_ADMIN_ADDRESS", msg.sender);
+			accessControl.grantRole(adminRole, envAdmin);
+			console.log("Granted ADMINISTRATOR_ROLE to:", envAdmin);
+
+			// Grant migration operator role to deployer (or designated operator)
+			address envOperator = vm.envOr("MIGRATION_OPERATOR_ADDRESS", msg.sender);
+			accessControl.grantRole(migrationOperatorRole, envOperator);
+			console.log("Granted MIGRATION_OPERATOR_ROLE to:", envOperator);
+
+			// Configure State with migration address if needed (assuming a setter exists)
+			// MorpherState(stateAddress).setMorpherSidechainToBaseMigrationAddress(migrationProxy);
+			// console.log("Set migration address in MorpherState.");
 		}
 
-		vm.stopBroadcast();
+		vm.stopBroadcast(); // Move outside the if block
 	}
 }

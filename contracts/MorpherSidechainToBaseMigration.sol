@@ -7,16 +7,18 @@
 pragma solidity ^0.8.15;
 
 import "./MorpherState.sol";
-import "./MorpherUserBlocking.sol";
-import "./MorpherAccessControl.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
-import "./MorpherTradeEngine.sol";
-import "./MorpherToken.sol";
+import "./MorpherUserBlocking.sol"; // Use adapted v5 interface
+import "./MorpherAccessControl.sol"; // Use adapted v5 interface
+// --- V5 Imports ---
+import {MerkleProof} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MerkleProof.sol"; // Use non-upgradeable MerkleProof
+import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Use non-upgradeable ECDSA
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Keep for _msgSender
+import "./MorpherTradeEngine.sol"; // Use adapted v5 interface
+import "./MorpherToken.sol"; // Use adapted v5 interface
 
-contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherSidechainToBaseMigration.sol:MorpherSidechainToBaseMigration // Add if needed
+contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable { // Update inheritance
     
     MorpherState public state;
     
@@ -114,13 +116,15 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
                 "MorpherMigration: User is blocked");
         _;
     }
-    
+
+    // --- Updated Initializer ---
     function initialize(
         address _stateAddress,
         bytes32 _plasmaStateRoot,
         uint256 _migrationBonusBps
     ) public initializer {
-        __Context_init();
+        __UUPSUpgradeable_init(); // Initialize UUPS
+        __Context_init(); // Initialize Context
         state = MorpherState(_stateAddress);
         plasmaStateRoot = _plasmaStateRoot;
         migrationBonus = _migrationBonusBps;
@@ -128,6 +132,23 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         
         emit PlasmaStateRootUpdated(_plasmaStateRoot);
     }
+
+    // --- Implement _authorizeUpgrade ---
+	function _authorizeUpgrade(address newImplementation)
+		internal
+		override
+	{
+		address accessControlAddress = state.morpherAccessControlAddress();
+		require(accessControlAddress != address(0), "MorpherMigration: AccessControl not set in State");
+		// Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+		require(
+			MorpherAccessControl(accessControlAddress).hasRole(
+				MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+				msg.sender // Use msg.sender directly
+			),
+			"MorpherMigration: Caller is not the proxy updater"
+		);
+	}
     
     // ------------------------------------------------------------------------
     // Administrative functions
@@ -167,7 +188,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
             block.chainid
         ));
         
-        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _signature);
+        address signer = ECDSA.recover(ECDSA.toEthSignedMessageHash(messageHash), _signature); // Use ECDSA
         require(signer == _msgSender(), "MorpherMigration: Invalid signature");
         
         // Emit event for backend to start migration process
@@ -197,7 +218,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
         
         // Verify Merkle proof against final balance root
         require(
-            MerkleProofUpgradeable.verify(_proof, finalBalanceMerkleRoot, balanceHash),
+            MerkleProof.verify(_proof, finalBalanceMerkleRoot, balanceHash), // Use MerkleProof
             "MorpherMigration: Invalid Merkle proof"
         );
         
@@ -261,7 +282,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
             block.chainid
         ));
         
-        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _userAuthSignature);
+        address signer = ECDSA.recover(ECDSA.toEthSignedMessageHash(messageHash), _userAuthSignature); // Use ECDSA
         require(signer == _user, "MorpherMigration: Invalid user authorization signature");
         
         bytes32[] memory positionHashes = new bytes32[](_positions.length);
@@ -341,7 +362,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
             block.chainid
         ));
         
-        address signer = ECDSAUpgradeable.recover(ECDSAUpgradeable.toEthSignedMessageHash(messageHash), _userAuthSignature);
+        address signer = ECDSA.recover(ECDSA.toEthSignedMessageHash(messageHash), _userAuthSignature); // Use ECDSA
         require(signer == _user, "MorpherMigration: Invalid user authorization signature");
         
         // Verify balance hasn't been migrated already
@@ -399,7 +420,7 @@ contract MorpherSidechainToBaseMigration is Initializable, ContextUpgradeable {
     ) public view returns (bool) {
         require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
         bytes32 balanceHash = keccak256(abi.encodePacked(_user, _balance, _lockedAmount, _lockDuration, _lockedRewardAmount));
-        return MerkleProofUpgradeable.verify(_proof, finalBalanceMerkleRoot, balanceHash);
+        return MerkleProof.verify(_proof, finalBalanceMerkleRoot, balanceHash); // Use MerkleProof
     }
     
     
