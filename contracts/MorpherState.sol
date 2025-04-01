@@ -3,8 +3,7 @@ pragma solidity ^0.8.20; // Update pragma if needed
 
 // --- Updated Imports ---
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
-// ContextUpgradeable might be implicitly included by UUPSUpgradeable or AccessControl in v5, check OZ docs if needed
-// import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Add Context back
 import "./MorpherToken.sol"; // Ensure this points to the adapted v5 version later
 import "./MorpherTradeEngine.sol"; // Ensure this points to the adapted v5 version later
 import "./MorpherAccessControl.sol"; // Use the adapted v5 interface/contract
@@ -15,7 +14,7 @@ import "./MorpherAccessControl.sol"; // Use the adapted v5 interface/contract
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherState.sol:MorpherState
-contract MorpherState is UUPSUpgradeable { // --- Inherit UUPSUpgradeable ---
+contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UUPSUpgradeable and ContextUpgradeable ---
 
     // --- Remove __gap variable if present ---
 
@@ -95,9 +94,9 @@ contract MorpherState is UUPSUpgradeable { // --- Inherit UUPSUpgradeable ---
 
     // --- Initializer ---
     function initialize(bool _mainChain, address _morpherAccessControlAddress) public initializer {
-        // Call parent initializers if needed by v5 UUPSUpgradeable or other inherited contracts
+        // Call parent initializers
         __UUPSUpgradeable_init();
-        // __Context_init_unchained(); // Call if ContextUpgradeable is explicitly inherited and needed
+        __Context_init(); // Initialize Context
 
         morpherAccessControlAddress = _morpherAccessControlAddress;
         mainChain = _mainChain;
