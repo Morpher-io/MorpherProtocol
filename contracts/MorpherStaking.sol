@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.15;
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/EIP712Upgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/CountersUpgradeable.sol";
+pragma solidity ^0.8.20; // Update pragma if needed
 
-import "./MorpherState.sol";
-import "./MorpherUserBlocking.sol";
+// --- V5 Imports ---
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+// Remove ContextUpgradeable, EIP712Upgradeable, ECDSAUpgradeable, CountersUpgradeable if only used for permit
+// import {CountersUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/CountersUpgradeable.sol";
+
+import "./MorpherState.sol"; // Use adapted v5 interface
+import "./MorpherUserBlocking.sol"; // Use adapted v5 interface
 import "./MorpherToken.sol";
 import "./MorpherInterestRateManager.sol";
 
@@ -19,8 +19,8 @@ import "./MorpherInterestRateManager.sol";
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherStaking.sol:MorpherStaking
-contract MorpherStaking is Initializable, ContextUpgradeable {
-    using CountersUpgradeable for CountersUpgradeable.Counter;
+contract MorpherStaking is UUPSUpgradeable { // Inherit UUPSUpgradeable
+    // using CountersUpgradeable for CountersUpgradeable.Counter; // Keep only if Counters are used elsewhere
 
     MorpherState public morpherState;
 
@@ -56,18 +56,14 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     }
     mapping(address => PoolShares) public poolShares;
 
-
-    
-    bytes32 public constant _HASHED_NAME = keccak256("MorpherStaking");
-    bytes32 public constant _HASHED_VERSION = keccak256("1");
-    bytes32 public constant _TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    
-    bytes32 public constant _STAKE_TYPEHASH = keccak256("Stake(uint256 amount,address owner,uint256 nonce,uint256 deadline)");
-    bytes32 public constant _UNSTAKE_TYPEHASH = keccak256("Unstake(uint256 shares,address owner,uint256 nonce,uint256 deadline)");
-    
-    mapping(address => CountersUpgradeable.Counter) private _nonces;
-
-	address private msgSenderOverride;
+    // --- Remove manual EIP712 Permit state variables ---
+    // bytes32 public constant _HASHED_NAME = ...;
+    // bytes32 public constant _HASHED_VERSION = ...;
+    // bytes32 public constant _TYPE_HASH = ...;
+    // bytes32 public constant _STAKE_TYPEHASH = ...;
+    // bytes32 public constant _UNSTAKE_TYPEHASH = ...;
+    // mapping(address => CountersUpgradeable.Counter) private _nonces;
+    // address private msgSenderOverride;
 
     // END STATE ----------------------------------------------------------------------------
 
@@ -93,12 +89,13 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         require(!MorpherUserBlocking(morpherState.morpherUserBlockingAddress()).userIsBlocked(_msgSender()), "MorpherStaking: User is blocked");
         _;
     }
-    
-    function initialize(address _morpherState) public initializer {
-        ContextUpgradeable.__Context_init();
 
-        morpherState = MorpherState(_morpherState);
-        
+    // --- Updated Initializer ---
+    function initialize(address _morpherStateAddress) public initializer {
+        __UUPSUpgradeable_init(); // Initialize UUPS
+        // Remove Context init: __Context_init();
+
+        morpherState = MorpherState(_morpherStateAddress);
         lastReward = block.timestamp;
         lockupPeriod = 30 days; // to prevent tactical staking and ensure smooth governance
         minimumStake = 10**23; // 100k MPH minimum
@@ -110,16 +107,25 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
         // missing: transferOwnership to Governance once deployed
     }
 
-    /**
-	 * Overrides the msgSender Context to understand when a call by signature happened
-	 */
-	function _msgSender() internal view override returns (address) {
-		if (msgSenderOverride != address(0)) {
-			return msgSenderOverride;
-		}
+    // --- Implement _authorizeUpgrade ---
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+    {
+        address accessControlAddress = morpherState.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "MorpherStaking: AccessControl not set in State");
+        // Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+        require(
+            MorpherAccessControl(accessControlAddress).hasRole(
+                MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+                msg.sender // Use msg.sender directly
+            ),
+            "MorpherStaking: Caller is not the proxy updater"
+        );
+    }
 
-		return msg.sender;
-	}
+    // --- Remove _msgSender override ---
+    // function _msgSender() ...
 
     // ----------------------------------------------------------------------------
     // updatePoolShareValue
@@ -218,109 +224,15 @@ contract MorpherStaking is Initializable, ContextUpgradeable {
     // Getter functions
     // ----------------------------------------------------------------------------
 
-    /**
-     * @dev "Consume a nonce": return the current value and increment.
-     */
-    function _useNonce(address owner) internal virtual returns (uint256 current) {
-        CountersUpgradeable.Counter storage nonce = _nonces[owner];
-        current = nonce.current();
-        nonce.increment();
-    }
-
-    /**
-     * @dev Returns the domain separator for the current chain.
-     */
-    function _domainSeparatorV4() internal view returns (bytes32) {
-        return _buildDomainSeparator(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION);
-    }
-
-    function _buildDomainSeparator(
-        bytes32 typeHash,
-        bytes32 nameHash,
-        bytes32 versionHash
-    ) private view returns (bytes32) {
-        return keccak256(abi.encode(typeHash, nameHash, versionHash, block.chainid, address(this)));
-    }
-
-    function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
-        return ECDSAUpgradeable.toTypedDataHash(_domainSeparatorV4(), structHash);
-    }
-
-    /**
-     * @dev See {IERC20Permit-nonces}.
-     */
-    function nonces(address owner) public view virtual returns (uint256) {
-        return _nonces[owner].current();
-    }
-
-    /**
-     * @dev See {IERC20Permit-DOMAIN_SEPARATOR}.
-     */
-    function DOMAIN_SEPARATOR() external view returns (bytes32) {
-        return _domainSeparatorV4();
-    }
-
-    function stakeWithPermit(
-        uint256 _amount,
-        address _owner,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public virtual returns (uint256) {
-        require(block.timestamp <= deadline, "MorpherStaking: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _STAKE_TYPEHASH,
-                _amount,
-                _owner,
-                _useNonce(_owner),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSAUpgradeable.recover(hash, v, r, s);
-        require(signer == _owner, "MorpherStaking: invalid signature");
-        msgSenderOverride = _owner;
-        uint _poolShares = stake(_amount);
-        msgSenderOverride = address(0);
-        return _poolShares;
-
-    }
-
-    function unstakeWithPermit(
-        uint256 _shares,
-        address _owner,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public virtual returns (uint256) {
-        require(block.timestamp <= deadline, "MorpherStaking: expired deadline");
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                _UNSTAKE_TYPEHASH,
-                _shares,
-                _owner,
-                _useNonce(_owner),
-                deadline
-            )
-        );
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-
-        address signer = ECDSAUpgradeable.recover(hash, v, r, s);
-        require(signer == _owner, "MorpherStaking: invalid signature");
-
-        msgSenderOverride = _owner;
-        uint _amount = unstake(_shares);
-        msgSenderOverride = address(0);
-        return _amount;
-    }
+    // --- Remove manual EIP712 Permit functions ---
+    // function _useNonce(...) ...
+    // function _domainSeparatorV4() ...
+    // function _buildDomainSeparator(...) ...
+    // function _hashTypedDataV4(...) ...
+    // function nonces(...) ...
+    // function DOMAIN_SEPARATOR() ...
+    // function stakeWithPermit(...) ...
+    // function unstakeWithPermit(...) ...
 
     function getTotalPooledValue() public view returns (uint256 _totalPooled) {
         // Only accurate if poolShareValue is up to date

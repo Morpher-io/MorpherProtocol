@@ -9,61 +9,78 @@ import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transpar
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
-import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
+// --- Import and Inherit from DeployOrUpgradeV5 ---
+import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 
 //morpher contracts
-import {MorpherStaking} from "../contracts/MorpherStaking.sol";
+import {MorpherStaking} from "../contracts/MorpherStaking.sol"; // Use adapted v5 contract
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
-import {MorpherToken} from "../contracts/MorpherToken.sol";
-import {MorpherState} from "../contracts/MorpherState.sol";
+import {MorpherToken} from "../contracts/MorpherToken.sol"; // Use adapted v5 contract
+import {MorpherState} from "../contracts/MorpherState.sol"; // Use adapted v5 contract
 
-contract DeployMorpherStaking is DeployOrUpgrade {
-    using stdJson for string;
+// --- Inherit from DeployOrUpgradeV5 ---
+contract DeployMorpherStaking is DeployOrUpgradeV5 {
+
+    string constant CONTRACT_KEY = "MorpherStaking";
+    // Use fully qualified name or filename as required by the upgrades plugin
+    string constant CONTRACT_NAME = "contracts/MorpherStaking.sol:MorpherStaking";
 
     function run() public {
+        // Load dependencies
+        address stateAddress = loadAddress("MorpherState");
+        require(stateAddress != address(0), "V5 MorpherState must be deployed first");
+        address accessControlAddress = loadAddress("MorpherAccessControl");
+        require(accessControlAddress != address(0), "V5 AccessControl must be deployed first");
+        address tokenAddress = loadAddress("MorpherToken");
+        require(tokenAddress != address(0), "V5 MorpherToken must be deployed first");
+
+        // Check if deploying fresh
+        address existingProxy = loadAddress(CONTRACT_KEY);
+        bool isNewDeployment = existingProxy == address(0);
+
         vm.startBroadcast();
 
-        // Load State address - required for Staking initialization
-        address stateAddress = loadAddress("MorpherState");
-        require(stateAddress != address(0), "MorpherState must be deployed first");
-
-        // Deploy or upgrade MorpherStaking
-        address existingStaking = loadAddress("MorpherStaking");
-        MorpherStaking implementation = new MorpherStaking();
-        
-        address staking = deployOrUpgrade(
-            existingStaking,
-            address(implementation),
+        // Deploy or upgrade using the V5 UUPS logic
+        address stakingProxy = deployOrUpgradeV5(
+            CONTRACT_KEY,
+            CONTRACT_NAME,
+            // Ensure initializer signature matches the adapted v5 contract
             abi.encodeCall(MorpherStaking.initialize, (stateAddress)),
-            "MorpherStaking.sol"
+            bytes("") // No upgrade call data needed for this example
         );
-        
-        saveAddress("MorpherStaking", staking);
-        console.log("MorpherStaking at:", staking);
+
+        console.log("MorpherStaking V5 Proxy at:", stakingProxy);
 
         // Only set roles and initial configuration for new deployments
-        if (existingStaking == address(0)) {
-            MorpherAccessControl accessControl = MorpherAccessControl(loadAddress("MorpherAccessControl"));
-            MorpherToken token = MorpherToken(loadAddress("MorpherToken"));
+        if (isNewDeployment) {
+            console.log("Performing initial configuration for MorpherStaking...");
+            MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+            MorpherToken token = MorpherToken(tokenAddress);
             MorpherState state = MorpherState(stateAddress);
-            MorpherStaking stakingContract = MorpherStaking(staking);
+            MorpherStaking stakingContract = MorpherStaking(stakingProxy); // Use proxy address
 
-            // Grant STAKINGADMIN role to deployer
-            accessControl.grantRole(stakingContract.STAKINGADMIN_ROLE(), msg.sender);
+            // Grant STAKINGADMIN role to deployer (or designated admin)
+            address envStakingAdmin = vm.envOr("STAKING_ADMIN_ADDRESS", msg.sender);
+            accessControl.grantRole(stakingContract.STAKINGADMIN_ROLE(), envStakingAdmin);
+            console.log("Granted STAKINGADMIN_ROLE to:", envStakingAdmin);
 
-            // Set initial interest rate
+            // Set initial interest rate (fetch from InterestRateManager instead?)
+            // For now, keeping the direct setting as in v4 script
             stakingContract.setInterestRate(15000); // 0.015% daily interest rate
+            console.log("Set initial interest rate.");
 
-            // Grant token roles to staking contract
-            accessControl.grantRole(token.BURNER_ROLE(), staking);
-            accessControl.grantRole(token.MINTER_ROLE(), staking);
+            // Grant token roles (MINTER/BURNER) to staking contract proxy
+            accessControl.grantRole(token.BURNER_ROLE(), stakingProxy);
+            accessControl.grantRole(token.MINTER_ROLE(), stakingProxy);
+            console.log("Granted MINTER/BURNER roles to Staking contract.");
 
-            // Set staking contract in state
-            state.setMorpherStaking(payable(staking));
+            // Set staking contract address in state
+            state.setMorpherStaking(payable(stakingProxy)); // Ensure setMorpherStaking takes payable if needed
+            console.log("Set MorpherStaking address in MorpherState.");
         }
-        
+
         vm.stopBroadcast();
     }
 }
