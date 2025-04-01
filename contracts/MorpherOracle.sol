@@ -45,7 +45,7 @@ import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/con
 import {PausableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/PausableUpgradeable.sol";
 import {EIP712Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/EIP712Upgradeable.sol";
 import {NoncesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/NoncesUpgradeable.sol"; // Use Nonces instead of Counters
-import {ECDSAUpgradeable} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Use non-upgradeable ECDSA
+import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Use non-upgradeable ECDSA
 import {IERC20Permit} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/extensions/IERC20Permit.sol"; // Use non-upgradeable interface
 
 import {IERC20} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/IERC20.sol";
@@ -518,7 +518,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		bytes32 digest = _hashTypedDataV4(structHash);
 
 		// Use ECDSA library directly
-		address signer = ECDSAUpgradeable.recover(digest, v, r, s);
+		address signer = ECDSA.recover(digest, v, r, s); // Use ECDSA instead of ECDSAUpgradeable
 		require(signer == _addressPositionOwner, "MorpherOracle: invalid signature");
 
 		// Keep msgSenderOverride logic
@@ -571,7 +571,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		bytes32 digest = _hashTypedDataV4(structHash);
 
 		// Use ECDSA library directly
-		address signer = ECDSAUpgradeable.recover(digest, v, r, s);
+		address signer = ECDSA.recover(digest, v, r, s); // Use ECDSA instead of ECDSAUpgradeable
 		require(signer == _addressPositionOwner, "MorpherOracle: invalid signature");
 
 		// Keep msgSenderOverride logic
@@ -797,7 +797,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		bytes32 digest = _hashTypedDataV4(structHash);
 
 		// Use ECDSA library directly
-		address signer = ECDSAUpgradeable.recover(digest, v, r, s);
+		address signer = ECDSA.recover(digest, v, r, s); // Use ECDSA instead of ECDSAUpgradeable
 		require(signer == _owner, "MorpherOracle: invalid signature");
 
 		// Keep msgSenderOverride logic
