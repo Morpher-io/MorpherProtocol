@@ -1,17 +1,39 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.20; // Update pragma if needed
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlEnumerableUpgradeable.sol";
+// --- Use v5 imports ---
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControlEnumerableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/access/AccessControlEnumerableUpgradeable.sol";
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAccessControl.sol:MorpherAccessControl
-contract MorpherAccessControl is AccessControlEnumerableUpgradeable {
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAccessControl.sol:MorpherAccessControl // Keep or update reference
+contract MorpherAccessControl is AccessControlEnumerableUpgradeable, UUPSUpgradeable { // Inherit both
 
+    // --- Define Proxy Updater Role ---
+    bytes32 public constant PROXYUPDATER_ROLE = keccak256("PROXYUPDATER_ROLE");
+
+    // --- Remove __gap variable if it existed ---
+
+    // --- Initializer ---
     function initialize() public initializer {
-        AccessControlEnumerableUpgradeable.__AccessControlEnumerable_init();
+        // Call initializers for all parent contracts
+        __AccessControlEnumerable_init();
+        __UUPSUpgradeable_init(); // Initialize UUPS
+
+        // Grant deployer admin role AND proxy updater role
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(PROXYUPDATER_ROLE, _msgSender()); // Grant deployer updater role initially
     }
 
-    function grantRoleBatch(bytes32 role, address[] calldata accounts) public onlyRole(getRoleAdmin(role))  {
+    // --- Implement _authorizeUpgrade ---
+    // Only allow the PROXYUPDATER_ROLE to upgrade this contract
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyRole(PROXYUPDATER_ROLE) // Restrict upgrade permission
+    {}
+
+    // --- grantRoleBatch remains the same ---
+    function grantRoleBatch(bytes32 role, address[] calldata accounts) public virtual onlyRole(getRoleAdmin(role))  {
         for(uint256 i = 0; i < accounts.length; i++) {
             grantRole(role, accounts[i]);
         }

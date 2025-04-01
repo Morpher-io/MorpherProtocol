@@ -1,18 +1,23 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.15;
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
-import "./MorpherToken.sol";
-import "./MorpherTradeEngine.sol";
+pragma solidity ^0.8.20; // Update pragma if needed
+
+// --- Updated Imports ---
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+// ContextUpgradeable might be implicitly included by UUPSUpgradeable or AccessControl in v5, check OZ docs if needed
+// import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
+import "./MorpherToken.sol"; // Ensure this points to the adapted v5 version later
+import "./MorpherTradeEngine.sol"; // Ensure this points to the adapted v5 version later
+import "./MorpherAccessControl.sol"; // Use the adapted v5 interface/contract
 
 // ----------------------------------------------------------------------------------
 // Data and token balance storage of the Morpher platform
-// Writing access is only granted to platform contracts. The contract can be paused
-// by an elected platform administrator (see MorpherGovernance) to perform protocol updates.
+// ... (rest of comments)
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherState.sol:MorpherState
-contract MorpherState is Initializable, ContextUpgradeable  {
+contract MorpherState is UUPSUpgradeable { // --- Inherit UUPSUpgradeable ---
+
+    // --- Remove __gap variable if present ---
 
     address public morpherAccessControlAddress;
     address public morpherAirdropAddress;
@@ -32,7 +37,7 @@ contract MorpherState is Initializable, ContextUpgradeable  {
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     bytes32 public constant PLATFORM_ROLE = keccak256("PLATFORM_ROLE");
- 
+    // No need to redefine ADMINISTRATOR_ROLE if only used for modifiers checking AccessControl
 
     address public morpherRewards;
     uint256 public maximumLeverage; // Leverage precision is 1e8, maximum leverage set to 10 initially
@@ -81,20 +86,38 @@ contract MorpherState is Initializable, ContextUpgradeable  {
 
     bool public mainChain;
 
-    
+
     // ----------------------------------------------------------------------------
     // New interest rate management
     // ----------------------------------------------------------------------------
 
     address public morpherInterestRateManagerAddress;
 
+    // --- Initializer ---
     function initialize(bool _mainChain, address _morpherAccessControlAddress) public initializer {
-        ContextUpgradeable.__Context_init();
-        
+        // Call parent initializers if needed by v5 UUPSUpgradeable or other inherited contracts
+        __UUPSUpgradeable_init();
+        // __Context_init_unchained(); // Call if ContextUpgradeable is explicitly inherited and needed
+
         morpherAccessControlAddress = _morpherAccessControlAddress;
         mainChain = _mainChain;
 
         maximumLeverage = 10*PRECISION; // Leverage precision is 1e8, maximum leverage set to 10 initially
+    }
+
+    // --- Implement _authorizeUpgrade ---
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+    {
+        // Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+        require(
+            MorpherAccessControl(morpherAccessControlAddress).hasRole(
+                MorpherAccessControl(morpherAccessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+                _msgSender()
+            ),
+            "MorpherState: Caller is not the proxy updater"
+        );
     }
 
     // ----------------------------------------------------------------------------

@@ -1,33 +1,62 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.20; // Update pragma if needed
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "./MorpherAccessControl.sol";
-import "./MorpherState.sol";
+// --- Updated Imports ---
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "./MorpherAccessControl.sol"; // Use adapted v5 interface/contract
+import "./MorpherState.sol"; // Use adapted v5 interface/contract
 
 
-contract MorpherUserBlocking is Initializable {
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherUserBlocking.sol:MorpherUserBlocking // Add if needed
+contract MorpherUserBlocking is UUPSUpgradeable { // --- Inherit UUPSUpgradeable ---
+
+    // --- Remove __gap variable if present ---
 
     mapping(address => bool) public userIsBlocked;
-    MorpherState state;
+    MorpherState public state; // Make state public for easier access in modifier/authz
 
+    // Role constants can be fetched from AccessControl if needed, or kept here for clarity
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant USERBLOCKINGADMIN_ROLE = keccak256("USERBLOCKINGADMIN_ROLE");
 
     event ChangeUserBlocked(address _user, bool _oldIsBlocked, bool _newIsBlocked);
-    event ChangedAddressAllowedToAddBlockedUsersAddress(address _oldAddress, address _newAddress);
+    event ChangedAddressAllowedToAddBlockedUsersAddress(address _oldAddress, address _newAddress); // This event seems unused?
 
-    function initialize(address _state) public initializer {
-        state = MorpherState(_state);
+    // --- Initializer ---
+    function initialize(address _stateAddress) public initializer {
+        __UUPSUpgradeable_init();
+        state = MorpherState(_stateAddress);
     }
 
+    // --- Implement _authorizeUpgrade ---
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+    {
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "UserBlocking: AccessControl not set");
+        // Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+        require(
+            MorpherAccessControl(accessControlAddress).hasRole(
+                MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+                _msgSender()
+            ),
+            "UserBlocking: Caller is not the proxy updater"
+        );
+    }
+
+    // --- Modifiers (check state and accessControlAddress validity) ---
     modifier onlyAdministrator() {
-        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(ADMINISTRATOR_ROLE, msg.sender), "UserBlocking: Only Administrator can call this function");
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "UserBlocking: AccessControl not set");
+        require(MorpherAccessControl(accessControlAddress).hasRole(ADMINISTRATOR_ROLE, _msgSender()), "UserBlocking: Only Administrator can call this function");
         _;
     }
 
     modifier onlyAllowedUsers() {
-        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(ADMINISTRATOR_ROLE, msg.sender) || MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(USERBLOCKINGADMIN_ROLE, msg.sender), "UserBlocking: Only White-Listed Users can call this function");
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "UserBlocking: AccessControl not set");
+        require(MorpherAccessControl(accessControlAddress).hasRole(ADMINISTRATOR_ROLE, _msgSender()) || MorpherAccessControl(accessControlAddress).hasRole(USERBLOCKINGADMIN_ROLE, _msgSender()), "UserBlocking: Only White-Listed Users can call this function");
         _;
     }
 

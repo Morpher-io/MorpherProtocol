@@ -1,52 +1,68 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {stdJson} from "forge-std/StdJson.sol";
-import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+// --- Import and Inherit from DeployOrUpgradeV5 ---
+import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
-
-import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
-
-//morpher contracts
+// Import the *adapted* v5 contracts
 import {MorpherUserBlocking} from "../contracts/MorpherUserBlocking.sol";
-import {MorpherState} from "../contracts/MorpherState.sol";
+import {MorpherState} from "../contracts/MorpherState.sol"; // Keep for setting address in state
+import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // Keep for role granting
 
-contract DeployMorpherUserBlocking is DeployOrUpgrade {
-    using stdJson for string;
+// --- Inherit from DeployOrUpgradeV5 ---
+contract DeployMorpherUserBlocking is DeployOrUpgradeV5 {
+
+    string constant CONTRACT_KEY = "MorpherUserBlocking";
+    // Use fully qualified name or filename as required by the upgrades plugin
+    string constant CONTRACT_NAME = "contracts/MorpherUserBlocking.sol:MorpherUserBlocking";
 
     function run() public {
+        // Load dependencies
+        address stateProxyAddress = loadAddress("MorpherState");
+        require(stateProxyAddress != address(0), "V5 MorpherState must be deployed first");
+        address accessControlAddress = loadAddress("MorpherAccessControl"); // Needed for granting roles
+         require(accessControlAddress != address(0), "V5 AccessControl must be deployed first");
+
+        // Check if deploying fresh
+        address existingProxy = loadAddress(CONTRACT_KEY);
+        bool isNewDeployment = existingProxy == address(0);
+
         vm.startBroadcast();
 
-        // Load State address - required for UserBlocking initialization
-        address stateAddress = loadAddress("MorpherState");
-        require(stateAddress != address(0), "MorpherState must be deployed first");
-
-        // Deploy or upgrade MorpherUserBlocking
-        address existingUserBlocking = loadAddress("MorpherUserBlocking");
-        MorpherUserBlocking implementation = new MorpherUserBlocking();
-        
-        address userBlocking = deployOrUpgrade(
-            existingUserBlocking,
-            address(implementation),
-            abi.encodeCall(MorpherUserBlocking.initialize, (stateAddress)),
-            "MorpherUserBlocking.sol"
+        // Deploy or upgrade using the V5 UUPS logic
+        address userBlockingProxy = deployOrUpgradeV5(
+            CONTRACT_KEY,
+            CONTRACT_NAME,
+            // Ensure initializer signature matches the adapted v5 contract
+            abi.encodeCall(MorpherUserBlocking.initialize, (stateProxyAddress)),
+            bytes("") // No upgrade call data needed for this example
         );
-        
-        saveAddress("MorpherUserBlocking", userBlocking);
-        console.log("MorpherUserBlocking at:", userBlocking);
 
-        // Set UserBlocking in State if this is a new deployment
-        if (existingUserBlocking == address(0)) {
-            MorpherState state = MorpherState(stateAddress);
-            state.setMorpherUserBlocking(userBlocking);
+        console.log("MorpherUserBlocking V5 Proxy at:", userBlockingProxy);
+
+        // Set UserBlocking address in State and grant roles if this is a new deployment
+        if (isNewDeployment) {
+            console.log("Setting MorpherUserBlocking address in MorpherState...");
+            MorpherState(stateProxyAddress).setMorpherUserBlocking(userBlockingProxy);
+
+            // Grant USERBLOCKINGADMIN_ROLE
+            console.log("Granting initial roles on AccessControl for MorpherUserBlocking...");
+            MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+            bytes32 userBlockingAdminRole = keccak256("USERBLOCKINGADMIN_ROLE"); // As defined in MorpherUserBlocking
+
+            // Grant role to deployer
+            accessControl.grantRole(userBlockingAdminRole, msg.sender);
+            console.log("Granted USERBLOCKINGADMIN_ROLE to deployer:", msg.sender);
+
+            // Grant role to environment address if specified
+            address envUserBlockingAdmin = vm.envOr("USERBLOCKING_ADMIN", address(0));
+            if (envUserBlockingAdmin != address(0) && envUserBlockingAdmin != msg.sender) {
+                accessControl.grantRole(userBlockingAdminRole, envUserBlockingAdmin);
+                 console.log("Granted USERBLOCKINGADMIN_ROLE to env address:", envUserBlockingAdmin);
+            }
         }
-        
+
         vm.stopBroadcast();
     }
 }
