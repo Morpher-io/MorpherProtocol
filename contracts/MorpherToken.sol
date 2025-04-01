@@ -17,20 +17,23 @@ pragma solidity ^0.8.15;
 *  
 *  Trade hundreds of markets: Stocks, Crypto, Commodities, Forex and some really unique markets. 
 *  Join our community of 200k+ happy traders today!
-*  
+*
 **/
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/draft-EIP712Upgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/CountersUpgradeable.sol";
-import "./MorpherAccessControl.sol";
-import "./MorpherState.sol";
+// --- V5 Imports ---
+import {ERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/ERC20Upgradeable.sol";
+import {ERC20PausableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
+import {ERC20PermitUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol"; // Use standard Permit
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+// Remove draft EIP712, ECDSA, Counters if only used for permit
+// import {ECDSAUpgradeable} from "../lib/openzeppelin-contracts-upgradeable-5/contracts/utils/cryptography/ECDSAUpgradeable.sol";
+// import {CountersUpgradeable} from "../lib/openzeppelin-contracts-upgradeable-5/contracts/utils/CountersUpgradeable.sol";
+import "./MorpherAccessControl.sol"; // Use adapted v5 interface
+import "./MorpherState.sol"; // Use adapted v5 interface
 
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherToken.sol:MorpherToken
-contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
+contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable { // Inherit new modules
 	MorpherAccessControl public morpherAccessControl;
 
 	bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -68,23 +71,14 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	event MintedTokensTransferred(address indexed from, address indexed to, uint256 amount);
 	event TokensTransferredIn(address indexed to, uint256 amount);
 
-	/**
-	 * Permit functionality
-	 * Added after proxy was deployed, so manually adding functionality here
-	 */
-	bytes32 private _HASHED_NAME; //todo: derive from the token name instad of a hardcoded value
-	bytes32 private _HASHED_VERSION;
-	bytes32 private constant _TYPE_HASH =
-		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-	using CountersUpgradeable for CountersUpgradeable.Counter;
-
-	mapping(address => CountersUpgradeable.Counter) private _nonces;
-
-	// solhint-disable-next-line var-name-mixedcase
-	bytes32 private constant _PERMIT_TYPEHASH =
-		keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-	
-	bytes32 private _PERMIT_TYPEHASH_DEPRECATED_SLOT;
+	// --- Remove manual EIP712 Permit state variables ---
+	// bytes32 private _HASHED_NAME;
+	// bytes32 private _HASHED_VERSION;
+	// bytes32 private constant _TYPE_HASH = ...;
+	// using CountersUpgradeable for CountersUpgradeable.Counter; // Keep if used elsewhere
+	// mapping(address => CountersUpgradeable.Counter) private _nonces; // Replaced by ERC20Permit's nonces
+	// bytes32 private constant _PERMIT_TYPEHASH = ...;
+	// bytes32 private _PERMIT_TYPEHASH_DEPRECATED_SLOT;
 
 	MorpherState public morpherState;
 
@@ -108,12 +102,39 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 	event SetTotalTokensInPositions(uint256 _oldValue, uint256 _newValue);
 	event SetRestrictTransfers(bool _oldValue, bool _newValue);
 
-	function initialize(address _morpherAccessControl, address _morpherState) public initializer {
-		ERC20Upgradeable.__ERC20_init("Morpher", "MPH");
-		morpherAccessControl = MorpherAccessControl(_morpherAccessControl);
-		_HASHED_NAME = keccak256(bytes("MorpherToken"));
-		_HASHED_VERSION = keccak256(bytes("1"));
-		morpherState = MorpherState(_morpherState);
+	// --- Updated Initializer ---
+	function initialize(
+		address _morpherAccessControlAddress,
+		address _morpherStateAddress,
+		string memory _permitName // Name for EIP712 Domain Separator used by ERC20Permit
+	) public initializer {
+		__ERC20_init("Morpher", "MPH");
+		__ERC20Pausable_init();
+		__UUPSUpgradeable_init();
+		__ERC20Permit_init(_permitName); // Initialize ERC20Permit
+
+		morpherAccessControl = MorpherAccessControl(_morpherAccessControlAddress);
+		morpherState = MorpherState(_morpherStateAddress);
+		// Remove manual hash initializations
+		// _HASHED_NAME = keccak256(bytes("MorpherToken")); // Handled by ERC20Permit
+		// _HASHED_VERSION = keccak256(bytes("1")); // Handled by ERC20Permit
+	}
+
+	// --- Implement _authorizeUpgrade ---
+	function _authorizeUpgrade(address newImplementation)
+		internal
+		override
+	{
+		address accessControlAddress = address(morpherAccessControl);
+		require(accessControlAddress != address(0), "MorpherToken: AccessControl not set");
+		// Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+		require(
+			MorpherAccessControl(accessControlAddress).hasRole(
+				MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+				_msgSender()
+			),
+			"MorpherToken: Caller is not the proxy updater"
+		);
 	}
 
 	modifier onlyRole(bytes32 role) {
@@ -133,12 +154,9 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		return string(bytesArray);
 	}
 
-    function setHashedName(string memory _name) public onlyRole(ADMINISTRATOR_ROLE) {
-        _HASHED_NAME = keccak256(bytes(_name));
-    }
-    function setHashedVersion(string memory _version) public onlyRole(ADMINISTRATOR_ROLE) {
-        _HASHED_VERSION = keccak256(bytes(_version));
-    }
+    // --- Remove manual EIP712 setters ---
+    // function setHashedName(string memory _name) public onlyRole(ADMINISTRATOR_ROLE) { ... }
+    // function setHashedVersion(string memory _version) public onlyRole(ADMINISTRATOR_ROLE) { ... }
 
 	function setMorpherStateAddress(address _morpherState) public onlyRole(ADMINISTRATOR_ROLE) {
 		morpherState = MorpherState(_morpherState);
@@ -421,179 +439,92 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable {
 		return _dailyMintedTransfers[account][block.timestamp / 1 days];
 	}
 
-	function _beforeTokenTransfer(
-		address from,
-		address to,
-		uint256 amount
-	) internal virtual override(ERC20Upgradeable, ERC20PausableUpgradeable) {
-		require(
-			!_restrictTransfers ||
-				morpherAccessControl.hasRole(TRANSFER_ROLE, _msgSender()) ||
-				morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()) ||
-				morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()) ||
-				morpherAccessControl.hasRole(TRANSFER_ROLE, from),
-			"MorpherToken: Transfer denied"
-		);
+	// --- Override _update instead of _beforeTokenTransfer ---
+	function _update(address from, address to, uint256 amount)
+		internal
+		virtual
+		override(ERC20Upgradeable, ERC20PausableUpgradeable) // Override both parents
+	{
+		// --- Custom Logic Start ---
+		// This logic runs *before* the balance update and pause check from super._update
 
-		require(
-			!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, _msgSender()),
-			"MorpherToken: Transfer for User is blocked."
-		);
+		// Transfer restriction checks (only for actual transfers, not mint/burn)
+		if (from != address(0) && to != address(0)) {
+			require(
+				!_restrictTransfers ||
+					morpherAccessControl.hasRole(TRANSFER_ROLE, _msgSender()) ||
+					morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()) || // Allow minters/burners? Check if needed
+					morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()) ||
+					morpherAccessControl.hasRole(TRANSFER_ROLE, from), // Allow sender if they have TRANSFER_ROLE
+				"MorpherToken: Transfer denied by restriction"
+			);
 
-		// Check if transfer would leave enough tokens to cover locked rewards
-		// Skip check for minting and if sender is trade engine
-		if (from != address(0)) { // Skip check for minting
+			require(
+				!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, from), // Check sender block
+				"MorpherToken: Transfer for sender is blocked."
+			);
+			require(
+				!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, to), // Check receiver block
+				"MorpherToken: Transfer for receiver is blocked."
+			);
+
+			// Check locked rewards and time locks against the *full* balance before transfer
+			(uint256 timeLockedAmount, ) = getTimeLock(from);
+			require(
+				super.balanceOf(from) >= _lockedRewards[from] + timeLockedAmount + amount,
+				"MorpherToken: transfer amount exceeds available balance (locked)"
+			);
+
+			// Daily limit logic (only if not called by TradeEngine)
 			if (_msgSender() != morpherState.morpherTradeEngineAddress()) {
+				// Track tokens transferred in for the receiver
+				_transferredInTokens[to] += amount;
+				emit TokensTransferredIn(to, amount);
 
-				require(
-					amount <= balanceOf(from),
-					"MorpherToken: transfer amount exceeds unlocked balance"
-				);
-				
-				// Track tokens transferred in
-				if (to != address(0)) { // Not burning
-					_transferredInTokens[to] += amount;
-					emit TokensTransferredIn(to, amount);
-				}
-				
-				// For transfers, first use transferred-in tokens
-				uint256 transferAmount = amount;
-				
+				// Apply daily limit logic to the sender
+				uint256 transferAmountFromMinted = amount;
+
 				// Use transferred-in tokens first (not subject to daily limit)
 				if (_transferredInTokens[from] > 0) {
-					uint256 transferFromTransferredIn = transferAmount > _transferredInTokens[from] ? _transferredInTokens[from] : transferAmount;
-					_transferredInTokens[from] -= transferFromTransferredIn;
-					transferAmount -= transferFromTransferredIn;
+					uint256 useFromTransferredIn = transferAmountFromMinted > _transferredInTokens[from]
+						? _transferredInTokens[from]
+						: transferAmountFromMinted;
+					_transferredInTokens[from] -= useFromTransferredIn;
+					transferAmountFromMinted -= useFromTransferredIn;
 				}
-				
-				// Any remaining amount is subject to daily limit
-				if (transferAmount > 0 && _dailyMintedTransferLimit > 0) {
+
+				// Any remaining amount comes from minted balance and is subject to daily limit
+				if (transferAmountFromMinted > 0 && _dailyMintedTransferLimit > 0) {
 					uint256 today = block.timestamp / 1 days;
 					uint256 transferredToday = _dailyMintedTransfers[from][today];
-					
-					// Check if this would exceed the daily limit
+
+					// Check if this transfer exceeds the daily limit
 					require(
-						transferredToday + transferAmount <= _dailyMintedTransferLimit || 
-						morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()),
+						transferredToday + transferAmountFromMinted <= _dailyMintedTransferLimit ||
+							morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()), // Admins bypass limit
 						"MorpherToken: daily minted token transfer limit exceeded"
 					);
-					
+
 					// Update the daily transfer amount
-					_dailyMintedTransfers[from][today] += transferAmount;
-					emit MintedTokensTransferred(from, to, transferAmount);
+					_dailyMintedTransfers[from][today] += transferAmountFromMinted;
+					emit MintedTokensTransferred(from, to, transferAmountFromMinted);
 				}
-			} else {
-				require(
-					amount <= getTradeableBalanceOf(from),
-					"MorpherToken: transfer amount exceeds total balance"
-				);
 			}
 		}
+		// --- Custom Logic End ---
 
-		super._beforeTokenTransfer(from, to, amount);
+		// Call the parent _update function which handles the actual balance update and pause check
+		super._update(from, to, amount);
 	}
 
-	/**
-	 * @dev Returns the domain separator for the current chain.
-	 */
-	function _domainSeparatorV4() internal view returns (bytes32) {
-		return _buildDomainSeparator(_TYPE_HASH, _EIP712NameHash(), _EIP712VersionHash());
-	}
-
-	function _buildDomainSeparator(
-		bytes32 typeHash,
-		bytes32 nameHash,
-		bytes32 versionHash
-	) private view returns (bytes32) {
-		return keccak256(abi.encode(typeHash, nameHash, versionHash, block.chainid, address(this)));
-	}
-
-	/**
-	 * @dev Given an already https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct[hashed struct], this
-	 * function returns the hash of the fully encoded EIP712 message for this domain.
-	 *
-	 * This hash can be used together with {ECDSA-recover} to obtain the signer of a message. For example:
-	 *
-	 * ```solidity
-	 * bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
-	 *     keccak256("Mail(address to,string contents)"),
-	 *     mailTo,
-	 *     keccak256(bytes(mailContents))
-	 * )));
-	 * address signer = ECDSA.recover(digest, signature);
-	 * ```
-	 */
-	function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
-		return ECDSAUpgradeable.toTypedDataHash(_domainSeparatorV4(), structHash);
-	}
-
-	/**
-	 * @dev The hash of the name parameter for the EIP712 domain.
-	 *
-	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
-	 * are a concern.
-	 */
-	function _EIP712NameHash() internal view virtual returns (bytes32) {
-		return _HASHED_NAME;
-	}
-
-	/**
-	 * @dev The hash of the version parameter for the EIP712 domain.
-	 *
-	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
-	 * are a concern.
-	 */
-	function _EIP712VersionHash() internal view virtual returns (bytes32) {
-		return _HASHED_VERSION;
-	}
-
-	/**
-	 * @dev See {IERC20Permit-permit}.
-	 */
-	function permit(
-		address owner,
-		address spender,
-		uint256 value,
-		uint256 deadline,
-		uint8 v,
-		bytes32 r,
-		bytes32 s
-	) public virtual {
-		require(block.timestamp <= deadline, "ERC20Permit: expired deadline");
-
-		bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, owner, spender, value, _useNonce(owner), deadline));
-
-		bytes32 hash = _hashTypedDataV4(structHash);
-
-		address signer = ECDSAUpgradeable.recover(hash, v, r, s);
-		require(signer == owner, "ERC20Permit: invalid signature");
-
-		_approve(owner, spender, value);
-	}
-
-	/**
-	 * @dev See {IERC20Permit-nonces}.
-	 */
-	function nonces(address owner) public view virtual returns (uint256) {
-		return _nonces[owner].current();
-	}
-
-	/**
-	 * @dev See {IERC20Permit-DOMAIN_SEPARATOR}.
-	 */
-	// solhint-disable-next-line func-name-mixedcase
-	function DOMAIN_SEPARATOR() external view returns (bytes32) {
-		return _domainSeparatorV4();
-	}
-
-	/**
-	 * @dev "Consume a nonce": return the current value and increment.
-	 *
-	 * _Available since v4.1._
-	 */
-	function _useNonce(address owner) internal virtual returns (uint256 current) {
-		CountersUpgradeable.Counter storage nonce = _nonces[owner];
-		current = nonce.current();
-		nonce.increment();
-	}
+	// --- Remove manual EIP712 Permit functions ---
+	// function _domainSeparatorV4() ...
+	// function _buildDomainSeparator(...) ...
+	// function _hashTypedDataV4(...) ...
+	// function _EIP712NameHash() ...
+	// function _EIP712VersionHash() ...
+	// function permit(...) ...
+	// function nonces(...) ... // Use ERC20Permit's nonces()
+	// function DOMAIN_SEPARATOR() ... // Use ERC20Permit's DOMAIN_SEPARATOR()
+	// function _useNonce(...) ... // Use ERC20Permit's _useNonce()
 }
