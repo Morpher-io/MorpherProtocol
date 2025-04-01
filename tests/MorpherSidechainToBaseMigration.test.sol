@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "./BaseSetup.sol";
 import "../contracts/MorpherSidechainToBaseMigration.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import "../lib/murky/src/Merkle.sol";
 
 contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
@@ -93,19 +94,15 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create a dummy leaf to ensure we have at least two leaves
         bytes32 dummyLeaf = keccak256(abi.encodePacked("dummy"));
         
-        // Create a Merkle tree with two leaves
+        // Create leaves array for Merkle tree
         bytes32[] memory leaves = new bytes32[](2);
         leaves[0] = balanceLeaf;
         leaves[1] = dummyLeaf;
         
-        // Create the Merkle tree
-        bytes32 merkleRoot = keccak256(abi.encodePacked(
-            keccak256(abi.encodePacked(balanceLeaf, dummyLeaf))
-        ));
-        
-        // Generate proof for the balance leaf
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = dummyLeaf;
+        // Use Murky to generate the Merkle root and proof
+        Merkle m = new Merkle();
+        bytes32 merkleRoot = m.getRoot(leaves);
+        bytes32[] memory proof = m.getProof(leaves, 0); // Get proof for balanceLeaf (index 0)
         
         // Set the final balance Merkle root
         morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
@@ -203,19 +200,15 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create a dummy leaf to ensure we have at least two leaves
         bytes32 dummyLeaf = keccak256(abi.encodePacked("dummy"));
         
-        // Create a Merkle tree with two leaves
+        // Create leaves array for Merkle tree
         bytes32[] memory leaves = new bytes32[](2);
         leaves[0] = balanceLeaf;
         leaves[1] = dummyLeaf;
         
-        // Create the Merkle tree
-        bytes32 merkleRoot = keccak256(abi.encodePacked(
-            keccak256(abi.encodePacked(balanceLeaf, dummyLeaf))
-        ));
-        
-        // Generate proof for the balance leaf
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = dummyLeaf;
+        // Use Murky to generate the Merkle root and proof
+        Merkle m = new Merkle();
+        bytes32 merkleRoot = m.getRoot(leaves);
+        bytes32[] memory proof = m.getProof(leaves, 0); // Get proof for balanceLeaf (index 0)
         
         // Set the final balance Merkle root
         morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
@@ -333,19 +326,15 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create a dummy leaf to ensure we have at least two leaves
         bytes32 dummyLeaf = keccak256(abi.encodePacked("dummy"));
         
-        // Create a Merkle tree with two leaves
+        // Create leaves array for Merkle tree
         bytes32[] memory leaves = new bytes32[](2);
         leaves[0] = zeroLockLeaf;
         leaves[1] = dummyLeaf;
         
-        // Create the Merkle tree
-        bytes32 merkleRoot = keccak256(abi.encodePacked(
-            keccak256(abi.encodePacked(zeroLockLeaf, dummyLeaf))
-        ));
-        
-        // Generate proof for the zero lock leaf
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = dummyLeaf;
+        // Use Murky to generate the Merkle root and proof
+        Merkle m = new Merkle();
+        bytes32 merkleRoot = m.getRoot(leaves);
+        bytes32[] memory proof = m.getProof(leaves, 0); // Get proof for zeroLockLeaf (index 0)
         
         // Set the final balance Merkle root
         morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
@@ -382,19 +371,15 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create a dummy leaf to ensure we have at least two leaves
         bytes32 dummyLeaf = keccak256(abi.encodePacked("dummy"));
         
-        // Create a Merkle tree with two leaves
+        // Create leaves array for Merkle tree
         bytes32[] memory leaves = new bytes32[](2);
         leaves[0] = partialLockLeaf;
         leaves[1] = dummyLeaf;
         
-        // Create the Merkle tree
-        bytes32 merkleRoot = keccak256(abi.encodePacked(
-            keccak256(abi.encodePacked(partialLockLeaf, dummyLeaf))
-        ));
-        
-        // Generate proof for the partial lock leaf
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = dummyLeaf;
+        // Use Murky to generate the Merkle root and proof
+        Merkle m = new Merkle();
+        bytes32 merkleRoot = m.getRoot(leaves);
+        bytes32[] memory proof = m.getProof(leaves, 0); // Get proof for partialLockLeaf (index 0)
         
         // Set the final balance Merkle root
         morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
@@ -460,19 +445,15 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create a dummy leaf to ensure we have at least two leaves
         bytes32 dummyLeaf = keccak256(abi.encodePacked("dummy"));
         
-        // Create a Merkle tree with two leaves
+        // Create leaves array for Merkle tree
         bytes32[] memory leaves = new bytes32[](2);
         leaves[0] = balanceLeaf;
         leaves[1] = dummyLeaf;
         
-        // Create the Merkle tree
-        bytes32 merkleRoot = keccak256(abi.encodePacked(
-            keccak256(abi.encodePacked(balanceLeaf, dummyLeaf))
-        ));
-        
-        // Generate proof for the balance leaf
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = dummyLeaf;
+        // Use Murky to generate the Merkle root and proof
+        Merkle m = new Merkle();
+        bytes32 merkleRoot = m.getRoot(leaves);
+        bytes32[] memory proof = m.getProof(leaves, 0); // Get proof for balanceLeaf (index 0)
         
         // Set the final balance Merkle root
         morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
@@ -537,15 +518,14 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create a dummy leaf to ensure we have at least two leaves
         bytes32 dummyLeaf = keccak256(abi.encodePacked("dummy"));
         
-        // Create a Merkle tree with two leaves
+        // Create leaves array for Merkle tree
         bytes32[] memory leaves = new bytes32[](2);
         leaves[0] = balanceLeaf;
         leaves[1] = dummyLeaf;
         
-        // Create the Merkle tree
-        bytes32 merkleRoot = keccak256(abi.encodePacked(
-            keccak256(abi.encodePacked(balanceLeaf, dummyLeaf))
-        ));
+        // Use Murky to generate the Merkle root
+        Merkle m = new Merkle();
+        bytes32 merkleRoot = m.getRoot(leaves);
         
         // Set the final balance Merkle root
         morpherMigration.setFinalBalanceMerkleRoot(merkleRoot);
