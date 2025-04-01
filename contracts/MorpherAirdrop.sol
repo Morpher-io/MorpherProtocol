@@ -1,9 +1,11 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.20; // Update pragma if needed
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "./MorpherToken.sol";
+// --- V5 Imports ---
+import {OwnableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+// Remove Initializable
+import "./MorpherToken.sol"; // Use adapted v5 interface
 
 // ----------------------------------------------------------------------------------
 // Holds the Airdrop Token balance on contract address
@@ -12,7 +14,7 @@ import "./MorpherToken.sol";
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAirdrop.sol:MorpherAirdrop
-contract MorpherAirdrop is Initializable, OwnableUpgradeable {
+contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inheritance
 
 
 // ----------------------------------------------------------------------------
@@ -33,27 +35,34 @@ contract MorpherAirdrop is Initializable, OwnableUpgradeable {
     event AirdropSent(address indexed _operator, address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
     event SetAirdropAuthorized(address indexed _recipient, uint256 _amountClaimed, uint256 _amountAuthorized);
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+    // --- Remove constructor ---
+    // constructor() { ... }
 
+    // --- Updated Initializer ---
     function initialize(
         address _airdropAdminAddress,
-        address _morpherToken,
-        address _coldStorageOwnerAddress
+        address _morpherTokenAddress,
+        address _initialOwner // The address that will own this contract initially
     ) public initializer {
-        __Ownable_init();
-        
-        setAirdropAdmin(_airdropAdminAddress);
-        setMorpherTokenAddress(_morpherToken);
-        transferOwnership(_coldStorageOwnerAddress);
+        __UUPSUpgradeable_init(); // Initialize UUPS
+        __Ownable_init(_initialOwner); // Initialize Ownable with the initial owner
+
+        airdropAdmin = _airdropAdminAddress; // Set directly
+        morpherToken = _morpherTokenAddress; // Set directly
+        // transferOwnership is handled by __Ownable_init
     }
 
     modifier onlyAirdropAdmin {
         require(msg.sender == airdropAdmin, "MorpherAirdrop: can only be called by Airdrop Administrator.");
         _;
     }
+
+    // --- Implement _authorizeUpgrade ---
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyOwner // Only the owner (cold storage) can upgrade
+    {}
 
 // ----------------------------------------------------------------------------
 // Administrative functions

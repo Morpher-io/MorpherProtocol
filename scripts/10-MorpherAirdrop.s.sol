@@ -9,63 +9,91 @@ import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transpar
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
-import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
+// --- Import and Inherit from DeployOrUpgradeV5 ---
+import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 
 //morpher contracts
-import {MorpherAirdrop} from "../contracts/MorpherAirdrop.sol";
-import {MorpherToken} from "../contracts/MorpherToken.sol";
-import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
+import {MorpherAirdrop} from "../contracts/MorpherAirdrop.sol"; // Use adapted v5 contract
+import {MorpherToken} from "../contracts/MorpherToken.sol"; // Use adapted v5 contract
+import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // Use adapted v5 contract
 
-contract DeployMorpherAirdrop is DeployOrUpgrade {
-    using stdJson for string;
+// --- Inherit from DeployOrUpgradeV5 ---
+contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
+
+    string constant CONTRACT_KEY = "MorpherAirdrop";
+    // Use fully qualified name or filename as required by the upgrades plugin
+    string constant CONTRACT_NAME = "contracts/MorpherAirdrop.sol:MorpherAirdrop";
 
     function run() public {
-        vm.startBroadcast();
-
-        // Load Token address - required for Airdrop initialization
+        // Load dependencies
         address tokenAddress = loadAddress("MorpherToken");
-        require(tokenAddress != address(0), "MorpherToken must be deployed first");
+        require(tokenAddress != address(0), "V5 MorpherToken must be deployed first");
+        address accessControlAddress = loadAddress("MorpherAccessControl");
+        require(accessControlAddress != address(0), "V5 AccessControl must be deployed first");
 
         // Get configuration from environment
         address airdropAdmin = vm.envOr("MORPHER_AIRDROP_ADMIN", msg.sender);
-        address coldStorageOwner = vm.envOr("MORPHER_OWNER", msg.sender);
+        address coldStorageOwner = vm.envOr("MORPHER_OWNER", msg.sender); // This will be the contract owner
 
-        // Deploy or upgrade MorpherAirdrop
-        address existingAirdrop = loadAddress("MorpherAirdrop");
-        MorpherAirdrop implementation = new MorpherAirdrop();
-        
-        address airdrop = deployOrUpgrade(
-            existingAirdrop,
-            address(implementation),
+        // Check if deploying fresh
+        address existingProxy = loadAddress(CONTRACT_KEY);
+        bool isNewDeployment = existingProxy == address(0);
+
+        vm.startBroadcast();
+
+        // Deploy or upgrade using the V5 UUPS logic
+        address airdropProxy = deployOrUpgradeV5(
+            CONTRACT_KEY,
+            CONTRACT_NAME,
+            // Ensure initializer signature matches the adapted v5 contract
             abi.encodeCall(
                 MorpherAirdrop.initialize,
-                (airdropAdmin, tokenAddress, coldStorageOwner)
+                (airdropAdmin, tokenAddress, coldStorageOwner) // Pass initial owner to initializer
             ),
-            "MorpherAirdrop.sol"
+            bytes("") // No upgrade call data needed for this example
         );
-        saveAddress("MorpherAirdrop", airdrop);
-        console.log("MorpherAirdrop at:", airdrop);
+        saveAddress(CONTRACT_KEY, airdropProxy);
+        console.log("MorpherAirdrop V5 Proxy at:", airdropProxy);
 
-        if(existingAirdrop == address(0x0)) {
-            address existingToken = loadAddress("MorpherToken");
-            MorpherToken token = MorpherToken(existingToken);
-            address accessControlAddress = loadAddress("MorpherAccessControl");
+        // Initial setup for new deployment on a new chain
+        if (isNewDeployment) {
+            console.log("Performing initial setup for MorpherAirdrop...");
+            MorpherToken token = MorpherToken(tokenAddress);
             MorpherAccessControl ac = MorpherAccessControl(accessControlAddress);
 
-            ac.grantRole(token.BURNER_ROLE(), msg.sender);
-            ac.grantRole(token.MINTER_ROLE(), msg.sender);
+            // Grant AIRDROPADMIN_ROLE to the Airdrop contract proxy itself
+            // This allows the Airdrop contract to call lockRewards on the Token contract
+            bytes32 airdropAdminRoleToken = token.AIRDROPADMIN_ROLE();
+            ac.grantRole(airdropAdminRoleToken, airdropProxy);
+            console.log("Granted AIRDROPADMIN_ROLE (on Token) to Airdrop contract.");
 
-            address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);
+            // Transfer initial Airdrop funds from Treasury to Airdrop contract
+            address treasuryAddress = vm.envOr("MORPHER_TREASURY", address(0));
+            uint256 airdropSupply = vm.envOr("AIRDROP_SUPPLY", uint256(100_000_000 ether)); // Example: 100M tokens
 
-            uint treasuryRollover = token.balanceOf(treasuryAddress);
-            token.burn(treasuryAddress, treasuryRollover);
-            token.mint(msg.sender, treasuryRollover);
-            token.transfer(airdropAdmin, 100_000 ether);
+            if (treasuryAddress != address(0) && airdropSupply > 0) {
+                console.log("Transferring", airdropSupply / 1 ether, "MPH from Treasury to Airdrop contract...");
+                // Ensure Treasury has TRANSFER_ROLE or deployer acts as Treasury
+                // Using vm.prank if deployer needs to act as treasury
+                // vm.startPrank(treasuryAddress);
+                token.transfer(airdropProxy, airdropSupply);
+                // vm.stopPrank();
+                console.log("Airdrop funds transferred.");
+            } else {
+                 console.log("Skipping Airdrop fund transfer: Treasury address or supply not set/zero.");
+            }
 
+            // The old logic for treasury rollover seems unnecessary for a fresh deployment.
+            // ac.grantRole(token.BURNER_ROLE(), msg.sender);
+            // ac.grantRole(token.MINTER_ROLE(), msg.sender);
+            // uint treasuryRollover = token.balanceOf(treasuryAddress);
+            // token.burn(treasuryAddress, treasuryRollover);
+            // token.mint(msg.sender, treasuryRollover);
+            // token.transfer(airdropAdmin, 100_000 ether);
         }
-        
+
         vm.stopBroadcast();
     }
 }
