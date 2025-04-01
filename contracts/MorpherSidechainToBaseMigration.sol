@@ -12,6 +12,7 @@ import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 // --- V5 Imports ---
 import {MerkleProof} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MerkleProof.sol"; // Use non-upgradeable MerkleProof
 import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Use non-upgradeable ECDSA
+import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol"; // Import MessageHashUtils
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Keep for _msgSender
 import "./MorpherTradeEngine.sol"; // Use adapted v5 interface
@@ -188,7 +189,7 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
             block.chainid
         ));
         
-        address signer = ECDSA.recover(ECDSA.toEthSignedMessageHash(messageHash), _signature); // Use ECDSA
+        address signer = ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(messageHash), _signature); // Use MessageHashUtils
         require(signer == _msgSender(), "MorpherMigration: Invalid signature");
         
         // Emit event for backend to start migration process
@@ -282,7 +283,7 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
             block.chainid
         ));
         
-        address signer = ECDSA.recover(ECDSA.toEthSignedMessageHash(messageHash), _userAuthSignature); // Use ECDSA
+        address signer = ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(messageHash), _userAuthSignature); // Use MessageHashUtils
         require(signer == _user, "MorpherMigration: Invalid user authorization signature");
         
         bytes32[] memory positionHashes = new bytes32[](_positions.length);
@@ -362,7 +363,7 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
             block.chainid
         ));
         
-        address signer = ECDSA.recover(ECDSA.toEthSignedMessageHash(messageHash), _userAuthSignature); // Use ECDSA
+        address signer = ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(messageHash), _userAuthSignature); // Use MessageHashUtils
         require(signer == _user, "MorpherMigration: Invalid user authorization signature");
         
         // Verify balance hasn't been migrated already
