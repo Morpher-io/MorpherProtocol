@@ -11,37 +11,33 @@ import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
 import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
 
+// --- Inherit from DeploymentUtils ---
+import {DeploymentUtils} from "./DeploymentUtils.sol";
 
-//morpher contracts
-import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
-import {MorpherState} from "../contracts/MorpherState.sol";
+// --- Remove Morpher contract imports if not directly used ---
 
+// --- Inherit from DeploymentUtils ---
+abstract contract DeployOrUpgrade is DeploymentUtils {
 
-abstract contract DeployOrUpgrade is Script {
-    using stdJson for string;
+    // --- Remove address management functions (now in DeploymentUtils) ---
+    // --- Remove Addresses struct (now in DeploymentUtils) ---
 
-    struct Addresses {
-        address accessControl;
-        address admin;
-        address airdrop;
-        address bridge;
-        address interestRateManager;
-        address mintingLimiter;
-        address oracle;
-        address proxyAdmin;
-        address state;
-        address staking;
-        address token;
-        address tradeEngine;
-        address userBlocking;
+    // --- Keep v4 specific helpers ---
+    function deployProxyAdmin() internal returns (address proxyAdminAddr) {
+        // Load the *v4* ProxyAdmin address
+        proxyAdminAddr = loadAddress("proxyAdmin"); // Assumes "proxyAdmin" key exists for v4 deployments
+        if (proxyAdminAddr == address(0)) {
+            console.log("Deploying new V4 ProxyAdmin...");
+            ProxyAdmin admin = new ProxyAdmin();
+            proxyAdminAddr = address(admin);
+            // Save the v4 proxy admin address using the specific key "proxyAdmin"
+            saveAddress("proxyAdmin", proxyAdminAddr);
+            console.log("Deployed V4 ProxyAdmin at:", proxyAdminAddr);
+        }
+        return proxyAdminAddr;
     }
 
-    function getAddressesPath() internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, "/deployments/", Strings.toString(block.chainid), ".json");
-    }
-
-    function loadAddresses() internal returns (Addresses memory addrs) {
+    function deployProxy(
         string memory path = getAddressesPath();
         if (!vm.isFile(path)) {
             addrs = getEmptyAddresses();
