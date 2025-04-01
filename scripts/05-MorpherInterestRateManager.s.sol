@@ -9,51 +9,61 @@ import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transpar
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
-import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
+// --- Import and Inherit from DeployOrUpgradeV5 ---
+import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 
 //morpher contracts
-import {MorpherInterestRateManager} from "../contracts/MorpherInterestRateManager.sol";
-import {MorpherState} from "../contracts/MorpherState.sol";
+import {MorpherInterestRateManager} from "../contracts/MorpherInterestRateManager.sol"; // Use adapted v5 contract
+import {MorpherState} from "../contracts/MorpherState.sol"; // Use adapted v5 contract
 
-contract DeployMorpherInterestRateManager is DeployOrUpgrade {
-    using stdJson for string;
+// --- Inherit from DeployOrUpgradeV5 ---
+contract DeployMorpherInterestRateManager is DeployOrUpgradeV5 {
+
+    string constant CONTRACT_KEY = "MorpherInterestRateManager";
+    // Use fully qualified name or filename as required by the upgrades plugin
+    string constant CONTRACT_NAME = "contracts/MorpherInterestRateManager.sol:MorpherInterestRateManager";
 
     function run() public {
+        // Load dependencies
+        address stateAddress = loadAddress("MorpherState");
+        require(stateAddress != address(0), "V5 MorpherState must be deployed first");
+
+        // Check if deploying fresh
+        address existingProxy = loadAddress(CONTRACT_KEY);
+        bool isNewDeployment = existingProxy == address(0);
+
         vm.startBroadcast();
 
-        // Load State address - required for InterestRateManager initialization
-        address stateAddress = loadAddress("MorpherState");
-        require(stateAddress != address(0), "MorpherState must be deployed first");
-
-        // Deploy or upgrade MorpherInterestRateManager
-        address existingInterestRateManager = loadAddress("MorpherInterestRateManager");
-        MorpherInterestRateManager implementation = new MorpherInterestRateManager();
-        
-        address interestRateManager = deployOrUpgrade(
-            existingInterestRateManager,
-            address(implementation),
+        // Deploy or upgrade using the V5 UUPS logic
+        address interestRateManagerProxy = deployOrUpgradeV5(
+            CONTRACT_KEY,
+            CONTRACT_NAME,
+            // Ensure initializer signature matches the adapted v5 contract
             abi.encodeCall(MorpherInterestRateManager.initialize, (stateAddress)),
-            "MorpherInterestRateManager.sol"
+            bytes("") // No upgrade call data needed for this example
         );
-        
-        saveAddress("MorpherInterestRateManager", interestRateManager);
-        console.log("MorpherInterestRateManager at:", interestRateManager);
+
+        console.log("MorpherInterestRateManager V5 Proxy at:", interestRateManagerProxy);
 
         // Configure if this is a new deployment
-        if (existingInterestRateManager == address(0)) {
-            MorpherInterestRateManager manager = MorpherInterestRateManager(interestRateManager);
-            
-            // Set initial interest rates as per BaseSetup
-            uint256 initialTimestamp = 1617094819;
-            manager.addInterestRate(15000, initialTimestamp);
-            manager.addInterestRate(30000, 1644491427);
+        if (isNewDeployment) {
+            console.log("Performing initial configuration for MorpherInterestRateManager...");
+            MorpherInterestRateManager manager = MorpherInterestRateManager(interestRateManagerProxy); // Use proxy address
 
-            // Set InterestRateManager in State
-            MorpherState(stateAddress).setMorpherInterestRateManager(interestRateManager);
+            // Set initial interest rates as per BaseSetup
+            uint256 initialTimestamp = 1617094819; // FIRST_RATE_TS from test
+            manager.addInterestRate(15000, initialTimestamp);
+            console.log("Added initial interest rate (15000).");
+            manager.addInterestRate(30000, 1644491427); // SECOND_RATE_TS from test
+            console.log("Added second interest rate (30000).");
+
+            // Set InterestRateManager address in State
+            MorpherState(stateAddress).setMorpherInterestRateManager(interestRateManagerProxy);
+            console.log("Set MorpherInterestRateManager address in MorpherState.");
         }
-        
+
         vm.stopBroadcast();
     }
 }

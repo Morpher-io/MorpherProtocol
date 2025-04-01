@@ -1,10 +1,12 @@
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.15;
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
+pragma solidity ^0.8.20; // Update pragma if needed
 
-import "./MorpherState.sol";
-import "./MorpherAccessControl.sol";
+// --- V5 Imports ---
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+// Remove Initializable, ContextUpgradeable
+
+import "./MorpherState.sol"; // Use adapted v5 interface
+import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 
 // ----------------------------------------------------------------------------------
 // Staking Morpher Token generates interest
@@ -13,7 +15,8 @@ import "./MorpherAccessControl.sol";
 // There is a lockup after staking or topping up (30 days) and a minimum stake (100k MPH)
 // ----------------------------------------------------------------------------------
 
-contract MorpherInterestRateManager is Initializable, ContextUpgradeable {
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherInterestRateManager.sol:MorpherInterestRateManager // Add if needed
+contract MorpherInterestRateManager is UUPSUpgradeable { // Inherit UUPSUpgradeable
 	MorpherState public morpherState;
 
 	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
@@ -35,15 +38,34 @@ contract MorpherInterestRateManager is Initializable, ContextUpgradeable {
 	event InterestRateValidFromChanged(uint256 interstRateIndex, uint256 oldvalue, uint256 newValue);
 	event LinkState(address stateAddress);
 
-	function initialize(address _morpherState) public initializer {
-		ContextUpgradeable.__Context_init();
-		morpherState = MorpherState(_morpherState);	
+	// --- Updated Initializer ---
+	function initialize(address _morpherStateAddress) public initializer {
+		__UUPSUpgradeable_init(); // Initialize UUPS
+		// Remove Context init: ContextUpgradeable.__Context_init();
+		morpherState = MorpherState(_morpherStateAddress);
+	}
+
+	// --- Implement _authorizeUpgrade ---
+	function _authorizeUpgrade(address newImplementation)
+		internal
+		override
+	{
+		address accessControlAddress = morpherState.morpherAccessControlAddress();
+		require(accessControlAddress != address(0), "InterestRateManager: AccessControl not set in State");
+		// Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+		require(
+			MorpherAccessControl(accessControlAddress).hasRole(
+				MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+				msg.sender // Use msg.sender directly
+			),
+			"InterestRateManager: Caller is not the proxy updater"
+		);
 	}
 
 	modifier onlyRole(bytes32 role) {
 		require(
-			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()),
-			"MorpherToken: Permission denied."
+			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, msg.sender), // Use msg.sender
+			"InterestRateManager: Permission denied." // Updated error message
 		);
 		_;
 	}
