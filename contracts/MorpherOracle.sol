@@ -36,21 +36,22 @@ pragma solidity ^0.8.15;
 
 import "./MorpherTradeEngine.sol";
 import "./MorpherState.sol";
-import "./MorpherAccessControl.sol";
+import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/security/PausableUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/EIP712Upgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/CountersUpgradeable.sol";
-import "../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol";
+// --- V5 Imports ---
+// import "../lib/openzeppelin-contracts-upgradeable-5/contracts/utils/cryptography/MerkleProofUpgradeable.sol"; // MerkleProof not used? Remove if unused.
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Keep for _msgSender override
+import {PausableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/PausableUpgradeable.sol";
+import {EIP712Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/EIP712Upgradeable.sol";
+import {NoncesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/NoncesUpgradeable.sol"; // Use Nonces instead of Counters
+import {ECDSAUpgradeable} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Use non-upgradeable ECDSA
+import {IERC20Permit} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/extensions/IERC20Permit.sol"; // Use non-upgradeable interface
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/IERC20Upgradeable.sol";
+import {SafeERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
+import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol"; // Keep external interface
 import "../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
 import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
 import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
@@ -65,7 +66,7 @@ import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherOracle.sol:MorpherOracle
-contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable {
+contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeable, EIP712Upgradeable, NoncesUpgradeable { // Update inheritance
 	MorpherState state; // read only, Oracle doesn't need writing access to state
 
 	bool public useWhiteList; //always false at the moment
@@ -93,19 +94,18 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	uint delistMarketFromIx;
 
-	using CountersUpgradeable for CountersUpgradeable.Counter;
+	// using CountersUpgradeable for CountersUpgradeable.Counter; // Replaced by NoncesUpgradeable
 
 	/**
-	 * Permit functionality
+	 * Permit functionality (using EIP712Upgradeable base)
 	 * Added after proxy was deployed, so manually adding functionality here
 	 */
-	bytes32 public constant _HASHED_NAME = 0xca82a94b3c35be4fb8e06faa102ba96b016e9c5dd45f747224333f012bfd5e6a;
-	bytes32 public constant _HASHED_VERSION = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-	bytes32 public constant _TYPE_HASH =
-		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+	// --- Remove manual EIP712 state ---
+	// bytes32 public constant _HASHED_NAME = ...; // Handled by EIP712Upgradeable
+	// bytes32 public constant _HASHED_VERSION = ...; // Handled by EIP712Upgradeable
+	// bytes32 public constant _TYPE_HASH = ...; // Handled by EIP712Upgradeable
 
-	
-	
+	// --- Keep action-specific typehashes ---
 	// solhint-disable-next-line var-name-mixedcase
 	bytes32 public constant _PERMIT_TYPEHASH =
 		keccak256(
@@ -148,8 +148,7 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 
 	address public wMaticAddress;
 
-	mapping(address => CountersUpgradeable.Counter) private _nonces;
-
+	// mapping(address => CountersUpgradeable.Counter) private _nonces; // Replaced by NoncesUpgradeable internal mapping
 
 	// MorpherSwapHelper addresses by chain
 	address public morpherSwapHelperAddress;
@@ -276,25 +275,51 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	}
 
 	modifier onlyRole(bytes32 role) {
-		require(
+		require( // Keep using _msgSender()
 			MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(role, _msgSender()),
 			"MorpherOracle: Permission denied."
 		);
 		_;
 	}
 
+	// --- Updated Initializer ---
 	function initialize(
 		address _morpherState,
 		address payable _gasCollectionAddress,
-		uint256 _gasForCallback
+		uint256 _gasForCallback,
+		string memory _eip712Name, // Add EIP712 params
+		string memory _eip712Version
 	) public initializer {
-		ContextUpgradeable.__Context_init();
-		PausableUpgradeable.__Pausable_init();
+		__UUPSUpgradeable_init();
+		__Context_init(); // Initialize Context
+		__Pausable_init(); // Initialize Pausable
+		__EIP712_init(_eip712Name, _eip712Version); // Initialize EIP712
+		__Nonces_init(); // Initialize Nonces
 
 		state = MorpherState(_morpherState);
 
-		setCallbackCollectionAddress(_gasCollectionAddress);
-		setGasForCallback(_gasForCallback);
+		callBackCollectionAddress = _gasCollectionAddress; // Set directly, avoid extra function call if possible
+		gasForCallback = _gasForCallback; // Set directly
+		// Emit events if needed
+		emit CallBackCollectionAddressChange(_gasCollectionAddress);
+		emit SetGasForCallback(_gasForCallback);
+	}
+
+	// --- Implement _authorizeUpgrade ---
+	function _authorizeUpgrade(address newImplementation)
+		internal
+		override
+	{
+		address accessControlAddress = state.morpherAccessControlAddress();
+		require(accessControlAddress != address(0), "MorpherOracle: AccessControl not set in State");
+		// Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+		require(
+			MorpherAccessControl(accessControlAddress).hasRole(
+				MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+				msg.sender // Use msg.sender directly
+			),
+			"MorpherOracle: Caller is not the proxy updater"
+		);
 	}
 
 	// ----------------------------------------------------------------------------------
@@ -474,6 +499,9 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	) public returns (bytes32 orderId) {
 		require(block.timestamp <= deadline, "MorpherOracle: expired deadline");
 
+		// Use _useNonce from NoncesUpgradeable
+		uint256 currentNonce = _useNonce(_addressPositionOwner);
+
 		bytes32 structHash = keccak256(
 			abi.encode(
 				_PERMIT_TYPEHASH,
@@ -481,15 +509,19 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 				createOrderParams._closeSharesAmount,
 				createOrderParams._openMPHTokenAmount,
 				_addressPositionOwner,
-				_useNonce(_addressPositionOwner),
+				currentNonce, // Use the consumed nonce
 				deadline
 			)
 		);
 
-		bytes32 hash = _hashTypedDataV4(structHash);
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
 
-		address signer = ECDSAUpgradeable.recover(hash, v, r, s);
+		// Use ECDSA library directly
+		address signer = ECDSAUpgradeable.recover(digest, v, r, s);
 		require(signer == _addressPositionOwner, "MorpherOracle: invalid signature");
+
+		// Keep msgSenderOverride logic
 		msgSenderOverride = _addressPositionOwner;
 		orderId = createOrder(createOrderParams);
 		msgSenderOverride = address(0);
@@ -535,12 +567,15 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 			)
 		);
 
-		bytes32 hash = _hashTypedDataV4(structHash);
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
 
-		address signer = ECDSAUpgradeable.recover(hash, v, r, s);
+		// Use ECDSA library directly
+		address signer = ECDSAUpgradeable.recover(digest, v, r, s);
 		require(signer == _addressPositionOwner, "MorpherOracle: invalid signature");
-		msgSenderOverride = _addressPositionOwner;
 
+		// Keep msgSenderOverride logic
+		msgSenderOverride = _addressPositionOwner;
 		createOrderFromToken(createOrderParams, inputToken);
 		msgSenderOverride = address(0);
 	}
@@ -685,61 +720,13 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 		}
 	}
 
-	/**
-	 * @dev Returns the domain separator for the current chain.
-	 */
-	function _domainSeparatorV4() internal view returns (bytes32) {
-		return _buildDomainSeparator(_TYPE_HASH, _EIP712NameHash(), _EIP712VersionHash());
-	}
+	// --- Remove manual EIP712 functions ---
+	// function _domainSeparatorV4() ... // Provided by EIP712Upgradeable
+	// function _buildDomainSeparator(...) ... // Handled by EIP712Upgradeable
+	// function _hashTypedDataV4(...) ... // Provided by EIP712Upgradeable
+	// function _EIP712NameHash() ... // Handled by EIP712Upgradeable
+	// function _EIP712VersionHash() ... // Handled by EIP712Upgradeable
 
-	function _buildDomainSeparator(
-		bytes32 typeHash,
-		bytes32 nameHash,
-		bytes32 versionHash
-	) private view returns (bytes32) {
-		return keccak256(abi.encode(typeHash, nameHash, versionHash, block.chainid, address(this)));
-	}
-
-	/**
-	 * @dev Given an already https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct[hashed struct], this
-	 * function returns the hash of the fully encoded EIP712 message for this domain.
-	 *
-	 * This hash can be used together with {ECDSA-recover} to obtain the signer of a message. For example:
-	 *
-	 * ```solidity
-	 * bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
-	 *     keccak256("Mail(address to,string contents)"),
-	 *     mailTo,
-	 *     keccak256(bytes(mailContents))
-	 * )));
-	 * address signer = ECDSA.recover(digest, signature);
-	 * ```
-	 */
-	function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
-		return ECDSAUpgradeable.toTypedDataHash(_domainSeparatorV4(), structHash);
-	}
-
-	/**
-	 * @dev The hash of the name parameter for the EIP712 domain.
-	 *
-	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
-	 * are a concern.
-	 */
-	function _EIP712NameHash() internal view virtual returns (bytes32) {
-		return _HASHED_NAME;
-	}
-
-	/**
-	 * @dev The hash of the version parameter for the EIP712 domain.
-	 *
-	 * NOTE: This function reads from storage by default, but can be redefined to return a constant value if gas costs
-	 * are a concern.
-	 */
-	function _EIP712VersionHash() internal view virtual returns (bytes32) {
-		return _HASHED_VERSION;
-	}
-	
-		
 	/**
 	 * @dev Set the MorpherSwapHelper address
 	 * @param _helperAddress Address of the MorpherSwapHelper contract
@@ -757,30 +744,22 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	}
 
 	/**
-	 * @dev See {IERC20Permit-nonces}.
+	 * @dev See {IERC20Permit-nonces}. Returns the nonce used by NoncesUpgradeable.
 	 */
-	function nonces(address owner) public view virtual returns (uint256) {
-		return _nonces[owner].current();
+	function nonces(address owner) public view virtual override(NoncesUpgradeable) returns (uint256) {
+		return super.nonces(owner); // Use implementation from NoncesUpgradeable
 	}
 
 	/**
-	 * @dev See {IERC20Permit-DOMAIN_SEPARATOR}.
+	 * @dev See {IERC20Permit-DOMAIN_SEPARATOR}. Returns the domain separator provided by EIP712Upgradeable.
 	 */
 	// solhint-disable-next-line func-name-mixedcase
-	function DOMAIN_SEPARATOR() external view returns (bytes32) {
-		return _domainSeparatorV4();
+	function DOMAIN_SEPARATOR() external view override returns (bytes32) { // Add override
+		return _domainSeparatorV4(); // Use implementation from EIP712Upgradeable
 	}
 
-	/**
-	 * @dev "Consume a nonce": return the current value and increment.
-	 *
-	 * _Available since v4.1._
-	 */
-	function _useNonce(address owner) internal virtual returns (uint256 current) {
-		CountersUpgradeable.Counter storage nonce = _nonces[owner];
-		current = nonce.current();
-		nonce.increment();
-	}
+	// --- Remove manual _useNonce ---
+	// function _useNonce(...) ... // Provided by NoncesUpgradeable
 
 	function initiateCancelOrder(bytes32 _orderId) public virtual {
 		MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
@@ -801,21 +780,27 @@ contract MorpherOracle is Initializable, ContextUpgradeable, PausableUpgradeable
 	) public virtual {
 		require(block.timestamp <= deadline, "MorpherOracle: expired deadline");
 
+		// Use _useNonce from NoncesUpgradeable
+		uint256 currentNonce = _useNonce(_owner);
+
 		bytes32 structHash = keccak256(
 			abi.encode(
 				_CANCEL_ORDER_TYPEHASH,
 				_orderId,
 				_owner,
-				_useNonce(_owner),
+				currentNonce, // Use consumed nonce
 				deadline
 			)
 		);
 
-		bytes32 hash = _hashTypedDataV4(structHash);
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
 
-		address signer = ECDSAUpgradeable.recover(hash, v, r, s);
+		// Use ECDSA library directly
+		address signer = ECDSAUpgradeable.recover(digest, v, r, s);
 		require(signer == _owner, "MorpherOracle: invalid signature");
-		
+
+		// Keep msgSenderOverride logic
 		msgSenderOverride = _owner;
 		initiateCancelOrder(_orderId);
 		msgSenderOverride = address(0);

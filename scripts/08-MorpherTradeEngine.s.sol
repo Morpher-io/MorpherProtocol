@@ -9,76 +9,82 @@ import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transpar
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
-import {DeployOrUpgrade} from "./deployOrUpgrade.sol";
+// --- Import and Inherit from DeployOrUpgradeV5 ---
+import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 
 //morpher contracts
-import {MorpherTradeEngine} from "../contracts/MorpherTradeEngine.sol";
+import {MorpherTradeEngine} from "../contracts/MorpherTradeEngine.sol"; // Use adapted v5 contract
 import {MorpherState} from "../contracts/MorpherState.sol";
-import {MorpherToken} from "../contracts/MorpherToken.sol";
-import {MorpherStaking} from "../contracts/MorpherStaking.sol";
-import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
+import {MorpherToken} from "../contracts/MorpherToken.sol"; // Use adapted v5 contract
+import {MorpherStaking} from "../contracts/MorpherStaking.sol"; // Use adapted v5 contract
+import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // Use adapted v5 contract
 
-contract DeployMorpherTradeEngine is DeployOrUpgrade {
-    using stdJson for string;
+// --- Inherit from DeployOrUpgradeV5 ---
+contract DeployMorpherTradeEngine is DeployOrUpgradeV5 {
+
+    string constant CONTRACT_KEY = "MorpherTradeEngine";
+    // Use fully qualified name or filename as required by the upgrades plugin
+    string constant CONTRACT_NAME = "contracts/MorpherTradeEngine.sol:MorpherTradeEngine";
 
     function run() public {
-        vm.startBroadcast();
-
-        // Load State address - required for TradeEngine initialization
+        // Load dependencies
         address stateAddress = loadAddress("MorpherState");
-        require(stateAddress != address(0), "MorpherState must be deployed first");
+        require(stateAddress != address(0), "V5 MorpherState must be deployed first");
+        address accessControlAddress = loadAddress("MorpherAccessControl");
+        require(accessControlAddress != address(0), "V5 AccessControl must be deployed first");
+        address tokenAddress = loadAddress("MorpherToken");
+        require(tokenAddress != address(0), "V5 MorpherToken must be deployed first");
 
         // Get configuration
         bool escrowEnabled = vm.envBool("ESCROW_ENABLED");
-        uint256 deployedTimestamp = vm.envOr("DEPLOYED_TIMESTAMP", uint256(1613399217));
+        uint256 deployedTimestamp = vm.envOr("DEPLOYED_TIMESTAMP", uint256(1613399217)); // Keep default or update
 
-        // Deploy or upgrade MorpherTradeEngine
-        address existingTradeEngine = loadAddress("MorpherTradeEngine");
-        MorpherTradeEngine implementation = new MorpherTradeEngine();
-        
-        address tradeEngine = deployOrUpgrade(
-            existingTradeEngine,
-            address(implementation),
+        // Check if deploying fresh
+        address existingProxy = loadAddress(CONTRACT_KEY);
+        bool isNewDeployment = existingProxy == address(0);
+
+        vm.startBroadcast();
+
+        // Deploy or upgrade using the V5 UUPS logic
+        address tradeEngineProxy = deployOrUpgradeV5(
+            CONTRACT_KEY,
+            CONTRACT_NAME,
+            // Ensure initializer signature matches the adapted v5 contract
             abi.encodeCall(MorpherTradeEngine.initialize, (stateAddress, escrowEnabled, deployedTimestamp)),
-            "MorpherTradeEngine.sol"
+            bytes("") // No upgrade call data needed for this example
         );
-        
-        saveAddress("MorpherTradeEngine", tradeEngine);
-        console.log("MorpherTradeEngine at:", tradeEngine);
+
+        console.log("MorpherTradeEngine V5 Proxy at:", tradeEngineProxy);
 
         // Configure if this is a new deployment
-        if (existingTradeEngine == address(0)) {
-            MorpherTradeEngine tradeEngineContract = MorpherTradeEngine(tradeEngine);
-            MorpherAccessControl accessControl = MorpherAccessControl(loadAddress("MorpherAccessControl"));
-            
+        if (isNewDeployment) {
+            console.log("Performing initial configuration for MorpherTradeEngine...");
+            MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+            MorpherToken token = MorpherToken(tokenAddress);
 
-            // Configure permissions
-            address tokenAddress = loadAddress("MorpherToken");
-            if (tokenAddress != address(0)) {
-                accessControl.grantRole(
-                    MorpherToken(tokenAddress).BURNER_ROLE(),
-                    tradeEngine
-                );
-            }
+            // Define roles using constants from the contract *type* or keccak256
+            bytes32 burnerRole = token.BURNER_ROLE();
+            bytes32 minterRole = token.MINTER_ROLE();
+            bytes32 positionAdminRole = keccak256("POSITIONADMIN_ROLE"); // As defined in TradeEngine
 
-            // Grant position admin role
-            accessControl.grantRole(
-                tradeEngineContract.POSITIONADMIN_ROLE(),
-                tradeEngine
-            );
+            // Grant token roles to trade engine proxy
+            accessControl.grantRole(burnerRole, tradeEngineProxy);
+            accessControl.grantRole(minterRole, tradeEngineProxy);
+            console.log("Granted MINTER/BURNER roles to TradeEngine.");
 
-            // Grant position admin role
-            accessControl.grantRole(
-                MorpherToken(tokenAddress).MINTER_ROLE(),
-                tradeEngine
-            );
+            // Grant position admin role to trade engine proxy (so it can call setPosition on itself?) - Check if this is correct logic
+            // Or should an external admin have this role? Assuming external admin for now.
+            address envPositionAdmin = vm.envOr("POSITION_ADMIN_ADDRESS", msg.sender);
+            accessControl.grantRole(positionAdminRole, envPositionAdmin);
+            console.log("Granted POSITIONADMIN_ROLE to:", envPositionAdmin);
 
-            // Set TradeEngine in State
-            MorpherState(stateAddress).setMorpherTradeEngine(tradeEngine);
+            // Set TradeEngine address in State
+            MorpherState(stateAddress).setMorpherTradeEngine(tradeEngineProxy);
+            console.log("Set MorpherTradeEngine address in MorpherState.");
         }
-        
+
         vm.stopBroadcast();
     }
 }

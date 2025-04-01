@@ -18,14 +18,15 @@ pragma solidity ^0.8.15;
 *  
 *  Trade hundreds of markets: Stocks, Crypto, Commodities, Forex and some really unique markets. 
 *  Join our community of 200k+ happy traders today!
-*  
+*
 **/
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol";
+// --- V5 Imports ---
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Keep for _msgSender
 
-import "./MorpherState.sol";
-import "./MorpherToken.sol";
+import "./MorpherState.sol"; // Use adapted v5 interface
+import "./MorpherToken.sol"; // Use adapted v5 interface
 import "./MorpherStaking.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherMintingLimiter.sol";
@@ -40,7 +41,7 @@ import "./MorpherInterestRateManager.sol";
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherTradeEngine.sol:MorpherTradeEngine
-contract MorpherTradeEngine is Initializable, ContextUpgradeable {
+contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit UUPS and Context
 
 	MorpherState public morpherState;
 
@@ -50,8 +51,9 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 	bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
 	bytes32 public constant POSITIONADMIN_ROLE = keccak256("POSITIONADMIN_ROLE"); //can set and modify positions
-	bytes32 public constant _HASHED_NAME = keccak256("MorpherTradeEngine");
-	bytes32 public constant _HASHED_VERSION = keccak256("1");
+	// --- Remove unused EIP712 constants ---
+	// bytes32 public constant _HASHED_NAME = keccak256("MorpherTradeEngine");
+	// bytes32 public constant _HASHED_VERSION = keccak256("1");
 
 	// ----------------------------------------------------------------------------
 	// Precision of prices and leverage
@@ -216,20 +218,39 @@ contract MorpherTradeEngine is Initializable, ContextUpgradeable {
 
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
+	// --- Updated Initializer ---
 	function initialize(
 		address _stateAddress,
 		bool _escrowOpenOrderEnabled,
 		uint256 _deployedTimestampOverride
 	) public initializer {
-		ContextUpgradeable.__Context_init();
+		__UUPSUpgradeable_init(); // Initialize UUPS
+		__Context_init(); // Initialize Context
 
 		morpherState = MorpherState(_stateAddress);
 		escrowOpenOrderEnabled = _escrowOpenOrderEnabled;
 		deployedTimeStamp = _deployedTimestampOverride > 0 ? _deployedTimestampOverride : block.timestamp;
 	}
 
-	modifier onlyRole(bytes32 role) {
+	// --- Implement _authorizeUpgrade ---
+	function _authorizeUpgrade(address newImplementation)
+		internal
+		override
+	{
+		address accessControlAddress = morpherState.morpherAccessControlAddress();
+		require(accessControlAddress != address(0), "TradeEngine: AccessControl not set in State");
+		// Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
 		require(
+			MorpherAccessControl(accessControlAddress).hasRole(
+				MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+				msg.sender // Use msg.sender directly
+			),
+			"TradeEngine: Caller is not the proxy updater"
+		);
+	}
+
+	modifier onlyRole(bytes32 role) {
+		require( // Keep using _msgSender() as ContextUpgradeable is inherited
 			MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(role, _msgSender()),
 			"MorpherTradeEngine: Permission denied."
 		);
