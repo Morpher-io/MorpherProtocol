@@ -186,6 +186,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(balancesMigrated, 0, "No balances should be migrated yet");
         assertEq(usersMigrated, 0, "User count should not increase for position-only migration");
         assertTrue(active, "Migration should be active");
+        assertFalse(finalRootSet, "Final root should not be set yet.");
     }
     
     function testMigrateBalanceSelfService() public {
@@ -224,7 +225,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         uint256 expectedBalance = initialBalance + testBalance;
         // Locked tokens are still part of the total balance but not available for transfer
         assertEq(morpherToken.getTradeableBalanceOf(testUser), expectedBalance);
-        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedAmount);
+        assertEq(morpherToken.balanceOf(testUser), expectedBalance - lockedAmount - lockedRewardAmount);
         
         // Check that the user is marked as migrated
         assertTrue(morpherMigration.migratedBalances(testUser));

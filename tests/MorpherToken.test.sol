@@ -193,8 +193,8 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		address user = address(0xabcdef);
 		
 		// Grant AIRDROPADMIN_ROLE to admin for reward locking
-		vm.startPrank(_admin);
 		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), _admin);
+		vm.startPrank(_admin);
 		
 		// Mint tokens to user
 		morpherToken.mint(user, 10 ether);
