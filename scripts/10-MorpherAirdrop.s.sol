@@ -32,9 +32,11 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
         require(tokenAddress != address(0), "V5 MorpherToken must be deployed first");
         address accessControlAddress = loadAddress("MorpherAccessControl");
         require(accessControlAddress != address(0), "V5 AccessControl must be deployed first");
+        address stateAddress = loadAddress("MorpherState"); // Load State address
+        require(stateAddress != address(0), "V5 MorpherState must be deployed first");
 
         // Get configuration from environment
-        address airdropAdmin = vm.envOr("MORPHER_AIRDROP_ADMIN", msg.sender);
+        // address airdropAdmin = vm.envOr("MORPHER_AIRDROP_ADMIN", msg.sender); // Role granted later
         address coldStorageOwner = vm.envOr("MORPHER_OWNER", msg.sender); // This will be the contract owner
 
         // Check if deploying fresh
@@ -47,10 +49,10 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
         address airdropProxy = deployOrUpgradeV5(
             CONTRACT_KEY,
             CONTRACT_NAME,
-            // Ensure initializer signature matches the adapted v5 contract
+            // Ensure initializer signature matches the adapted v5 contract (state, token, owner)
             abi.encodeCall(
                 MorpherAirdrop.initialize,
-                (airdropAdmin, tokenAddress, coldStorageOwner) // Pass initial owner to initializer
+                (stateAddress, tokenAddress, coldStorageOwner) // Pass state, token, initial owner
             ),
             bytes("") // No upgrade call data needed for this example
         );
@@ -62,12 +64,19 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
             console.log("Performing initial setup for MorpherAirdrop...");
             MorpherToken token = MorpherToken(tokenAddress);
             MorpherAccessControl ac = MorpherAccessControl(accessControlAddress);
+            MorpherAirdrop airdropContract = MorpherAirdrop(airdropProxy); // Use proxy address
 
-            // Grant AIRDROPADMIN_ROLE to the Airdrop contract proxy itself
+            // Grant AIRDROPADMIN_ROLE (defined in Airdrop contract) on AccessControl to the designated admin address
+            address envAirdropAdmin = vm.envOr("MORPHER_AIRDROP_ADMIN", msg.sender);
+            bytes32 airdropAdminRoleAirdrop = airdropContract.AIRDROPADMIN_ROLE();
+            ac.grantRole(airdropAdminRoleAirdrop, envAirdropAdmin);
+            console.log("Granted AIRDROPADMIN_ROLE (on AccessControl) to:", envAirdropAdmin);
+
+            // Grant AIRDROPADMIN_ROLE (defined in Token contract) on AccessControl to the Airdrop contract proxy itself
             // This allows the Airdrop contract to call lockRewards on the Token contract
             bytes32 airdropAdminRoleToken = token.AIRDROPADMIN_ROLE();
             ac.grantRole(airdropAdminRoleToken, airdropProxy);
-            console.log("Granted AIRDROPADMIN_ROLE (on Token) to Airdrop contract.");
+            console.log("Granted AIRDROPADMIN_ROLE (on Token) to Airdrop contract proxy.");
 
             // Transfer initial Airdrop funds from Treasury to Airdrop contract
             address treasuryAddress = vm.envOr("MORPHER_TREASURY", address(0));

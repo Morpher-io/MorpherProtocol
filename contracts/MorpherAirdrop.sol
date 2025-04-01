@@ -6,6 +6,8 @@ import {OwnableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/con
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
 // Remove Initializable
 import "./MorpherToken.sol"; // Use adapted v5 interface
+import "./MorpherAccessControl.sol"; // Import AccessControl
+import "./MorpherState.sol"; // Import State to get AccessControl address
 
 // ----------------------------------------------------------------------------------
 // Holds the Airdrop Token balance on contract address
@@ -26,8 +28,12 @@ contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inher
     uint256 public totalAirdropAuthorized;
     uint256 public totalAirdropClaimed;
 
-    address public airdropAdmin;
+    // address public airdropAdmin; // Removed - Replaced by role
     address public morpherToken;
+    MorpherState public state; // Store state contract address
+
+    // --- Define Role ---
+    bytes32 public constant AIRDROPADMIN_ROLE = keccak256("AIRDROPADMIN_ROLE");
 
 // ----------------------------------------------------------------------------
 // Events
@@ -40,20 +46,26 @@ contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inher
 
     // --- Updated Initializer ---
     function initialize(
-        address _airdropAdminAddress,
+        address _stateAddress, // Add state address
         address _morpherTokenAddress,
         address _initialOwner // The address that will own this contract initially
     ) public initializer {
         __UUPSUpgradeable_init(); // Initialize UUPS
         __Ownable_init(_initialOwner); // Initialize Ownable with the initial owner
 
-        airdropAdmin = _airdropAdminAddress; // Set directly
+        state = MorpherState(_stateAddress); // Store state address
         morpherToken = _morpherTokenAddress; // Set directly
         // transferOwnership is handled by __Ownable_init
+        // airdropAdmin role is granted in deployment script
     }
 
     modifier onlyAirdropAdmin {
-        require(msg.sender == airdropAdmin, "MorpherAirdrop: can only be called by Airdrop Administrator.");
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "MorpherAirdrop: AccessControl not set in State");
+        require(
+            MorpherAccessControl(accessControlAddress).hasRole(AIRDROPADMIN_ROLE, msg.sender),
+            "MorpherAirdrop: Caller is not an Airdrop Administrator."
+        );
         _;
     }
 
@@ -67,8 +79,12 @@ contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inher
 // ----------------------------------------------------------------------------
 // Administrative functions
 // ----------------------------------------------------------------------------
-    function setAirdropAdmin(address _address) public onlyOwner {
-        airdropAdmin = _address;
+    // function setAirdropAdmin(address _address) public onlyOwner { // Removed - Roles managed externally
+    //     airdropAdmin = _address;
+    // }
+
+    function setMorpherStateAddress(address _stateAddress) public onlyOwner {
+        state = MorpherState(_stateAddress);
     }
 
     function setMorpherTokenAddress(address _address) public onlyOwner {
