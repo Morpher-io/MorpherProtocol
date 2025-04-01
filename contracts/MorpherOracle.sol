@@ -754,7 +754,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	 * @dev See {IERC20Permit-DOMAIN_SEPARATOR}. Returns the domain separator provided by EIP712Upgradeable.
 	 */
 	// solhint-disable-next-line func-name-mixedcase
-	function DOMAIN_SEPARATOR() external view override returns (bytes32) { // Add override
+	function DOMAIN_SEPARATOR() external view returns (bytes32) { // Remove override
 		return _domainSeparatorV4(); // Use implementation from EIP712Upgradeable
 	}
 
