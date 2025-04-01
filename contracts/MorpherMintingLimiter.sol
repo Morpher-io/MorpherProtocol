@@ -4,13 +4,15 @@ pragma solidity ^0.8.15;
 import "./MorpherAccessControl.sol";
 import "./MorpherState.sol";
 import "./MorpherTradeEngine.sol";
-import "./MorpherToken.sol";
+import "./MorpherToken.sol"; // Use adapted v5 interface
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+// --- V5 Imports ---
+import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+// Remove Initializable
 
 
-
-contract MorpherMintingLimiter is Initializable {
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherMintingLimiter.sol:MorpherMintingLimiter // Add if needed
+contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 
@@ -44,21 +46,38 @@ contract MorpherMintingLimiter is Initializable {
         _;
     }
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        // _disableInitializers();
-    }
+    // --- Remove empty constructor ---
+    // constructor() { ... }
 
+    // --- Updated Initializer ---
     function initialize(
         address _stateAddress,
         uint256 _mintingLimitPerUser,
         uint256 _mintingLimitDaily,
         uint256 _timeLockingPeriodInSeconds
     ) public initializer {
+        __UUPSUpgradeable_init(); // Initialize UUPS
         state = MorpherState(_stateAddress);
         mintingLimitPerUser = _mintingLimitPerUser;
         mintingLimitDaily = _mintingLimitDaily;
         timeLockingPeriod = _timeLockingPeriodInSeconds;
+    }
+
+    // --- Implement _authorizeUpgrade ---
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+    {
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "MintingLimiter: AccessControl not set in State");
+        // Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl
+        require(
+            MorpherAccessControl(accessControlAddress).hasRole(
+                MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(), // Get role hash from AC
+                msg.sender // Use msg.sender directly
+            ),
+            "MintingLimiter: Caller is not the proxy updater"
+        );
     }
 
     function setTradeEngineAddress(address _tradeEngineAddress) public onlyAdministrator {
