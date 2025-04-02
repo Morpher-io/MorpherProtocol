@@ -817,9 +817,9 @@ contract MorpherTokenTest is
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 		assertEq(morpherToken.nonces(owner.addr), nonce + 1);
 
-		// Second call with same signature should fail due to nonce mismatch
-		// Use correct OZ v5 error signature from NoncesUpgradeable (inherited via ERC20PermitUpgradeable)
-		vm.expectRevert(abi.encodeWithSelector(NoncesUpgradeable.InvalidAccountNonce.selector, owner.addr, nonce + 1));
+		// Second call with same signature should fail due to nonce mismatch, resulting in an invalid signer error
+		// Expect ERC2612InvalidSigner because the digest generated with the incremented nonce won't match the signature
+		vm.expectRevert(ERC20PermitUpgradeable.ERC2612InvalidSigner.selector);
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 	}
 
