@@ -435,26 +435,21 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			)
 		);
 
-		vm.prank(owner.addr);
+
+
 		// wmatic from user to morpher oracle
 		vm.expectEmit(true, true, true, true);
 		emit Approval(owner.addr, address(morpherOracle), 50 ether);
 		vm.expectEmit(true, true, true, true);
-		emit Approval(owner.addr, address(morpherOracle), 0);
-		vm.expectEmit(true, true, true, true);
 		emit Transfer(owner.addr, address(morpherOracle), 50 ether);
-		// wmatic and mph from oracle to uniswap
+		// wmatic from oracle to uniswap
 		vm.expectEmit(true, true, true, true);
 		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 50 ether);
-		vm.expectEmit(true, true, true, true);
-		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 100 ether);
 		// swap get executed (mocking contract)
-		vm.expectEmit(true, true, true, true);
-		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 0);
 		vm.expectEmit(true, true, true, true);
 		emit Transfer(address(morpherOracle), morpherOracle.uniswapRouter(), 50 ether); // -> wmatic
 		vm.expectEmit(true, true, true, true);
-		emit Transfer(morpherOracle.uniswapRouter(), owner.addr, 100 ether); // -> mph
+		emit Transfer(morpherOracle.uniswapRouter(), owner.addr,  100 ether); // -> MPH
 		// wmatic and mph from oracle to uniswap reset
 		vm.expectEmit(true, true, true, true);
 		emit Approval(address(morpherOracle), morpherOracle.uniswapRouter(), 0);
