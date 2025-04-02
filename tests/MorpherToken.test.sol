@@ -775,14 +775,17 @@ contract MorpherTokenTest is
 
 		uint nonce = morpherToken.nonces(owner.addr);
 
-		// Generate signature using helper, but sign with wrong key
+		// Generate the digest using the helper's logic (or call helper and re-sign)
+		// For clarity, let's recalculate the digest here to sign with the wrong key
 		bytes32 permitTypehash = keccak256(
 			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
 		);
 		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
 		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongSigner.key, finalHash); // Sign with wrong key
+
+		// Sign the digest with the wrong signer's key
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongSigner.key, finalHash);
 
 		// Use correct OZ v5 error signature
 		vm.expectRevert(
