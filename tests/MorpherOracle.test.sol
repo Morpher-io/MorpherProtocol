@@ -1,16 +1,35 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.20; // Update pragma
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
+// --- V5 Imports ---
+import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
+import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol"; // For upgrade test
+import {IUpgradeableProxy} from "../lib/openzeppelin-contracts-5/contracts/proxy/ERC1967/IUpgradeableProxy.sol"; // For upgrade test
 
 import "./BaseSetup.sol";
 import "./mocks/ERC20.sol";
 import "./mocks/UniswapRouter.sol";
 import "../contracts/MorpherOracle.sol";
+// Import V2 mock for upgrade test
+import "../contracts/mocks/MorpherOracleV2.sol";
 
-// using staking as one of the inheriting contracts
-contract MorpherOracleTest is BaseSetup, MorpherOracle {
+// Remove inheritance from MorpherOracle implementation
+contract MorpherOracleTest is BaseSetup {
 	uint public constant PRECISION = 1e8;
+
+	// --- Remove manual EIP712 constants ---
+	// bytes32 public constant _HASHED_NAME = ...;
+	// bytes32 public constant _HASHED_VERSION = ...;
+	// bytes32 public constant _TYPE_HASH = ...;
+
+	// --- Keep action-specific typehashes ---
+	bytes32 public constant _PERMIT_TYPEHASH =
+		keccak256(
+			"CreateOrder(bytes32 _marketId,uint256 _closeSharesAmount,uint256 _openMPHTokenAmount,address _msgSender,uint256 nonce,uint256 deadline)"
+		);
+	bytes32 public constant _CANCEL_ORDER_TYPEHASH =
+		keccak256("CancelOrder(bytes32 _orderId,address _msgSender,uint256 nonce,uint256 deadline)");
 
 	MockERC20 public WMATIC;
 	MockERC20 public OTHER_ERC20;
@@ -324,7 +343,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 
 		bytes32 structHash = keccak256(
 			abi.encode(
-				_PERMIT_TYPEHASH,
+				_PERMIT_TYPEHASH, // Use locally defined constant
 				str._marketId,
 				str._closeSharesAmount,
 				str._openMPHTokenAmount,
@@ -333,10 +352,10 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 				str._goodUntil
 			)
 		);
-		bytes32 domainSeparator = keccak256(
-			abi.encode(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION, block.chainid, address(morpherOracle))
-		);
-		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+		// Get domain separator from contract
+		bytes32 domainSeparator = morpherOracle.DOMAIN_SEPARATOR();
+		// Use MessageHashUtils and ECDSA
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		bytes32 expectedOrderId = keccak256(
@@ -379,11 +398,21 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 structHash = keccak256(
 			abi.encode(erc20PermitTypehash, owner.addr, address(morpherOracle), 50 ether, 0, 1)
 		);
+		// --- Reconstruct domain hash for external token permit ---
+		// Note: Assumes WMATIC mock implements EIP712 domain separator correctly or has fixed values
+		// This part is tricky without knowing the mock's exact EIP712 implementation.
+		// Assuming fixed name/version for mock:
 		bytes32 domainHash = keccak256(
-			abi.encode(_TYPE_HASH, keccak256("wmatic"), keccak256("1"), block.chainid, address(WMATIC))
+			abi.encode(
+				keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+				keccak256("wmatic"), // Mock name
+				keccak256("1"), // Mock version
+				block.chainid,
+				address(WMATIC)
+			)
 		);
-
-		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		// Use MessageHashUtils and ECDSA
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
@@ -491,11 +520,19 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 structHash = keccak256(
 			abi.encode(erc20PermitTypehash, owner.addr, address(morpherOracle), 50 ether, 0, 1)
 		);
+		// --- Reconstruct domain hash for external token permit ---
+		// Assuming fixed name/version for mock:
 		bytes32 domainHash = keccak256(
-			abi.encode(_TYPE_HASH, keccak256("test"), keccak256("1"), block.chainid, address(OTHER_ERC20))
+			abi.encode(
+				keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+				keccak256("test"), // Mock name
+				keccak256("1"), // Mock version
+				block.chainid,
+				address(OTHER_ERC20)
+			)
 		);
-
-		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		// Use MessageHashUtils and ECDSA
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
@@ -561,11 +598,19 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 structHash = keccak256(
 			abi.encode(erc20PermitTypehash, owner.addr, address(morpherOracle), 50 ether, 0, 1)
 		);
+		// --- Reconstruct domain hash for external token permit ---
+		// Assuming fixed name/version for mock:
 		bytes32 domainHash = keccak256(
-			abi.encode(_TYPE_HASH, keccak256("wmatic"), keccak256("1"), block.chainid, address(WMATIC))
+			abi.encode(
+				keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+				keccak256("wmatic"), // Mock name
+				keccak256("1"), // Mock version
+				block.chainid,
+				address(WMATIC)
+			)
 		);
-
-		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		// Use MessageHashUtils and ECDSA
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
@@ -592,10 +637,10 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 				str._goodUntil
 			)
 		);
-		domainHash = keccak256(
-			abi.encode(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION, block.chainid, address(morpherOracle))
-		);
-		finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		// Get domain separator from contract
+		domainHash = morpherOracle.DOMAIN_SEPARATOR();
+		// Use MessageHashUtils and ECDSA
+		finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(v, r, s) = vm.sign(owner.key, finalHash);
 
 		bytes32 expectedOrderId = keccak256(
@@ -650,13 +695,13 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 				orderId,
 				owner.addr,
 				nonce,
-				uint256(1000)
+				uint256(1000) // deadline
 			)
 		);
-		bytes32 domainSeparator = keccak256(
-			abi.encode(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION, block.chainid, address(morpherOracle))
-		);
-		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+		// Get domain separator from contract
+		bytes32 domainSeparator = morpherOracle.DOMAIN_SEPARATOR();
+		// Use MessageHashUtils and ECDSA
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		vm.expectEmit(true, true, true, true);
