@@ -46,8 +46,9 @@ contract MorpherInterestRateManager is UUPSUpgradeable { // Inherit UUPSUpgradea
 	}
 
 	// --- Implement _authorizeUpgrade ---
-	function _authorizeUpgrade(address newImplementation)
+	function _authorizeUpgrade(address /** unused */)
 		internal
+		view
 		override
 	{
 		address accessControlAddress = morpherState.morpherAccessControlAddress();

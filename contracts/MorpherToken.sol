@@ -121,8 +121,9 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	}
 
 	// --- Implement _authorizeUpgrade ---
-	function _authorizeUpgrade(address newImplementation)
+	function _authorizeUpgrade(address /** unused */)
 		internal
+		view
 		override
 	{
 		address accessControlAddress = address(morpherAccessControl);
@@ -138,8 +139,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	}
 
 	modifier onlyRole(bytes32 role) {
-		require(morpherAccessControl.hasRole(role, _msgSender()), 
-			string(abi.encodePacked("MorpherToken: Missing required role ", _bytes32ToString(role))));
+		require(morpherAccessControl.hasRole(role, _msgSender()), "MorpherToken: Missing required role.");
 		_;
 	}
 	

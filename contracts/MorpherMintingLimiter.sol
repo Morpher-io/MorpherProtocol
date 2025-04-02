@@ -64,8 +64,9 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
     }
 
     // --- Implement _authorizeUpgrade ---
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address /** unused */)
         internal
+        view
         override
     {
         address accessControlAddress = state.morpherAccessControlAddress();

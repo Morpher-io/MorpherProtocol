@@ -11,7 +11,7 @@ import "../contracts/MorpherState.sol"; // Needed for Token init
 import "../contracts/MorpherToken.sol"; // V1 Implementation
 import "../contracts/mocks/MorpherTokenV2.sol"; // V2 Implementation Mock
 // Import proxy interface for try/catch
-import {IUpgradeableProxy} from "../lib/openzeppelin-contracts-5/contracts/proxy/ERC1967/IUpgradeableProxy.sol";
+import {IUpgradeableProxy} from "../lib/openzeppelin-foundry-upgrades/src/internal/interfaces/IUpgradeableProxy.sol";
 
 
 contract UUPSUpgradeTest is Test {
@@ -87,15 +87,15 @@ contract UUPSUpgradeTest is Test {
 
         // Attempt upgrade from an unauthorized address using try/catch
         vm.prank(unauthorizedUser); // Use regular prank for the try/catch block
-        try proxy.upgradeTo(address(implV2)) {
+        try proxy.upgradeToAndCall(address(implV2), "") {
             // If the call succeeds, the test should fail
-            fail("Upgrade by unauthorized user should have reverted");
+            revert("Upgrade by unauthorized user should have reverted");
         } catch Error(string memory reason) {
             // Assert that the revert reason matches the one from _authorizeUpgrade
             assertEq(reason, "MorpherToken: Caller is not the proxy updater", "Incorrect revert reason");
         } catch (bytes memory /*lowLevelData*/) {
             // Catch other potential revert types (Panic, etc.) and fail
-            fail("Upgrade reverted with unexpected error type");
+            revert("Upgrade reverted with unexpected error type");
         }
         // Note: We are not calling UnsafeUpgrades.upgradeProxy here,
         // as we are directly testing the proxy call that fails.

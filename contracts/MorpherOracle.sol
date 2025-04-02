@@ -67,7 +67,7 @@ import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherOracle.sol:MorpherOracle
 contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeable, EIP712Upgradeable, NoncesUpgradeable { // Update inheritance
-	MorpherState state; // read only, Oracle doesn't need writing access to state
+	MorpherState public state; // read only, Oracle doesn't need writing access to state
 
 	bool public useWhiteList; //always false at the moment
 
@@ -306,8 +306,9 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	}
 
 	// --- Implement _authorizeUpgrade ---
-	function _authorizeUpgrade(address newImplementation)
+	function _authorizeUpgrade(address /** unused */)
 		internal
+		view
 		override
 	{
 		address accessControlAddress = state.morpherAccessControlAddress();

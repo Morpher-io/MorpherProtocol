@@ -3,12 +3,13 @@ pragma solidity ^0.8.20; // Update pragma if needed
 
 // --- Updated Imports ---
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
 import "./MorpherAccessControl.sol"; // Use adapted v5 interface/contract
 import "./MorpherState.sol"; // Use adapted v5 interface/contract
 
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherUserBlocking.sol:MorpherUserBlocking // Add if needed
-contract MorpherUserBlocking is UUPSUpgradeable { // --- Inherit UUPSUpgradeable ---
+contract MorpherUserBlocking is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UUPSUpgradeable ---
 
     // --- Remove __gap variable if present ---
 
@@ -29,8 +30,9 @@ contract MorpherUserBlocking is UUPSUpgradeable { // --- Inherit UUPSUpgradeable
     }
 
     // --- Implement _authorizeUpgrade ---
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address /** unused */)
         internal
+        view
         override
     {
         address accessControlAddress = state.morpherAccessControlAddress();

@@ -109,8 +109,9 @@ contract MorpherStaking is UUPSUpgradeable, ContextUpgradeable { // Inherit UUPS
     }
 
     // --- Implement _authorizeUpgrade ---
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address /** unsed */)
         internal
+        view
         override
     {
         address accessControlAddress = morpherState.morpherAccessControlAddress();

@@ -29,8 +29,9 @@ contract MorpherTokenV2 is Initializable, UUPSUpgradeable {
     }
 
     // This MUST match the authorization logic intended for upgrades
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address /** unusued */)
         internal
+        view
         override
     {
         require(accessControl != address(0), "AC not set");

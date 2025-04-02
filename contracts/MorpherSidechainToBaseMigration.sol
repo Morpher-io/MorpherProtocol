@@ -135,8 +135,9 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
     }
 
     // --- Implement _authorizeUpgrade ---
-	function _authorizeUpgrade(address newImplementation)
+	function _authorizeUpgrade(address /** unused */)
 		internal
+        view
 		override
 	{
 		address accessControlAddress = state.morpherAccessControlAddress();

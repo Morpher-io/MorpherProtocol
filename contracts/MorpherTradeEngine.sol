@@ -233,8 +233,9 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 	}
 
 	// --- Implement _authorizeUpgrade ---
-	function _authorizeUpgrade(address newImplementation)
+	function _authorizeUpgrade(address /** unused */)
 		internal
+		view
 		override
 	{
 		address accessControlAddress = morpherState.morpherAccessControlAddress();

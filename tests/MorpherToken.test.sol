@@ -8,7 +8,10 @@ import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/
 
 import "./BaseSetup.sol";
 
-contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgradeable inheritance if not needed directly
+contract MorpherTokenTest is
+	BaseSetup,
+	ERC20Upgradeable // Remove ERC20Upgradeable inheritance if not needed directly
+{
 	address _admin = address(0x1234);
 	address _tokenUpdater = address(0x5678);
 	address _pauser = address(0x90);
@@ -599,16 +602,16 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 
 	// --- Mint/Burn Role Tests ---
 
-	function testMint_Fail_NoRole() public {
+	function testMintFailNoRole() public {
 		address user = makeAddr("user");
 		address nonMinter = makeAddr("nonMinter");
 		vm.startPrank(nonMinter);
-		vm.expectRevert("MorpherToken: Missing required role 0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6"); // MINTER_ROLE hash
+		vm.expectRevert("MorpherToken: must have minter role to mint"); // MINTER_ROLE hash
 		morpherToken.mint(user, 1 ether);
 		vm.stopPrank();
 	}
 
-	function testBurn_Fail_NoRole() public {
+	function testBurnFailNoRole() public {
 		address user = makeAddr("user");
 		address nonBurner = makeAddr("nonBurner");
 		vm.startPrank(_admin);
@@ -616,7 +619,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		vm.stopPrank();
 
 		vm.startPrank(nonBurner);
-		vm.expectRevert("MorpherToken: Missing required role 0x3c11d16cbaffd01df69ce1c404f6340ee057498f5f00246190ea54220576a848"); // BURNER_ROLE hash
+		vm.expectRevert("MorpherToken: must have burner role to burn"); // BURNER_ROLE hash
 		morpherToken.burn(user, 1 ether);
 		vm.stopPrank();
 	}
@@ -666,7 +669,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 
 	// --- Locking Function Role Tests ---
 
-	function testLockRewards_Fail_NoRole() public {
+	function testLockRewardsFailNoRole() public {
 		address user = makeAddr("user");
 		address nonAirdropAdmin = makeAddr("nonAirdropAdmin");
 		vm.startPrank(_admin);
@@ -674,7 +677,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		vm.stopPrank();
 
 		vm.startPrank(nonAirdropAdmin);
-		vm.expectRevert("MorpherToken: Missing required role 0x17a0f30a65086195f3bd886105b485a3619561b973e4157815087c10430d6754"); // AIRDROPADMIN_ROLE hash
+		vm.expectRevert("MorpherToken: Missing required role."); // AIRDROPADMIN_ROLE hash
 		morpherToken.lockRewards(user, 1 ether);
 		vm.stopPrank();
 	}
@@ -690,12 +693,14 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		vm.stopPrank();
 
 		vm.startPrank(nonAdmin);
-		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		vm.expectRevert(
+			"MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
+		); // ADMINISTRATOR_ROLE hash
 		morpherToken.unlockRewards(user, 1 ether);
 		vm.stopPrank();
 	}
 
-	function testLockTokensForTime_Fail_NoRole() public {
+	function testLockTokensForTimeFailNoRole() public {
 		address user = makeAddr("user");
 		address nonAdmin = makeAddr("nonAdmin");
 		vm.startPrank(_admin);
@@ -703,48 +708,48 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		vm.stopPrank();
 
 		vm.startPrank(nonAdmin);
-		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		vm.expectRevert("MorpherToken: Missing required role."); // ADMINISTRATOR_ROLE hash
 		morpherToken.lockTokensForTime(user, 1 ether, 1 days);
 		vm.stopPrank();
 	}
 
 	// --- Setter Role Tests ---
 
-	function testSetRestrictTransfers_Fail_NoRole() public {
+	function testSetRestrictTransfersFailNoRole() public {
 		address nonAdmin = makeAddr("nonAdmin");
 		vm.startPrank(nonAdmin);
-		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		vm.expectRevert("MorpherToken: Missing required role."); // ADMINISTRATOR_ROLE hash
 		morpherToken.setRestrictTransfers(true);
 		vm.stopPrank();
 	}
 
-	function testSetTotalTokensOnOtherChain_Fail_NoRole() public {
+	function testSetTotalTokensOnOtherChainFailNoRole() public {
 		address nonUpdater = makeAddr("nonUpdater");
 		vm.startPrank(nonUpdater);
-		vm.expectRevert("MorpherToken: Missing required role 0x134cbb8a74551700c095063f14604af991861b4e9f6b717c408006b747405174"); // TOKENUPDATER_ROLE hash
+		vm.expectRevert("MorpherToken: Missing required role."); // TOKENUPDATER_ROLE hash
 		morpherToken.setTotalTokensOnOtherChain(1 ether);
 		vm.stopPrank();
 	}
 
-	function testSetTotalInPositions_Fail_NoRole() public {
+	function testSetTotalInPositionsFailNoRole() public {
 		address nonUpdater = makeAddr("nonUpdater");
 		vm.startPrank(nonUpdater);
-		vm.expectRevert("MorpherToken: Missing required role 0x134cbb8a74551700c095063f14604af991861b4e9f6b717c408006b747405174"); // TOKENUPDATER_ROLE hash
+		vm.expectRevert("MorpherToken: Missing required role."); // TOKENUPDATER_ROLE hash
 		morpherToken.setTotalInPositions(1 ether);
 		vm.stopPrank();
 	}
 
-	function testSetDailyMintedTransferLimit_Fail_NoRole() public {
+	function testSetDailyMintedTransferLimitFailNoRole() public {
 		address nonAdmin = makeAddr("nonAdmin");
 		vm.startPrank(nonAdmin);
-		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		vm.expectRevert("MorpherToken: Missing required role."); // ADMINISTRATOR_ROLE hash
 		morpherToken.setDailyMintedTransferLimit(1 ether);
 		vm.stopPrank();
 	}
 
 	// --- Permit Edge Case Tests ---
 
-	function testPermit_Fail_ExpiredDeadline() public {
+	function testPermitFailExpiredDeadline() public {
 		Account memory owner = makeAccount("owner");
 		address spender = address(0xdef);
 		uint value = 1 ether;
@@ -755,17 +760,19 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
-		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+		bytes32 permitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
 		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
 		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
-		vm.expectRevert("ERC2612ExpiredSignature(uint256)"); // OZ v5 error
+		vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("ERC2612ExpiredSignature(uint256)")), deadline)); // OZ v5 error
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 	}
 
-	function testPermit_Fail_InvalidSignature() public {
+	function testPermitFailInvalidSignature() public {
 		Account memory owner = makeAccount("owner");
 		Account memory wrongSigner = makeAccount("wrongSigner");
 		address spender = address(0xdef);
@@ -777,15 +784,25 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
-		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+		bytes32 permitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
 		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
 		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
 		// Sign with wrong key
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongSigner.key, finalHash);
+		{
+			vm.expectRevert(
+				abi.encodeWithSelector(
+					bytes4(keccak256("ERC2612InvalidSigner(address,address)")),
+					wrongSigner.addr,
+					owner.addr
+				)
+			); // OZ v5 error
 
-		vm.expectRevert("ERC2612InvalidSigner(address,address)"); // OZ v5 error
-		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+			morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+		}
 	}
 
 	function testPermit_Fail_Replay() public {
@@ -799,7 +816,9 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
-		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+		bytes32 permitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
 		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
 		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);

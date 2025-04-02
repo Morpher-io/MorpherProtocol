@@ -105,8 +105,9 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
     }
 
     // --- Implement _authorizeUpgrade ---
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address /** unused */)
         internal
+        view
         override
     {
         // Check if the sender has the PROXYUPDATER_ROLE defined in MorpherAccessControl

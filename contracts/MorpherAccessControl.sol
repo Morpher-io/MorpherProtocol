@@ -3,10 +3,10 @@ pragma solidity ^0.8.20; // Update pragma if needed
 
 // --- Use v5 imports ---
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
-import {AccessControlEnumerableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/access/AccessControlEnumerableUpgradeable.sol";
+import {AccessControlUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/access/AccessControlUpgradeable.sol";
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAccessControl.sol:MorpherAccessControl // Keep or update reference
-contract MorpherAccessControl is AccessControlEnumerableUpgradeable, UUPSUpgradeable { // Inherit both
+contract MorpherAccessControl is AccessControlUpgradeable, UUPSUpgradeable { // Inherit both
 
     // --- Define Proxy Updater Role ---
     bytes32 public constant PROXYUPDATER_ROLE = keccak256("PROXYUPDATER_ROLE");
@@ -16,7 +16,7 @@ contract MorpherAccessControl is AccessControlEnumerableUpgradeable, UUPSUpgrade
     // --- Initializer ---
     function initialize() public initializer {
         // Call initializers for all parent contracts
-        __AccessControlEnumerable_init();
+        __AccessControl_init();
         __UUPSUpgradeable_init(); // Initialize UUPS
 
         // Grant deployer admin role AND proxy updater role
