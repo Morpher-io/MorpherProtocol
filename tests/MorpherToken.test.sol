@@ -96,22 +96,8 @@ contract MorpherTokenTest is
 
 		uint nonce = morpherToken.nonces(owner.addr);
 
-		// Rebuild Permit typehash locally for signing
-		bytes32 permitTypehash = keccak256(
-			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-		);
-
-		// Hash the struct data
-		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
-
-		// Get domain separator from the contract (it now uses ERC20Permit's implementation)
-		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
-
-		// Create the EIP712 digest
-		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
-
-		// Sign the digest
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+		// Generate signature using helper
+		(uint8 v, bytes32 r, bytes32 s) = _generatePermitSignature(owner, spender, value, nonce, deadline);
 
 		// Call permit
 		vm.expectEmit(true, true, true, true);
@@ -476,7 +462,7 @@ contract MorpherTokenTest is
 
 	// --- _update Function Tests ---
 
-	function testUpdate_TransferRestriction_Fail_NoRole() public {
+	function testUpdateTransferRestrictionFailNoRole() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
 		vm.startPrank(_admin);
@@ -491,7 +477,7 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 	}
 
-	function testUpdate_TransferRestriction_Success_SenderRole() public {
+	function testUpdateTransferRestrictionSuccessSenderRole() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
 		vm.startPrank(_admin);
@@ -507,7 +493,7 @@ contract MorpherTokenTest is
 		assertEq(morpherToken.balanceOf(user2), 1 ether);
 	}
 
-	function testUpdate_TransferRestriction_Success_MinterRole() public {
+	function testUpdateTransferRestrictionSuccessMinterRole() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
 		address minter = makeAddr("minter"); // Use a separate minter address for clarity
@@ -527,7 +513,7 @@ contract MorpherTokenTest is
 		assertEq(morpherToken.balanceOf(user2), 1 ether);
 	}
 
-	function testUpdate_TransferBlocked_Fail_Sender() public {
+	function testUpdateTransferBlockedFailSender() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
 		vm.startPrank(_admin);
@@ -542,7 +528,7 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 	}
 
-	function testUpdate_TransferBlocked_Fail_Receiver() public {
+	function testUpdateTransferBlockedFailReceiver() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
 		vm.startPrank(_admin);
@@ -557,7 +543,7 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 	}
 
-	function testUpdate_DailyLimit_AdminBypass() public {
+	function testUpdateDailyLimitAdminBypass() public {
 		address user = makeAddr("user");
 		address recipient = makeAddr("recipient");
 		vm.startPrank(_admin);
@@ -578,7 +564,7 @@ contract MorpherTokenTest is
 		assertEq(morpherToken.getDailyMintedTransfers(user), 0);
 	}
 
-	function testUpdate_DailyLimit_TradeEngineBypass() public {
+	function testUpdateDailyLimitTradeEngineBypass() public {
 		address user = makeAddr("user");
 		address recipient = makeAddr("recipient");
 		address tradeEngine = morpherState.morpherTradeEngineAddress();
@@ -606,7 +592,8 @@ contract MorpherTokenTest is
 		address user = makeAddr("user");
 		address nonMinter = makeAddr("nonMinter");
 		vm.startPrank(nonMinter);
-		vm.expectRevert("MorpherToken: must have minter role to mint"); // MINTER_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.mint(user, 1 ether);
 		vm.stopPrank();
 	}
@@ -619,14 +606,15 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		vm.startPrank(nonBurner);
-		vm.expectRevert("MorpherToken: must have burner role to burn"); // BURNER_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.burn(user, 1 ether);
 		vm.stopPrank();
 	}
 
 	// --- Pause/Unpause Role and Functionality Tests ---
 
-	function testPause_Fail_NoRole() public {
+	function testPauseFailNoRole() public {
 		address nonPauser = makeAddr("nonPauser");
 		vm.startPrank(nonPauser);
 		vm.expectRevert("MorpherToken: must have pauser role to pause");
@@ -634,7 +622,7 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 	}
 
-	function testUnpause_Fail_NoRole() public {
+	function testUnpauseFailNoRole() public {
 		address nonPauser = makeAddr("nonPauser");
 		// Pause first
 		vm.startPrank(_pauser);
@@ -648,7 +636,7 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 	}
 
-	function testTransfer_Fail_WhenPaused() public {
+	function testTransferFailWhenPaused() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
 		vm.startPrank(_admin);
@@ -677,12 +665,13 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		vm.startPrank(nonAirdropAdmin);
-		vm.expectRevert("MorpherToken: Missing required role."); // AIRDROPADMIN_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.lockRewards(user, 1 ether);
 		vm.stopPrank();
 	}
 
-	function testUnlockRewards_Fail_NoRole() public {
+	function testUnlockRewardsFailNoRole() public {
 		address user = makeAddr("user");
 		address nonAdmin = makeAddr("nonAdmin");
 		// Grant AIRDROPADMIN_ROLE to admin for locking
@@ -693,9 +682,8 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		vm.startPrank(nonAdmin);
-		vm.expectRevert(
-			"MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"
-		); // ADMINISTRATOR_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.unlockRewards(user, 1 ether);
 		vm.stopPrank();
 	}
@@ -708,7 +696,8 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		vm.startPrank(nonAdmin);
-		vm.expectRevert("MorpherToken: Missing required role."); // ADMINISTRATOR_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.lockTokensForTime(user, 1 ether, 1 days);
 		vm.stopPrank();
 	}
@@ -718,7 +707,8 @@ contract MorpherTokenTest is
 	function testSetRestrictTransfersFailNoRole() public {
 		address nonAdmin = makeAddr("nonAdmin");
 		vm.startPrank(nonAdmin);
-		vm.expectRevert("MorpherToken: Missing required role."); // ADMINISTRATOR_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.setRestrictTransfers(true);
 		vm.stopPrank();
 	}
@@ -726,7 +716,8 @@ contract MorpherTokenTest is
 	function testSetTotalTokensOnOtherChainFailNoRole() public {
 		address nonUpdater = makeAddr("nonUpdater");
 		vm.startPrank(nonUpdater);
-		vm.expectRevert("MorpherToken: Missing required role."); // TOKENUPDATER_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.setTotalTokensOnOtherChain(1 ether);
 		vm.stopPrank();
 	}
@@ -734,7 +725,8 @@ contract MorpherTokenTest is
 	function testSetTotalInPositionsFailNoRole() public {
 		address nonUpdater = makeAddr("nonUpdater");
 		vm.startPrank(nonUpdater);
-		vm.expectRevert("MorpherToken: Missing required role."); // TOKENUPDATER_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.setTotalInPositions(1 ether);
 		vm.stopPrank();
 	}
@@ -742,7 +734,8 @@ contract MorpherTokenTest is
 	function testSetDailyMintedTransferLimitFailNoRole() public {
 		address nonAdmin = makeAddr("nonAdmin");
 		vm.startPrank(nonAdmin);
-		vm.expectRevert("MorpherToken: Missing required role."); // ADMINISTRATOR_ROLE hash
+		// Use generic role error message from modifier
+		vm.expectRevert("MorpherToken: Missing required role.");
 		morpherToken.setDailyMintedTransferLimit(1 ether);
 		vm.stopPrank();
 	}
@@ -760,15 +753,12 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
-		bytes32 permitTypehash = keccak256(
-			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-		);
-		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
-		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
-		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
-		vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("ERC2612ExpiredSignature(uint256)")), deadline)); // OZ v5 error
+		// Generate signature using helper
+		(uint8 v, bytes32 r, bytes32 s) = _generatePermitSignature(owner, spender, value, nonce, deadline);
+
+		// Use correct OZ v5 error signature
+		vm.expectRevert(abi.encodeWithSelector(ERC20PermitUpgradeable.ERC2612ExpiredSignature.selector, deadline));
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 	}
 
@@ -784,28 +774,24 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
+
+		// Generate signature using helper, but sign with wrong key
 		bytes32 permitTypehash = keccak256(
 			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
 		);
 		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
 		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
-		// Sign with wrong key
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongSigner.key, finalHash);
-		{
-			vm.expectRevert(
-				abi.encodeWithSelector(
-					bytes4(keccak256("ERC2612InvalidSigner(address,address)")),
-					wrongSigner.addr,
-					owner.addr
-				)
-			); // OZ v5 error
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongSigner.key, finalHash); // Sign with wrong key
 
-			morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
-		}
+		// Use correct OZ v5 error signature
+		vm.expectRevert(
+			abi.encodeWithSelector(ERC20PermitUpgradeable.ERC2612InvalidSigner.selector, wrongSigner.addr, owner.addr)
+		);
+		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 	}
 
-	function testPermit_Fail_Replay() public {
+	function testPermitFailReplay() public {
 		Account memory owner = makeAccount("owner");
 		address spender = address(0xdef);
 		uint value = 1 ether;
@@ -816,20 +802,47 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
-		bytes32 permitTypehash = keccak256(
-			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-		);
-		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
-		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
-		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		// Generate signature using helper
+		(uint8 v, bytes32 r, bytes32 s) = _generatePermitSignature(owner, spender, value, nonce, deadline);
 
 		// First call succeeds
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 		assertEq(morpherToken.nonces(owner.addr), nonce + 1);
 
 		// Second call with same signature should fail due to nonce mismatch
-		vm.expectRevert("InvalidAccountNonce(address,uint256)"); // OZ v5 error
+		// Use correct OZ v5 error signature from NoncesUpgradeable (inherited via ERC20PermitUpgradeable)
+		vm.expectRevert(abi.encodeWithSelector(NoncesUpgradeable.InvalidAccountNonce.selector, owner.addr, nonce + 1));
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+	}
+
+	// --- Helper Function for Permit Signature Generation ---
+
+	/**
+	 * @dev Internal helper to generate permit signature components.
+	 */
+	function _generatePermitSignature(
+		Account memory owner,
+		address spender,
+		uint256 value,
+		uint256 nonce,
+		uint256 deadline
+	) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+		// Rebuild Permit typehash locally for signing
+		bytes32 permitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
+
+		// Hash the struct data
+		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
+
+		// Get domain separator from the contract
+		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
+
+		// Create the EIP712 digest
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
+
+		// Sign the digest
+		(v, r, s) = vm.sign(owner.key, finalHash);
 	}
 }
