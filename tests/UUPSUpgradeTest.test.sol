@@ -66,11 +66,11 @@ contract UUPSUpgradeTest is Test {
 
         // 4. Deploy MorpherToken V1 via Proxy
         bytes memory tokenInitData = abi.encodeCall(MorpherToken.initialize, (accessControlAddress, stateAddress, TOKEN_PERMIT_NAME));
-        // Use the version without Options
-        tokenProxyAddress = Upgrades.deployUUPSProxy(TOKEN_V1, tokenInitData);
+        // Use UnsafeUpgrades with implementation address
+        tokenProxyAddress = UnsafeUpgrades.deployUUPSProxy(address(tokenImpl), tokenInitData);
         morpherTokenProxy = MorpherToken(tokenProxyAddress);
 
-        // 4. Set Token address in State (needed by Token's _authorizeUpgrade)
+        // 5. Set Token address in State (needed by Token's _authorizeUpgrade) // Update comment number
         stateProxy.setMorpherToken(tokenProxyAddress);
     }
 
