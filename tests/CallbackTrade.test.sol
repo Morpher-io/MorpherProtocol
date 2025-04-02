@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.20; // Update pragma if needed
 
 import "forge-std/Test.sol";
-import {Upgrades} from "openzeppelin-foundry-upgrades/LegacyUpgrades.sol";
+// --- Use UnsafeUpgrades ---
+import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import "forge-std/console.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Script} from "forge-std/Script.sol";
+// --- Use V5 Contracts ---
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
-import {ProxyAdmin} from "openzeppelin-contracts-5/contracts/proxy/transparent/ProxyAdmin.sol";
-import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
+// Remove ProxyAdmin import
+// import {ProxyAdmin} from "openzeppelin-contracts-5/contracts/proxy/transparent/ProxyAdmin.sol";
+// Remove Options import
+// import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 
 import {MorpherOracle} from "../contracts/MorpherOracle.sol";
 import {MorpherState} from "../contracts/MorpherState.sol";
@@ -20,10 +24,11 @@ import {IOracle} from "account-abstraction-v7/samples/utils/IOracle.sol";
 import {UniswapHelper} from "account-abstraction-v7/samples/utils/UniswapHelper.sol";
 import {ISwapRouter} from "uniswap-v3-periphery/interfaces/ISwapRouter.sol";
 
-import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol"; // Keep if used
 
-import {ITransparentUpgradeableProxy} from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
+// Remove ITransparentUpgradeableProxy import
+// import {ITransparentUpgradeableProxy} from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol"; // Keep if used
 
 interface UniswapQuoter {
 	function factory() external view returns (address);
@@ -47,23 +52,36 @@ contract CallbackTrade is Test {
 	bytes32 public constant CRYPTO_BTC = keccak256("CRYPTO_BTC");
 	bytes32 public constant CRYPTO_ETH = keccak256("CTYPTO_ETH");
 
-	
+	// Define PROXYUPDATER_ROLE for clarity
+	bytes32 constant PROXYUPDATER_ROLE = keccak256("PROXYUPDATER_ROLE");
 
 	function _testCallbackOracle() public {
+		// --- Use V5 contract interfaces ---
 		MorpherState state = MorpherState(morpherStateAddress);
 		MorpherOracle oracle = MorpherOracle(oracleProxyAddress);
 		MorpherToken morpherToken = MorpherToken(state.morpherTokenAddress());
-		ProxyAdmin admin = ProxyAdmin(0x3cFa9C5F4238fe6200b73038b1e6daBb5F6b8A0a);
+		MorpherAccessControl morpherAccessControl = MorpherAccessControl(state.morpherAccessControlAddress());
+		// Remove ProxyAdmin
 
-		vm.startPrank(0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762);
-		MorpherOracle newOracle = new MorpherOracle();
-		admin.upgrade(ITransparentUpgradeableProxy(oracleProxyAddress), address(newOracle));
+		// --- Assume the prank address has PROXYUPDATER_ROLE for upgrades ---
+		address proxyUpdater = 0x51c5cE7C4926D5cA74f4824e11a062f1Ef491762;
+		// Grant the role if needed (might require another admin prank)
+		// vm.startPrank(admin_address);
+		// morpherAccessControl.grantRole(PROXYUPDATER_ROLE, proxyUpdater);
+		// vm.stopPrank();
 
-		MorpherTradeEngine newTradeEngine = new MorpherTradeEngine();
-		admin.upgrade(ITransparentUpgradeableProxy(tradeEngineAddress), address(newTradeEngine));
-		MorpherAccessControl newAccessControl = new MorpherAccessControl();
-		admin.upgrade(ITransparentUpgradeableProxy(state.morpherAccessControlAddress()), address(newAccessControl));
-		MorpherAccessControl morpherAccessControl = MorpherAccessControl(0x139950831d8338487db6807c6FdAeD1827726dF2);
+		vm.startPrank(proxyUpdater);
+		// Deploy new implementations first
+		MorpherOracle newOracleImpl = new MorpherOracle();
+		MorpherTradeEngine newTradeEngineImpl = new MorpherTradeEngine();
+		MorpherAccessControl newAccessControlImpl = new MorpherAccessControl();
+
+		// Upgrade using UnsafeUpgrades
+		UnsafeUpgrades.upgradeProxy(oracleProxyAddress, address(newOracleImpl), "");
+		UnsafeUpgrades.upgradeProxy(tradeEngineAddress, address(newTradeEngineImpl), "");
+		UnsafeUpgrades.upgradeProxy(state.morpherAccessControlAddress(), address(newAccessControlImpl), "");
+
+		// Grant roles using the (potentially upgraded) access control instance
 		morpherAccessControl.grantRole(oracle.ORACLEOPERATOR_ROLE(), 0x58f0442c8F9C9ecd2a09b9De3f1D834068387304);
 		morpherAccessControl.grantRole(oracle.ORACLEOPERATOR_ROLE(), 0x1fdd1bB9AFc69F19ebBF55ceB5153c43b5C5bc1E);
 		morpherAccessControl.grantRole(oracle.ORACLEOPERATOR_ROLE(), 0x181AD9eBA392b8001eeAD315e50E9fD9572116D2);
