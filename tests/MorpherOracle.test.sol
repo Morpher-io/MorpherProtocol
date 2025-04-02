@@ -914,11 +914,11 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			)
 		);
 		
-		bytes32 domainHash = keccak256(
-			abi.encode(keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"), keccak256("MorpherToken"), keccak256("1"), block.chainid, address(morpherToken))
-		);
+		// Get the correct domain separator from the MorpherToken contract
+		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
 
-		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
+		// Use MessageHashUtils and ECDSA
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
