@@ -10,6 +10,9 @@ import "../contracts/MorpherAccessControl.sol";
 import "../contracts/MorpherState.sol"; // Needed for Token init
 import "../contracts/MorpherToken.sol"; // V1 Implementation
 import "../contracts/mocks/MorpherTokenV2.sol"; // V2 Implementation Mock
+// Import proxy interface for try/catch
+import {IUpgradeableProxy} from "../lib/openzeppelin-contracts-5/contracts/proxy/ERC1967/IUpgradeableProxy.sol";
+
 
 contract UUPSUpgradeTest is Test {
 
