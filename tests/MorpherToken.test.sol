@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.20; // Update pragma if needed
 
-import "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/ERC20Upgradeable.sol";
-import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/ERC20Upgradeable.sol";
+import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
+// Import EIP712 for struct hashing in test (optional, can reconstruct hash manually)
+// import {EIP712} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/EIP712.sol";
 
 import "./BaseSetup.sol";
 
-contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
+contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgradeable inheritance if not needed directly
 	address _admin = address(0x1234);
 	address _tokenUpdater = address(0x5678);
 	address _pauser = address(0x90);
 
-	bytes32 private constant _TYPE_HASH =
-		keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-	bytes32 private constant _PERMIT_TYPEHASH =
-		keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+	// --- Remove manual EIP712 constants ---
+	// bytes32 private constant _TYPE_HASH = ...;
+	// bytes32 private constant _PERMIT_TYPEHASH = ...; // Rebuild locally if needed for signing
 
 	event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);
 	event SetTotalTokensInPositions(uint256 _oldValue, uint256 _newValue);
@@ -162,7 +163,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 
 		// Try to transfer more than available balance
 		vm.startPrank(user);
-		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
+		vm.expectRevert("MorpherToken: transfer amount exceeds available balance (locked)");
 		morpherToken.transfer(address(0x123), 6 ether);
 
 		// Transfer within available balance
@@ -216,7 +217,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 
 		// Try to transfer more than available balance
 		vm.startPrank(user);
-		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
+		vm.expectRevert("MorpherToken: transfer amount exceeds available balance (locked)");
 		morpherToken.transfer(address(0x123), 4 ether);
 
 		// Transfer within available balance
