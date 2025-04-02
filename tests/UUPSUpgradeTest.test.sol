@@ -40,7 +40,8 @@ contract UUPSUpgradeTest is Test {
 
         // 1. Deploy Access Control via Proxy
         bytes memory acInitData = abi.encodeCall(MorpherAccessControl.initialize, ());
-        accessControlAddress = Upgrades.deployUUPSProxy(ACCESS_CONTROL_V1, acInitData, Options({}));
+        // Use the version without Options
+        accessControlAddress = Upgrades.deployUUPSProxy(ACCESS_CONTROL_V1, acInitData);
         accessControlProxy = MorpherAccessControl(accessControlAddress);
 
         // Grant deployer admin role on AccessControl for setup
@@ -49,12 +50,14 @@ contract UUPSUpgradeTest is Test {
 
         // 2. Deploy State via Proxy (needed for Token)
         bytes memory stateInitData = abi.encodeCall(MorpherState.initialize, (true, accessControlAddress));
-        stateAddress = Upgrades.deployUUPSProxy(STATE_V1, stateInitData, Options({}));
+        // Use the version without Options
+        stateAddress = Upgrades.deployUUPSProxy(STATE_V1, stateInitData);
         stateProxy = MorpherState(stateAddress);
 
         // 3. Deploy MorpherToken V1 via Proxy
         bytes memory tokenInitData = abi.encodeCall(MorpherToken.initialize, (accessControlAddress, stateAddress, TOKEN_PERMIT_NAME));
-        tokenProxyAddress = Upgrades.deployUUPSProxy(TOKEN_V1, tokenInitData, Options({}));
+        // Use the version without Options
+        tokenProxyAddress = Upgrades.deployUUPSProxy(TOKEN_V1, tokenInitData);
         morpherTokenProxy = MorpherToken(tokenProxyAddress);
 
         // 4. Set Token address in State (needed by Token's _authorizeUpgrade)
@@ -73,7 +76,8 @@ contract UUPSUpgradeTest is Test {
 
         // Expect revert from _authorizeUpgrade (or AccessControl if role check fails there)
         vm.expectRevert(bytes("MorpherToken: Caller is not the proxy updater")); // Match error in MorpherToken V1's _authorizeUpgrade
-        Upgrades.upgradeProxy(tokenProxyAddress, TOKEN_V2_MOCK, "", Options({}));
+        // Use the version without Options
+        Upgrades.upgradeProxy(tokenProxyAddress, TOKEN_V2_MOCK, "");
     }
 
     function test_UUPSUpgrade_Success() public {
@@ -91,7 +95,8 @@ contract UUPSUpgradeTest is Test {
         // Perform upgrade as the authorized deployer
         vm.prank(deployer);
         // Use upgradeProxy - it deploys V2 and calls upgradeTo on the proxy
-        Upgrades.upgradeProxy(tokenProxyAddress, TOKEN_V2_MOCK, "", Options({}));
+        // Use the version without Options
+        Upgrades.upgradeProxy(tokenProxyAddress, TOKEN_V2_MOCK, "");
 
         // Verify implementation address changed
         address implV2Address = Upgrades.getImplementationAddress(tokenProxyAddress);
@@ -111,7 +116,8 @@ contract UUPSUpgradeTest is Test {
 
         // Perform upgrade as the authorized deployer, including the call data
         vm.prank(deployer);
-        Upgrades.upgradeProxy(tokenProxyAddress, TOKEN_V2_MOCK, upgradeData, Options({}));
+        // Use the version without Options
+        Upgrades.upgradeProxy(tokenProxyAddress, TOKEN_V2_MOCK, upgradeData);
 
         // Interact with V2 via the proxy address
         MorpherTokenV2 morpherTokenV2 = MorpherTokenV2(tokenProxyAddress);
