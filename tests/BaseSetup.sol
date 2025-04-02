@@ -10,13 +10,14 @@ import "../contracts/MorpherStaking.sol";
 import "../contracts/MorpherMintingLimiter.sol";
 import "../contracts/MorpherTradeEngine.sol";
 import "../contracts/MorpherOracle.sol";
-import "../contracts/MorpherBridge.sol";
 import "../contracts/MorpherAdmin.sol";
 import "../contracts/MorpherAirdrop.sol";
 import "../contracts/MorpherInterestRateManager.sol";
 import "../contracts/MorpherSidechainToBaseMigration.sol";
 
 import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
+import {ISwapRouter} from "../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol";
+
 
 contract BaseSetup is Test {
 	using stdStorage for StdStorage;
@@ -35,7 +36,6 @@ contract BaseSetup is Test {
 	MorpherMintingLimiter internal morpherMintingLimiter;
 	MorpherTradeEngine internal morpherTradeEngine;
 	MorpherOracle internal morpherOracle;
-	MorpherBridge internal morpherBridge;
 	MorpherAdmin internal morpherAdmin;
 	MorpherInterestRateManager internal morpherInterestRateManager;
 	MorpherAirdrop internal morpherAirdrop;
@@ -127,14 +127,6 @@ contract BaseSetup is Test {
 		morpherOracle.initialize(address(morpherState), payable(address(this)), 0);
 		morpherAccessControl.grantRole(morpherTradeEngine.ORACLE_ROLE(), address(morpherOracle));
 		morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this));
-
-		//deploy bridge
-		morpherBridge = new MorpherBridge();
-		morpherBridge.initialize(address(morpherState), recoveryEnabled_baseSetup, swapRouter_baseSetup);
-		morpherState.setMorpherBridge(address(morpherBridge));
-		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherBridge));
-		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherBridge));
-		morpherAccessControl.grantRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), address(this));
 
 		morpherAccessControl.revokeRole(morpherState.ADMINISTRATOR_ROLE(), address(this));
 	}
