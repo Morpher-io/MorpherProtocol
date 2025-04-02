@@ -765,24 +765,27 @@ contract MorpherTokenTest is
 	function testPermitFailInvalidSignature() public {
 		Account memory owner = makeAccount("owner");
 		Account memory wrongSigner = makeAccount("wrongSigner");
-		address spender = address(0xdef);
-		uint value = 1 ether;
-		uint deadline = block.timestamp + 1 hours;
+		// Inlined spender, value, deadline below where possible
 
 		vm.startPrank(_admin);
-		morpherToken.mint(owner.addr, value);
+		morpherToken.mint(owner.addr, 1 ether); // Use literal value
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
+		uint256 currentDeadline = block.timestamp + 1 hours; // Store deadline once
 
-		// Generate the digest using the helper's logic (or call helper and re-sign)
-		// For clarity, let's recalculate the digest here to sign with the wrong key
-		bytes32 permitTypehash = keccak256(
-			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		// Combine hash generation slightly
+		bytes32 structHash = keccak256(
+			abi.encode(
+				keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+				owner.addr,
+				address(0xdef), // Inline spender
+				1 ether, // Inline value
+				nonce,
+				currentDeadline // Use stored deadline
+			)
 		);
-		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
-		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
-		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(morpherToken.DOMAIN_SEPARATOR(), structHash);
 
 		// Sign the digest with the wrong signer's key
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongSigner.key, finalHash);
@@ -791,7 +794,8 @@ contract MorpherTokenTest is
 		vm.expectRevert(
 			abi.encodeWithSelector(ERC20PermitUpgradeable.ERC2612InvalidSigner.selector, wrongSigner.addr, owner.addr)
 		);
-		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+		// Call permit with literals/stored deadline
+		morpherToken.permit(owner.addr, address(0xdef), 1 ether, currentDeadline, v, r, s);
 	}
 
 	function testPermitFailReplay() public {
