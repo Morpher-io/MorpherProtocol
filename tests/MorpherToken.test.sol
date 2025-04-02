@@ -35,16 +35,16 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 	function testAdminFunctions() public {
 		vm.startPrank(_admin);
 
-		string memory name = "MorpherToken2";
-		bytes32 expectedHash = keccak256(bytes(name));
-		morpherToken.setHashedName(name);
-
-		string memory version = "2";
-		expectedHash = keccak256(bytes(version));
-		morpherToken.setHashedVersion(version);
+		// --- Remove setHashedName/Version calls ---
+		// string memory name = "MorpherToken2";
+		// bytes32 expectedHash = keccak256(bytes(name));
+		// morpherToken.setHashedName(name);
+		// string memory version = "2";
+		// expectedHash = keccak256(bytes(version));
+		// morpherToken.setHashedVersion(version);
 
 		vm.expectEmit(true, true, true, true);
-		emit SetRestrictTransfers(false, false);
+		emit SetRestrictTransfers(false, false); // Assuming initial state is false
 		morpherToken.setRestrictTransfers(false);
 		assertEq(morpherToken.getRestrictTransfers(), false);
 
@@ -84,29 +84,30 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		Account memory owner = makeAccount("owner");
 		address spender = address(0xdef);
 		uint value = 1 ether;
-		uint deadline = 100;
+		uint deadline = block.timestamp + 1 hours; // Use future timestamp
 
 		vm.startPrank(_admin);
-
-		bytes32 nameHash = keccak256(bytes("MorpherToken2"));
-		morpherToken.setHashedName("MorpherToken2");
-
-		bytes32 versionHash = keccak256(bytes("2"));
-		morpherToken.setHashedVersion("2");
-
 		morpherToken.mint(owner.addr, value);
-
 		vm.stopPrank();
 
 		uint nonce = morpherToken.nonces(owner.addr);
 
-		bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, owner.addr, spender, value, nonce, deadline));
-		bytes32 domainSeparator = keccak256(
-			abi.encode(_TYPE_HASH, nameHash, versionHash, block.chainid, address(morpherToken))
-		);
+		// Rebuild Permit typehash locally for signing
+		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+		// Hash the struct data
+		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
+
+		// Get domain separator from the contract (it now uses ERC20Permit's implementation)
+		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
+
+		// Create the EIP712 digest
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
+
+		// Sign the digest
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
+		// Call permit
 		vm.expectEmit(true, true, true, true);
 		emit Approval(owner.addr, spender, value);
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
