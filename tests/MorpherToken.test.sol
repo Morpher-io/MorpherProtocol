@@ -93,7 +93,9 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		uint nonce = morpherToken.nonces(owner.addr);
 
 		// Rebuild Permit typehash locally for signing
-		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+		bytes32 permitTypehash = keccak256(
+			"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+		);
 
 		// Hash the struct data
 		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
@@ -136,166 +138,166 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		totalSupply = morpherToken.totalSupply();
 		assertEq(totalSupply, 2 ether);
 	}
-	
+
 	function testTimeLockTokens() public {
 		address user = address(0xabcdef);
-		
+
 		// Mint tokens to user
 		vm.startPrank(_admin);
 		morpherToken.mint(user, 10 ether);
-		
+
 		// Lock 5 ether for 180 days
 		uint256 lockDuration = 180 days;
 		morpherToken.lockTokensForTime(user, 5 ether, lockDuration);
 		vm.stopPrank();
-		
+
 		// Check balances
 		assertEq(morpherToken.getTradeableBalanceOf(user), 10 ether);
 		assertEq(morpherToken.balanceOf(user), 5 ether); // Only 5 ether available
-		
+
 		// Get time lock info
 		(uint256 lockedAmount, uint256 lockedUntil) = morpherToken.getTimeLock(user);
 		assertEq(lockedAmount, 5 ether);
 		assertEq(lockedUntil, block.timestamp + lockDuration);
-		
+
 		// Try to transfer more than available balance
 		vm.startPrank(user);
 		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
 		morpherToken.transfer(address(0x123), 6 ether);
-		
+
 		// Transfer within available balance
 		morpherToken.transfer(address(0x123), 4 ether);
 		vm.stopPrank();
-		
+
 		// Check balances after transfer
 		assertEq(morpherToken.getTradeableBalanceOf(user), 6 ether);
 		assertEq(morpherToken.balanceOf(user), 1 ether);
-		
+
 		// Fast forward past lock period
 		vm.warp(block.timestamp + lockDuration + 1);
-		
+
 		// Check that tokens are now available
 		(lockedAmount, lockedUntil) = morpherToken.getTimeLock(user);
 		assertEq(lockedAmount, 0); // Lock has expired
 		assertEq(lockedUntil, 0);
-		
+
 		// Balances should reflect unlocked tokens
 		assertEq(morpherToken.balanceOf(user), 6 ether);
-		
+
 		// Manually trigger unlock
 		vm.prank(user);
 		morpherToken.unlockExpiredTokens(user);
-		
+
 		// Check total time locked
 		assertEq(morpherToken.getTotalTimeLocked(), 0);
 	}
-	
+
 	function testTimeLockAndRewardsLock() public {
 		address user = address(0xabcdef);
-		
+
 		// Grant AIRDROPADMIN_ROLE to admin for reward locking
 		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), _admin);
 		vm.startPrank(_admin);
-		
+
 		// Mint tokens to user
 		morpherToken.mint(user, 10 ether);
-		
+
 		// Lock 3 ether as rewards
 		morpherToken.lockRewards(user, 3 ether);
-		
+
 		// Lock 4 ether with time lock
 		uint256 lockDuration = 30 days;
 		morpherToken.lockTokensForTime(user, 4 ether, lockDuration);
 		vm.stopPrank();
-		
+
 		// Check balances
 		assertEq(morpherToken.getTradeableBalanceOf(user), 10 ether);
 		assertEq(morpherToken.balanceOf(user), 3 ether); // 10 - 3 (rewards) - 4 (time lock)
-		
+
 		// Try to transfer more than available balance
 		vm.startPrank(user);
 		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
 		morpherToken.transfer(address(0x123), 4 ether);
-		
+
 		// Transfer within available balance
 		morpherToken.transfer(address(0x123), 2 ether);
 		vm.stopPrank();
-		
+
 		// Check balances after transfer
 		assertEq(morpherToken.getTradeableBalanceOf(user), 8 ether);
 		assertEq(morpherToken.balanceOf(user), 1 ether);
-		
+
 		// Fast forward past time lock period
 		vm.warp(block.timestamp + lockDuration + 1);
-		
+
 		// Check balances - time lock should be expired but rewards lock remains
 		assertEq(morpherToken.balanceOf(user), 5 ether); // 8 - 3 (rewards)
-		
+
 		// Manually trigger unlock
 		vm.prank(user);
 		morpherToken.unlockExpiredTokens(user);
-		
+
 		// Unlock rewards
 		vm.startPrank(_admin);
 		morpherToken.unlockRewards(user, 3 ether);
 		vm.stopPrank();
-		
+
 		// Check final balance - all locks removed
 		assertEq(morpherToken.balanceOf(user), 8 ether);
 	}
-	
+
 	function testDailyMintedTransferLimit() public {
 		address user = address(0xabcdef);
 		address recipient = address(0x123456);
-		
+
 		// Set daily transfer limit
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(5 ether);
 		vm.stopPrank();
-		
+
 		// Mint tokens as MintingLimiter (these should not be tracked as transferred in)
 		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 10 ether);
 		vm.stopPrank();
-		
+
 		// Check balance and transferred in tokens
 		assertEq(morpherToken.balanceOf(user), 10 ether);
 		assertEq(morpherToken.getTransferredInTokens(user), 0 ether);
-		
+
 		// Try to transfer more than the daily limit
 		vm.startPrank(user);
 		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
 		morpherToken.transfer(recipient, 6 ether);
 		vm.stopPrank();
-		
+
 		// Transfer within the limit
 		vm.startPrank(user);
 		morpherToken.transfer(recipient, 4 ether);
 		vm.stopPrank();
-		
+
 		// Check balances after transfer
 		assertEq(morpherToken.balanceOf(user), 6 ether);
 		assertEq(morpherToken.balanceOf(recipient), 4 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 4 ether);
 		assertEq(morpherToken.getTransferredInTokens(recipient), 4 ether);
-		
+
 		// Try another transfer that would exceed the limit
 		vm.startPrank(user);
 		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
 		morpherToken.transfer(recipient, 2 ether);
 		vm.stopPrank();
-		
+
 		// Transfer exactly at the limit
 		vm.startPrank(user);
 		morpherToken.transfer(recipient, 1 ether);
 		vm.stopPrank();
-		
+
 		// Check final balances
 		assertEq(morpherToken.balanceOf(user), 5 ether);
 		assertEq(morpherToken.balanceOf(recipient), 5 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user), 5 ether);
 		assertEq(morpherToken.getTransferredInTokens(recipient), 5 ether);
-		
+
 		// Test burn/mint cycle with TradeEngine
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user, 3 ether);
@@ -304,19 +306,19 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 3 ether);
 		vm.stopPrank();
-		
+
 		// Admin should be able to bypass the limit
 		vm.startPrank(_admin);
 		morpherToken.mint(user, 10 ether);
 		vm.stopPrank();
-		
+
 		// Admin transfer should bypass limit
 		vm.prank(user);
 		morpherToken.approve(_admin, 10 ether);
 		vm.startPrank(_admin);
 		morpherToken.transferFrom(user, recipient, 10 ether);
 		vm.stopPrank();
-		
+
 		// Check final balances after admin transfer
 		assertEq(morpherToken.balanceOf(user), 5 ether);
 		assertEq(morpherToken.balanceOf(recipient), 15 ether);
@@ -324,47 +326,47 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 	function testTransferredInTokensWithBurnMintCycle() public {
 		address user1 = address(0xabcdef);
 		address user2 = address(0x123456);
-		
+
 		// Set daily transfer limit
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(5 ether);
 		morpherToken.mint(user1, 10 ether);
 		vm.stopPrank();
-		
+
 		// User1 transfers to User2
 		vm.startPrank(user1);
 		morpherToken.transfer(user2, 10 ether);
 		vm.stopPrank();
-		
+
 		// Check that User2 has transferred in tokens
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		
+
 		// TradeEngine burns tokens (opening a position)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user2, 10 ether);
 		vm.stopPrank();
-		
+
 		// Check balances
 		assertEq(morpherToken.balanceOf(user2), 0 ether);
 		// Transferred in tokens remain the same even after burning
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		
+
 		// TradeEngine mints tokens back (closing a position with 50% profit)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.mint(user2, 15 ether); // 10 original + 5 profit
 		vm.stopPrank();
-		
+
 		// Check balances - user should have 15 ether total
 		assertEq(morpherToken.balanceOf(user2), 15 ether);
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		
+
 		// User2 should be able to transfer all tokens (10 original + 5 profit)
 		// The first 10 ether should be from transferred-in tokens (not subject to limit)
 		// The 5 ether profit is within the daily limit
 		vm.startPrank(user2);
 		morpherToken.transfer(user1, 15 ether);
 		vm.stopPrank();
-		
+
 		// Check final balances
 		assertEq(morpherToken.balanceOf(user2), 0 ether);
 		assertEq(morpherToken.balanceOf(user1), 15 ether);
@@ -373,93 +375,93 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 	}
 	function testMintFromOtherSourcesTrackedAsTransferredIn() public {
 		address user = address(0xabcdef);
-		
+
 		// Mint tokens as admin (should be tracked as transferred in)
 		vm.startPrank(_admin);
 		morpherToken.mint(user, 10 ether);
 		vm.stopPrank();
-		
+
 		// Check balance and transferred in tokens
 		assertEq(morpherToken.balanceOf(user), 10 ether);
 		assertEq(morpherToken.getTransferredInTokens(user), 10 ether);
-		
+
 		// Mint tokens as MintingLimiter (should not be tracked as transferred in)
 		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 5 ether);
 		vm.stopPrank();
-		
+
 		// Check updated balance and transferred in tokens
 		assertEq(morpherToken.balanceOf(user), 15 ether);
 		assertEq(morpherToken.getTransferredInTokens(user), 10 ether); // Still 10 ether
-		
+
 		// Mint tokens as TradeEngine (should not be tracked as transferred in)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.mint(user, 5 ether);
 		vm.stopPrank();
-		
+
 		// Check final balance and transferred in tokens
 		assertEq(morpherToken.balanceOf(user), 20 ether);
 		assertEq(morpherToken.getTransferredInTokens(user), 10 ether); // Still 10 ether
 	}
-	
+
 	function testPositionWithProfitAndTransferLimit() public {
 		address user1 = address(0xabcdef);
 		address user2 = address(0x123456);
-		
+
 		// Set daily transfer limit to 3 ether (less than the expected profit)
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(3 ether);
 		morpherToken.mint(user1, 10 ether);
 		vm.stopPrank();
-		
+
 		// User1 transfers to User2
 		vm.startPrank(user1);
 		morpherToken.transfer(user2, 10 ether);
 		vm.stopPrank();
-		
+
 		// Verify initial state
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		
+
 		// TradeEngine burns tokens (opening a position)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user2, 10 ether);
 		vm.stopPrank();
-		
+
 		// Verify state after burning - transferred in tokens remain the same
 		assertEq(morpherToken.balanceOf(user2), 0);
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		
+
 		// TradeEngine mints tokens back (closing position with 100% profit)
 		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.mint(user2, 20 ether); // 10 original + 10 profit
 		vm.stopPrank();
-		
+
 		// Verify state after minting
 		assertEq(morpherToken.balanceOf(user2), 20 ether);
 		assertEq(morpherToken.getTransferredInTokens(user2), 10 ether);
-		
+
 		// User2 should be able to transfer transferred-in tokens (10 ether) plus up to the daily limit (3 ether)
 		vm.startPrank(user2);
 		morpherToken.transfer(user1, 13 ether);
 		vm.stopPrank();
-		
+
 		// Verify state after first transfer
 		assertEq(morpherToken.balanceOf(user2), 7 ether);
 		assertEq(morpherToken.balanceOf(user1), 13 ether);
 		assertEq(morpherToken.getTransferredInTokens(user2), 0); // Transferred-in tokens fully used
 		assertEq(morpherToken.getDailyMintedTransfers(user2), 3 ether); // 3 ether counted toward daily limit
-		
+
 		// Try to transfer more than the remaining daily limit
 		vm.startPrank(user2);
 		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
 		morpherToken.transfer(user1, 4 ether); // Would exceed daily limit
 		vm.stopPrank();
-		
+
 		// Transfer exactly at the remaining limit
 		vm.startPrank(user2);
 		morpherToken.transfer(user1, 0 ether); // No more transfers allowed today
 		vm.stopPrank();
-		
+
 		// Verify final state
 		assertEq(morpherToken.balanceOf(user2), 7 ether);
 		assertEq(morpherToken.balanceOf(user1), 13 ether);
