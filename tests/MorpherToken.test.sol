@@ -817,10 +817,23 @@ contract MorpherTokenTest is
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 		assertEq(morpherToken.nonces(owner.addr), nonce + 1);
 
+		assertEq(morpherToken.nonces(owner.addr), nonce + 1);
+
 		// Second call with same signature should fail due to nonce mismatch, resulting in an invalid signer error
-		// Expect ERC2612InvalidSigner because the digest generated with the incremented nonce won't match the signature
-		vm.expectRevert(ERC20PermitUpgradeable.ERC2612InvalidSigner.selector);
-		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+		// Use try/catch to check only the selector, as vm.expectRevert(selector) seems to compare full data
+		try morpherToken.permit(owner.addr, spender, value, deadline, v, r, s) {
+			fail("Second permit call should have reverted");
+		} catch (bytes memory revertData) {
+			// Check if the revert data starts with the expected selector
+			bytes4 actualSelector;
+			// Ensure revertData is long enough to contain the selector
+			if (revertData.length >= 4) {
+				assembly {
+					actualSelector := mload(add(revertData, 0x20))
+				}
+			}
+			assertEq(actualSelector, ERC20PermitUpgradeable.ERC2612InvalidSigner.selector, "Incorrect error selector");
+		}
 	}
 
 	// --- Helper Function for Permit Signature Generation ---
