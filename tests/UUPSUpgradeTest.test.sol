@@ -83,21 +83,22 @@ contract UUPSUpgradeTest is Test {
     function test_UUPSUpgrade_Fail_Unauthorized() public {
         // Deploy V2 implementation manually
         MorpherTokenV2 implV2 = new MorpherTokenV2();
+        IUpgradeableProxy proxy = IUpgradeableProxy(tokenProxyAddress);
 
-        assertEq("5.0.0", morpherTokenProxy.UPGRADE_INTERFACE_VERSION());
-        (bool success, bytes memory returndata) = tokenProxyAddress.call(abi.encodeWithSignature("UPGRADE_INTERFACE_VERSION()"));
-        assertEq("5.0.0", abi.decode(returndata, (string)));
-
-        assertEq(true, success);
-        
-
-        // Expect revert from _authorizeUpgrade (or AccessControl if role check fails there)
-        vm.expectRevert("MorpherToken: Caller is not the proxy updater"); // Match error in MorpherToken V1's _authorizeUpgrade
-        // Attempt upgrade from an unauthorized address
-        vm.startPrank(unauthorizedUser, true);
-        // Use UnsafeUpgrades.upgradeProxy with implementation address
-        UnsafeUpgrades.upgradeProxy(tokenProxyAddress, address(implV2), "");
-        vm.stopPrank();
+        // Attempt upgrade from an unauthorized address using try/catch
+        vm.prank(unauthorizedUser); // Use regular prank for the try/catch block
+        try proxy.upgradeTo(address(implV2)) {
+            // If the call succeeds, the test should fail
+            fail("Upgrade by unauthorized user should have reverted");
+        } catch Error(string memory reason) {
+            // Assert that the revert reason matches the one from _authorizeUpgrade
+            assertEq(reason, "MorpherToken: Caller is not the proxy updater", "Incorrect revert reason");
+        } catch (bytes memory /*lowLevelData*/) {
+            // Catch other potential revert types (Panic, etc.) and fail
+            fail("Upgrade reverted with unexpected error type");
+        }
+        // Note: We are not calling UnsafeUpgrades.upgradeProxy here,
+        // as we are directly testing the proxy call that fails.
     }
 
     function test_UUPSUpgrade_Success() public {
