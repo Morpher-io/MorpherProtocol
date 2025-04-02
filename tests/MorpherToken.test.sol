@@ -468,4 +468,349 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable { // Remove ERC20Upgrad
 		assertEq(morpherToken.balanceOf(user1), 13 ether);
 		assertEq(morpherToken.getDailyMintedTransfers(user2), 3 ether);
 	}
+
+	// --- Additional Tests for Coverage ---
+
+	// --- _update Function Tests ---
+
+	function testUpdate_TransferRestriction_Fail_NoRole() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+		vm.startPrank(_admin);
+		morpherToken.mint(user1, 1 ether);
+		morpherToken.setRestrictTransfers(true); // Enable restriction
+		vm.stopPrank();
+
+		vm.startPrank(user1);
+		// User1 lacks TRANSFER_ROLE, MINTER_ROLE, BURNER_ROLE
+		vm.expectRevert("MorpherToken: Transfer denied by restriction");
+		morpherToken.transfer(user2, 1 ether);
+		vm.stopPrank();
+	}
+
+	function testUpdate_TransferRestriction_Success_SenderRole() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+		vm.startPrank(_admin);
+		morpherToken.mint(user1, 1 ether);
+		morpherToken.setRestrictTransfers(true); // Enable restriction
+		// Grant TRANSFER_ROLE to sender
+		morpherAccessControl.grantRole(morpherToken.TRANSFER_ROLE(), user1);
+		vm.stopPrank();
+
+		vm.startPrank(user1);
+		morpherToken.transfer(user2, 1 ether); // Should succeed
+		vm.stopPrank();
+		assertEq(morpherToken.balanceOf(user2), 1 ether);
+	}
+
+	function testUpdate_TransferRestriction_Success_MinterRole() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+		address minter = makeAddr("minter"); // Use a separate minter address for clarity
+		vm.startPrank(_admin);
+		morpherToken.mint(user1, 1 ether);
+		morpherToken.setRestrictTransfers(true); // Enable restriction
+		// Grant MINTER_ROLE to caller (minter)
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), minter);
+		// Approve minter to spend user1's tokens
+		vm.prank(user1);
+		morpherToken.approve(minter, 1 ether);
+		vm.stopPrank(); // Stop admin prank
+
+		vm.startPrank(minter);
+		morpherToken.transferFrom(user1, user2, 1 ether); // Should succeed as minter
+		vm.stopPrank();
+		assertEq(morpherToken.balanceOf(user2), 1 ether);
+	}
+
+	function testUpdate_TransferBlocked_Fail_Sender() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+		vm.startPrank(_admin);
+		morpherToken.mint(user1, 1 ether);
+		// Block the sender
+		morpherAccessControl.grantRole(morpherToken.TRANSFERBLOCKED_ROLE(), user1);
+		vm.stopPrank();
+
+		vm.startPrank(user1);
+		vm.expectRevert("MorpherToken: Transfer for sender is blocked.");
+		morpherToken.transfer(user2, 1 ether);
+		vm.stopPrank();
+	}
+
+	function testUpdate_TransferBlocked_Fail_Receiver() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+		vm.startPrank(_admin);
+		morpherToken.mint(user1, 1 ether);
+		// Block the receiver
+		morpherAccessControl.grantRole(morpherToken.TRANSFERBLOCKED_ROLE(), user2);
+		vm.stopPrank();
+
+		vm.startPrank(user1);
+		vm.expectRevert("MorpherToken: Transfer for receiver is blocked.");
+		morpherToken.transfer(user2, 1 ether);
+		vm.stopPrank();
+	}
+
+	function testUpdate_DailyLimit_AdminBypass() public {
+		address user = makeAddr("user");
+		address recipient = makeAddr("recipient");
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(1 ether); // Set low limit
+		morpherToken.mint(user, 10 ether); // Mint more than limit
+		// Approve admin to spend user's tokens
+		vm.prank(user);
+		morpherToken.approve(_admin, 10 ether);
+		vm.stopPrank(); // Stop user prank
+
+		// Transfer as admin - should bypass limit
+		vm.startPrank(_admin);
+		morpherToken.transferFrom(user, recipient, 5 ether); // Transfer more than limit
+		vm.stopPrank();
+
+		assertEq(morpherToken.balanceOf(recipient), 5 ether);
+		// Daily minted transfers for user should still be 0 as admin bypassed
+		assertEq(morpherToken.getDailyMintedTransfers(user), 0);
+	}
+
+	function testUpdate_DailyLimit_TradeEngineBypass() public {
+		address user = makeAddr("user");
+		address recipient = makeAddr("recipient");
+		address tradeEngine = morpherState.morpherTradeEngineAddress();
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(1 ether); // Set low limit
+		morpherToken.mint(user, 10 ether); // Mint more than limit
+		// Approve trade engine to spend user's tokens
+		vm.prank(user);
+		morpherToken.approve(tradeEngine, 10 ether);
+		vm.stopPrank(); // Stop user prank
+
+		// Transfer as trade engine - should bypass limit logic
+		vm.startPrank(tradeEngine);
+		morpherToken.transferFrom(user, recipient, 5 ether); // Transfer more than limit
+		vm.stopPrank();
+
+		assertEq(morpherToken.balanceOf(recipient), 5 ether);
+		// Daily minted transfers for user should still be 0 as trade engine bypassed
+		assertEq(morpherToken.getDailyMintedTransfers(user), 0);
+	}
+
+	// --- Mint/Burn Role Tests ---
+
+	function testMint_Fail_NoRole() public {
+		address user = makeAddr("user");
+		address nonMinter = makeAddr("nonMinter");
+		vm.startPrank(nonMinter);
+		vm.expectRevert("MorpherToken: Missing required role 0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6"); // MINTER_ROLE hash
+		morpherToken.mint(user, 1 ether);
+		vm.stopPrank();
+	}
+
+	function testBurn_Fail_NoRole() public {
+		address user = makeAddr("user");
+		address nonBurner = makeAddr("nonBurner");
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 1 ether);
+		vm.stopPrank();
+
+		vm.startPrank(nonBurner);
+		vm.expectRevert("MorpherToken: Missing required role 0x3c11d16cbaffd01df69ce1c404f6340ee057498f5f00246190ea54220576a848"); // BURNER_ROLE hash
+		morpherToken.burn(user, 1 ether);
+		vm.stopPrank();
+	}
+
+	// --- Pause/Unpause Role and Functionality Tests ---
+
+	function testPause_Fail_NoRole() public {
+		address nonPauser = makeAddr("nonPauser");
+		vm.startPrank(nonPauser);
+		vm.expectRevert("MorpherToken: must have pauser role to pause");
+		morpherToken.pause();
+		vm.stopPrank();
+	}
+
+	function testUnpause_Fail_NoRole() public {
+		address nonPauser = makeAddr("nonPauser");
+		// Pause first
+		vm.startPrank(_pauser);
+		morpherToken.pause();
+		vm.stopPrank();
+
+		// Attempt unpause without role
+		vm.startPrank(nonPauser);
+		vm.expectRevert("MorpherToken: must have pauser role to unpause");
+		morpherToken.unpause();
+		vm.stopPrank();
+	}
+
+	function testTransfer_Fail_WhenPaused() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+		vm.startPrank(_admin);
+		morpherToken.mint(user1, 1 ether);
+		vm.stopPrank();
+
+		// Pause
+		vm.startPrank(_pauser);
+		morpherToken.pause();
+		vm.stopPrank();
+
+		// Attempt transfer
+		vm.startPrank(user1);
+		vm.expectRevert("ERC20Pausable: token transfer while paused");
+		morpherToken.transfer(user2, 1 ether);
+		vm.stopPrank();
+	}
+
+	// --- Locking Function Role Tests ---
+
+	function testLockRewards_Fail_NoRole() public {
+		address user = makeAddr("user");
+		address nonAirdropAdmin = makeAddr("nonAirdropAdmin");
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 1 ether);
+		vm.stopPrank();
+
+		vm.startPrank(nonAirdropAdmin);
+		vm.expectRevert("MorpherToken: Missing required role 0x17a0f30a65086195f3bd886105b485a3619561b973e4157815087c10430d6754"); // AIRDROPADMIN_ROLE hash
+		morpherToken.lockRewards(user, 1 ether);
+		vm.stopPrank();
+	}
+
+	function testUnlockRewards_Fail_NoRole() public {
+		address user = makeAddr("user");
+		address nonAdmin = makeAddr("nonAdmin");
+		// Grant AIRDROPADMIN_ROLE to admin for locking
+		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), _admin);
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 1 ether);
+		morpherToken.lockRewards(user, 1 ether);
+		vm.stopPrank();
+
+		vm.startPrank(nonAdmin);
+		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		morpherToken.unlockRewards(user, 1 ether);
+		vm.stopPrank();
+	}
+
+	function testLockTokensForTime_Fail_NoRole() public {
+		address user = makeAddr("user");
+		address nonAdmin = makeAddr("nonAdmin");
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 1 ether);
+		vm.stopPrank();
+
+		vm.startPrank(nonAdmin);
+		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		morpherToken.lockTokensForTime(user, 1 ether, 1 days);
+		vm.stopPrank();
+	}
+
+	// --- Setter Role Tests ---
+
+	function testSetRestrictTransfers_Fail_NoRole() public {
+		address nonAdmin = makeAddr("nonAdmin");
+		vm.startPrank(nonAdmin);
+		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		morpherToken.setRestrictTransfers(true);
+		vm.stopPrank();
+	}
+
+	function testSetTotalTokensOnOtherChain_Fail_NoRole() public {
+		address nonUpdater = makeAddr("nonUpdater");
+		vm.startPrank(nonUpdater);
+		vm.expectRevert("MorpherToken: Missing required role 0x134cbb8a74551700c095063f14604af991861b4e9f6b717c408006b747405174"); // TOKENUPDATER_ROLE hash
+		morpherToken.setTotalTokensOnOtherChain(1 ether);
+		vm.stopPrank();
+	}
+
+	function testSetTotalInPositions_Fail_NoRole() public {
+		address nonUpdater = makeAddr("nonUpdater");
+		vm.startPrank(nonUpdater);
+		vm.expectRevert("MorpherToken: Missing required role 0x134cbb8a74551700c095063f14604af991861b4e9f6b717c408006b747405174"); // TOKENUPDATER_ROLE hash
+		morpherToken.setTotalInPositions(1 ether);
+		vm.stopPrank();
+	}
+
+	function testSetDailyMintedTransferLimit_Fail_NoRole() public {
+		address nonAdmin = makeAddr("nonAdmin");
+		vm.startPrank(nonAdmin);
+		vm.expectRevert("MorpherToken: Missing required role 0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775"); // ADMINISTRATOR_ROLE hash
+		morpherToken.setDailyMintedTransferLimit(1 ether);
+		vm.stopPrank();
+	}
+
+	// --- Permit Edge Case Tests ---
+
+	function testPermit_Fail_ExpiredDeadline() public {
+		Account memory owner = makeAccount("owner");
+		address spender = address(0xdef);
+		uint value = 1 ether;
+		uint deadline = block.timestamp - 1; // Expired deadline
+
+		vm.startPrank(_admin);
+		morpherToken.mint(owner.addr, value);
+		vm.stopPrank();
+
+		uint nonce = morpherToken.nonces(owner.addr);
+		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
+		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		vm.expectRevert("ERC2612ExpiredSignature(uint256)"); // OZ v5 error
+		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+	}
+
+	function testPermit_Fail_InvalidSignature() public {
+		Account memory owner = makeAccount("owner");
+		Account memory wrongSigner = makeAccount("wrongSigner");
+		address spender = address(0xdef);
+		uint value = 1 ether;
+		uint deadline = block.timestamp + 1 hours;
+
+		vm.startPrank(_admin);
+		morpherToken.mint(owner.addr, value);
+		vm.stopPrank();
+
+		uint nonce = morpherToken.nonces(owner.addr);
+		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
+		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
+		// Sign with wrong key
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongSigner.key, finalHash);
+
+		vm.expectRevert("ERC2612InvalidSigner(address,address)"); // OZ v5 error
+		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+	}
+
+	function testPermit_Fail_Replay() public {
+		Account memory owner = makeAccount("owner");
+		address spender = address(0xdef);
+		uint value = 1 ether;
+		uint deadline = block.timestamp + 1 hours;
+
+		vm.startPrank(_admin);
+		morpherToken.mint(owner.addr, value);
+		vm.stopPrank();
+
+		uint nonce = morpherToken.nonces(owner.addr);
+		bytes32 permitTypehash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+		bytes32 structHash = keccak256(abi.encode(permitTypehash, owner.addr, spender, value, nonce, deadline));
+		bytes32 domainSeparator = morpherToken.DOMAIN_SEPARATOR();
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
+
+		// First call succeeds
+		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+		assertEq(morpherToken.nonces(owner.addr), nonce + 1);
+
+		// Second call with same signature should fail due to nonce mismatch
+		vm.expectRevert("InvalidAccountNonce(address,uint256)"); // OZ v5 error
+		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
+	}
 }
