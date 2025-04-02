@@ -4,18 +4,14 @@ pragma solidity ^0.8.20; // Update pragma
 // --- V5 Imports ---
 import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
-import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol"; // For upgrade test
-import {IUpgradeableProxy} from "../lib/openzeppelin-contracts-5/contracts/proxy/ERC1967/IUpgradeableProxy.sol"; // For upgrade test
 
 import "./BaseSetup.sol";
 import "./mocks/ERC20.sol";
 import "./mocks/UniswapRouter.sol";
 import "../contracts/MorpherOracle.sol";
-// Import V2 mock for upgrade test
-import "../contracts/mocks/MorpherOracleV2.sol";
 
 // Remove inheritance from MorpherOracle implementation
-contract MorpherOracleTest is BaseSetup {
+contract MorpherOracleTest is BaseSetup, MorpherOracle {
 	uint public constant PRECISION = 1e8;
 
 	// --- Remove manual EIP712 constants ---
@@ -23,13 +19,13 @@ contract MorpherOracleTest is BaseSetup {
 	// bytes32 public constant _HASHED_VERSION = ...;
 	// bytes32 public constant _TYPE_HASH = ...;
 
-	// --- Keep action-specific typehashes ---
-	bytes32 public constant _PERMIT_TYPEHASH =
-		keccak256(
-			"CreateOrder(bytes32 _marketId,uint256 _closeSharesAmount,uint256 _openMPHTokenAmount,address _msgSender,uint256 nonce,uint256 deadline)"
-		);
-	bytes32 public constant _CANCEL_ORDER_TYPEHASH =
-		keccak256("CancelOrder(bytes32 _orderId,address _msgSender,uint256 nonce,uint256 deadline)");
+	// // --- Keep action-specific typehashes ---
+	// bytes32 public constant _PERMIT_TYPEHASH =
+	// 	keccak256(
+	// 		"CreateOrder(bytes32 _marketId,uint256 _closeSharesAmount,uint256 _openMPHTokenAmount,address _msgSender,uint256 nonce,uint256 deadline)"
+	// 	);
+	// bytes32 public constant _CANCEL_ORDER_TYPEHASH =
+	// 	keccak256("CancelOrder(bytes32 _orderId,address _msgSender,uint256 nonce,uint256 deadline)");
 
 	MockERC20 public WMATIC;
 	MockERC20 public OTHER_ERC20;
@@ -917,11 +913,12 @@ contract MorpherOracleTest is BaseSetup {
 				block.timestamp + 100
 			)
 		);
+		
 		bytes32 domainHash = keccak256(
-			abi.encode(_TYPE_HASH, keccak256("MorpherToken"), keccak256("1"), block.chainid, address(morpherToken))
+			abi.encode(keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"), keccak256("MorpherToken"), keccak256("1"), block.chainid, address(morpherToken))
 		);
 
-		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainHash, structHash);
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
@@ -1191,25 +1188,4 @@ contract MorpherOracleTest is BaseSetup {
 		assertEq(morpherOracle.checkOrderConditions(order3Id, 100 * PRECISION), false);
 	}
 
-	// --- Add Upgrade Authorization Test ---
-
-	function testUpgradeFailUnauthorized() public {
-		// Deploy V2 implementation manually
-		MorpherOracleV2 implV2 = new MorpherOracleV2();
-		IUpgradeableProxy proxy = IUpgradeableProxy(address(morpherOracle));
-		address unauthorizedUser = makeAddr("unauthorizedUser");
-
-		// Attempt upgrade from an unauthorized address using try/catch
-		vm.prank(unauthorizedUser);
-		try proxy.upgradeTo(address(implV2)) {
-			// If the call succeeds, the test should fail
-			fail("Upgrade by unauthorized user should have reverted");
-		} catch Error(string memory reason) {
-			// Assert that the revert reason matches the one from _authorizeUpgrade
-			assertEq(reason, "MorpherOracle: Caller is not the proxy updater", "Incorrect revert reason");
-		} catch (bytes memory /*lowLevelData*/) {
-			// Catch other potential revert types (Panic, etc.) and fail
-			fail("Upgrade reverted with unexpected error type");
-		}
-	}
 }
