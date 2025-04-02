@@ -60,7 +60,8 @@ contract BaseSetup is Test {
 
 		//deploy token
 		morpherToken = new MorpherToken();
-		morpherToken.initialize(address(morpherAccessControl), address(morpherState));
+		// Add the permit name argument (e.g., "Morpher")
+		morpherToken.initialize(address(morpherAccessControl), address(morpherState), "Morpher");
 		morpherState.setMorpherToken(address(morpherToken));
 		if (initialMint) {
 			morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
@@ -124,7 +125,8 @@ contract BaseSetup is Test {
 
 		//deploy oracle
 		morpherOracle = new MorpherOracle();
-		morpherOracle.initialize(address(morpherState), payable(address(this)), 0);
+		// Add EIP712 name ("MorpherOracle") and version ("1") arguments
+		morpherOracle.initialize(address(morpherState), payable(address(this)), 0, "MorpherOracle", "1");
 		morpherAccessControl.grantRole(morpherTradeEngine.ORACLE_ROLE(), address(morpherOracle));
 		morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this));
 
