@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.15;
 
-import "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/ERC20Upgradeable.sol";
+import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import "./BaseSetup.sol";
 
@@ -104,7 +104,7 @@ contract MorpherTokenTest is BaseSetup, ERC20Upgradeable {
 		bytes32 domainSeparator = keccak256(
 			abi.encode(_TYPE_HASH, nameHash, versionHash, block.chainid, address(morpherToken))
 		);
-		bytes32 finalHash = ECDSAUpgradeable.toTypedDataHash(domainSeparator, structHash);
+		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
 		vm.expectEmit(true, true, true, true);
