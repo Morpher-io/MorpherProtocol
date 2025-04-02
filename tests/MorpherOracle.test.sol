@@ -1190,4 +1190,26 @@ contract MorpherOracleTest is BaseSetup {
 		assertEq(morpherOracle.checkOrderConditions(order3Id, 50 * PRECISION), true);
 		assertEq(morpherOracle.checkOrderConditions(order3Id, 100 * PRECISION), false);
 	}
+
+	// --- Add Upgrade Authorization Test ---
+
+	function testUpgradeFailUnauthorized() public {
+		// Deploy V2 implementation manually
+		MorpherOracleV2 implV2 = new MorpherOracleV2();
+		IUpgradeableProxy proxy = IUpgradeableProxy(address(morpherOracle));
+		address unauthorizedUser = makeAddr("unauthorizedUser");
+
+		// Attempt upgrade from an unauthorized address using try/catch
+		vm.prank(unauthorizedUser);
+		try proxy.upgradeTo(address(implV2)) {
+			// If the call succeeds, the test should fail
+			fail("Upgrade by unauthorized user should have reverted");
+		} catch Error(string memory reason) {
+			// Assert that the revert reason matches the one from _authorizeUpgrade
+			assertEq(reason, "MorpherOracle: Caller is not the proxy updater", "Incorrect revert reason");
+		} catch (bytes memory /*lowLevelData*/) {
+			// Catch other potential revert types (Panic, etc.) and fail
+			fail("Upgrade reverted with unexpected error type");
+		}
+	}
 }
