@@ -71,6 +71,7 @@ contract UUPSUpgradeTest is Test {
         morpherTokenProxy = MorpherToken(tokenProxyAddress);
 
         // 5. Set Token address in State (needed by Token's _authorizeUpgrade) // Update comment number
+        accessControlProxy.grantRole(stateProxy.ADMINISTRATOR_ROLE(), deployer);
         stateProxy.setMorpherToken(tokenProxyAddress);
     }
 
@@ -80,13 +81,20 @@ contract UUPSUpgradeTest is Test {
         // Deploy V2 implementation manually
         MorpherTokenV2 implV2 = new MorpherTokenV2();
 
-        // Attempt upgrade from an unauthorized address
-        vm.prank(unauthorizedUser);
+        assertEq("5.0.0", morpherTokenProxy.UPGRADE_INTERFACE_VERSION());
+        (bool success, bytes memory returndata) = tokenProxyAddress.call(abi.encodeWithSignature("UPGRADE_INTERFACE_VERSION()"));
+        assertEq("5.0.0", abi.decode(returndata, (string)));
+
+        assertEq(true, success);
+        
 
         // Expect revert from _authorizeUpgrade (or AccessControl if role check fails there)
-        vm.expectRevert(bytes("MorpherToken: Caller is not the proxy updater")); // Match error in MorpherToken V1's _authorizeUpgrade
+        vm.expectRevert("MorpherToken: Caller is not the proxy updater"); // Match error in MorpherToken V1's _authorizeUpgrade
+        // Attempt upgrade from an unauthorized address
+        vm.startPrank(unauthorizedUser, true);
         // Use UnsafeUpgrades.upgradeProxy with implementation address
         UnsafeUpgrades.upgradeProxy(tokenProxyAddress, address(implV2), "");
+        vm.stopPrank();
     }
 
     function test_UUPSUpgrade_Success() public {
