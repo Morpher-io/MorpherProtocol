@@ -593,7 +593,7 @@ contract MorpherTokenTest is
 		address nonMinter = makeAddr("nonMinter");
 		vm.startPrank(nonMinter);
 		// Use generic role error message from modifier
-		vm.expectRevert("MorpherToken: Missing required role.");
+		vm.expectRevert("MorpherToken: must have minter role to mint");
 		morpherToken.mint(user, 1 ether);
 		vm.stopPrank();
 	}
@@ -607,7 +607,7 @@ contract MorpherTokenTest is
 
 		vm.startPrank(nonBurner);
 		// Use generic role error message from modifier
-		vm.expectRevert("MorpherToken: Missing required role.");
+		vm.expectRevert("MorpherToken: must have burner role to burn");
 		morpherToken.burn(user, 1 ether);
 		vm.stopPrank();
 	}
