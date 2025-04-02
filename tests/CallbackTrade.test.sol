@@ -8,21 +8,18 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Script} from "forge-std/Script.sol";
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
-import {ProxyAdmin} from "openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
+import {ProxyAdmin} from "openzeppelin-contracts-5/contracts/proxy/transparent/ProxyAdmin.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 
 import {MorpherOracle} from "../contracts/MorpherOracle.sol";
 import {MorpherState} from "../contracts/MorpherState.sol";
 import {MorpherToken} from "../contracts/MorpherToken.sol";
 import {MorpherTradeEngine} from "../contracts/MorpherTradeEngine.sol";
-import {MorpherPriceOracle} from "../contracts/MorpherPriceOracle.sol";
-import {MorpherTokenPaymaster} from "../contracts/MorpherTokenPaymaster.sol";
 import {OracleHelper} from "account-abstraction-v7/samples/utils/OracleHelper.sol";
 import {IOracle} from "account-abstraction-v7/samples/utils/IOracle.sol";
 import {UniswapHelper} from "account-abstraction-v7/samples/utils/UniswapHelper.sol";
 import {ISwapRouter} from "uniswap-v3-periphery/interfaces/ISwapRouter.sol";
 
-import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 
 import {ITransparentUpgradeableProxy} from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -50,30 +47,7 @@ contract CallbackTrade is Test {
 	bytes32 public constant CRYPTO_BTC = keccak256("CRYPTO_BTC");
 	bytes32 public constant CRYPTO_ETH = keccak256("CTYPTO_ETH");
 
-	function _testPoolAddress() public {
-		address morpherTokenAddress = 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE;
-		address wmaticAddress = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
-		address uniswapQuoterAddress = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
-
-		MorpherPriceOracle morpherPriceOracle = new MorpherPriceOracle(
-			morpherTokenAddress,
-			wmaticAddress,
-			uniswapQuoterAddress
-		);
-
-		console.log("Price Oracle", address(morpherPriceOracle));
-		UniswapQuoter quoter = UniswapQuoter(uniswapQuoterAddress);
-		console.log(quoter.factory());
-		console.log(wmaticAddress);
-		console.log(morpherTokenAddress);
-		console.log(
-			morpherPriceOracle.computeAddress(
-				quoter.factory(),
-				PoolAddress.getPoolKey(wmaticAddress, morpherTokenAddress, 3000)
-			)
-		);
-	}
-
+	
 
 	function _testCallbackOracle() public {
 		MorpherState state = MorpherState(morpherStateAddress);
