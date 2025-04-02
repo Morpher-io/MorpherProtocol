@@ -2,18 +2,22 @@
 pragma solidity ^0.8.15;
 
 import "./BaseSetup.sol";
-import "../contracts/MorpherAirdrop.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import "../contracts/MorpherAirdrop.sol"; // Use V5 contract
+// --- V5 Imports ---
+import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+// Remove Transparent Proxy imports
+// import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+// import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 contract MorpherAirdropTest is BaseSetup {
-	address _airdropAdmin = address(0x1234);
-	address _coldStorageOwner = address(0x5678);
+	address _airdropAdmin = address(0x1234); // Address granted AIRDROPADMIN_ROLE
+	address _coldStorageOwner = address(0x5678); // Address set as Ownable owner
 	
-	ProxyAdmin proxyAdmin;
-	MorpherAirdrop implementation;
-	TransparentUpgradeableProxy proxy;
-	MorpherAirdrop wrappedProxy;
+	// Remove ProxyAdmin, implementation, proxy variables
+	// ProxyAdmin proxyAdmin;
+	// MorpherAirdrop implementation;
+	// TransparentUpgradeableProxy proxy;
+	// MorpherAirdrop wrappedProxy; // Use morpherAirdrop from BaseSetup
 
 	event AirdropSent(
 		address indexed _operator,
@@ -25,55 +29,78 @@ contract MorpherAirdropTest is BaseSetup {
 	event Transfer(address indexed from, address indexed to, uint256 value);
 
 	function setUp() public override {
+		// BaseSetup already deploys implementations, including MorpherAirdrop
+		// We need to override the deployment in BaseSetup to use UUPS proxy
+		// OR deploy it here separately. Let's deploy separately for clarity.
+
+		// Call BaseSetup first to get dependencies (State, Token, AccessControl)
 		super.setUp();
 
-		// Deploy implementation
-		implementation = new MorpherAirdrop();
-		
-		// Deploy ProxyAdmin
-		proxyAdmin = new ProxyAdmin();
+		// 1. Deploy Implementation
+		MorpherAirdrop airdropImpl = new MorpherAirdrop();
 
-		// Encode initialization data
-		bytes memory initData = abi.encodeWithSelector(
-			MorpherAirdrop.initialize.selector,
-			_airdropAdmin,
-			address(morpherToken),
-			_coldStorageOwner
+		// 2. Encode V5 initialization data (state, token, owner)
+		bytes memory initData = abi.encodeCall(
+			MorpherAirdrop.initialize,
+			(address(morpherState), address(morpherToken), _coldStorageOwner)
 		);
 
-		// Deploy proxy
-		proxy = new TransparentUpgradeableProxy(
-			address(implementation),
-			address(proxyAdmin),
-			initData
-		);
+		// 3. Deploy UUPS Proxy using UnsafeUpgrades
+		address airdropProxyAddress = UnsafeUpgrades.deployUUPSProxy(address(airdropImpl), initData);
 
-		// Create wrapped proxy for easier calls
-		wrappedProxy = MorpherAirdrop(payable(address(proxy)));
-		morpherAirdrop = wrappedProxy;
+		// 4. Set the morpherAirdrop variable used in tests
+		morpherAirdrop = MorpherAirdrop(airdropProxyAddress);
 
-		// Setup permissions
-		morpherAccessControl.grantRole(morpherToken.TRANSFER_ROLE(), address(proxy));
-		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), address(proxy));
+		// 5. Setup permissions
+		// Grant AIRDROPADMIN_ROLE (on AccessControl) to the designated admin address
+		morpherAccessControl.grantRole(morpherAirdrop.AIRDROPADMIN_ROLE(), _airdropAdmin);
+		// Grant AIRDROPADMIN_ROLE (on Token) to the Airdrop contract proxy itself
+		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), airdropProxyAddress);
+		// Grant MINTER_ROLE to test contract for initial funding
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
-		morpherToken.mint(address(proxy), 10 ether);
+		// Fund the Airdrop proxy
+		morpherToken.mint(airdropProxyAddress, 10 ether);
+		// Revoke minter role if not needed elsewhere
+		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
 	}
 
-	function testAdminFunctions() public {	
+	function testAdminFunctions() public {
+		// Test Ownable functions (called by _coldStorageOwner)
 		vm.expectRevert("Ownable: caller is not the owner");
-		morpherAirdrop.setAirdropAdmin(address(0x11));
+		morpherAirdrop.setMorpherStateAddress(address(0x33)); // Test new setter
 
 		vm.expectRevert("Ownable: caller is not the owner");
 		morpherAirdrop.setMorpherTokenAddress(address(0x22));
 
-		vm.prank(_coldStorageOwner);
-		morpherAirdrop.setAirdropAdmin(address(0x11));
+		// Test role-based function (called by _airdropAdmin)
+		vm.expectRevert("MorpherAirdrop: Caller is not an Airdrop Administrator.");
+		morpherAirdrop.setAirdropAuthorized(address(0x44), 1 ether);
 
-		vm.prank(_coldStorageOwner);
+		// Test successful calls
+		vm.startPrank(_coldStorageOwner);
+		morpherAirdrop.setMorpherStateAddress(address(0x33));
 		morpherAirdrop.setMorpherTokenAddress(address(0x22));
+		vm.stopPrank();
 
-		assertEq(morpherAirdrop.airdropAdmin(), address(0x11));
+		assertEq(address(morpherAirdrop.state()), address(0x33));
 		assertEq(morpherAirdrop.morpherToken(), address(0x22));
+
+		// Test successful role call
+		vm.startPrank(_airdropAdmin);
+		morpherAirdrop.setAirdropAuthorized(address(0x44), 1 ether);
+		vm.stopPrank();
+		assertEq(morpherAirdrop.getAirdropAuthorized(address(0x44)), 1 ether);
+	}
+
+	function testCannotReceiveETH() public {
+
+		vm.prank(_coldStorageOwner);
+		morpherAirdrop.setAirdropAdmin(address(0x11));
+
+		vm.prank(_coldStorageOwner);
+		morpherAirdrop.setMorpherTokenAddress(address(0x22));
+
+		// Removed assertions for removed airdropAdmin getter
 	}
 
 	function testCannotReceiveETH() public {
