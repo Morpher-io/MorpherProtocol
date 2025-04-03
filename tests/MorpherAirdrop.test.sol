@@ -12,7 +12,7 @@ import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 contract MorpherAirdropTest is BaseSetup {
 	address _airdropAdmin = address(0x1234); // Address granted AIRDROPADMIN_ROLE
 	address _coldStorageOwner = address(0x5678); // Address set as Ownable owner
-	
+
 	// Remove ProxyAdmin, implementation, proxy variables
 	// ProxyAdmin proxyAdmin;
 	// MorpherAirdrop implementation;
@@ -92,16 +92,13 @@ contract MorpherAirdropTest is BaseSetup {
 		assertEq(morpherAirdrop.getAirdropAuthorized(address(0x44)), 1 ether);
 	}
 
-	function testCannotReceiveETH() public {
-
-		vm.prank(_coldStorageOwner);
-		morpherAirdrop.setAirdropAdmin(address(0x11));
-
-		vm.prank(_coldStorageOwner);
-		morpherAirdrop.setMorpherTokenAddress(address(0x22));
-
-		// Removed assertions for removed airdropAdmin getter
-	}
+	// --- Remove duplicate testCannotReceiveETH ---
+	// function testCannotReceiveETH() public {
+	// 	vm.prank(_coldStorageOwner);
+	// 	morpherAirdrop.setAirdropAdmin(address(0x11)); // This function was removed
+	// 	vm.prank(_coldStorageOwner);
+	// 	morpherAirdrop.setMorpherTokenAddress(address(0x22));
+	// }
 
 	function testCannotReceiveETH() public {
 		vm.deal(address(0x11), 1 ether);
