@@ -42,10 +42,10 @@ contract MorpherAirdropTest is BaseSetup {
 		// 1. Deploy Implementation
 		MorpherAirdrop airdropImpl = new MorpherAirdrop();
 
-		// 2. Encode V5 initialization data (state, token) - REMOVED owner
+		// 2. Encode V5 initialization data (state) - REMOVED owner and token
 		bytes memory initData = abi.encodeCall(
 			MorpherAirdrop.initialize,
-			(address(morpherState), address(morpherToken))
+			(address(morpherState)) // Pass only state address
 		);
 
 		// 3. Deploy UUPS Proxy using UnsafeUpgrades
@@ -75,25 +75,25 @@ contract MorpherAirdropTest is BaseSetup {
 	function testAdminFunctions() public {
 		// --- Test Role-Based Admin Functions ---
 
-		// Test setMorpherStateAddress requires ADMINISTRATOR_ROLE
-		vm.startPrank(_randomUser); // User without role
-		vm.expectRevert("MorpherAirdrop: Permission denied.");
-		morpherAirdrop.setMorpherStateAddress(address(0x33));
-		vm.stopPrank();
+		// // Test setMorpherStateAddress requires ADMINISTRATOR_ROLE // REMOVED Test
+		// vm.startPrank(_randomUser); // User without role
+		// vm.expectRevert("MorpherAirdrop: Permission denied.");
+		// morpherAirdrop.setMorpherStateAddress(address(0x33));
+		// vm.stopPrank();
+		//
+		// vm.startPrank(_airdropAdmin); // User with different role
+		// vm.expectRevert("MorpherAirdrop: Permission denied.");
+		// morpherAirdrop.setMorpherStateAddress(address(0x33));
+		// vm.stopPrank();
 
-		vm.startPrank(_airdropAdmin); // User with different role
-		vm.expectRevert("MorpherAirdrop: Permission denied.");
-		morpherAirdrop.setMorpherStateAddress(address(0x33));
-		vm.stopPrank();
-
-		// Test setMorpherTokenAddress requires ADMINISTRATOR_ROLE
-		vm.startPrank(_randomUser);
-		vm.expectRevert("MorpherAirdrop: Permission denied.");
-		morpherAirdrop.setMorpherTokenAddress(address(0x22));
-		vm.stopPrank();
+		// // Test setMorpherTokenAddress requires ADMINISTRATOR_ROLE // REMOVED Test
+		// vm.startPrank(_randomUser);
+		// vm.expectRevert("MorpherAirdrop: Permission denied.");
+		// morpherAirdrop.setMorpherTokenAddress(address(0x22));
+		// vm.stopPrank();
 
 		// Test setAirdropAuthorized requires AIRDROPADMIN_ROLE
-		vm.startPrank(_randomUser);
+		vm.startPrank(_randomUser); // User without role
 		vm.expectRevert("MorpherAirdrop: Caller is not an Airdrop Administrator.");
 		morpherAirdrop.setAirdropAuthorized(address(0x44), 1 ether);
 		vm.stopPrank();
@@ -106,25 +106,28 @@ contract MorpherAirdropTest is BaseSetup {
 
 		// --- Test Successful Calls ---
 
-		// Test successful admin calls (set state/token)
-		vm.startPrank(_administrator);
-		morpherAirdrop.setMorpherStateAddress(address(0x33));
-		morpherAirdrop.setMorpherTokenAddress(address(0x22));
-		vm.stopPrank();
-
-		assertEq(address(morpherAirdrop.state()), address(0x33));
-		assertEq(morpherAirdrop.morpherToken(), address(0x22));
+		// // Test successful admin calls (set state/token) // REMOVED Test
+		// vm.startPrank(_administrator);
+		// morpherAirdrop.setMorpherStateAddress(address(0x33));
+		// morpherAirdrop.setMorpherTokenAddress(address(0x22));
+		// vm.stopPrank();
+		//
+		// assertEq(address(morpherAirdrop.state()), address(0x33));
+		// assertEq(morpherAirdrop.morpherToken(), address(0x22)); // Can't check removed variable
 
 		// Test successful airdrop admin call (set authorized)
-		vm.startPrank(_airdropAdmin);
+		vm.startPrank(_airdropAdmin); // Correct role for this action
 		morpherAirdrop.setAirdropAuthorized(address(0x44), 1 ether);
 		vm.stopPrank();
 		assertEq(morpherAirdrop.getAirdropAuthorized(address(0x44)), 1 ether);
+
+		// Verify state address is still the original one from setUp
+		assertEq(address(morpherAirdrop.state()), address(morpherState));
 	}
 
 	function testAuthorizeUpgrade() public {
-        // Attempt upgrade from an address without PROXYUPDATER_ROLE
-        vm.startPrank(_randomUser);
+		// Attempt upgrade from an address without PROXYUPDATER_ROLE
+		vm.startPrank(_randomUser);
         vm.expectRevert("MorpherAirdrop: Caller is not the proxy updater");
         morpherAirdrop.upgradeToAndCall(address(0xdead), ""); // Use upgradeToAndCall for testing UUPS upgrade auth
         vm.stopPrank();
@@ -251,13 +254,15 @@ contract MorpherAirdropTest is BaseSetup {
 		morpherAirdrop.adminSendLockedRewards(user, rewardAmount);
 
 		// Verify the rewards are locked
-		assertEq(MorpherToken(morpherToken).balanceOf(user), 0);
-		assertEq(MorpherToken(morpherToken).getTradeableBalanceOf(user), rewardAmount);
-		assertEq(MorpherToken(morpherToken).getLockedRewards(user), rewardAmount);
+		// Fetch token address from state for assertions
+		address tokenAddr = morpherState.morpherTokenAddress();
+		assertEq(MorpherToken(tokenAddr).balanceOf(user), 0);
+		assertEq(MorpherToken(tokenAddr).getTradeableBalanceOf(user), rewardAmount);
+		assertEq(MorpherToken(tokenAddr).getLockedRewards(user), rewardAmount);
 
 		// User should not be able to transfer locked rewards
 		vm.prank(user);
 		vm.expectRevert("MorpherToken: transfer amount exceeds available balance (locked)");
-		MorpherToken(morpherToken).transfer(address(0xdef), rewardAmount);
+		MorpherToken(tokenAddr).transfer(address(0xdef), rewardAmount);
 	}
 }

@@ -49,10 +49,10 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
         address airdropProxy = deployOrUpgradeV5(
             CONTRACT_KEY,
             CONTRACT_NAME,
-            // Ensure initializer signature matches the adapted v5 contract (state, token)
+            // Ensure initializer signature matches the adapted v5 contract (state)
             abi.encodeCall(
                 MorpherAirdrop.initialize,
-                (stateAddress, tokenAddress) // Pass state, token ONLY
+                (stateAddress) // Pass state ONLY
             ),
             bytes("") // No upgrade call data needed for this example
         );

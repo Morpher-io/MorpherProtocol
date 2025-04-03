@@ -30,7 +30,7 @@ contract MorpherAirdrop is
 	uint256 public totalAirdropClaimed;
 
 	// address public airdropAdmin; // Removed - Replaced by role
-	address public morpherToken;
+	// address public morpherToken; // REMOVED - Fetch from state
 	MorpherState public state; // Store state contract address
 
 	// --- Define Roles (Keep AIRDROPADMIN_ROLE specific to this contract's logic) ---
@@ -54,12 +54,8 @@ contract MorpherAirdrop is
 	// constructor() { ... }
 
 	// --- Updated Initializer ---
-	function initialize(
-		address _stateAddress, // Add state address
-		address _morpherTokenAddress
-	)
+	function initialize(address _stateAddress /* Add state address */) // REMOVED _morpherTokenAddress
 		public
-		// Remove _initialOwner
 		initializer
 	{
 		__UUPSUpgradeable_init(); // Initialize UUPS
@@ -67,11 +63,14 @@ contract MorpherAirdrop is
 		// Remove __Ownable_init
 
 		require(_stateAddress != address(0), "MorpherAirdrop: State address cannot be zero");
-		require(_morpherTokenAddress != address(0), "MorpherAirdrop: Token address cannot be zero");
+		// require(_morpherTokenAddress != address(0), "MorpherAirdrop: Token address cannot be zero"); // REMOVED check
 
 		state = MorpherState(_stateAddress); // Store state address
-		morpherToken = _morpherTokenAddress; // Set directly
+		// morpherToken = _morpherTokenAddress; // REMOVED - Fetch from state
 		// airdropAdmin role is granted in deployment script
+
+		// Add check to ensure state has a valid token address set during initialization
+		require(state.morpherTokenAddress() != address(0), "MorpherAirdrop: Token address not set in State");
 	}
 
 	modifier onlyRole(bytes32 role) {
@@ -116,19 +115,19 @@ contract MorpherAirdrop is
 	//     airdropAdmin = _address;
 	// }
 
-	function setMorpherStateAddress(address _stateAddress) public onlyRole(keccak256("ADMINISTRATOR_ROLE")) {
-		// Use ADMINISTRATOR_ROLE
-		require(_stateAddress != address(0), "MorpherAirdrop: State address cannot be zero");
-		state = MorpherState(_stateAddress);
-		// Consider emitting an event
-	}
+	// function setMorpherStateAddress(address _stateAddress) public onlyRole(keccak256("ADMINISTRATOR_ROLE")) { // REMOVED
+	// 	// Use ADMINISTRATOR_ROLE
+	// 	require(_stateAddress != address(0), "MorpherAirdrop: State address cannot be zero");
+	// 	state = MorpherState(_stateAddress);
+	// 	// Consider emitting an event
+	// }
 
-	function setMorpherTokenAddress(address _address) public onlyRole(keccak256("ADMINISTRATOR_ROLE")) {
-		// Use ADMINISTRATOR_ROLE
-		require(_address != address(0), "MorpherAirdrop: Token address cannot be zero");
-		morpherToken = _address;
-		// Consider emitting an event
-	}
+	// function setMorpherTokenAddress(address _address) public onlyRole(keccak256("ADMINISTRATOR_ROLE")) { // REMOVED
+	// 	// Use ADMINISTRATOR_ROLE
+	// 	 require(_address != address(0), "MorpherAirdrop: Token address cannot be zero");
+	// 	morpherToken = _address;
+	// 	// Consider emitting an event
+	// }
 
 	// ----------------------------------------------------------------------------
 	// Get airdrop amount authorized for or claimed by address
@@ -200,7 +199,9 @@ contract MorpherAirdrop is
 		);
 		airdropClaimed[_recipient] = airdropClaimed[_recipient] + _amount;
 		totalAirdropClaimed = totalAirdropClaimed + _amount;
-		MorpherToken(morpherToken).transfer(_recipient, _amount);
+		address tokenAddress = state.morpherTokenAddress(); // Fetch token address from state
+		require(tokenAddress != address(0), "MorpherAirdrop: Token address not set in State"); // Add check
+		MorpherToken(tokenAddress).transfer(_recipient, _amount); // Use fetched address
 		emit AirdropSent(msg.sender, _recipient, airdropClaimed[_recipient], airdropAuthorized[_recipient]);
 	}
 
@@ -219,12 +220,14 @@ contract MorpherAirdrop is
 	 */
 	function adminSendLockedRewards(address _recipient, uint256 _amount) public onlyAirdropAdmin {
 		require(_amount > 0, "MorpherAirdrop: amount must be greater than 0");
+		address tokenAddress = state.morpherTokenAddress(); // Fetch token address from state
+		require(tokenAddress != address(0), "MorpherAirdrop: Token address not set in State"); // Add check
 
 		// First transfer the tokens
-		MorpherToken(morpherToken).transfer(_recipient, _amount);
+		MorpherToken(tokenAddress).transfer(_recipient, _amount); // Use fetched address
 
 		// Then lock them as rewards
-		MorpherToken(morpherToken).lockRewards(_recipient, _amount);
+		MorpherToken(tokenAddress).lockRewards(_recipient, _amount); // Use fetched address
 
 		emit AirdropSent(msg.sender, _recipient, _amount, _amount);
 	}
