@@ -259,6 +259,13 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
 	/**
+	 * Position Migration Events (Moved from MorpherAdmin)
+	 */
+	event AddressPositionMigrationComplete(address _owner, bytes32 _oldMarketId, bytes32 _newMarketId);
+	event AllPositionMigrationsComplete(bytes32 _oldMarketId, bytes32 _newMarketId);
+	event AllPositionMigrationIncomplete(bytes32 _oldMarketId, bytes32 _newMarketId, uint _maxIx);
+
+	/**
 	 * MPH Uniswap Conversion Events
 	 */
 	event MphCloseOrderSoftFail(bytes32 _orderId, uint _mphTokenAmountCloseOrder, uint _mphTokenAmountPermit); //used when on close order all tokens cannot be converted back, so it fails, but it will still close the position just keep it in MPH token then
@@ -1087,5 +1094,61 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	function getTradeEngineFromOrderId(uint orderId) public view returns (address) {
 		orderId = orderId; //mute the warning
 		return state.morpherTradeEngineAddress();
+	}
+
+	// ----------------------------------------------------------------------------------
+	// migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId)
+	// Administrator migrates all positions from an old (deactivated) market to a new one.
+	// ----------------------------------------------------------------------------------
+	function migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId) public onlyRole(ADMINISTRATOR_ROLE) {
+		require(state.getMarketActive(_oldMarketId) == false, "MorpherOracle: Old market must be deactivated for migration.");
+		require(state.getMarketActive(_newMarketId) == false, "MorpherOracle: New market must be deactivated for migration.");
+
+		MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+		uint256 maxMarketAddressIndex = tradeEngine.getMaxMappingIndex(_oldMarketId);
+
+		// Create a temporary array to store addresses to avoid issues with index changes during deletion
+		address[] memory addressesToMigrate = new address[](maxMarketAddressIndex);
+		uint validAddressCount = 0;
+		for (uint256 i = 1; i <= maxMarketAddressIndex; i++) {
+			address addr = tradeEngine.getExposureMappingAddress(_oldMarketId, i);
+			if (addr != address(0)) { // Check if address is valid
+				addressesToMigrate[validAddressCount] = addr;
+				validAddressCount++;
+			}
+		}
+
+		// Iterate through the collected valid addresses
+		for (uint256 i = 0; i < validAddressCount; i++) {
+			address _address = addressesToMigrate[i];
+			MorpherTradeEngine.position memory position = tradeEngine.getPosition(_address, _oldMarketId);
+
+			if (position.longShares > 0 || position.shortShares > 0) {
+				// Create a new position for the new market with the same parameters
+				tradeEngine.setPosition(
+					_address,
+					_newMarketId,
+					block.timestamp, // Use current timestamp for the new position
+					position.longShares,
+					position.shortShares,
+					position.meanEntryPrice,
+					position.meanEntrySpread,
+					position.meanEntryLeverage,
+					position.liquidationPrice
+				);
+				// Delete the old position by setting shares to zero
+				tradeEngine.setPosition(_address, _oldMarketId, block.timestamp, 0, 0, 0, 0, 0, 0);
+				emit AddressPositionMigrationComplete(_address, _oldMarketId, _newMarketId);
+			}
+
+			// Check gas before potentially starting the next iteration's complex operations
+			if (gasleft() < 500000 && (i + 1) < validAddressCount) {
+				//stop if there's not enough gas to write the next transaction
+				emit AllPositionMigrationIncomplete(_oldMarketId, _newMarketId, i); // Emit index processed so far
+				return; // Exit early
+			}
+		}
+
+		emit AllPositionMigrationsComplete(_oldMarketId, _newMarketId);
 	}
 }

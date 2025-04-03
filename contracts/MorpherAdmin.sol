@@ -26,9 +26,9 @@ contract MorpherAdmin is Initializable {
         uint256 _orderLeverage
         );
 
- event AddressPositionMigrationComplete(address _owner, bytes32 _oldMarketId, bytes32 _newMarketId);
- event AllPositionMigrationsComplete(bytes32 _oldMarketId, bytes32 _newMarketId);
- event AllPositionMigrationIncomplete(bytes32 _oldMarketId, bytes32 _newMarketId, uint _maxIx);
+ // event AddressPositionMigrationComplete(address _owner, bytes32 _oldMarketId, bytes32 _newMarketId); // MOVED to MorpherOracle
+ // event AllPositionMigrationsComplete(bytes32 _oldMarketId, bytes32 _newMarketId); // MOVED to MorpherOracle
+ // event AllPositionMigrationIncomplete(bytes32 _oldMarketId, bytes32 _newMarketId, uint _maxIx); // MOVED to MorpherOracle
  event BatchMintCompleted(address[] recipients, uint256[] amounts, uint256 totalAmount);
 
 // ----------------------------------------------------------------------------
