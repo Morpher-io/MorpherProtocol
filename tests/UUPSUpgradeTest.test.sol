@@ -9,7 +9,7 @@ import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import "../contracts/MorpherAccessControl.sol";
 import "../contracts/MorpherState.sol"; // Needed for Token init
 import "../contracts/MorpherToken.sol"; // V1 Implementation
-import "../contracts/mocks/MorpherTokenV2.sol"; // V2 Implementation Mock
+import "./mocks/MorpherTokenV2.sol"; // V2 Implementation Mock
 // Import proxy interface for try/catch
 import {IUpgradeableProxy} from "../lib/openzeppelin-foundry-upgrades/src/internal/interfaces/IUpgradeableProxy.sol";
 

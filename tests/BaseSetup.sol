@@ -10,7 +10,6 @@ import "../contracts/MorpherStaking.sol";
 import "../contracts/MorpherMintingLimiter.sol";
 import "../contracts/MorpherTradeEngine.sol";
 import "../contracts/MorpherOracle.sol";
-import "../contracts/MorpherAdmin.sol";
 import "../contracts/MorpherAirdrop.sol";
 import "../contracts/MorpherInterestRateManager.sol";
 import "../contracts/MorpherSidechainToBaseMigration.sol";
@@ -36,7 +35,6 @@ contract BaseSetup is Test {
 	MorpherMintingLimiter internal morpherMintingLimiter;
 	MorpherTradeEngine internal morpherTradeEngine;
 	MorpherOracle internal morpherOracle;
-	MorpherAdmin internal morpherAdmin;
 	MorpherInterestRateManager internal morpherInterestRateManager;
 	MorpherAirdrop internal morpherAirdrop;
 	MorpherSidechainToBaseMigration internal morpherMigration;
@@ -115,13 +113,6 @@ contract BaseSetup is Test {
 		morpherState.setMorpherTradeEngine(address(morpherTradeEngine));
 		// enable 1 market
 		morpherState.activateMarket(keccak256("CRYPTO_BTC"));
-
-		// deploy admin
-		morpherAdmin = new MorpherAdmin();
-		morpherAdmin.initialize(address(morpherState));
-		morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherAdmin));
-		morpherAccessControl.grantRole(morpherTradeEngine.ORACLE_ROLE(), address(morpherAdmin));
-		morpherAccessControl.grantRole(morpherTradeEngine.ADMINISTRATOR_ROLE(), address(morpherAdmin));
 
 		//deploy oracle
 		morpherOracle = new MorpherOracle();

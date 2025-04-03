@@ -1208,6 +1208,8 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(longShares, 999000999); // Check initial position
 		bool active = morpherState.getMarketActive(oldMarket);
 		assertEq(active, true);
+		bool activeNew = morpherState.getMarketActive(newMarket);
+		assertEq(activeNew, false);
 
 		// Test revert if markets are not deactivated
 		vm.expectRevert("MorpherOracle: Old market must be deactivated for migration.");
@@ -1215,13 +1217,14 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 
 		morpherState.deActivateMarket(oldMarket); // Deactivate old market
 
+		// New market doesn't need activation for migration, just deactivation check
+		morpherState.activateMarket(newMarket); // No need to activate new market yet
 		vm.expectRevert("MorpherOracle: New market must be deactivated for migration.");
 		morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
 
-		// New market doesn't need activation for migration, just deactivation check
-		// morpherState.activateMarket(newMarket); // No need to activate new market yet
-		// morpherState.deActivateMarket(newMarket); // Ensure new market is also considered "deactivated" (not active)
+		morpherState.deActivateMarket(newMarket); // Ensure new market is also considered "deactivated" (not active)
 
+		morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherOracle)); // Needed for setPositionInState
 		// Expect events from MorpherOracle now
 		vm.expectEmit(true, true, true, true);
 		emit AddressPositionMigrationComplete(user, oldMarket, newMarket);
@@ -1267,6 +1270,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 
 		morpherState.deActivateMarket(oldMarket);
 		// New market doesn't need to be active/inactive for the check
+		morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherOracle)); // Needed for setPositionInState
 
 		// Expect the first user to migrate and then potentially incomplete event
 		// This is hard to predict exactly without knowing gas usage.

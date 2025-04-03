@@ -480,11 +480,12 @@ contract MorpherTokenTest is
 	function testUpdateTransferRestrictionSuccessSenderRole() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
+		// Grant TRANSFER_ROLE to sender
+		morpherAccessControl.grantRole(morpherToken.TRANSFER_ROLE(), user1);
+		
 		vm.startPrank(_admin);
 		morpherToken.mint(user1, 1 ether);
 		morpherToken.setRestrictTransfers(true); // Enable restriction
-		// Grant TRANSFER_ROLE to sender
-		morpherAccessControl.grantRole(morpherToken.TRANSFER_ROLE(), user1);
 		vm.stopPrank();
 
 		vm.startPrank(user1);
@@ -497,15 +498,16 @@ contract MorpherTokenTest is
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
 		address minter = makeAddr("minter"); // Use a separate minter address for clarity
+		// Grant MINTER_ROLE to caller (minter)
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), minter);
+
 		vm.startPrank(_admin);
 		morpherToken.mint(user1, 1 ether);
 		morpherToken.setRestrictTransfers(true); // Enable restriction
-		// Grant MINTER_ROLE to caller (minter)
-		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), minter);
+		vm.stopPrank(); // Stop admin prank
 		// Approve minter to spend user1's tokens
 		vm.prank(user1);
 		morpherToken.approve(minter, 1 ether);
-		vm.stopPrank(); // Stop admin prank
 
 		vm.startPrank(minter);
 		morpherToken.transferFrom(user1, user2, 1 ether); // Should succeed as minter
@@ -516,10 +518,11 @@ contract MorpherTokenTest is
 	function testUpdateTransferBlockedFailSender() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
+		morpherAccessControl.grantRole(morpherToken.TRANSFERBLOCKED_ROLE(), user1);
+
 		vm.startPrank(_admin);
 		morpherToken.mint(user1, 1 ether);
 		// Block the sender
-		morpherAccessControl.grantRole(morpherToken.TRANSFERBLOCKED_ROLE(), user1);
 		vm.stopPrank();
 
 		vm.startPrank(user1);
@@ -531,10 +534,11 @@ contract MorpherTokenTest is
 	function testUpdateTransferBlockedFailReceiver() public {
 		address user1 = makeAddr("user1");
 		address user2 = makeAddr("user2");
+		morpherAccessControl.grantRole(morpherToken.TRANSFERBLOCKED_ROLE(), user2);
+
 		vm.startPrank(_admin);
 		morpherToken.mint(user1, 1 ether);
 		// Block the receiver
-		morpherAccessControl.grantRole(morpherToken.TRANSFERBLOCKED_ROLE(), user2);
 		vm.stopPrank();
 
 		vm.startPrank(user1);
@@ -549,10 +553,11 @@ contract MorpherTokenTest is
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(1 ether); // Set low limit
 		morpherToken.mint(user, 10 ether); // Mint more than limit
+		vm.stopPrank(); // Stop user prank
 		// Approve admin to spend user's tokens
 		vm.prank(user);
 		morpherToken.approve(_admin, 10 ether);
-		vm.stopPrank(); // Stop user prank
+		
 
 		// Transfer as admin - should bypass limit
 		vm.startPrank(_admin);
@@ -571,10 +576,11 @@ contract MorpherTokenTest is
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(1 ether); // Set low limit
 		morpherToken.mint(user, 10 ether); // Mint more than limit
+
+		vm.stopPrank(); // Stop user prank
 		// Approve trade engine to spend user's tokens
 		vm.prank(user);
 		morpherToken.approve(tradeEngine, 10 ether);
-		vm.stopPrank(); // Stop user prank
 
 		// Transfer as trade engine - should bypass limit logic
 		vm.startPrank(tradeEngine);
@@ -650,7 +656,7 @@ contract MorpherTokenTest is
 
 		// Attempt transfer
 		vm.startPrank(user1);
-		vm.expectRevert("ERC20Pausable: token transfer while paused");
+		vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
 		morpherToken.transfer(user2, 1 ether);
 		vm.stopPrank();
 	}
@@ -822,7 +828,7 @@ contract MorpherTokenTest is
 		// Second call with same signature should fail due to nonce mismatch, resulting in an invalid signer error
 		// Use try/catch to check only the selector, as vm.expectRevert(selector) seems to compare full data
 		try morpherToken.permit(owner.addr, spender, value, deadline, v, r, s) {
-			fail("Second permit call should have reverted");
+			revert("Second permit call should have reverted");
 		} catch (bytes memory revertData) {
 			// Check if the revert data starts with the expected selector
 			bytes4 actualSelector;

@@ -4,7 +4,7 @@ pragma solidity ^0.8.15;
 import "forge-std/Test.sol";
 import "./BaseSetup.sol";
 import "../contracts/MorpherSidechainToBaseMigration.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
 import "../lib/murky/src/Merkle.sol";
 
 contract MorpherSidechainToBaseMigrationTest is BaseSetup {
@@ -55,7 +55,7 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Create the message that will be signed
         string memory message = "I authorize migration of all my positions from plasma chain to Base L2";
         bytes32 messageHash = keccak256(abi.encodePacked(message, testUser, block.chainid));
-        bytes32 ethSignedMessageHash = ECDSAUpgradeable.toEthSignedMessageHash(messageHash);
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
         
         // Sign the message with the test user's private key
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(testUserPrivateKey, ethSignedMessageHash);
