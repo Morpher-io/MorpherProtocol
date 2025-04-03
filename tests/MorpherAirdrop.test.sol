@@ -11,7 +11,10 @@ import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 contract MorpherAirdropTest is BaseSetup {
 	address _airdropAdmin = address(0x1234); // Address granted AIRDROPADMIN_ROLE
-	address _coldStorageOwner = address(0x5678); // Address set as Ownable owner
+	// address _coldStorageOwner = address(0x5678); // REMOVED
+	address _administrator = address(0xADMIN); // Address granted ADMINISTRATOR_ROLE
+	address _proxyUpdater = address(0xUPGRD); // Address granted PROXYUPDATER_ROLE
+	address _randomUser = address(0x9999); // Address with no roles
 
 	// Remove ProxyAdmin, implementation, proxy variables
 	// ProxyAdmin proxyAdmin;
@@ -39,10 +42,10 @@ contract MorpherAirdropTest is BaseSetup {
 		// 1. Deploy Implementation
 		MorpherAirdrop airdropImpl = new MorpherAirdrop();
 
-		// 2. Encode V5 initialization data (state, token, owner)
+		// 2. Encode V5 initialization data (state, token) - REMOVED owner
 		bytes memory initData = abi.encodeCall(
 			MorpherAirdrop.initialize,
-			(address(morpherState), address(morpherToken), _coldStorageOwner)
+			(address(morpherState), address(morpherToken))
 		);
 
 		// 3. Deploy UUPS Proxy using UnsafeUpgrades
@@ -51,11 +54,16 @@ contract MorpherAirdropTest is BaseSetup {
 		// 4. Set the morpherAirdrop variable used in tests
 		morpherAirdrop = MorpherAirdrop(payable(airdropProxyAddress));
 
-		// 5. Setup permissions
-		// Grant AIRDROPADMIN_ROLE (on AccessControl) to the designated admin address
+		// 5. Setup permissions (on AccessControl contract)
+		// Grant roles needed for tests
 		morpherAccessControl.grantRole(morpherAirdrop.AIRDROPADMIN_ROLE(), _airdropAdmin);
-		// Grant AIRDROPADMIN_ROLE (on Token) to the Airdrop contract proxy itself
+		morpherAccessControl.grantRole(keccak256("ADMINISTRATOR_ROLE"), _administrator);
+		morpherAccessControl.grantRole(morpherAccessControl.PROXYUPDATER_ROLE(), _proxyUpdater); // Fetch role hash from AC
+
+		// Grant AIRDROPADMIN_ROLE (defined in Token contract) to the Airdrop contract proxy itself
+		// This allows the Airdrop contract to call lockRewards on the Token contract
 		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), airdropProxyAddress);
+
 		// Grant MINTER_ROLE to test contract for initial funding
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
 		// Fund the Airdrop proxy
@@ -65,19 +73,41 @@ contract MorpherAirdropTest is BaseSetup {
 	}
 
 	function testAdminFunctions() public {
-		// Test Ownable functions (called by _coldStorageOwner)
-		vm.expectRevert("Ownable: caller is not the owner");
-		morpherAirdrop.setMorpherStateAddress(address(0x33)); // Test new setter
+		// --- Test Role-Based Admin Functions ---
 
-		vm.expectRevert("Ownable: caller is not the owner");
+		// Test setMorpherStateAddress requires ADMINISTRATOR_ROLE
+		vm.startPrank(_randomUser); // User without role
+		vm.expectRevert("MorpherAirdrop: Permission denied.");
+		morpherAirdrop.setMorpherStateAddress(address(0x33));
+		vm.stopPrank();
+
+		vm.startPrank(_airdropAdmin); // User with different role
+		vm.expectRevert("MorpherAirdrop: Permission denied.");
+		morpherAirdrop.setMorpherStateAddress(address(0x33));
+		vm.stopPrank();
+
+		// Test setMorpherTokenAddress requires ADMINISTRATOR_ROLE
+		vm.startPrank(_randomUser);
+		vm.expectRevert("MorpherAirdrop: Permission denied.");
 		morpherAirdrop.setMorpherTokenAddress(address(0x22));
+		vm.stopPrank();
 
-		// Test role-based function (called by _airdropAdmin)
+		// Test setAirdropAuthorized requires AIRDROPADMIN_ROLE
+		vm.startPrank(_randomUser);
 		vm.expectRevert("MorpherAirdrop: Caller is not an Airdrop Administrator.");
 		morpherAirdrop.setAirdropAuthorized(address(0x44), 1 ether);
+		vm.stopPrank();
 
-		// Test successful calls
-		vm.startPrank(_coldStorageOwner);
+		vm.startPrank(_administrator); // User with different role
+		vm.expectRevert("MorpherAirdrop: Caller is not an Airdrop Administrator.");
+		morpherAirdrop.setAirdropAuthorized(address(0x44), 1 ether);
+		vm.stopPrank();
+
+
+		// --- Test Successful Calls ---
+
+		// Test successful admin calls (set state/token)
+		vm.startPrank(_administrator);
 		morpherAirdrop.setMorpherStateAddress(address(0x33));
 		morpherAirdrop.setMorpherTokenAddress(address(0x22));
 		vm.stopPrank();
@@ -85,12 +115,30 @@ contract MorpherAirdropTest is BaseSetup {
 		assertEq(address(morpherAirdrop.state()), address(0x33));
 		assertEq(morpherAirdrop.morpherToken(), address(0x22));
 
-		// Test successful role call
+		// Test successful airdrop admin call (set authorized)
 		vm.startPrank(_airdropAdmin);
 		morpherAirdrop.setAirdropAuthorized(address(0x44), 1 ether);
 		vm.stopPrank();
 		assertEq(morpherAirdrop.getAirdropAuthorized(address(0x44)), 1 ether);
 	}
+
+	function testAuthorizeUpgrade() public {
+        // Attempt upgrade from an address without PROXYUPDATER_ROLE
+        vm.startPrank(_randomUser);
+        vm.expectRevert("MorpherAirdrop: Caller is not the proxy updater");
+        morpherAirdrop.upgradeToAndCall(address(0xdead), ""); // Use upgradeToAndCall for testing UUPS upgrade auth
+        vm.stopPrank();
+
+		// Attempt upgrade from an address with a different role (e.g., ADMINISTRATOR_ROLE)
+        vm.startPrank(_administrator);
+        vm.expectRevert("MorpherAirdrop: Caller is not the proxy updater");
+        morpherAirdrop.upgradeToAndCall(address(0xdead), "");
+        vm.stopPrank();
+
+        // Note: Testing the *successful* upgrade requires deploying a new implementation
+        // and calling upgradeToAndCall from the _proxyUpdater, which is more involved.
+        // This test primarily verifies the access control check.
+    }
 
 	// --- Remove duplicate testCannotReceiveETH ---
 	// function testCannotReceiveETH() public {
@@ -109,11 +157,11 @@ contract MorpherAirdropTest is BaseSetup {
 
 	function testUserClaimAirdrop() public {
 		address user = address(0xabcdef);
-		vm.prank(_coldStorageOwner);
-		vm.expectRevert();
-		morpherAirdrop.setAirdropAuthorized(user, 1 ether);
+		// vm.prank(_coldStorageOwner); // REMOVED - No longer owner
+		// vm.expectRevert(); // REMOVED - This check is now part of testAdminFunctions
+		// morpherAirdrop.setAirdropAuthorized(user, 1 ether);
 
-		vm.prank(_airdropAdmin);
+		vm.prank(_airdropAdmin); // Correct admin for this action
 		vm.expectEmit(true, true, true, true);
 		emit SetAirdropAuthorized(user, 0, 1 ether);
 		morpherAirdrop.setAirdropAuthorized(user, 1 ether);

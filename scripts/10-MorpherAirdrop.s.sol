@@ -37,7 +37,7 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
 
         // Get configuration from environment
         // address airdropAdmin = vm.envOr("MORPHER_AIRDROP_ADMIN", msg.sender); // Role granted later
-        address coldStorageOwner = vm.envOr("MORPHER_OWNER", msg.sender); // This will be the contract owner
+        // address coldStorageOwner = vm.envOr("MORPHER_OWNER", msg.sender); // REMOVED - No longer Ownable
 
         // Check if deploying fresh
         address existingProxy = loadAddress(CONTRACT_KEY);
@@ -49,10 +49,10 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
         address airdropProxy = deployOrUpgradeV5(
             CONTRACT_KEY,
             CONTRACT_NAME,
-            // Ensure initializer signature matches the adapted v5 contract (state, token, owner)
+            // Ensure initializer signature matches the adapted v5 contract (state, token)
             abi.encodeCall(
                 MorpherAirdrop.initialize,
-                (stateAddress, tokenAddress, coldStorageOwner) // Pass state, token, initial owner
+                (stateAddress, tokenAddress) // Pass state, token ONLY
             ),
             bytes("") // No upgrade call data needed for this example
         );

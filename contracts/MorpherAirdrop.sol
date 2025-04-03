@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20; // Update pragma if needed
 
 // --- V5 Imports ---
-import {OwnableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/access/OwnableUpgradeable.sol";
+// Remove OwnableUpgradeable
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
-// Remove Initializable
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Add Context for _msgSender
 import "./MorpherToken.sol"; // Use adapted v5 interface
 import "./MorpherAccessControl.sol"; // Import AccessControl
 import "./MorpherState.sol"; // Import State to get AccessControl address
@@ -16,10 +16,10 @@ import "./MorpherState.sol"; // Import State to get AccessControl address
 // ----------------------------------------------------------------------------------
 
 /// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAirdrop.sol:MorpherAirdrop
-contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inheritance
+contract MorpherAirdrop is UUPSUpgradeable, ContextUpgradeable { // Remove OwnableUpgradeable, Add ContextUpgradeable
 
 
-// ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
 // Mappings for authorized / claimed airdrop
 // ----------------------------------------------------------------------------
     mapping(address => uint256) private airdropClaimed;
@@ -32,8 +32,12 @@ contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inher
     address public morpherToken;
     MorpherState public state; // Store state contract address
 
-    // --- Define Role ---
+    // --- Define Roles (Keep AIRDROPADMIN_ROLE specific to this contract's logic) ---
     bytes32 public constant AIRDROPADMIN_ROLE = keccak256("AIRDROPADMIN_ROLE");
+    // Roles below are fetched from AccessControl for consistency
+    // bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    // bytes32 public constant PROXYUPDATER_ROLE = keccak256("PROXYUPDATER_ROLE");
+
 
 // ----------------------------------------------------------------------------
 // Events
@@ -47,34 +51,58 @@ contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inher
     // --- Updated Initializer ---
     function initialize(
         address _stateAddress, // Add state address
-        address _morpherTokenAddress,
-        address _initialOwner // The address that will own this contract initially
+        address _morpherTokenAddress
+        // Remove _initialOwner
     ) public initializer {
         __UUPSUpgradeable_init(); // Initialize UUPS
-        __Ownable_init(_initialOwner); // Initialize Ownable with the initial owner
+        __Context_init(); // Initialize Context
+        // Remove __Ownable_init
+
+        require(_stateAddress != address(0), "MorpherAirdrop: State address cannot be zero");
+        require(_morpherTokenAddress != address(0), "MorpherAirdrop: Token address cannot be zero");
 
         state = MorpherState(_stateAddress); // Store state address
         morpherToken = _morpherTokenAddress; // Set directly
-        // transferOwnership is handled by __Ownable_init
         // airdropAdmin role is granted in deployment script
     }
 
-    modifier onlyAirdropAdmin {
+    modifier onlyRole(bytes32 role) {
         address accessControlAddress = state.morpherAccessControlAddress();
         require(accessControlAddress != address(0), "MorpherAirdrop: AccessControl not set in State");
         require(
-            MorpherAccessControl(accessControlAddress).hasRole(AIRDROPADMIN_ROLE, msg.sender),
+            MorpherAccessControl(accessControlAddress).hasRole(role, _msgSender()), // Use _msgSender() from Context
+            "MorpherAirdrop: Permission denied."
+        );
+        _;
+    }
+
+    modifier onlyAirdropAdmin {
+        // Keep specific modifier for clarity, but use the same underlying check logic
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "MorpherAirdrop: AccessControl not set in State");
+        require(
+            MorpherAccessControl(accessControlAddress).hasRole(AIRDROPADMIN_ROLE, _msgSender()),
             "MorpherAirdrop: Caller is not an Airdrop Administrator."
         );
         _;
     }
 
     // --- Implement _authorizeUpgrade ---
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address /** newImplementation */)
         internal
+        view // Changed from internal override onlyRole(...) to internal view override
         override
-        onlyOwner // Only the owner (cold storage) can upgrade
-    {}
+    {
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "MorpherAirdrop: AccessControl not set in State");
+        // Fetch PROXYUPDATER_ROLE hash directly from the AccessControl contract
+        bytes32 proxyUpdaterRole = MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE();
+        require(
+            MorpherAccessControl(accessControlAddress).hasRole(proxyUpdaterRole, _msgSender()),
+            "MorpherAirdrop: Caller is not the proxy updater"
+        );
+    }
+
 
 // ----------------------------------------------------------------------------
 // Administrative functions
@@ -83,12 +111,16 @@ contract MorpherAirdrop is UUPSUpgradeable, OwnableUpgradeable { // Update inher
     //     airdropAdmin = _address;
     // }
 
-    function setMorpherStateAddress(address _stateAddress) public onlyOwner {
+    function setMorpherStateAddress(address _stateAddress) public onlyRole(keccak256("ADMINISTRATOR_ROLE")) { // Use ADMINISTRATOR_ROLE
+        require(_stateAddress != address(0), "MorpherAirdrop: State address cannot be zero");
         state = MorpherState(_stateAddress);
+        // Consider emitting an event
     }
 
-    function setMorpherTokenAddress(address _address) public onlyOwner {
+    function setMorpherTokenAddress(address _address) public onlyRole(keccak256("ADMINISTRATOR_ROLE")) { // Use ADMINISTRATOR_ROLE
+         require(_address != address(0), "MorpherAirdrop: Token address cannot be zero");
         morpherToken = _address;
+        // Consider emitting an event
     }
 
 // ----------------------------------------------------------------------------
