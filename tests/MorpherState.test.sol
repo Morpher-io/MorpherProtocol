@@ -111,7 +111,86 @@ contract MorpherStateTest is BaseSetup, MorpherState {
 
 		active = morpherState.getMarketActive(marketId);
 		assertEq(active, false);
+
+		// Test revert if called by non-admin
+		vm.startPrank(address(0x1234)); // Non-admin address
+		vm.expectRevert("MorpherState: Permission denied.");
+		morpherState.activateMarket(marketId);
+		vm.expectRevert("MorpherState: Permission denied.");
+		morpherState.deActivateMarket(marketId);
+		vm.stopPrank();
 	}
+
+	function testBulkMarketActivationDeactivation() public {
+		bytes32 market1 = keccak256("MARKET_A");
+		bytes32 market2 = keccak256("MARKET_B");
+		bytes32 market3 = keccak256("MARKET_C");
+		bytes32[] memory markets = new bytes32[](3);
+		markets[0] = market1;
+		markets[1] = market2;
+		markets[2] = market3;
+
+		// --- Test Bulk Activation ---
+		vm.startPrank(_admin);
+
+		// Check initial state (should be false)
+		assertEq(morpherState.getMarketActive(market1), false);
+		assertEq(morpherState.getMarketActive(market2), false);
+		assertEq(morpherState.getMarketActive(market3), false);
+
+		// Expect events for each market
+		vm.expectEmit(true, true, true, true);
+		emit MarketActivated(market1);
+		vm.expectEmit(true, true, true, true);
+		emit MarketActivated(market2);
+		vm.expectEmit(true, true, true, true);
+		emit MarketActivated(market3);
+
+		// Call bulk activation
+		morpherState.activateMarket(markets);
+
+		// Check final state (should be true)
+		assertEq(morpherState.getMarketActive(market1), true);
+		assertEq(morpherState.getMarketActive(market2), true);
+		assertEq(morpherState.getMarketActive(market3), true);
+
+		vm.stopPrank();
+
+		// Test revert if called by non-admin
+		vm.startPrank(address(0x1234)); // Non-admin address
+		vm.expectRevert("MorpherState: Permission denied.");
+		morpherState.activateMarket(markets);
+		vm.stopPrank();
+
+
+		// --- Test Bulk Deactivation ---
+		vm.startPrank(_admin);
+
+		// Expect events for each market
+		vm.expectEmit(true, true, true, true);
+		emit MarketDeActivated(market1);
+		vm.expectEmit(true, true, true, true);
+		emit MarketDeActivated(market2);
+		vm.expectEmit(true, true, true, true);
+		emit MarketDeActivated(market3);
+
+		// Call bulk deactivation
+		morpherState.deActivateMarket(markets);
+
+		// Check final state (should be false)
+		assertEq(morpherState.getMarketActive(market1), false);
+		assertEq(morpherState.getMarketActive(market2), false);
+		assertEq(morpherState.getMarketActive(market3), false);
+
+		vm.stopPrank();
+
+		// Test revert if called by non-admin
+		vm.startPrank(address(0x1234)); // Non-admin address
+		vm.expectRevert("MorpherState: Permission denied.");
+		morpherState.deActivateMarket(markets);
+		vm.stopPrank();
+	}
+
 
 	function testMaximumLeverage() public {
 		uint256 newLeverage = 50 * 10 ** 8;

@@ -204,9 +204,35 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
         emit MarketActivated(_activateMarket);
     }
 
-    function deActivateMarket(bytes32 _deActivateMarket) public onlyRole(ADMINISTRATOR_ROLE)  {
+    /**
+     * @notice Activates multiple markets.
+     * @param _markets Array of market IDs (bytes32) to activate.
+     */
+    function activateMarket(bytes32[] calldata _markets) public onlyRole(ADMINISTRATOR_ROLE) {
+        for (uint i = 0; i < _markets.length; i++) {
+            if (_markets[i] != bytes32(0x0)) { // Skip empty slots if any
+                marketActive[_markets[i]] = true;
+                emit MarketActivated(_markets[i]);
+            }
+        }
+    }
+
+    function deActivateMarket(bytes32 _deActivateMarket) public onlyRole(ADMINISTRATOR_ROLE) {
         marketActive[_deActivateMarket] = false;
         emit MarketDeActivated(_deActivateMarket);
+    }
+
+    /**
+     * @notice Deactivates multiple markets.
+     * @param _markets Array of market IDs (bytes32) to deactivate.
+     */
+    function deActivateMarket(bytes32[] calldata _markets) public onlyRole(ADMINISTRATOR_ROLE) {
+        for (uint i = 0; i < _markets.length; i++) {
+            if (_markets[i] != bytes32(0x0)) { // Skip empty slots if any
+                marketActive[_markets[i]] = false;
+                emit MarketDeActivated(_markets[i]);
+            }
+        }
     }
 
     function getMarketActive(bytes32 _marketId) public view returns(bool _active) {

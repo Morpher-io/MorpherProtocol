@@ -96,20 +96,20 @@ contract MorpherAdmin is Initializable {
         emit AllPositionMigrationsComplete(_oldMarketId, _newMarketId);
     }
 
-    /**
-    * Bulk activates markets through a bytes32 array given as calldata
-    * Only the Admin should be able to do this
-    */
-    function bulkActivateMarkets(bytes32[] memory _marketHashes) public onlyAdministrator {
-        for(uint i = 0; i < _marketHashes.length; i++) {
-            if(_marketHashes[i] != bytes32(0x0)) {
-                MorpherState(state).activateMarket(_marketHashes[i]);
-                // bytes memory payload = abi.encodeWithSignature("activateMarket(bytes32)", _marketHashes[i]);
-                // (bool success, ) = address(state).call(payload);
-                // require(success,  "MorpherAdmin: Failed to activate Market");
-            }
-        }
-    }
+    // /** // REMOVED - Functionality moved to MorpherState.activateMarket(bytes32[])
+    // * Bulk activates markets through a bytes32 array given as calldata
+    // * Only the Admin should be able to do this
+    // */
+    // function bulkActivateMarkets(bytes32[] memory _marketHashes) public onlyAdministrator {
+    //     for(uint i = 0; i < _marketHashes.length; i++) {
+    //         if(_marketHashes[i] != bytes32(0x0)) {
+    //             MorpherState(state).activateMarket(_marketHashes[i]);
+    //             // bytes memory payload = abi.encodeWithSignature("activateMarket(bytes32)", _marketHashes[i]);
+    //             // (bool success, ) = address(state).call(payload);
+    //             // require(success,  "MorpherAdmin: Failed to activate Market");
+    //         }
+    //     }
+    // }
 
 
 
