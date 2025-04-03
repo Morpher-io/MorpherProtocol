@@ -148,10 +148,6 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		morpherOracle.setStateAddress(address(0x03));
 	}
 
-	function testGetTradeEngineFromOrderId() public view {
-		address res = morpherOracle.getTradeEngineFromOrderId(0);
-		assertEq(res, address(morpherTradeEngine));
-	}
 
 	function testEmitOrderFailed() public {
 		bytes32 orderId = keccak256("order");
@@ -960,58 +956,58 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		morpherOracle.createLiquidationOrder(user, keccak256("CRYPTO_BTC"));
 	}
 
-	function testLiquidationOrderFromAdmin() public {
-		address user = address(0xff01);
+	// function testLiquidationOrderFromAdmin() public {
+	// 	address user = address(0xff01);
 
-		morpherAccessControl.grantRole(keccak256("POSITIONADMIN_ROLE"), address(this));
-		morpherTradeEngine.setPosition(
-			user,
-			keccak256("CRYPTO_BTC"),
-			block.timestamp,
-			10 * PRECISION,
-			5 * PRECISION,
-			50000 * PRECISION,
-			10 * PRECISION,
-			PRECISION,
-			0
-		);
+	// 	morpherAccessControl.grantRole(keccak256("POSITIONADMIN_ROLE"), address(this));
+	// 	morpherTradeEngine.setPosition(
+	// 		user,
+	// 		keccak256("CRYPTO_BTC"),
+	// 		block.timestamp,
+	// 		10 * PRECISION,
+	// 		5 * PRECISION,
+	// 		50000 * PRECISION,
+	// 		10 * PRECISION,
+	// 		PRECISION,
+	// 		0
+	// 	);
 
-		bytes32 orderId1 = keccak256(
-			abi.encodePacked(
-				user,
-				block.number,
-				keccak256("CRYPTO_BTC"),
-				10 * PRECISION,
-				uint(0),
-				false,
-				PRECISION,
-				uint(1)
-			)
-		);
+	// 	bytes32 orderId1 = keccak256(
+	// 		abi.encodePacked(
+	// 			user,
+	// 			block.number,
+	// 			keccak256("CRYPTO_BTC"),
+	// 			10 * PRECISION,
+	// 			uint(0),
+	// 			false,
+	// 			PRECISION,
+	// 			uint(1)
+	// 		)
+	// 	);
 
-		bytes32 orderId2 = keccak256(
-			abi.encodePacked(
-				user,
-				block.number,
-				keccak256("CRYPTO_BTC"),
-				5 * PRECISION,
-				uint(0),
-				true,
-				PRECISION,
-				uint(2)
-			)
-		);
+	// 	bytes32 orderId2 = keccak256(
+	// 		abi.encodePacked(
+	// 			user,
+	// 			block.number,
+	// 			keccak256("CRYPTO_BTC"),
+	// 			5 * PRECISION,
+	// 			uint(0),
+	// 			true,
+	// 			PRECISION,
+	// 			uint(2)
+	// 		)
+	// 	);
 
-		vm.expectEmit(true, true, true, true);
-		emit OrderIdRequested(orderId1, user, keccak256("CRYPTO_BTC"), 10 * PRECISION, 0, false, PRECISION);
-		vm.expectEmit(true, true, true, true);
-		emit AdminLiquidationOrderCreated(orderId1, user, keccak256("CRYPTO_BTC"), 10 * PRECISION, 0, false, 10 ** 8);
-		vm.expectEmit(true, true, true, true);
-		emit OrderIdRequested(orderId2, user, keccak256("CRYPTO_BTC"), 5 * PRECISION, 0, true, PRECISION);
-		vm.expectEmit(true, true, true, true);
-		emit AdminLiquidationOrderCreated(orderId2, user, keccak256("CRYPTO_BTC"), 5 * PRECISION, 0, true, 10 ** 8);
-		morpherOracle.adminLiquidationOrder(user, keccak256("CRYPTO_BTC"));
-	}
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit OrderIdRequested(orderId1, user, keccak256("CRYPTO_BTC"), 10 * PRECISION, 0, false, PRECISION);
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit AdminLiquidationOrderCreated(orderId1, user, keccak256("CRYPTO_BTC"), 10 * PRECISION, 0, false, 10 ** 8);
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit OrderIdRequested(orderId2, user, keccak256("CRYPTO_BTC"), 5 * PRECISION, 0, true, PRECISION);
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit AdminLiquidationOrderCreated(orderId2, user, keccak256("CRYPTO_BTC"), 5 * PRECISION, 0, true, 10 ** 8);
+	// 	morpherOracle.adminLiquidationOrder(user, keccak256("CRYPTO_BTC"));
+	// }
 
 	function testCancelOrder() public {
 		address user = address(0xff01);
@@ -1054,38 +1050,38 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		assertEq(addr, address(0));
 	}
 
-	function testDelistMarket() public {
-		address addr1 = address(0x0001);
-		address addr2 = address(0x0002);
-		address addr3 = address(0x0003);
-		address addr4 = address(0x0004);
-		bytes32 mId = keccak256("CRYPTO_BTC");
-		uint256 ts = SECOND_RATE_TS;
-		uint256 ls = 100;
-		uint256 ss = 50;
-		uint256 mep = 1000 * 10 ** 8;
-		uint256 mes = 1 * 10 ** 8;
-		uint256 mel = PRECISION;
-		uint256 lp = 500 * 10 ** 8;
+	// function testDelistMarket() public {
+	// 	address addr1 = address(0x0001);
+	// 	address addr2 = address(0x0002);
+	// 	address addr3 = address(0x0003);
+	// 	address addr4 = address(0x0004);
+	// 	bytes32 mId = keccak256("CRYPTO_BTC");
+	// 	uint256 ts = SECOND_RATE_TS;
+	// 	uint256 ls = 100;
+	// 	uint256 ss = 50;
+	// 	uint256 mep = 1000 * 10 ** 8;
+	// 	uint256 mes = 1 * 10 ** 8;
+	// 	uint256 mel = PRECISION;
+	// 	uint256 lp = 500 * 10 ** 8;
 
-		morpherAccessControl.grantRole(keccak256("POSITIONADMIN_ROLE"), address(this));
-		morpherTradeEngine.setPosition(addr1, mId, ts, ls, 0, mep, mes, mel, lp);
-		morpherTradeEngine.setPosition(addr2, mId, ts, 0, ss, mep, mes, mel, lp);
-		morpherTradeEngine.setPosition(addr3, mId, ts, ls, 0, mep, mes, mel, lp);
-		morpherTradeEngine.setPosition(addr4, mId, ts, 0, ss, mep, mes, mel, lp);
+	// 	morpherAccessControl.grantRole(keccak256("POSITIONADMIN_ROLE"), address(this));
+	// 	morpherTradeEngine.setPosition(addr1, mId, ts, ls, 0, mep, mes, mel, lp);
+	// 	morpherTradeEngine.setPosition(addr2, mId, ts, 0, ss, mep, mes, mel, lp);
+	// 	morpherTradeEngine.setPosition(addr3, mId, ts, ls, 0, mep, mes, mel, lp);
+	// 	morpherTradeEngine.setPosition(addr4, mId, ts, 0, ss, mep, mes, mel, lp);
 
-		vm.expectEmit(false, true, true, true);
-		emit AdminLiquidationOrderCreated(bytes32(0), addr1, mId, ls, 0, false, 10 ** 8);
-		vm.expectEmit(false, true, true, true);
-		emit AdminLiquidationOrderCreated(bytes32(0), addr2, mId, ss, 0, true, 10 ** 8);
-		vm.expectEmit(false, true, true, true);
-		emit AdminLiquidationOrderCreated(bytes32(0), addr3, mId, ls, 0, false, 10 ** 8);
-		vm.expectEmit(false, true, true, true);
-		emit AdminLiquidationOrderCreated(bytes32(0), addr4, mId, ss, 0, true, 10 ** 8);
-		vm.expectEmit(false, true, true, true);
-		emit DelistMarketComplete(mId);
-		morpherOracle.delistMarket(mId, false);
-	}
+	// 	vm.expectEmit(false, true, true, true);
+	// 	emit AdminLiquidationOrderCreated(bytes32(0), addr1, mId, ls, 0, false, 10 ** 8);
+	// 	vm.expectEmit(false, true, true, true);
+	// 	emit AdminLiquidationOrderCreated(bytes32(0), addr2, mId, ss, 0, true, 10 ** 8);
+	// 	vm.expectEmit(false, true, true, true);
+	// 	emit AdminLiquidationOrderCreated(bytes32(0), addr3, mId, ls, 0, false, 10 ** 8);
+	// 	vm.expectEmit(false, true, true, true);
+	// 	emit AdminLiquidationOrderCreated(bytes32(0), addr4, mId, ss, 0, true, 10 ** 8);
+	// 	vm.expectEmit(false, true, true, true);
+	// 	emit DelistMarketComplete(mId);
+	// 	morpherOracle.delistMarket(mId, false);
+	//  }
 
 	function testCreateOrderFromGasToken() public {
 		address user = address(0xff01);
@@ -1185,120 +1181,120 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 
 	// --- Tests Moved from MorpherAdminTest ---
 
-	function testPositionMigrationToNewMarketsFull() public {
-		vm.warp(1630000000);
-		address user = address(0x123);
-		bytes32 oldMarket = keccak256("CRYPTO_BTC_OLD");
-		bytes32 newMarket = keccak256("CRYPTO_BTC_NEW");
-		morpherState.activateMarket(oldMarket); // Activate old market
+	// function testPositionMigrationToNewMarketsFull() public {
+	// 	vm.warp(1630000000);
+	// 	address user = address(0x123);
+	// 	bytes32 oldMarket = keccak256("CRYPTO_BTC_OLD");
+	// 	bytes32 newMarket = keccak256("CRYPTO_BTC_NEW");
+	// 	morpherState.activateMarket(oldMarket); // Activate old market
 
-		// Grant necessary roles for generating position (if not already done in setup)
-		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
-		morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this)); // Needed for processOrder
+	// 	// Grant necessary roles for generating position (if not already done in setup)
+	// 	morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+	// 	morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this)); // Needed for processOrder
 
-		this.generatePosition(oldMarket, user); // Use helper from this test contract
+	// 	this.generatePosition(oldMarket, user); // Use helper from this test contract
 
-		// Revoke roles if granted temporarily
-		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
-		// Keep ORACLEOPERATOR_ROLE as it's granted in setup
+	// 	// Revoke roles if granted temporarily
+	// 	morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+	// 	// Keep ORACLEOPERATOR_ROLE as it's granted in setup
 
-		uint longShares;
-		(, longShares, , , , , , ) = morpherTradeEngine.portfolio(user, oldMarket);
+	// 	uint longShares;
+	// 	(, longShares, , , , , , ) = morpherTradeEngine.portfolio(user, oldMarket);
 
-		assertEq(longShares, 999000999); // Check initial position
-		bool active = morpherState.getMarketActive(oldMarket);
-		assertEq(active, true);
-		bool activeNew = morpherState.getMarketActive(newMarket);
-		assertEq(activeNew, false);
+	// 	assertEq(longShares, 999000999); // Check initial position
+	// 	bool active = morpherState.getMarketActive(oldMarket);
+	// 	assertEq(active, true);
+	// 	bool activeNew = morpherState.getMarketActive(newMarket);
+	// 	assertEq(activeNew, false);
 
-		// Test revert if markets are not deactivated
-		vm.expectRevert("MorpherOracle: Old market must be deactivated for migration.");
-		morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
+	// 	// Test revert if markets are not deactivated
+	// 	vm.expectRevert("MorpherOracle: Old market must be deactivated for migration.");
+	// 	morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
 
-		morpherState.deActivateMarket(oldMarket); // Deactivate old market
+	// 	morpherState.deActivateMarket(oldMarket); // Deactivate old market
 
-		// New market doesn't need activation for migration, just deactivation check
-		morpherState.activateMarket(newMarket); // No need to activate new market yet
-		vm.expectRevert("MorpherOracle: New market must be deactivated for migration.");
-		morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
+	// 	// New market doesn't need activation for migration, just deactivation check
+	// 	morpherState.activateMarket(newMarket); // No need to activate new market yet
+	// 	vm.expectRevert("MorpherOracle: New market must be deactivated for migration.");
+	// 	morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
 
-		morpherState.deActivateMarket(newMarket); // Ensure new market is also considered "deactivated" (not active)
+	// 	morpherState.deActivateMarket(newMarket); // Ensure new market is also considered "deactivated" (not active)
 
-		morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherOracle)); // Needed for setPositionInState
-		// Expect events from MorpherOracle now
-		vm.expectEmit(true, true, true, true);
-		emit AddressPositionMigrationComplete(user, oldMarket, newMarket);
-		vm.expectEmit(true, true, true, true);
-		emit AllPositionMigrationsComplete(oldMarket, newMarket);
+	// 	morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherOracle)); // Needed for setPositionInState
+	// 	// Expect events from MorpherOracle now
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit AddressPositionMigrationComplete(user, oldMarket, newMarket);
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit AllPositionMigrationsComplete(oldMarket, newMarket);
 
-		// Call migrate function on MorpherOracle
-		morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
+	// 	// Call migrate function on MorpherOracle
+	// 	morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
 
-		// Check final state
-		(, longShares, , , , , , ) = morpherTradeEngine.portfolio(user, oldMarket);
-		assertEq(longShares, 0); // Old position should be gone
-		(, longShares, , , , , , ) = morpherTradeEngine.portfolio(user, newMarket);
-		assertEq(longShares, 999000999); // New position should exist
+	// 	// Check final state
+	// 	(, longShares, , , , , , ) = morpherTradeEngine.portfolio(user, oldMarket);
+	// 	assertEq(longShares, 0); // Old position should be gone
+	// 	(, longShares, , , , , , ) = morpherTradeEngine.portfolio(user, newMarket);
+	// 	assertEq(longShares, 999000999); // New position should exist
 
-		// Test revert if called by non-admin
-		vm.startPrank(address(0x9876)); // Non-admin address
-		vm.expectRevert("MorpherOracle: Permission denied.");
-		morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
-		vm.stopPrank();
-	}
+	// 	// Test revert if called by non-admin
+	// 	vm.startPrank(address(0x9876)); // Non-admin address
+	// 	vm.expectRevert("MorpherOracle: Permission denied.");
+	// 	morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
+	// 	vm.stopPrank();
+	// }
 
-	// Note: Partial migration test is complex due to gas limits.
-	// It might be better tested in a fork environment or adjusted for unit testing.
-	// Keeping the structure here for reference.
-	function testPositionMigrationToNewMarketsPartial() public {
-		vm.warp(1630000000);
-		address user = address(0x123);
-		address user2 = address(0x456);
-		bytes32 oldMarket = keccak256("CRYPTO_BTC_OLD_PARTIAL");
-		bytes32 newMarket = keccak256("CRYPTO_BTC_NEW_PARTIAL");
-		morpherState.activateMarket(oldMarket);
+	// // Note: Partial migration test is complex due to gas limits.
+	// // It might be better tested in a fork environment or adjusted for unit testing.
+	// // Keeping the structure here for reference.
+	// function testPositionMigrationToNewMarketsPartial() public {
+	// 	vm.warp(1630000000);
+	// 	address user = address(0x123);
+	// 	address user2 = address(0x456);
+	// 	bytes32 oldMarket = keccak256("CRYPTO_BTC_OLD_PARTIAL");
+	// 	bytes32 newMarket = keccak256("CRYPTO_BTC_NEW_PARTIAL");
+	// 	morpherState.activateMarket(oldMarket);
 
-		// Grant necessary roles
-		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
-		morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this));
+	// 	// Grant necessary roles
+	// 	morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+	// 	morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this));
 
-		this.generatePosition(oldMarket, user);
-		this.generatePosition(oldMarket, user2);
+	// 	this.generatePosition(oldMarket, user);
+	// 	this.generatePosition(oldMarket, user2);
 
-		// Revoke roles
-		morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+	// 	// Revoke roles
+	// 	morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
 
-		morpherState.deActivateMarket(oldMarket);
-		// New market doesn't need to be active/inactive for the check
-		morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherOracle)); // Needed for setPositionInState
+	// 	morpherState.deActivateMarket(oldMarket);
+	// 	// New market doesn't need to be active/inactive for the check
+	// 	morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherOracle)); // Needed for setPositionInState
 
-		// Expect the first user to migrate and then potentially incomplete event
-		// This is hard to predict exactly without knowing gas usage.
-		vm.expectEmit(true, true, true, true);
-		emit AddressPositionMigrationComplete(user, oldMarket, newMarket);
-		// vm.expectEmit(true, true, true, true); // This might or might not emit depending on gas
-		// emit AllPositionMigrationIncomplete(oldMarket, newMarket, 0); // Index might vary
+	// 	// Expect the first user to migrate and then potentially incomplete event
+	// 	// This is hard to predict exactly without knowing gas usage.
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit AddressPositionMigrationComplete(user, oldMarket, newMarket);
+	// 	// vm.expectEmit(true, true, true, true); // This might or might not emit depending on gas
+	// 	// emit AllPositionMigrationIncomplete(oldMarket, newMarket, 0); // Index might vary
 
-		// Call migrate function on MorpherOracle
-		morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
+	// 	// Call migrate function on MorpherOracle
+	// 	morpherOracle.migratePositionsToNewMarket(oldMarket, newMarket);
 
-		// Check state after (potentially partial) migration
-		uint longSharesUser1Old;
-		uint longSharesUser1New;
-		uint longSharesUser2Old;
-		uint longSharesUser2New;
+	// 	// Check state after (potentially partial) migration
+	// 	uint longSharesUser1Old;
+	// 	uint longSharesUser1New;
+	// 	uint longSharesUser2Old;
+	// 	uint longSharesUser2New;
 
-		(, longSharesUser1Old, , , , , , ) = morpherTradeEngine.portfolio(user, oldMarket);
-		(, longSharesUser1New, , , , , , ) = morpherTradeEngine.portfolio(user, newMarket);
-		(, longSharesUser2Old, , , , , , ) = morpherTradeEngine.portfolio(user2, oldMarket);
-		(, longSharesUser2New, , , , , , ) = morpherTradeEngine.portfolio(user2, newMarket);
+	// 	(, longSharesUser1Old, , , , , , ) = morpherTradeEngine.portfolio(user, oldMarket);
+	// 	(, longSharesUser1New, , , , , , ) = morpherTradeEngine.portfolio(user, newMarket);
+	// 	(, longSharesUser2Old, , , , , , ) = morpherTradeEngine.portfolio(user2, oldMarket);
+	// 	(, longSharesUser2New, , , , , , ) = morpherTradeEngine.portfolio(user2, newMarket);
 
-		// Assert based on expected outcome (at least user1 migrated)
-		assertEq(longSharesUser1Old, 0);
-		assertEq(longSharesUser1New, 999000999);
+	// 	// Assert based on expected outcome (at least user1 migrated)
+	// 	assertEq(longSharesUser1Old, 0);
+	// 	assertEq(longSharesUser1New, 999000999);
 
-		// User2 might still be on the old market if gas ran out
-		// assertEq(longSharesUser2Old, 999000999); // Or 0 if full migration happened
-		// assertEq(longSharesUser2New, 0); // Or 999000999 if full migration happened
-	}
+	// 	// User2 might still be on the old market if gas ran out
+	// 	// assertEq(longSharesUser2Old, 999000999); // Or 0 if full migration happened
+	// 	// assertEq(longSharesUser2New, 0); // Or 999000999 if full migration happened
+	// }
 }

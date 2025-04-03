@@ -10,8 +10,6 @@ import "./MorpherToken.sol"; // Use adapted v5 interface
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
 // Remove Initializable
 
-
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherMintingLimiter.sol:MorpherMintingLimiter // Add if needed
 contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");

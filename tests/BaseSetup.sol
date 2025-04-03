@@ -65,10 +65,8 @@ contract BaseSetup is Test {
 			morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
 			if (isMainChain) {
 				morpherToken.mint(treasuryAddress, 425000000 ether);
-				morpherToken.setTotalTokensOnOtherChain(575000000 ether);
 			} else {
 				morpherToken.mint(treasuryAddress, 575000000 ether);
-				morpherToken.setTotalTokensOnOtherChain(425000000 ether);
 			}
 			morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
 		}

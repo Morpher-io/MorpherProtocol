@@ -44,7 +44,7 @@
 
                 // Validate the upgrade (optional but recommended)
                 // Set referenceContract in opts if not using @custom:oz-upgrades-from annotation
-                // opts.referenceContract = "path/to/PreviousVersion.sol:PreviousVersion"; // Example
+                opts.referenceContract = string.concat("contracts/prev/contracts/",implementationContractName); // Example
                 // You might need to dynamically determine the previous version artifact path
                 // For simplicity now, we rely on the @custom:oz-upgrades-from annotation in the contract
                 // Upgrades.validateUpgrade(implementationContractName, opts); // Validate against previous version

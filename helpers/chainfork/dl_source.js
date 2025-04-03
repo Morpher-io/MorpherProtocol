@@ -12,6 +12,11 @@ const NETWORKS = {
         apiKey: process.env.ETHERSCAN_KEY,
         apiUrl: 'https://api-sepolia.etherscan.io'
     },
+    84532: {
+        name: 'Base Sepolia',
+        apiKey: process.env.BASE_API_KEY,
+        apiUrl: 'https://api-sepolia.basescan.org'
+    },
     137: {
         name: 'Polygon Mainnet',
         apiKey: process.env.POLYGON_KEY,

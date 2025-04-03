@@ -45,7 +45,7 @@
             string memory json = vm.readFile(path);
             // Use safe parsing: check if key exists before parsing
             bytes memory check = vm.parseJson(json, string.concat(".", key));
-            if (check.length == 0 || (check.length == 4 && string(check) == "null")) {
+            if (check.length == 0) {
                  // Key might not exist yet or is null, return 0
                  return address(0);
             }
@@ -57,7 +57,7 @@
             string memory path = getAddressesPath();
             // Define the base JSON structure *without* proxyAdmin
             // Ensure all keys from the Addresses struct are present
-            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0"}'; // REMOVED proxyAdmin, added missing keys
+            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0"}'; // REMOVED proxyAdmin, added missing keys
 
             if (!vm.isFile(path)) {
                 vm.writeFile(path, baseJsonStructure);
@@ -77,7 +77,7 @@
 
         function saveAddresses(Addresses memory addrs) internal virtual {
             string memory path = getAddressesPath();
-            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAdmin": "0x0", "MorpherAirdrop": "0x0", "MorpherBridge": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0"}'; // REMOVED proxyAdmin, added missing keys
+            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0"}'; // REMOVED proxyAdmin, added missing keys
 
             if (!vm.isFile(path)) {
                 vm.writeFile(path, baseJsonStructure);

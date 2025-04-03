@@ -3,13 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {stdJson} from "forge-std/StdJson.sol";
-import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
 // --- Import and Inherit from DeployOrUpgradeV5 ---
 import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
@@ -25,7 +18,7 @@ contract DeployMorpherOracle is DeployOrUpgradeV5 {
 
 	string constant CONTRACT_KEY = "MorpherOracle";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "contracts/MorpherOracle.sol:MorpherOracle";
+	string constant CONTRACT_NAME = "MorpherOracle.sol:MorpherOracle";
 	// Define EIP712 domain parameters
 	string constant EIP712_NAME = "MorpherOracle";
 	string constant EIP712_VERSION = "1";
@@ -108,7 +101,7 @@ contract DeployMorpherOracle is DeployOrUpgradeV5 {
 
 		if (block.chainid == 84532) { // Base Sepolia
 			wethAddress = 0x4200000000000000000000000000000000000006;
-			uniswapRouterAddress = 0x94cC9016C785094F0117501564431914a6a6366A; // V3 SwapRouter on Base Sepolia (check this address)
+			uniswapRouterAddress = 0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4; // V3 SwapRouter on Base Sepolia (check this address)
 		} else if (block.chainid == 8453) { // Base Mainnet
 			wethAddress = 0x4200000000000000000000000000000000000006;
 			uniswapRouterAddress = 0x2626664c2603336E57B271c5C0b26F421741e481; // V3 SwapRouter on Base Mainnet

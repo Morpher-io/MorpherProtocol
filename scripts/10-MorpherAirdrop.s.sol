@@ -4,12 +4,6 @@ pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {stdJson} from "forge-std/StdJson.sol";
-import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
 // --- Import and Inherit from DeployOrUpgradeV5 ---
 import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
@@ -24,7 +18,7 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherAirdrop";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "contracts/MorpherAirdrop.sol:MorpherAirdrop";
+    string constant CONTRACT_NAME = "MorpherAirdrop.sol:MorpherAirdrop";
 
     function run() public {
         // Load dependencies
@@ -64,7 +58,7 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
             console.log("Performing initial setup for MorpherAirdrop...");
             MorpherToken token = MorpherToken(tokenAddress);
             MorpherAccessControl ac = MorpherAccessControl(accessControlAddress);
-            MorpherAirdrop airdropContract = MorpherAirdrop(airdropProxy); // Use proxy address
+            MorpherAirdrop airdropContract = MorpherAirdrop(payable(airdropProxy)); // Use proxy address
 
             // Grant AIRDROPADMIN_ROLE (defined in Airdrop contract) on AccessControl to the designated admin address
             address envAirdropAdmin = vm.envOr("MORPHER_AIRDROP_ADMIN", msg.sender);
@@ -78,21 +72,22 @@ contract DeployMorpherAirdrop is DeployOrUpgradeV5 {
             ac.grantRole(airdropAdminRoleToken, airdropProxy);
             console.log("Granted AIRDROPADMIN_ROLE (on Token) to Airdrop contract proxy.");
 
+            // We are not minting any more tokens for Base, will use MorpherSidechainToBaseMigration for that.
             // Transfer initial Airdrop funds from Treasury to Airdrop contract
-            address treasuryAddress = vm.envOr("MORPHER_TREASURY", address(0));
-            uint256 airdropSupply = vm.envOr("AIRDROP_SUPPLY", uint256(100_000_000 ether)); // Example: 100M tokens
+            // address treasuryAddress = vm.envOr("MORPHER_TREASURY", address(0));
+            // uint256 airdropSupply = vm.envOr("AIRDROP_SUPPLY", uint256(100_000_000 ether)); // Example: 100M tokens
 
-            if (treasuryAddress != address(0) && airdropSupply > 0) {
-                console.log("Transferring", airdropSupply / 1 ether, "MPH from Treasury to Airdrop contract...");
-                // Ensure Treasury has TRANSFER_ROLE or deployer acts as Treasury
-                // Using vm.prank if deployer needs to act as treasury
-                // vm.startPrank(treasuryAddress);
-                token.transfer(airdropProxy, airdropSupply);
-                // vm.stopPrank();
-                console.log("Airdrop funds transferred.");
-            } else {
-                 console.log("Skipping Airdrop fund transfer: Treasury address or supply not set/zero.");
-            }
+            // if (treasuryAddress != address(0) && airdropSupply > 0) {
+            //     console.log("Transferring", airdropSupply / 1 ether, "MPH from Treasury to Airdrop contract...");
+            //     // Ensure Treasury has TRANSFER_ROLE or deployer acts as Treasury
+            //     // Using vm.prank if deployer needs to act as treasury
+            //     // vm.startPrank(treasuryAddress);
+            //     token.transfer(airdropProxy, airdropSupply);
+            //     // vm.stopPrank();
+            //     console.log("Airdrop funds transferred.");
+            // } else {
+            //      console.log("Skipping Airdrop fund transfer: Treasury address or supply not set/zero.");
+            // }
 
             // The old logic for treasury rollover seems unnecessary for a fresh deployment.
             // ac.grantRole(token.BURNER_ROLE(), msg.sender);

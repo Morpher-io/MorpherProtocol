@@ -15,7 +15,6 @@ import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 // There is a lockup after staking or topping up (30 days) and a minimum stake (100k MPH)
 // ----------------------------------------------------------------------------------
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherInterestRateManager.sol:MorpherInterestRateManager // Add if needed
 contract MorpherInterestRateManager is UUPSUpgradeable { // Inherit UUPSUpgradeable
 	MorpherState public morpherState;
 

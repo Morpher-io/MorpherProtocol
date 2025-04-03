@@ -39,8 +39,6 @@ import "./MorpherInterestRateManager.sol";
 // Needs writing/reading access to/from Morpher State. Order objects are stored locally,
 // portfolios are stored in state.
 // ----------------------------------------------------------------------------------
-
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherTradeEngine.sol:MorpherTradeEngine
 contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit UUPS and Context
 
 	MorpherState public morpherState;

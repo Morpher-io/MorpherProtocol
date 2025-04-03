@@ -66,9 +66,9 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
     event SwapExecuted(
         address indexed user,          // The owner who signed the permit
         address indexed relayer,       // The msg.sender executing the swap
-        address indexed tokenIn,
+        address tokenIn,
         uint256 amountIn,
-        address indexed tokenOut,      // Should always be MPH token
+        address tokenOut,      // Should always be MPH token
         uint256 amountOutTotal,    // Total MPH received from swap
         uint256 amountOutUser,     // MPH sent to user
         uint256 amountOutRelayer   // MPH sent to relayer (fee)
@@ -130,8 +130,9 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
     }
 
     // --- UUPS Upgrade ---
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address /** unused */)
         internal
+        view
         override
         onlyRole(PROXYUPDATER_ROLE) // Use PROXYUPDATER_ROLE defined in MorpherAccessControl
     {
@@ -178,7 +179,7 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         IERC20(tokenIn).safeTransferFrom(owner, address(this), amountIn);
 
         // 3. Approve the Uniswap Router to spend the input token
-        IERC20(tokenIn).safeApprove(uniswapRouter, amountIn);
+        IERC20(tokenIn).approve(uniswapRouter, amountIn);
 
         // 4. Prepare the swap path
         bytes memory path;
@@ -194,7 +195,6 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
             path: path,
             recipient: address(this), // Swap sends MPH output to this contract first
-            deadline: block.timestamp, // Use current time for swap deadline
             amountIn: amountIn,
             amountOutMinimum: minAmountOut // Slippage protection from input struct
         });
@@ -202,7 +202,7 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         uint256 amountOutTotal = IV3SwapRouter(uniswapRouter).exactInput(params);
 
         // 6. Reset approval for the router (good practice)
-        IERC20(tokenIn).safeApprove(uniswapRouter, 0);
+        IERC20(tokenIn).approve(uniswapRouter, 0);
 
         // 7. Distribute the received MPH
         uint256 fee = relayerFee;

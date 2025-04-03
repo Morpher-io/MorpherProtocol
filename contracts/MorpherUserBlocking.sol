@@ -8,7 +8,6 @@ import "./MorpherAccessControl.sol"; // Use adapted v5 interface/contract
 import "./MorpherState.sol"; // Use adapted v5 interface/contract
 
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherUserBlocking.sol:MorpherUserBlocking // Add if needed
 contract MorpherUserBlocking is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UUPSUpgradeable ---
 
     // --- Remove __gap variable if present ---

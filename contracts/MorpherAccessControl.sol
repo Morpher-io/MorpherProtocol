@@ -5,7 +5,6 @@ pragma solidity ^0.8.20; // Update pragma if needed
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/access/AccessControlUpgradeable.sol";
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAccessControl.sol:MorpherAccessControl // Keep or update reference
 contract MorpherAccessControl is AccessControlUpgradeable, UUPSUpgradeable { // Inherit both
 
     // --- Define Proxy Updater Role ---

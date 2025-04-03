@@ -55,12 +55,6 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 		vm.startPrank(_tokenUpdater);
 
-		uint256 totalOnOtherChain = 1000 * 10 ** 18;
-		vm.expectEmit(true, true, true, true);
-		emit SetTotalTokensOnOtherChain(0, totalOnOtherChain);
-		morpherToken.setTotalTokensOnOtherChain(totalOnOtherChain);
-		assertEq(morpherToken.getTotalTokensOnOtherChain(), totalOnOtherChain);
-
 		uint256 totalTokensInPositions = 500 * 10 ** 18;
 		vm.expectEmit(true, true, true, true);
 		emit SetTotalTokensInPositions(0, totalTokensInPositions);
@@ -70,7 +64,7 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		uint256 totalSupply = morpherToken.totalSupply();
-		assertEq(totalSupply, 1500 * 10 ** 18);
+		assertEq(totalSupply, 500 * 10 ** 18);
 
 		vm.startPrank(_pauser);
 		vm.expectEmit(true, true, true, true);
@@ -719,14 +713,6 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 	}
 
-	function testSetTotalTokensOnOtherChainFailNoRole() public {
-		address nonUpdater = makeAddr("nonUpdater");
-		vm.startPrank(nonUpdater);
-		// Use generic role error message from modifier
-		vm.expectRevert("MorpherToken: Missing required role.");
-		morpherToken.setTotalTokensOnOtherChain(1 ether);
-		vm.stopPrank();
-	}
 
 	function testSetTotalInPositionsFailNoRole() public {
 		address nonUpdater = makeAddr("nonUpdater");

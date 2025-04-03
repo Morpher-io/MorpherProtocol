@@ -15,7 +15,7 @@ contract DeployMorpherUserBlocking is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherUserBlocking";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "contracts/MorpherUserBlocking.sol:MorpherUserBlocking";
+    string constant CONTRACT_NAME = "MorpherUserBlocking.sol:MorpherUserBlocking";
 
     function run() public {
         // Load dependencies

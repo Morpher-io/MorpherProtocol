@@ -14,7 +14,7 @@ contract DeployMorpherAccessControl is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherAccessControl";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "contracts/MorpherAccessControl.sol:MorpherAccessControl";
+    string constant CONTRACT_NAME = "MorpherAccessControl.sol:MorpherAccessControl";
 
     function run() public {
         // Check if deploying fresh by seeing if the address already exists
@@ -40,7 +40,7 @@ contract DeployMorpherAccessControl is DeployOrUpgradeV5 {
             if (envProxyUpdater != address(0) && envProxyUpdater != msg.sender) {
                 console.log("Granting PROXYUPDATER_ROLE to env address:", envProxyUpdater);
                 MorpherAccessControl(accessControlProxy).grantRole(
-                    MorpherAccessControl.PROXYUPDATER_ROLE, // Access constant via type
+                    keccak256("PROXYUPDATER_ROLE"), // Access constant via type
                     envProxyUpdater
                 );
             }

@@ -18,7 +18,6 @@ import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/con
 import "./MorpherTradeEngine.sol"; // Use adapted v5 interface
 import "./MorpherToken.sol"; // Use adapted v5 interface
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherSidechainToBaseMigration.sol:MorpherSidechainToBaseMigration // Add if needed
 contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable { // Update inheritance
     
     MorpherState public state;

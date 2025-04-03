@@ -32,7 +32,6 @@ import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 import "./MorpherState.sol"; // Use adapted v5 interface
 
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherToken.sol:MorpherToken
 contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable { // Inherit new modules
 	MorpherAccessControl public morpherAccessControl;
 
@@ -46,7 +45,6 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	bytes32 public constant TOKENUPDATER_ROLE = keccak256("TOKENUPDATER_ROLE");
 	bytes32 public constant AIRDROPADMIN_ROLE = keccak256("AIRDROPADMIN_ROLE");
 
-	uint256 private _totalTokensOnOtherChain;
 	uint256 private _totalTokensInPositions;
 	bool private _restrictTransfers;
 	
@@ -162,9 +160,6 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		morpherState = MorpherState(_morpherState);
 	}
 
-	// function getMorpherAccessControl() public view returns(address) {
-	//     return address(morpherAccessControl);
-	// }
 
 	function setRestrictTransfers(bool restrictTransfers) public onlyRole(ADMINISTRATOR_ROLE) {
 		emit SetRestrictTransfers(_restrictTransfers, restrictTransfers);
@@ -173,15 +168,6 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 
 	function getRestrictTransfers() public view returns (bool) {
 		return _restrictTransfers;
-	}
-
-	function setTotalTokensOnOtherChain(uint256 totalOnOtherChain) public onlyRole(TOKENUPDATER_ROLE) {
-		emit SetTotalTokensOnOtherChain(_totalTokensInPositions, totalOnOtherChain);
-		_totalTokensOnOtherChain = totalOnOtherChain;
-	}
-
-	function getTotalTokensOnOtherChain() public view returns (uint256) {
-		return _totalTokensOnOtherChain;
 	}
 
 	function setTotalInPositions(uint256 totalTokensInPositions) public onlyRole(TOKENUPDATER_ROLE) {
@@ -197,7 +183,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * @dev See {IERC20-totalSupply}.
 	 */
 	function totalSupply() public view virtual override returns (uint256) {
-		return super.totalSupply() + _totalTokensOnOtherChain + _totalTokensInPositions;
+		return super.totalSupply() + _totalTokensInPositions;
 	}
 
 	/**

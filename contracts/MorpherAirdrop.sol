@@ -15,10 +15,9 @@ import "./MorpherState.sol"; // Import State to get AccessControl address
 // Users have to claim their airdrop actively or Admin initiates transfer.
 // ----------------------------------------------------------------------------------
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherAirdrop.sol:MorpherAirdrop
 contract MorpherAirdrop is
 	UUPSUpgradeable,
-	ContextUpgradeable // Remove OwnableUpgradeable, Add ContextUpgradeable
+	ContextUpgradeable 
 {
 	// ----------------------------------------------------------------------------
 	// Mappings for authorized / claimed airdrop

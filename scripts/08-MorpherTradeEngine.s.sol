@@ -3,13 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {stdJson} from "forge-std/StdJson.sol";
-import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
 // --- Import and Inherit from DeployOrUpgradeV5 ---
 import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
@@ -21,12 +14,11 @@ import {MorpherToken} from "../contracts/MorpherToken.sol"; // Use adapted v5 co
 import {MorpherStaking} from "../contracts/MorpherStaking.sol"; // Use adapted v5 contract
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // Use adapted v5 contract
 
-// --- Inherit from DeployOrUpgradeV5 ---
 contract DeployMorpherTradeEngine is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherTradeEngine";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "contracts/MorpherTradeEngine.sol:MorpherTradeEngine";
+    string constant CONTRACT_NAME = "MorpherTradeEngine.sol:MorpherTradeEngine";
 
     function run() public {
         // Load dependencies

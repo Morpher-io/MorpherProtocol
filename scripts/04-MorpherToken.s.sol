@@ -15,7 +15,7 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 
 	string constant CONTRACT_KEY = "MorpherToken";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "contracts/MorpherToken.sol:MorpherToken";
+	string constant CONTRACT_NAME = "MorpherToken.sol:MorpherToken";
 	// Define the EIP712 domain name for the permit function
 	string constant PERMIT_NAME = "MorpherToken"; // Or "MorpherToken" - should match what users expect
 
@@ -50,12 +50,8 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 			MorpherToken tokenContract = MorpherToken(tokenProxy); // Use proxy address
 
 			// Define roles using constants from the contract *type*
-			bytes32 pauserRole = MorpherToken.PAUSER_ROLE;
-			bytes32 adminRole = MorpherToken.ADMINISTRATOR_ROLE;
-			bytes32 minterRole = MorpherToken.MINTER_ROLE;
-			bytes32 burnerRole = MorpherToken.BURNER_ROLE; // Needed for staking/other burns
-			bytes32 tokenUpdaterRole = MorpherToken.TOKENUPDATER_ROLE; // Needed for setting balances
-			bytes32 airdropAdminRole = MorpherToken.AIRDROPADMIN_ROLE; // Needed for locking rewards
+			bytes32 minterRole = tokenContract.MINTER_ROLE();
+			bytes32 burnerRole = tokenContract.BURNER_ROLE(); // Needed for staking/other burns
 
 			// Grant initial roles to deployer (or designated admin/pauser addresses)
 			address envAdmin = vm.envOr("TOKEN_ADMIN_ADDRESS", msg.sender);
@@ -63,10 +59,10 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 			address envTokenUpdater = vm.envOr("TOKEN_UPDATER_ADDRESS", msg.sender);
 			address envAirdropAdmin = vm.envOr("AIRDROP_ADMIN_ADDRESS", msg.sender);
 
-			accessControl.grantRole(pauserRole, envPauser);
-			accessControl.grantRole(adminRole, envAdmin);
-			accessControl.grantRole(tokenUpdaterRole, envTokenUpdater);
-			accessControl.grantRole(airdropAdminRole, envAirdropAdmin);
+			accessControl.grantRole(tokenContract.PAUSER_ROLE(), envPauser);
+			accessControl.grantRole(tokenContract.ADMINISTRATOR_ROLE(), envAdmin);
+			accessControl.grantRole(tokenContract.TOKENUPDATER_ROLE(), envTokenUpdater);
+			accessControl.grantRole(tokenContract.AIRDROPADMIN_ROLE(), envAirdropAdmin);
 			// Grant MINTER_ROLE initially to deployer for initial mint, revoke later if needed
 			accessControl.grantRole(minterRole, msg.sender);
 			// Grant BURNER_ROLE to deployer initially if needed for setup, revoke later
@@ -75,14 +71,14 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 			console.log("Granted PAUSER/ADMIN/UPDATER/AIRDROP roles.");
 
 			// Get treasury address from environment or use deployer
-			address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);
+			// address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);
 
 			// Mint initial supply (adjust amounts as needed for the new chain)
 			// tokenContract.setTotalTokensOnOtherChain(0); // Start fresh on new chain
 
-			uint256 initialMint = 1_000_000_000 ether; // Example: Mint total supply to treasury
-			tokenContract.mint(treasuryAddress, initialMint);
-			console.log("Minted", initialMint / 1 ether, "MPH to treasury:", treasuryAddress);
+			// uint256 initialMint = 1_000_000_000 ether; // Example: Mint total supply to treasury
+			// tokenContract.mint(treasuryAddress, initialMint);
+			// console.log("Minted", initialMint / 1 ether, "MPH to treasury:", treasuryAddress);
 
 			// Configure State with token address
 			MorpherState(stateAddress).setMorpherToken(tokenProxy);

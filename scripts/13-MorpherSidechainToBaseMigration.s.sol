@@ -3,13 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {stdJson} from "forge-std/StdJson.sol";
-import {Strings} from "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {ProxyAdmin} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/LegacyUpgrades.sol";
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol"; // Keep Options if used by V5 helper
 
 // --- Import and Inherit from DeployOrUpgradeV5 ---
 import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
@@ -24,7 +17,7 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 
 	string constant CONTRACT_KEY = "MorpherSidechainToBaseMigration";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "contracts/MorpherSidechainToBaseMigration.sol:MorpherSidechainToBaseMigration";
+	string constant CONTRACT_NAME = "MorpherSidechainToBaseMigration.sol:MorpherSidechainToBaseMigration";
 
 	function run() public {
 		vm.startBroadcast();
@@ -44,8 +37,6 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 		// Check if deploying fresh
 		address existingProxy = loadAddress(CONTRACT_KEY);
 		bool isNewDeployment = existingProxy == address(0);
-
-		vm.startBroadcast();
 
 		// Deploy or upgrade using the V5 UUPS logic
 		address migrationProxy = deployOrUpgradeV5(

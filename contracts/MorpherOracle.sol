@@ -65,7 +65,6 @@ import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 // creating their order.
 // ----------------------------------------------------------------------------------
 
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherOracle.sol:MorpherOracle
 contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeable, EIP712Upgradeable, NoncesUpgradeable { // Update inheritance
 	MorpherState public state; // read only, Oracle doesn't need writing access to state
 
@@ -254,16 +253,16 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	 * if it reached all positions it will emit "DelistMarketComplete"
 	 * otherwise it needs to be re-run.
 	 */
-	event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
-	event DelistMarketComplete(bytes32 _marketId);
+	// event DelistMarketIncomplete(bytes32 _marketId, uint256 _processedUntilIndex);
+	// event DelistMarketComplete(bytes32 _marketId);
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
 
-	/**
-	 * Position Migration Events (Moved from MorpherAdmin)
-	 */
-	event AddressPositionMigrationComplete(address _owner, bytes32 _oldMarketId, bytes32 _newMarketId);
-	event AllPositionMigrationsComplete(bytes32 _oldMarketId, bytes32 _newMarketId);
-	event AllPositionMigrationIncomplete(bytes32 _oldMarketId, bytes32 _newMarketId, uint _maxIx);
+	// /**
+	//  * Position Migration Events (Moved from MorpherAdmin)
+	//  */
+	// event AddressPositionMigrationComplete(address _owner, bytes32 _oldMarketId, bytes32 _newMarketId);
+	// event AllPositionMigrationsComplete(bytes32 _oldMarketId, bytes32 _newMarketId);
+	// event AllPositionMigrationIncomplete(bytes32 _oldMarketId, bytes32 _newMarketId, uint _maxIx);
 
 	/**
 	 * MPH Uniswap Conversion Events
@@ -953,72 +952,73 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		return createdPosition;
 	}
 
-	// ----------------------------------------------------------------------------------
-	// delistMarket(bytes32 _marketId)
-	// Administrator closes out all existing positions on _marketId market at current prices
-	// ----------------------------------------------------------------------------------
+	// contract size too large, will move to an admin contract.
+	// // ----------------------------------------------------------------------------------
+	// // delistMarket(bytes32 _marketId)
+	// // Administrator closes out all existing positions on _marketId market at current prices
+	// // ----------------------------------------------------------------------------------
 
-	function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyRole(ADMINISTRATOR_ROLE) {
-		require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
-		// If no _fromIx and _toIx specified, do entire _list
-		if (_startFromScratch) {
-			delistMarketFromIx = 0;
-		}
+	// function delistMarket(bytes32 _marketId, bool _startFromScratch) public onlyRole(ADMINISTRATOR_ROLE) {
+	// 	require(state.getMarketActive(_marketId) == true, "Market must be active to process position liquidations.");
+	// 	// If no _fromIx and _toIx specified, do entire _list
+	// 	if (_startFromScratch) {
+	// 		delistMarketFromIx = 0;
+	// 	}
 
-		uint _toIx = MorpherTradeEngine(state.morpherTradeEngineAddress()).getMaxMappingIndex(_marketId);
+	// 	uint _toIx = MorpherTradeEngine(state.morpherTradeEngineAddress()).getMaxMappingIndex(_marketId);
 
-		address _address;
-		for (uint256 i = delistMarketFromIx; i <= _toIx; i++) {
-			if (gasleft() < 250000 && i != _toIx) {
-				//stop if there's not enough gas to write the next transaction
-				delistMarketFromIx = i;
-				emit DelistMarketIncomplete(_marketId, _toIx);
-				return;
-			}
+	// 	address _address;
+	// 	for (uint256 i = delistMarketFromIx; i <= _toIx; i++) {
+	// 		if (gasleft() < 250000 && i != _toIx) {
+	// 			//stop if there's not enough gas to write the next transaction
+	// 			delistMarketFromIx = i;
+	// 			emit DelistMarketIncomplete(_marketId, _toIx);
+	// 			return;
+	// 		}
 
-			_address = MorpherTradeEngine(state.morpherTradeEngineAddress()).getExposureMappingAddress(_marketId, i);
-			adminLiquidationOrder(_address, _marketId);
-		}
-		emit DelistMarketComplete(_marketId);
-	}
+	// 		_address = MorpherTradeEngine(state.morpherTradeEngineAddress()).getExposureMappingAddress(_marketId, i);
+	// 		adminLiquidationOrder(_address, _marketId);
+	// 	}
+	// 	emit DelistMarketComplete(_marketId);
+	// }
 
-	// ----------------------------------------------------------------------------------
-	// adminLiquidationOrder(address _address, bytes32 _marketId)
-	// Administrator closes out an existing position of _address on _marketId market at current price
-	// ----------------------------------------------------------------------------------
-	function adminLiquidationOrder(
-		address _address,
-		bytes32 _marketId
-	) public onlyRole(ADMINISTRATOR_ROLE) returns (bytes32 _orderId) {
-		MorpherTradeEngine.position memory position = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(
-			_address,
-			_marketId
-		);
+	// // ----------------------------------------------------------------------------------
+	// // adminLiquidationOrder(address _address, bytes32 _marketId)
+	// // Administrator closes out an existing position of _address on _marketId market at current price
+	// // ----------------------------------------------------------------------------------
+	// function adminLiquidationOrder(
+	// 	address _address,
+	// 	bytes32 _marketId
+	// ) public onlyRole(ADMINISTRATOR_ROLE) returns (bytes32 _orderId) {
+	// 	MorpherTradeEngine.position memory position = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(
+	// 		_address,
+	// 		_marketId
+	// 	);
 
-		if (position.longShares > 0) {
-			_orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
-				_address,
-				_marketId,
-				position.longShares,
-				0,
-				false,
-				10 ** 8
-			);
-			emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, position.longShares, 0, false, 10 ** 8);
-		}
-		if (position.shortShares > 0) {
-			_orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
-				_address,
-				_marketId,
-				position.shortShares,
-				0,
-				true,
-				10 ** 8
-			);
-			emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, position.shortShares, 0, true, 10 ** 8);
-		}
-		return _orderId;
-	}
+	// 	if (position.longShares > 0) {
+	// 		_orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
+	// 			_address,
+	// 			_marketId,
+	// 			position.longShares,
+	// 			0,
+	// 			false,
+	// 			10 ** 8
+	// 		);
+	// 		emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, position.longShares, 0, false, 10 ** 8);
+	// 	}
+	// 	if (position.shortShares > 0) {
+	// 		_orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
+	// 			_address,
+	// 			_marketId,
+	// 			position.shortShares,
+	// 			0,
+	// 			true,
+	// 			10 ** 8
+	// 		);
+	// 		emit AdminLiquidationOrderCreated(_orderId, _address, _marketId, position.shortShares, 0, true, 10 ** 8);
+	// 	}
+	// 	return _orderId;
+	// }
 
 	/**
 	 * @dev Create an order using native ETH/gas token
@@ -1088,67 +1088,61 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		return amountOut;
 	}
 
-	/**
-	 * Deprecated function
-	 */
-	function getTradeEngineFromOrderId(uint orderId) public view returns (address) {
-		orderId = orderId; //mute the warning
-		return state.morpherTradeEngineAddress();
-	}
 
-	// ----------------------------------------------------------------------------------
-	// migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId)
-	// Administrator migrates all positions from an old (deactivated) market to a new one.
-	// ----------------------------------------------------------------------------------
-	function migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId) public onlyRole(ADMINISTRATOR_ROLE) {
-		require(state.getMarketActive(_oldMarketId) == false, "MorpherOracle: Old market must be deactivated for migration.");
-		require(state.getMarketActive(_newMarketId) == false, "MorpherOracle: New market must be deactivated for migration.");
+	//contract size too big, will move this later on to an admin contract.
+	// // ----------------------------------------------------------------------------------
+	// // migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId)
+	// // Administrator migrates all positions from an old (deactivated) market to a new one.
+	// // ----------------------------------------------------------------------------------
+	// function migratePositionsToNewMarket(bytes32 _oldMarketId, bytes32 _newMarketId) public onlyRole(ADMINISTRATOR_ROLE) {
+	// 	require(state.getMarketActive(_oldMarketId) == false, "MorpherOracle: Old market must be deactivated for migration.");
+	// 	require(state.getMarketActive(_newMarketId) == false, "MorpherOracle: New market must be deactivated for migration.");
 
-		MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
-		uint256 maxMarketAddressIndex = tradeEngine.getMaxMappingIndex(_oldMarketId);
+	// 	MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+	// 	uint256 maxMarketAddressIndex = tradeEngine.getMaxMappingIndex(_oldMarketId);
 
-		// Create a temporary array to store addresses to avoid issues with index changes during deletion
-		address[] memory addressesToMigrate = new address[](maxMarketAddressIndex);
-		uint validAddressCount = 0;
-		for (uint256 i = 1; i <= maxMarketAddressIndex; i++) {
-			address addr = tradeEngine.getExposureMappingAddress(_oldMarketId, i);
-			if (addr != address(0)) { // Check if address is valid
-				addressesToMigrate[validAddressCount] = addr;
-				validAddressCount++;
-			}
-		}
+	// 	// Create a temporary array to store addresses to avoid issues with index changes during deletion
+	// 	address[] memory addressesToMigrate = new address[](maxMarketAddressIndex);
+	// 	uint validAddressCount = 0;
+	// 	for (uint256 i = 1; i <= maxMarketAddressIndex; i++) {
+	// 		address addr = tradeEngine.getExposureMappingAddress(_oldMarketId, i);
+	// 		if (addr != address(0)) { // Check if address is valid
+	// 			addressesToMigrate[validAddressCount] = addr;
+	// 			validAddressCount++;
+	// 		}
+	// 	}
 
-		// Iterate through the collected valid addresses
-		for (uint256 i = 0; i < validAddressCount; i++) {
-			address _address = addressesToMigrate[i];
-			MorpherTradeEngine.position memory position = tradeEngine.getPosition(_address, _oldMarketId);
+	// 	// Iterate through the collected valid addresses
+	// 	for (uint256 i = 0; i < validAddressCount; i++) {
+	// 		address _address = addressesToMigrate[i];
+	// 		MorpherTradeEngine.position memory position = tradeEngine.getPosition(_address, _oldMarketId);
 
-			if (position.longShares > 0 || position.shortShares > 0) {
-				// Create a new position for the new market with the same parameters
-				tradeEngine.setPosition(
-					_address,
-					_newMarketId,
-					block.timestamp, // Use current timestamp for the new position
-					position.longShares,
-					position.shortShares,
-					position.meanEntryPrice,
-					position.meanEntrySpread,
-					position.meanEntryLeverage,
-					position.liquidationPrice
-				);
-				// Delete the old position by setting shares to zero
-				tradeEngine.setPosition(_address, _oldMarketId, block.timestamp, 0, 0, 0, 0, 0, 0);
-				emit AddressPositionMigrationComplete(_address, _oldMarketId, _newMarketId);
-			}
+	// 		if (position.longShares > 0 || position.shortShares > 0) {
+	// 			// Create a new position for the new market with the same parameters
+	// 			tradeEngine.setPosition(
+	// 				_address,
+	// 				_newMarketId,
+	// 				block.timestamp, // Use current timestamp for the new position
+	// 				position.longShares,
+	// 				position.shortShares,
+	// 				position.meanEntryPrice,
+	// 				position.meanEntrySpread,
+	// 				position.meanEntryLeverage,
+	// 				position.liquidationPrice
+	// 			);
+	// 			// Delete the old position by setting shares to zero
+	// 			tradeEngine.setPosition(_address, _oldMarketId, block.timestamp, 0, 0, 0, 0, 0, 0);
+	// 			emit AddressPositionMigrationComplete(_address, _oldMarketId, _newMarketId);
+	// 		}
 
-			// Check gas before potentially starting the next iteration's complex operations
-			if (gasleft() < 500000 && (i + 1) < validAddressCount) {
-				//stop if there's not enough gas to write the next transaction
-				emit AllPositionMigrationIncomplete(_oldMarketId, _newMarketId, i); // Emit index processed so far
-				return; // Exit early
-			}
-		}
+	// 		// Check gas before potentially starting the next iteration's complex operations
+	// 		if (gasleft() < 500000 && (i + 1) < validAddressCount) {
+	// 			//stop if there's not enough gas to write the next transaction
+	// 			emit AllPositionMigrationIncomplete(_oldMarketId, _newMarketId, i); // Emit index processed so far
+	// 			return; // Exit early
+	// 		}
+	// 	}
 
-		emit AllPositionMigrationsComplete(_oldMarketId, _newMarketId);
-	}
+	// 	emit AllPositionMigrationsComplete(_oldMarketId, _newMarketId);
+	// }
 }

@@ -1,9 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-//SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
-
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 // --- Inherit from DeployOrUpgradeV5 ---
@@ -17,7 +14,7 @@ import {MorpherState} from "../contracts/MorpherState.sol";
 contract DeploySwapHelper is DeployOrUpgradeV5 {
 	string constant CONTRACT_KEY = "MorpherSwapHelper";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "contracts/MorpherSwapHelper.sol:MorpherSwapHelper";
+	string constant CONTRACT_NAME = "MorpherSwapHelper.sol:MorpherSwapHelper";
 
 	// Chain specific addresses
 	address public UNISWAP_V3_ROUTER;
@@ -91,9 +88,9 @@ contract DeploySwapHelper is DeployOrUpgradeV5 {
 		address deployer = msg.sender;
 
 		// Define roles needed by SwapHelper (using the contract type for constants)
-		bytes32 adminRole = MorpherSwapHelper.ADMINISTRATOR_ROLE;
-		bytes32 pauserRole = MorpherSwapHelper.PAUSER_ROLE;
-		bytes32 proxyUpdaterRole = MorpherSwapHelper.PROXYUPDATER_ROLE; // Needed for future upgrades
+		bytes32 adminRole = swapHelper.ADMINISTRATOR_ROLE();
+		bytes32 pauserRole = swapHelper.PAUSER_ROLE();
+		bytes32 proxyUpdaterRole = swapHelper.PROXYUPDATER_ROLE(); // Needed for future upgrades
 
 		if (isNewDeployment) {
 			console.log("Performing initial setup for new deployment...");
@@ -114,8 +111,6 @@ contract DeploySwapHelper is DeployOrUpgradeV5 {
 			// 2. Grant Permanent Roles on AccessControl for the SwapHelper contract
 			// Grant roles to deployer initially
 			accessControl.grantRole(adminRole, deployer);
-			accessControl.grantRole(pauserRole, deployer);
-			accessControl.grantRole(proxyUpdaterRole, deployer);
 			console.log("Granted ADMIN/PAUSER/PROXYUPDATER roles for SwapHelper to deployer:", deployer);
 
 			// Grant roles to environment addresses if specified

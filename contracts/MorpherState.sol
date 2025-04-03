@@ -8,12 +8,6 @@ import "./MorpherToken.sol"; // Ensure this points to the adapted v5 version lat
 import "./MorpherTradeEngine.sol"; // Ensure this points to the adapted v5 version later
 import "./MorpherAccessControl.sol"; // Use the adapted v5 interface/contract
 
-// ----------------------------------------------------------------------------------
-// Data and token balance storage of the Morpher platform
-// ... (rest of comments)
-// ----------------------------------------------------------------------------------
-
-/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherState.sol:MorpherState
 contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UUPSUpgradeable and ContextUpgradeable ---
 
     // --- Remove __gap variable if present ---
