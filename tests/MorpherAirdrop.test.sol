@@ -49,7 +49,7 @@ contract MorpherAirdropTest is BaseSetup {
 		address airdropProxyAddress = UnsafeUpgrades.deployUUPSProxy(address(airdropImpl), initData);
 
 		// 4. Set the morpherAirdrop variable used in tests
-		morpherAirdrop = MorpherAirdrop(airdropProxyAddress);
+		morpherAirdrop = MorpherAirdrop(payable(airdropProxyAddress));
 
 		// 5. Setup permissions
 		// Grant AIRDROPADMIN_ROLE (on AccessControl) to the designated admin address
@@ -191,7 +191,7 @@ contract MorpherAirdropTest is BaseSetup {
 
 		// Non-admin should not be able to send locked rewards
 		vm.prank(user);
-		vm.expectRevert("MorpherAirdrop: can only be called by Airdrop Administrator.");
+		vm.expectRevert("MorpherAirdrop: Caller is not an Airdrop Administrator.");
 		morpherAirdrop.adminSendLockedRewards(user, rewardAmount);
 
 		// Admin should be able to send locked rewards
@@ -209,7 +209,7 @@ contract MorpherAirdropTest is BaseSetup {
 
 		// User should not be able to transfer locked rewards
 		vm.prank(user);
-		vm.expectRevert("MorpherToken: transfer amount exceeds unlocked balance");
+		vm.expectRevert("MorpherToken: transfer amount exceeds available balance (locked)");
 		MorpherToken(morpherToken).transfer(address(0xdef), rewardAmount);
 	}
 }
