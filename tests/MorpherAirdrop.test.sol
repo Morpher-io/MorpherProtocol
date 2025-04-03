@@ -12,8 +12,8 @@ import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 contract MorpherAirdropTest is BaseSetup {
 	address _airdropAdmin = address(0x1234); // Address granted AIRDROPADMIN_ROLE
 	// address _coldStorageOwner = address(0x5678); // REMOVED
-	address _administrator = address(0xADMIN); // Address granted ADMINISTRATOR_ROLE
-	address _proxyUpdater = address(0xUPGRD); // Address granted PROXYUPDATER_ROLE
+	address _administrator = address(0xadd12); // Address granted ADMINISTRATOR_ROLE
+	address _proxyUpdater = address(0x0101); // Address granted PROXYUPDATER_ROLE
 	address _randomUser = address(0x9999); // Address with no roles
 
 	// Remove ProxyAdmin, implementation, proxy variables
