@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol"; // Assuming this is the correct base
+// Removed: import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 import {MorpherSidechainToBaseMigration} from "../contracts/MorpherSidechainMigrationSelfcontained.sol";
 
 // Minimal interface for the MorpherState contract to call grantAccess
@@ -12,9 +12,9 @@ interface IMorpherStateForAccess {
     function getAdministrator() external view returns(address); // Needed to check if OWNER_ADDRESS is admin
 }
 
-contract DeploySidechainMigration is DeployOrUpgradeV5 {
+contract DeploySidechainMigration is Script { // Changed inheritance
 
-    string constant MIGRATION_CONTRACT_KEY = "MorpherSidechainMigration";
+    // Removed: string constant MIGRATION_CONTRACT_KEY = "MorpherSidechainMigration";
 
     function run() external {
         // --- Load Environment Variables ---
@@ -51,9 +51,7 @@ contract DeploySidechainMigration is DeployOrUpgradeV5 {
         address migrationContractAddress = address(migrationContract);
         console.log("Deployed MorpherSidechainToBaseMigration at:", migrationContractAddress);
 
-        // --- Save Address ---
-        saveAddress(MIGRATION_CONTRACT_KEY, migrationContractAddress);
-        console.log("Saved contract address with key:", MIGRATION_CONTRACT_KEY);
+        // Removed: saveAddress call
 
         // --- Grant Access on State Contract ---
         console.log("Granting access for migration contract on MorpherState...");
