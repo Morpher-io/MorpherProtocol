@@ -161,25 +161,25 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     // --- Split testDelegateMigrateStakeBatch to avoid Stack Too Deep ---
 
     function testDelegateMigrateStakeBatch_Success() public {
-        // Prepare data for two users
-        address user1 = testUser;
-        address user2 = vm.addr(0xB0B);
-        uint256 shares1 = 1000 * 10**18; // Example shares
-        uint256 shares2 = 5000 * 10**18;
-        uint256 lockUntil1 = block.timestamp + 30 days;
-        uint256 lockUntil2 = block.timestamp + 60 days;
+        // Prepare data directly in arrays to reduce local variables
+        address user1_addr = testUser; // Keep one for assertion clarity
+        address user2_addr = vm.addr(0xB0B); // Keep one for assertion clarity
+        uint256 shares1_val = 1000 * 10**18; // Keep one for assertion clarity
+        uint256 shares2_val = 5000 * 10**18; // Keep one for assertion clarity
+        uint256 lockUntil1_val = block.timestamp + 30 days; // Keep one for assertion clarity
+        uint256 lockUntil2_val = block.timestamp + 60 days; // Keep one for assertion clarity
 
         address[] memory users = new address[](2);
-        users[0] = user1;
-        users[1] = user2;
+        users[0] = user1_addr;
+        users[1] = user2_addr;
 
         uint256[] memory shares = new uint256[](2);
-        shares[0] = shares1;
-        shares[1] = shares2;
+        shares[0] = shares1_val;
+        shares[1] = shares2_val;
 
         uint256[] memory lockTimes = new uint256[](2);
-        lockTimes[0] = lockUntil1;
-        lockTimes[1] = lockUntil2;
+        lockTimes[0] = lockUntil1_val;
+        lockTimes[1] = lockUntil2_val;
 
         uint256 initialTotalShares = morpherStaking.totalShares();
 
@@ -187,19 +187,19 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateStakeBatch(users, shares, lockTimes);
 
         // Verify state in MorpherStaking
-        (uint256 numShares1, uint256 lockedUntilTimestamp1) = morpherStaking.poolShares(user1);
-        (uint256 numShares2, uint256 lockedUntilTimestamp2) = morpherStaking.poolShares(user2);
+        (uint256 numShares1, uint256 lockedUntilTimestamp1) = morpherStaking.poolShares(user1_addr);
+        (uint256 numShares2, uint256 lockedUntilTimestamp2) = morpherStaking.poolShares(user2_addr);
 
-        assertEq(numShares1, shares1, "User1 shares mismatch");
-        assertEq(lockedUntilTimestamp1, lockUntil1, "User1 lock time mismatch");
-        assertEq(numShares2, shares2, "User2 shares mismatch");
-        assertEq(lockedUntilTimestamp2, lockUntil2, "User2 lock time mismatch");
+        assertEq(numShares1, shares1_val, "User1 shares mismatch");
+        assertEq(lockedUntilTimestamp1, lockUntil1_val, "User1 lock time mismatch");
+        assertEq(numShares2, shares2_val, "User2 shares mismatch");
+        assertEq(lockedUntilTimestamp2, lockUntil2_val, "User2 lock time mismatch");
 
-        assertEq(morpherStaking.totalShares(), initialTotalShares + shares1 + shares2, "Total shares mismatch");
+        assertEq(morpherStaking.totalShares(), initialTotalShares + shares1_val + shares2_val, "Total shares mismatch");
 
         // Verify state in MorpherSidechainToBaseMigration
-        assertTrue(morpherMigration.migratedStakes(user1), "User1 stake not marked migrated");
-        assertTrue(morpherMigration.migratedStakes(user2), "User2 stake not marked migrated");
+        assertTrue(morpherMigration.migratedStakes(user1_addr), "User1 stake not marked migrated");
+        assertTrue(morpherMigration.migratedStakes(user2_addr), "User2 stake not marked migrated");
 
         (uint256 totalStakesMigrated,,,,,) = morpherMigration.getMigrationStats();
         assertEq(totalStakesMigrated, 2, "Total stakes migrated count mismatch");
