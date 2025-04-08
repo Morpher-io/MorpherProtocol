@@ -197,30 +197,16 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
 
 
     function testDelegateMigrateStakeBatch_Success_StakingState() public {
-        // Prepare data directly in arrays to reduce local variables - MOVED TO HELPER
-        address user1_addr = testUser; // Keep one for assertion clarity
-        address user2_addr = vm.addr(0xB0B); // Keep one for assertion clarity
-        uint256 shares1_val = 1000 * 10**18; // Keep one for assertion clarity
-        uint256 shares2_val = 5000 * 10**18; // Keep one for assertion clarity
-        uint256 lockUntil1_val = block.timestamp + 30 days; // Keep one for assertion clarity
-        uint256 lockUntil2_val = block.timestamp + 60 days; // Keep one for assertion clarity
-
-        address[] memory users = new address[](2);
-        users[0] = user1_addr;
-        users[1] = user2_addr;
-
-        uint256[] memory shares = new uint256[](2);
-        shares[0] = shares1_val;
-        shares[1] = shares2_val;
-
-        uint256[] memory lockTimes = new uint256[](2);
-        lockTimes[0] = lockUntil1_val;
-        lockTimes[1] = lockUntil2_val;
-
-        uint256 initialTotalShares = morpherStaking.totalShares();
-
-        // Call the batch migration function
-        morpherMigration.delegateMigrateStakeBatch(users, shares, lockTimes);
+        // Call helper to perform setup and migration
+        (
+            address user1_addr,
+            address user2_addr,
+            uint256 shares1_val,
+            uint256 shares2_val,
+            uint256 lockUntil1_val,
+            uint256 lockUntil2_val,
+            uint256 initialTotalShares
+        ) = _setupAndMigrateStakeBatch();
 
         // Verify state in MorpherStaking
         (uint256 numShares1, uint256 lockedUntilTimestamp1) = morpherStaking.poolShares(user1_addr);
@@ -232,11 +218,22 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(lockedUntilTimestamp2, lockUntil2_val, "User2 lock time mismatch");
 
         assertEq(morpherStaking.totalShares(), initialTotalShares + shares1_val + shares2_val, "Total shares mismatch");
+    }
+
+    function testDelegateMigrateStakeBatch_Success_MigrationState() public {
+        // Call helper to perform setup and migration
+        (address user1_addr, address user2_addr,,,,,) = _setupAndMigrateStakeBatch();
 
         // Verify state in MorpherSidechainToBaseMigration
         assertTrue(morpherMigration.migratedStakes(user1_addr), "User1 stake not marked migrated");
         assertTrue(morpherMigration.migratedStakes(user2_addr), "User2 stake not marked migrated");
+    }
 
+    function testDelegateMigrateStakeBatch_Success_Stats() public {
+        // Call helper to perform setup and migration
+        _setupAndMigrateStakeBatch();
+
+        // Verify statistics
         (uint256 totalStakesMigrated,,,,,) = morpherMigration.getMigrationStats();
         assertEq(totalStakesMigrated, 2, "Total stakes migrated count mismatch");
     }
