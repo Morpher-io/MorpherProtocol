@@ -185,13 +185,13 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherMigration.delegateMigrateStakeBatch(users, shares, lockTimes);
 
         // Verify state in MorpherStaking
-        MorpherStaking.PoolShares memory stake1 = morpherStaking.poolShares(user1);
-        MorpherStaking.PoolShares memory stake2 = morpherStaking.poolShares(user2);
+        (uint256 numShares1, uint256 lockedUntilTimestamp1) = morpherStaking.poolShares(user1);
+        (uint256 numShares2, uint256 lockedUntilTimestamp2) = morpherStaking.poolShares(user2);
 
-        assertEq(stake1.numPoolShares, shares1, "User1 shares mismatch");
-        assertEq(stake1.lockedUntil, lockUntil1, "User1 lock time mismatch");
-        assertEq(stake2.numPoolShares, shares2, "User2 shares mismatch");
-        assertEq(stake2.lockedUntil, lockUntil2, "User2 lock time mismatch");
+        assertEq(numShares1, shares1, "User1 shares mismatch");
+        assertEq(lockedUntilTimestamp1, lockUntil1, "User1 lock time mismatch");
+        assertEq(numShares2, shares2, "User2 shares mismatch");
+        assertEq(lockedUntilTimestamp2, lockUntil2, "User2 lock time mismatch");
 
         assertEq(morpherStaking.totalShares(), initialTotalShares + shares1 + shares2, "Total shares mismatch");
 
