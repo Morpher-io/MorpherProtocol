@@ -32,9 +32,11 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
     // Track migrated positions and balances to prevent double-claiming
     mapping(bytes32 => bool) public migratedPositions;
     mapping(address => bool) public migratedBalances;
-    
+       mapping(address => bool) public migratedStakes; // Added
+
     // Migration statistics
     uint256 public totalPositionsMigrated;
+       uint256 public totalStakesMigrated; // Added
     uint256 public totalBalancesMigrated;
     uint256 public totalUsersMigrated;
     

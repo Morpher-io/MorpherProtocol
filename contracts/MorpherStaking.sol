@@ -78,6 +78,7 @@ contract MorpherStaking is
 	event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
 	event StakingRewardsMinted(uint256 indexed lastReward, uint256 delta);
 	event Staked(address indexed userAddress, uint256 indexed amount, uint256 poolShares, uint256 lockedUntil);
+	event StakeMigrated(address indexed userAddress, uint256 numPoolShares, uint256 lockedUntil); // Added Event
 	event Unstaked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);
 
 	modifier onlyRole(bytes32 role) {
@@ -232,6 +233,24 @@ contract MorpherStaking is
 		require(_interestRate <= 100000000, "MorpherStaking: Interest Rate cannot be larger than 100%");
 		interestRate = _interestRate;
 		emit InterestRateChanged(_interestRate);
+	}
+
+	/**
+	 * @notice Sets the staking data for a user during migration. Only callable by STAKINGADMIN_ROLE.
+	 * @dev This function bypasses standard staking logic like minimum stake and lockup period creation.
+	 * @param _user The address of the user whose stake is being migrated.
+	 * @param _numPoolShares The number of pool shares the user had.
+	 * @param _lockedUntil The timestamp until which the migrated stake remains locked.
+	 */
+	function setMigratedStake(address _user, uint256 _numPoolShares, uint256 _lockedUntil)
+		public
+		onlyRole(STAKINGADMIN_ROLE)
+	{
+		require(_user != address(0), "MorpherStaking: User address cannot be zero");
+		// Note: This potentially overwrites existing stake data for the user. Assumed intended for migration.
+		poolShares[_user] = PoolShares(_numPoolShares, _lockedUntil);
+		totalShares += _numPoolShares; // Crucial: Update totalShares
+		emit StakeMigrated(_user, _numPoolShares, _lockedUntil);
 	}
 
 	// ----------------------------------------------------------------------------

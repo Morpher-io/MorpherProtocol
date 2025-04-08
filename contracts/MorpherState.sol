@@ -19,7 +19,8 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
     address public morpherGovernanceAddress;
     address public morpherMintingLimiterAddress;
     address public morpherOracleAddress;
-    address payable public morpherStakingAddress;
+    address public morpherSidechainToBaseMigrationAddress; // Added
+    address public morpherStakingAddress; // Changed from payable
     address public morpherTokenAddress;
     address public morpherTradeEngineAddress;
     address public morpherUserBlockingAddress;
@@ -159,8 +160,9 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
         morpherOracleAddress = _morpherOracleAddress;
     }
 
-    event SetMorpherStakingAddress(address _oldAddress, address _newAddress);
-    function setMorpherStaking(address payable _morpherStakingAddress) public onlyRole(ADMINISTRATOR_ROLE) {
+    event SetMorpherStakingAddress(address _oldAddress, address _newAddress); // Note: Event param was already address
+    function setMorpherStakingAddress(address _morpherStakingAddress) public onlyRole(ADMINISTRATOR_ROLE) { // Renamed and changed param type
+        require(_morpherStakingAddress != address(0), "MorpherState: Address cannot be zero");
         emit SetMorpherStakingAddress(morpherStakingAddress, _morpherStakingAddress);
         morpherStakingAddress = _morpherStakingAddress;
     }
@@ -187,6 +189,13 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
     function setMorpherInterestRateManager(address _morpherInterestRateManagerAddress) public onlyRole(ADMINISTRATOR_ROLE) {
         emit SetMorpherInterestRateManagerAddress(morpherInterestRateManagerAddress, _morpherInterestRateManagerAddress);
         morpherInterestRateManagerAddress = _morpherInterestRateManagerAddress;
+    }
+
+    event SetMorpherSidechainToBaseMigrationAddress(address _oldAddress, address _newAddress); // Added Event
+    function setMorpherSidechainToBaseMigrationAddress(address _morpherSidechainToBaseMigrationAddress) public onlyRole(ADMINISTRATOR_ROLE) { // Added Function
+        require(_morpherSidechainToBaseMigrationAddress != address(0), "MorpherState: Address cannot be zero");
+        emit SetMorpherSidechainToBaseMigrationAddress(morpherSidechainToBaseMigrationAddress, _morpherSidechainToBaseMigrationAddress);
+        morpherSidechainToBaseMigrationAddress = _morpherSidechainToBaseMigrationAddress;
     }
 
     // ----------------------------------------------------------------------------

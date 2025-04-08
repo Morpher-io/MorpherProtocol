@@ -4,13 +4,15 @@ pragma solidity ^0.8.15;
 import "forge-std/Test.sol";
 import "./BaseSetup.sol";
 import "../contracts/MorpherSidechainToBaseMigration.sol";
+import "../contracts/MorpherStaking.sol"; // Added import
 import "../lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
 import "../lib/murky/src/Merkle.sol";
 
 contract MorpherSidechainToBaseMigrationTest is BaseSetup {
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    bytes32 public constant STAKINGADMIN_ROLE = keccak256("STAKINGADMIN_ROLE"); // Added role
     bytes32 public constant MIGRATION_OPERATOR_ROLE = keccak256("MIGRATION_OPERATOR_ROLE");
-    
+
     // Test data
     bytes32 testMerkleRoot;
     address testUser;
@@ -48,7 +50,8 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         morpherAccessControl.grantRole(morpherToken.ADMINISTRATOR_ROLE(), address(morpherMigration)); //to timelock tokens
         morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), address(morpherMigration)); //to lock rewards
         morpherAccessControl.grantRole(morpherTradeEngine.POSITIONADMIN_ROLE(), address(morpherMigration)); //to set positions
-        
+        morpherAccessControl.grantRole(STAKINGADMIN_ROLE, address(morpherMigration)); // Grant role to set stakes
+
         // Fund the test user with some tokens for testing
         morpherToken.mint(testUser, 10 ether);
         
@@ -144,11 +147,68 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Verify locked rewards
         uint256 actualLockedRewards = morpherToken.getLockedRewards(testUser);
         assertEq(actualLockedRewards, lockedRewardAmount);
-        
+
         // Check that the user is marked as migrated
         assertTrue(morpherMigration.migratedBalances(testUser));
-        
 
+
+    }
+
+    function testDelegateMigrateStakeBatch() public {
+        // Prepare data for two users
+        address user1 = testUser;
+        address user2 = vm.addr(0xB0B);
+        uint256 shares1 = 1000 * 10**18; // Example shares
+        uint256 shares2 = 5000 * 10**18;
+        uint256 lockUntil1 = block.timestamp + 30 days;
+        uint256 lockUntil2 = block.timestamp + 60 days;
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+
+        uint256[] memory shares = new uint256[](2);
+        shares[0] = shares1;
+        shares[1] = shares2;
+
+        uint256[] memory lockTimes = new uint256[](2);
+        lockTimes[0] = lockUntil1;
+        lockTimes[1] = lockUntil2;
+
+        uint256 initialTotalShares = morpherStaking.totalShares();
+
+        // Call the batch migration function
+        morpherMigration.delegateMigrateStakeBatch(users, shares, lockTimes);
+
+        // Verify state in MorpherStaking
+        MorpherStaking.PoolShares memory stake1 = morpherStaking.poolShares(user1);
+        MorpherStaking.PoolShares memory stake2 = morpherStaking.poolShares(user2);
+
+        assertEq(stake1.numPoolShares, shares1, "User1 shares mismatch");
+        assertEq(stake1.lockedUntil, lockUntil1, "User1 lock time mismatch");
+        assertEq(stake2.numPoolShares, shares2, "User2 shares mismatch");
+        assertEq(stake2.lockedUntil, lockUntil2, "User2 lock time mismatch");
+
+        assertEq(morpherStaking.totalShares(), initialTotalShares + shares1 + shares2, "Total shares mismatch");
+
+        // Verify state in MorpherSidechainToBaseMigration
+        assertTrue(morpherMigration.migratedStakes(user1), "User1 stake not marked migrated");
+        assertTrue(morpherMigration.migratedStakes(user2), "User2 stake not marked migrated");
+
+        (uint256 totalStakesMigrated,,,,,) = morpherMigration.getMigrationStats();
+        assertEq(totalStakesMigrated, 2, "Total stakes migrated count mismatch");
+
+        // --- Test Reverts ---
+
+        // Try migrating again (should fail)
+        vm.expectRevert("MorpherMigration: Stake already migrated for user");
+        morpherMigration.delegateMigrateStakeBatch(users, shares, lockTimes);
+
+        // Try migrating with mismatched arrays
+        uint256[] memory shortShares = new uint256[](1);
+        shortShares[0] = 1 ether;
+        vm.expectRevert("MorpherMigration: Input array length mismatch");
+        morpherMigration.delegateMigrateStakeBatch(users, shortShares, lockTimes);
     }
     
     function testDelegateMigratePositionsBatch() public {

@@ -25,8 +25,10 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 		// Load required addresses
 		address accessControlAddress = loadAddress("MorpherAccessControl");
 		address stateAddress = loadAddress("MorpherState");
+        address stakingAddress = loadAddress("MorpherStaking"); // Added load
 		require(accessControlAddress != address(0), "AccessControl must be deployed first");
 		require(stateAddress != address(0), "MorpherState must be deployed first");
+        require(stakingAddress != address(0), "MorpherStaking must be deployed first"); // Added require
 
 		// Get initial plasma state root from environment or use a default
 		bytes32 initialPlasmaStateRoot = vm.envOr("INITIAL_PLASMA_STATE_ROOT", bytes32(0));
@@ -58,6 +60,7 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 			// Define roles using constants from the contract *type* or keccak256
 			bytes32 adminRole = migrationContract.ADMINISTRATOR_ROLE();
 			bytes32 migrationOperatorRole = migrationContract.MIGRATION_OPERATOR_ROLE();
+            bytes32 stakingAdminRole = keccak256("STAKINGADMIN_ROLE"); // Role defined in MorpherStaking
 
 			// Grant ADMINISTRATOR_ROLE to the migration contract proxy itself? Or to an external admin?
 			// Assuming external admin for now.
@@ -70,9 +73,15 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 			accessControl.grantRole(migrationOperatorRole, envOperator);
 			console.log("Granted MIGRATION_OPERATOR_ROLE to:", envOperator);
 
-			// Configure State with migration address if needed (assuming a setter exists)
-			// MorpherState(stateAddress).setMorpherSidechainToBaseMigrationAddress(migrationProxy);
-			// console.log("Set migration address in MorpherState.");
+            // Grant STAKINGADMIN_ROLE to the migration contract proxy
+            accessControl.grantRole(stakingAdminRole, migrationProxy);
+            console.log("Granted STAKINGADMIN_ROLE to Migration Contract:", migrationProxy);
+
+			// Configure State with migration address and staking address
+            MorpherState stateContract = MorpherState(stateAddress);
+			stateContract.setMorpherSidechainToBaseMigrationAddress(migrationProxy);
+            stateContract.setMorpherStakingAddress(stakingAddress); // Set staking address in state
+			console.log("Set migration and staking addresses in MorpherState.");
 		}
 
 		vm.stopBroadcast(); // Move outside the if block
