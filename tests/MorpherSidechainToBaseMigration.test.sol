@@ -158,7 +158,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
 
     }
 
-    function testDelegateMigrateStakeBatch() public {
+    // --- Split testDelegateMigrateStakeBatch to avoid Stack Too Deep ---
+
+    function testDelegateMigrateStakeBatch_Success() public {
         // Prepare data for two users
         address user1 = testUser;
         address user2 = vm.addr(0xB0B);
@@ -201,20 +203,57 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
 
         (uint256 totalStakesMigrated,,,,,) = morpherMigration.getMigrationStats();
         assertEq(totalStakesMigrated, 2, "Total stakes migrated count mismatch");
+    }
 
-        // --- Test Reverts ---
+    function testDelegateMigrateStakeBatch_Revert_AlreadyMigrated() public {
+        // Prepare data and perform initial migration
+        address user1 = testUser;
+        address user2 = vm.addr(0xB0B);
+        uint256 shares1 = 1000 * 10**18;
+        uint256 shares2 = 5000 * 10**18;
+        uint256 lockUntil1 = block.timestamp + 30 days;
+        uint256 lockUntil2 = block.timestamp + 60 days;
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+        uint256[] memory shares = new uint256[](2);
+        shares[0] = shares1;
+        shares[1] = shares2;
+        uint256[] memory lockTimes = new uint256[](2);
+        lockTimes[0] = lockUntil1;
+        lockTimes[1] = lockUntil2;
+
+        morpherMigration.delegateMigrateStakeBatch(users, shares, lockTimes);
 
         // Try migrating again (should fail)
         vm.expectRevert("MorpherMigration: Stake already migrated for user");
         morpherMigration.delegateMigrateStakeBatch(users, shares, lockTimes);
+    }
 
-        // Try migrating with mismatched arrays
+    function testDelegateMigrateStakeBatch_Revert_MismatchedArrays() public {
+        // Prepare data with mismatched arrays
+        address user1 = testUser;
+        address user2 = vm.addr(0xB0B);
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+
+        // Shares array has only one element
         uint256[] memory shortShares = new uint256[](1);
         shortShares[0] = 1 ether;
+
+        uint256[] memory lockTimes = new uint256[](2);
+        lockTimes[0] = block.timestamp + 30 days;
+        lockTimes[1] = block.timestamp + 60 days;
+
+        // Try migrating with mismatched arrays (should fail)
         vm.expectRevert("MorpherMigration: Input array length mismatch");
         morpherMigration.delegateMigrateStakeBatch(users, shortShares, lockTimes);
     }
-    
+
+    // --- End split tests ---
+
     function testDelegateMigratePositionsBatch() public {
         // Create position data in memory
         MorpherSidechainToBaseMigration.PositionMigrationData[] memory positionData = 
