@@ -40,10 +40,11 @@ contract DeployMorpherStaking is DeployOrUpgradeV5 {
             CONTRACT_KEY,
             CONTRACT_NAME,
             // Ensure initializer signature matches the adapted v5 contract
-            abi.encodeCall(MorpherStaking.initialize, (stateAddress)),
+            // Pass initial poolShareValue (134590000) and lastReward (1744036313) for migration
+            abi.encodeCall(MorpherStaking.initialize, (stateAddress, uint256(134590000), uint256(1744036313))),
             bytes("") // No upgrade call data needed for this example
         );
-
+ 
         console.log("MorpherStaking V5 Proxy at:", stakingProxy);
 
         // Only set roles and initial configuration for new deployments
