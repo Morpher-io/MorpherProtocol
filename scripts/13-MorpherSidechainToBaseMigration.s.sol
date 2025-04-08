@@ -11,6 +11,7 @@ import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 import {MorpherState} from "../contracts/MorpherState.sol"; // Use adapted v5 contract
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // Use adapted v5 contract
 import {MorpherSidechainToBaseMigration} from "../contracts/MorpherSidechainToBaseMigration.sol"; // Use adapted v5 contract
+import {MorpherStaking} from "../contracts/MorpherStaking.sol"; // Added import
 
 // --- Inherit from DeployOrUpgradeV5 ---
 contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {

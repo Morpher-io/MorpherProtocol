@@ -70,6 +70,10 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
         bytes32[] positionHashes
     );
     
+    event StakesBatchMigrated( // Added Event
+        uint256 count
+    );
+
     event BalanceMigrated(
         address indexed user,
         uint256 amount
@@ -427,11 +431,56 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
     }
     
     
+    /**
+     * @notice Delegate migration of staking data (pool shares and lockup) in batch.
+     * @dev Requires MIGRATION_OPERATOR_ROLE. Only runs when migration is active.
+     * @param _users Array of user addresses.
+     * @param _numPoolShares Array of pool share amounts corresponding to users.
+     * @param _lockedUntil Array of lockup end timestamps corresponding to users.
+     */
+    function delegateMigrateStakeBatch(
+        address[] memory _users,
+        uint256[] memory _numPoolShares,
+        uint256[] memory _lockedUntil
+    ) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
+        require(_users.length > 0, "MorpherMigration: No stakes to migrate");
+        require(
+            _users.length == _numPoolShares.length && _users.length == _lockedUntil.length,
+            "MorpherMigration: Input array length mismatch"
+        );
+
+        address stakingContractAddress = state.morpherStakingAddress();
+        require(stakingContractAddress != address(0), "MorpherMigration: Staking address not set in State");
+        MorpherStaking stakingContract = MorpherStaking(stakingContractAddress);
+
+        uint256 migratedCount = 0;
+        for (uint i = 0; i < _users.length; i++) {
+            address user = _users[i];
+            require(user != address(0), "MorpherMigration: User address cannot be zero");
+            // Verify stake hasn't been migrated already for this user
+            require(!migratedStakes[user], "MorpherMigration: Stake already migrated for user");
+
+            // Mark stake as migrated for this user
+            migratedStakes[user] = true;
+
+            // Set stake data in MorpherStaking contract
+            stakingContract.setMigratedStake(user, _numPoolShares[i], _lockedUntil[i]);
+
+            migratedCount++;
+        }
+
+        // Update statistics
+        totalStakesMigrated += migratedCount;
+
+        emit StakesBatchMigrated(migratedCount);
+    }
+       
        
     /**
      * Get migration statistics
      */
     function getMigrationStats() public view returns (
+        uint256 _totalStakesMigrated, // Added return value
         uint256 _totalPositionsMigrated,
         uint256 _totalBalancesMigrated,
         uint256 _totalUsersMigrated,
@@ -442,6 +491,7 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
         bool finalRootSet = finalBalanceMerkleRoot != bytes32(0);
         
         return (
+            totalStakesMigrated, // Added
             totalPositionsMigrated,
             totalBalancesMigrated,
             totalUsersMigrated,

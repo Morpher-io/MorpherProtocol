@@ -31,6 +31,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         // Deploy the migration contract
         morpherMigration = new MorpherSidechainToBaseMigration();
         morpherMigration.initialize(address(morpherState), bytes32(0), 500); // 5% bonus
+
+        // Set staking and migration addresses in state (assuming morpherStaking is deployed in BaseSetup)
+        morpherState.setMorpherStakingAddress(address(morpherStaking));
+        morpherState.setMorpherSidechainToBaseMigrationAddress(address(morpherMigration));
         
         // Create a private key for the test user
         uint256 testUserPrivateKey = 0xA11CE;
@@ -239,9 +243,10 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(position.longShares, 1 ether);
         
         // Check statistics
-        (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
+        (uint256 stakesMigrated, uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
             morpherMigration.getMigrationStats();
         
+        assertEq(stakesMigrated, 0, "No stakes should be migrated yet");
         assertEq(positionsMigrated, 1, "One position should be migrated");
         assertEq(balancesMigrated, 0, "No balances should be migrated yet");
         assertEq(usersMigrated, 0, "User count should not increase for position-only migration");
@@ -296,8 +301,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertEq(lockedUntil, block.timestamp + lockDuration);
         
         // Verify migration statistics
-        (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
+        (uint256 stakesMigrated, uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
             morpherMigration.getMigrationStats();
+        assertEq(stakesMigrated, 0, "No stakes should be migrated");
         assertEq(positionsMigrated, 0, "No positions should be migrated");
         assertEq(balancesMigrated, 1, "One balance should be migrated");
         assertEq(usersMigrated, 1, "One user should be migrated");
@@ -625,8 +631,9 @@ contract MorpherSidechainToBaseMigrationTest is BaseSetup {
         assertTrue(morpherMigration.migratedBalances(testUser), "Balance should be marked as migrated");
         
         // Check final statistics
-        (uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
+        (uint256 stakesMigrated, uint256 positionsMigrated, uint256 balancesMigrated, uint256 usersMigrated, bool active, bool finalRootSet) = 
             morpherMigration.getMigrationStats();
+        assertEq(stakesMigrated, 0, "No stakes migrated in this flow");
         assertEq(positionsMigrated, 1, "One position should be migrated");
         assertEq(balancesMigrated, 1, "One balance should be migrated");
         assertEq(usersMigrated, 1, "One user should be migrated");
