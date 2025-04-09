@@ -68,8 +68,8 @@ contract MorpherStaking is
 	bytes32 private constant _HASHED_NAME = keccak256("MorpherStaking");
 	// solhint-disable-next-line var-name-mixedcase
 	bytes32 private constant _HASHED_VERSION = keccak256("1");
-	// solhint-disable-next-line var-name-mixedcase
-	bytes32 private constant _TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+	// --- _TYPE_HASH is handled by EIP712Upgradeable ---
+	// bytes32 private constant _TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 	// bytes32 public constant _STAKE_TYPEHASH = ...; // Keep action-specific hashes public
 	// bytes32 public constant _UNSTAKE_TYPEHASH = ...;
 	// mapping(address => CountersUpgradeable.Counter) private _nonces; // Replaced by NoncesUpgradeable internal mapping
@@ -307,10 +307,17 @@ contract MorpherStaking is
 	// function _hashTypedDataV4(...) ... // Provided by EIP712Upgradeable - We still use this
 
     /**
-     * @dev Overrides the EIP712 domain separator calculation to use hardcoded values.
+     * @dev Overrides the EIP712 name hash calculation.
      */
-    function _domainSeparatorV4() internal view override returns (bytes32) {
-        return keccak256(abi.encode(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION, block.chainid, address(this)));
+    function _EIP712NameHash() internal pure override returns (bytes32) {
+        return _HASHED_NAME;
+    }
+
+    /**
+     * @dev Overrides the EIP712 version hash calculation.
+     */
+    function _EIP712VersionHash() internal pure override returns (bytes32) {
+        return _HASHED_VERSION;
     }
 
 	function stakeWithPermit(
