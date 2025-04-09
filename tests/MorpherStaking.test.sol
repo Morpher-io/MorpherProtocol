@@ -21,6 +21,16 @@ contract MorkpherStakingTest is BaseSetup {
 	uint256 constant TEST_USER_PK = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
 	address testUserWithPK = vm.addr(TEST_USER_PK);
 
+	// Struct for stake permit test data
+	struct StakePermitTestData {
+		address owner_addr;
+		uint256 stake_amount;
+		uint256 initial_nonce;
+		uint256 expectedPoolSharesVal;
+		uint256 expectedLockedUntilVal;
+		uint256 actualPoolShares;
+		// We'll fetch initial balance/shares in the specific tests
+	}
 
 	function setUp() public override {
 		super.setUp();
@@ -337,71 +347,54 @@ contract MorkpherStakingTest is BaseSetup {
 
 	// --- Permit Tests ---
 
-	// Internal helper for stakeWithPermit success tests
-	function _setupAndStakeWithPermit() internal returns (
-		address owner_addr,
-		uint256 stake_amount,
-		uint256 initial_nonce,
-		uint256 expectedPoolSharesVal,
-		uint256 expectedLockedUntilVal,
-		// Remove initialTotalSharesVal, initialBalanceVal from returns
-		uint256 actualPoolShares
-	) {
+	// Internal helper for stakeWithPermit success tests - Returns struct
+	function _setupAndStakeWithPermit() internal returns (StakePermitTestData memory testData) {
 		vm.warp(1617094819); // Set consistent time
 
-		owner_addr = testUserWithPK;
-		stake_amount = 300_000 * 1e18;
+		testData.owner_addr = testUserWithPK;
+		testData.stake_amount = 300_000 * 1e18;
 		uint256 current_deadline = block.timestamp + 1 hours;
-		initial_nonce = morpherStaking.nonces(owner_addr);
+		testData.initial_nonce = morpherStaking.nonces(testData.owner_addr);
 
 		// Approve token transfer
-		vm.prank(owner_addr);
-		morpherToken.approve(address(morpherStaking), stake_amount);
+		vm.prank(testData.owner_addr);
+		morpherToken.approve(address(morpherStaking), testData.stake_amount);
 
 		// Hash struct
-		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, stake_amount, owner_addr, initial_nonce, current_deadline));
+		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, testData.stake_amount, testData.owner_addr, testData.initial_nonce, current_deadline));
 		// Calculate EIP712 digest
 		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
 		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 		// Sign
 		(uint8 v_sig, bytes32 r_sig, bytes32 s_sig) = vm.sign(TEST_USER_PK, digest);
 
-		// Pre-calculate expected values (excluding initial balance/shares)
-		expectedPoolSharesVal = stake_amount / morpherStaking.poolShareValue();
-		expectedLockedUntilVal = block.timestamp + morpherStaking.lockupPeriod();
-		// initialTotalSharesVal = morpherStaking.totalShares(); // Removed calculation
-		// initialBalanceVal = morpherToken.balanceOf(owner_addr); // Removed calculation
+		// Pre-calculate expected values
+		testData.expectedPoolSharesVal = testData.stake_amount / morpherStaking.poolShareValue();
+		testData.expectedLockedUntilVal = block.timestamp + morpherStaking.lockupPeriod();
 
 		// Emit event check before the call
 		vm.expectEmit(true, true, true, true);
-		emit Staked(owner_addr, stake_amount, expectedPoolSharesVal, expectedLockedUntilVal);
+		emit Staked(testData.owner_addr, testData.stake_amount, testData.expectedPoolSharesVal, testData.expectedLockedUntilVal);
 
 		// Call stakeWithPermit
-		actualPoolShares = morpherStaking.stakeWithPermit(stake_amount, owner_addr, current_deadline, v_sig, r_sig, s_sig);
+		testData.actualPoolShares = morpherStaking.stakeWithPermit(testData.stake_amount, testData.owner_addr, current_deadline, v_sig, r_sig, s_sig);
+
+		// Return the populated struct
 	}
 
 	function testStakeWithPermit_Success_StakingState() public {
 		// Fetch initial state before calling helper
 		uint256 initialTotalShares = morpherStaking.totalShares();
 
-		// Call helper
-		(
-			address owner_addr,
-			, // stake_amount not needed
-			, // initial_nonce not needed
-			uint256 expectedPoolSharesVal,
-			uint256 expectedLockedUntilVal,
-			// uint256 initialTotalSharesVal, // Removed from return
-			// initialBalanceVal not needed (placeholder for 6th value if needed)
-			uint256 actualPoolShares // This is the 6th value returned
-		) = _setupAndStakeWithPermit();
+		// Call helper - receive struct
+		StakePermitTestData memory testData = _setupAndStakeWithPermit();
 
-		// Assertions for staking state
-		assertEq(actualPoolShares, expectedPoolSharesVal, "Incorrect pool shares returned");
-		assertEq(morpherStaking.totalShares(), initialTotalShares + expectedPoolSharesVal, "Total shares incorrect"); // Use local initialTotalShares
-		(uint numPoolShares, uint lockedUntil) = morpherStaking.poolShares(owner_addr);
-		assertEq(numPoolShares, expectedPoolSharesVal, "Stored pool shares incorrect");
-		assertEq(lockedUntil, expectedLockedUntilVal, "Lockup incorrect");
+		// Assertions for staking state using struct fields
+		assertEq(testData.actualPoolShares, testData.expectedPoolSharesVal, "Incorrect pool shares returned");
+		assertEq(morpherStaking.totalShares(), initialTotalShares + testData.expectedPoolSharesVal, "Total shares incorrect"); // Use local initialTotalShares
+		(uint numPoolShares, uint lockedUntil) = morpherStaking.poolShares(testData.owner_addr);
+		assertEq(numPoolShares, testData.expectedPoolSharesVal, "Stored pool shares incorrect");
+		assertEq(lockedUntil, testData.expectedLockedUntilVal, "Lockup incorrect");
 	}
 
 	function testStakeWithPermit_Success_TokenBalance() public {
@@ -409,35 +402,19 @@ contract MorkpherStakingTest is BaseSetup {
 		address owner_addr_local = testUserWithPK; // Need owner address locally too
 		uint256 initialBalance = morpherToken.balanceOf(owner_addr_local);
 
-		// Call helper
-		(
-			address owner_addr, // Keep owner_addr from helper for consistency
-			, // stake_amount not needed
-			, // initial_nonce not needed
-			uint256 expectedPoolSharesVal,
-			, // expectedLockedUntilVal not needed
-			// , // initialTotalSharesVal not needed
-			// uint256 initialBalanceVal, // Removed from return
-			/* actualPoolShares not needed */
-		) = _setupAndStakeWithPermit();
+		// Call helper - receive struct
+		StakePermitTestData memory testData = _setupAndStakeWithPermit();
 
-		// Assertion for token balance
-		assertEq(morpherToken.balanceOf(owner_addr), initialBalance - (expectedPoolSharesVal * morpherStaking.poolShareValue()), "Owner balance incorrect"); // Use local initialBalance
+		// Assertion for token balance using struct fields
+		assertEq(morpherToken.balanceOf(testData.owner_addr), initialBalance - (testData.expectedPoolSharesVal * morpherStaking.poolShareValue()), "Owner balance incorrect"); // Use local initialBalance
 	}
 
 	function testStakeWithPermit_Success_Nonce() public {
-		// Call helper
-		(
-			address owner_addr,
-			, // stake_amount not needed
-			uint256 initial_nonce,
-			, // expectedPoolSharesVal not needed
-			, // expectedLockedUntilVal not needed
-			/* actualPoolShares not needed (6th value) */
-		) = _setupAndStakeWithPermit(); // Now correctly expects 6 values
+		// Call helper - receive struct
+		StakePermitTestData memory testData = _setupAndStakeWithPermit();
 
-		// Assertion for nonce
-		assertEq(morpherStaking.nonces(owner_addr), initial_nonce + 1, "Nonce not incremented");
+		// Assertion for nonce using struct fields
+		assertEq(morpherStaking.nonces(testData.owner_addr), testData.initial_nonce + 1, "Nonce not incremented");
 	}
 
 	function testStakeWithPermit_Revert_InvalidSignature() public {
