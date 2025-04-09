@@ -351,8 +351,9 @@ contract MorkpherStakingTest is BaseSetup {
 
 		// Hash struct
 		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
-		// Hash EIP712
-		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 		// Sign
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
 
@@ -388,8 +389,9 @@ contract MorkpherStakingTest is BaseSetup {
 
 		// Hash struct
 		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
-		// Hash EIP712
-		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 		// Sign with wrong key
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(0xBADBADBAD, digest); // Use a different PK
 
@@ -409,8 +411,9 @@ contract MorkpherStakingTest is BaseSetup {
 
 		// Hash struct
 		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
-		// Hash EIP712
-		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 		// Sign
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
 
@@ -441,8 +444,9 @@ contract MorkpherStakingTest is BaseSetup {
 
 		// Hash struct
 		bytes32 structHash = keccak256(abi.encode(UNSTAKE_TYPEHASH, sharesToUnstake, owner, nonce, deadline));
-		// Hash EIP712
-		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 		// Sign
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
 
@@ -484,8 +488,9 @@ contract MorkpherStakingTest is BaseSetup {
 
 		// Hash struct
 		bytes32 structHash = keccak256(abi.encode(UNSTAKE_TYPEHASH, sharesToUnstake, owner, nonce, deadline));
-		// Hash EIP712
-		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 		// Sign
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
 
