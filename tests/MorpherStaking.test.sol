@@ -522,7 +522,7 @@ contract MorkpherStakingTest is BaseSetup {
 
 	function testUnstakeWithPermit_Success_Amount() public {
 		// Call helper
-		(,,,, uint256 expectedAmountOut, uint256 actualAmountOut) = _setupAndUnstakeWithPermit(); // Adjusted destructuring (6 return values now)
+		(,,,,, uint256 expectedAmountOut, uint256 actualAmountOut) = _setupAndUnstakeWithPermit(); // Adjusted destructuring (6 return values now)
 
 		// Assertions
 		assertEq(actualAmountOut, expectedAmountOut, "Incorrect amount returned");
