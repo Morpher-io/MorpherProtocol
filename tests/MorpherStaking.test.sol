@@ -467,8 +467,8 @@ contract MorkpherStakingTest is BaseSetup {
 		uint256 stakedShares,
 		uint256 sharesToUnstake,
 		uint256 nonce,
-		uint256 initialTotalShares,
-		uint256 initialBalance,
+		// uint256 initialTotalShares, // Removed from return
+		// uint256 initialBalance, // Removed from return
 		uint256 expectedAmountOut,
 		uint256 actualAmountOut
 	) {
@@ -499,9 +499,9 @@ contract MorkpherStakingTest is BaseSetup {
 		// Sign
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
 
-		// Pre-calculate values
-		initialTotalShares = morpherStaking.totalShares();
-		initialBalance = morpherToken.balanceOf(owner);
+		// Pre-calculate values (excluding initial balance/shares)
+		// initialTotalShares = morpherStaking.totalShares(); // Removed calculation
+		// initialBalance = morpherToken.balanceOf(owner); // Removed calculation
 		expectedAmountOut = sharesToUnstake * morpherStaking.poolShareValue();
 
 		// Emit check
@@ -515,33 +515,41 @@ contract MorkpherStakingTest is BaseSetup {
 
 	function testUnstakeWithPermit_Success_Amount() public {
 		// Call helper
-		(,,,,,, uint256 expectedAmountOut, uint256 actualAmountOut) = _setupAndUnstakeWithPermit();
+		(,,,, uint256 expectedAmountOut, uint256 actualAmountOut) = _setupAndUnstakeWithPermit(); // Adjusted destructuring (6 return values now)
 
 		// Assertions
 		assertEq(actualAmountOut, expectedAmountOut, "Incorrect amount returned");
 	}
 
 	function testUnstakeWithPermit_Success_TokenBalance() public {
+		// Fetch initial state before calling helper
+		address owner_local = testUserWithPK; // Need owner address locally too
+		uint256 initialBalance = morpherToken.balanceOf(owner_local);
+
 		// Call helper
-		(address owner, , uint256 sharesToUnstake, , , uint256 initialBalance, uint256 expectedAmountOut,) = _setupAndUnstakeWithPermit();
+		(address owner, , uint256 sharesToUnstake, , uint256 expectedAmountOut,) = _setupAndUnstakeWithPermit(); // Adjusted destructuring
 
 		// Assertions
-		assertEq(morpherToken.balanceOf(owner), initialBalance + expectedAmountOut, "Owner balance incorrect");
+		assertEq(morpherToken.balanceOf(owner), initialBalance + expectedAmountOut, "Owner balance incorrect"); // Use local initialBalance
 	}
 
 	function testUnstakeWithPermit_Success_StakingState() public {
+		// Fetch initial state before calling helper
+		address owner_local = testUserWithPK; // Need owner address locally too
+		uint256 initialTotalShares = morpherStaking.totalShares();
+
 		// Call helper
-		(address owner, uint256 stakedShares, uint256 sharesToUnstake, , uint256 initialTotalShares,,,) = _setupAndUnstakeWithPermit(); // Removed trailing comma
+		(address owner, uint256 stakedShares, uint256 sharesToUnstake, , ,) = _setupAndUnstakeWithPermit(); // Adjusted destructuring
 
 		// Assertions
-		assertEq(morpherStaking.totalShares(), initialTotalShares - sharesToUnstake, "Total shares incorrect");
+		assertEq(morpherStaking.totalShares(), initialTotalShares - sharesToUnstake, "Total shares incorrect"); // Use local initialTotalShares
 		(uint numPoolShares, ) = morpherStaking.poolShares(owner);
 		assertEq(numPoolShares, stakedShares - sharesToUnstake, "Stored pool shares incorrect");
 	}
 
 	function testUnstakeWithPermit_Success_Nonce() public {
 		// Call helper
-		(address owner, , , uint256 nonce,,,,) = _setupAndUnstakeWithPermit();
+		(address owner, , , uint256 nonce,,) = _setupAndUnstakeWithPermit(); // Adjusted destructuring
 
 		// Assertions
 		assertEq(morpherStaking.nonces(owner), nonce + 1, "Nonce not incremented");
