@@ -340,41 +340,45 @@ contract MorkpherStakingTest is BaseSetup {
 	function testStakeWithPermit_Success() public {
 		vm.warp(1617094819); // Set consistent time
 
-		address owner = testUserWithPK;
-		uint256 amount = 300_000 * 1e18;
-		uint256 deadline = block.timestamp + 1 hours;
-		uint256 nonce = morpherStaking.nonces(owner);
+		// Keep essential variables, inline others
+		address owner_addr = testUserWithPK;
+		uint256 stake_amount = 300_000 * 1e18;
+		uint256 current_deadline = block.timestamp + 1 hours;
+		uint256 initial_nonce = morpherStaking.nonces(owner_addr);
 
 		// Approve token transfer first (Permit in Staking is for the action, not token transfer)
-		vm.prank(owner);
-		morpherToken.approve(address(morpherStaking), amount);
+		vm.prank(owner_addr);
+		morpherToken.approve(address(morpherStaking), stake_amount);
 
 		// Hash struct
-		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
+		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, stake_amount, owner_addr, initial_nonce, current_deadline));
 		// Calculate EIP712 digest
 		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
 		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 		// Sign
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
+		(uint8 v_sig, bytes32 r_sig, bytes32 s_sig) = vm.sign(TEST_USER_PK, digest);
 
-		// Call stakeWithPermit
-		uint256 initialTotalShares = morpherStaking.totalShares();
-		uint256 initialBalance = morpherToken.balanceOf(owner);
-		uint256 expectedPoolShares = amount / morpherStaking.poolShareValue();
-		uint256 expectedLockedUntil = block.timestamp + morpherStaking.lockupPeriod();
+		// Pre-calculate expected values needed for assertions
+		uint256 expectedPoolSharesVal = stake_amount / morpherStaking.poolShareValue();
+		uint256 expectedLockedUntilVal = block.timestamp + morpherStaking.lockupPeriod();
+		uint256 initialTotalSharesVal = morpherStaking.totalShares();
+		uint256 initialBalanceVal = morpherToken.balanceOf(owner_addr);
 
+		// Emit event check before the call
 		vm.expectEmit(true, true, true, true);
-		emit Staked(owner, amount, expectedPoolShares, expectedLockedUntil);
-		uint256 actualPoolShares = morpherStaking.stakeWithPermit(amount, owner, deadline, v, r, s);
+		emit Staked(owner_addr, stake_amount, expectedPoolSharesVal, expectedLockedUntilVal);
+
+		// Call stakeWithPermit (inlining parameters)
+		uint256 actualPoolShares = morpherStaking.stakeWithPermit(stake_amount, owner_addr, current_deadline, v_sig, r_sig, s_sig);
 
 		// Assertions
-		assertEq(actualPoolShares, expectedPoolShares, "Incorrect pool shares returned");
-		assertEq(morpherToken.balanceOf(owner), initialBalance - (expectedPoolShares * morpherStaking.poolShareValue()), "Owner balance incorrect");
-		assertEq(morpherStaking.totalShares(), initialTotalShares + expectedPoolShares, "Total shares incorrect");
-		(uint numPoolShares, uint lockedUntil) = morpherStaking.poolShares(owner);
-		assertEq(numPoolShares, expectedPoolShares, "Stored pool shares incorrect");
-		assertEq(lockedUntil, expectedLockedUntil, "Lockup incorrect");
-		assertEq(morpherStaking.nonces(owner), nonce + 1, "Nonce not incremented");
+		assertEq(actualPoolShares, expectedPoolSharesVal, "Incorrect pool shares returned");
+		assertEq(morpherToken.balanceOf(owner_addr), initialBalanceVal - (expectedPoolSharesVal * morpherStaking.poolShareValue()), "Owner balance incorrect");
+		assertEq(morpherStaking.totalShares(), initialTotalSharesVal + expectedPoolSharesVal, "Total shares incorrect");
+		(uint numPoolShares, uint lockedUntil) = morpherStaking.poolShares(owner_addr);
+		assertEq(numPoolShares, expectedPoolSharesVal, "Stored pool shares incorrect");
+		assertEq(lockedUntil, expectedLockedUntilVal, "Lockup incorrect");
+		assertEq(morpherStaking.nonces(owner_addr), initial_nonce + 1, "Nonce not incremented");
 	}
 
 	function testStakeWithPermit_Revert_InvalidSignature() public {
