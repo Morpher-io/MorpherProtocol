@@ -533,48 +533,36 @@ contract MorkpherStakingTest is BaseSetup {
 
 
 	function testUnstakeWithPermit_Success_Amount() public {
-		vm.warp(1617094819); // Set consistent time - MOVED TO HELPER
-		address owner = testUserWithPK;
-		uint256 stakeAmount = 300_000 * 1e18;
-
-		// Initial stake
-		vm.prank(owner);
-		morpherToken.approve(address(morpherStaking), stakeAmount);
-		vm.prank(owner);
-		uint256 stakedShares = morpherStaking.stake(stakeAmount);
-
-		// Warp time past lockup
-		vm.warp(block.timestamp + morpherStaking.lockupPeriod() + 1 days);
-		morpherStaking.updatePoolShareValue(); // Update value before unstake
-
-		// Prepare unstake permit
-		uint256 sharesToUnstake = stakedShares / 2;
-		uint256 deadline = block.timestamp + 1 hours;
-		uint256 nonce = morpherStaking.nonces(owner);
-
-		// Hash struct
-		bytes32 structHash = keccak256(abi.encode(UNSTAKE_TYPEHASH, sharesToUnstake, owner, nonce, deadline));
-		// Calculate EIP712 digest
-		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
-		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
-		// Sign
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
-
-		// Call unstakeWithPermit
-		uint256 initialTotalShares = morpherStaking.totalShares();
-		uint256 initialBalance = morpherToken.balanceOf(owner);
-		uint256 expectedAmountOut = sharesToUnstake * morpherStaking.poolShareValue();
-
-		vm.expectEmit(true, true, true, true);
-		emit Unstaked(owner, expectedAmountOut, sharesToUnstake);
-		uint256 actualAmountOut = morpherStaking.unstakeWithPermit(sharesToUnstake, owner, deadline, v, r, s);
+		// Call helper
+		(,,,,,, uint256 expectedAmountOut, uint256 actualAmountOut) = _setupAndUnstakeWithPermit();
 
 		// Assertions
 		assertEq(actualAmountOut, expectedAmountOut, "Incorrect amount returned");
+	}
+
+	function testUnstakeWithPermit_Success_TokenBalance() public {
+		// Call helper
+		(address owner, , uint256 sharesToUnstake, , , uint256 initialBalance, uint256 expectedAmountOut,) = _setupAndUnstakeWithPermit();
+
+		// Assertions
 		assertEq(morpherToken.balanceOf(owner), initialBalance + expectedAmountOut, "Owner balance incorrect");
+	}
+
+	function testUnstakeWithPermit_Success_StakingState() public {
+		// Call helper
+		(address owner, uint256 stakedShares, uint256 sharesToUnstake, , uint256 initialTotalShares,,,,) = _setupAndUnstakeWithPermit();
+
+		// Assertions
 		assertEq(morpherStaking.totalShares(), initialTotalShares - sharesToUnstake, "Total shares incorrect");
 		(uint numPoolShares, ) = morpherStaking.poolShares(owner);
 		assertEq(numPoolShares, stakedShares - sharesToUnstake, "Stored pool shares incorrect");
+	}
+
+	function testUnstakeWithPermit_Success_Nonce() public {
+		// Call helper
+		(address owner, , , uint256 nonce,,,,) = _setupAndUnstakeWithPermit();
+
+		// Assertions
 		assertEq(morpherStaking.nonces(owner), nonce + 1, "Nonce not incremented");
 	}
 
