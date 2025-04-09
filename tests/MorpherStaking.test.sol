@@ -337,8 +337,52 @@ contract MorkpherStakingTest is BaseSetup {
 
 	// --- Permit Tests ---
 
-	function testStakeWithPermit_Success() public {
+	// Internal helper for stakeWithPermit success tests
+	function _setupAndStakeWithPermit() internal returns (
+		address owner_addr,
+		uint256 stake_amount,
+		uint256 initial_nonce,
+		uint256 expectedPoolSharesVal,
+		uint256 expectedLockedUntilVal,
+		uint256 initialTotalSharesVal,
+		uint256 initialBalanceVal,
+		uint256 actualPoolShares
+	) {
 		vm.warp(1617094819); // Set consistent time
+
+		owner_addr = testUserWithPK;
+		stake_amount = 300_000 * 1e18;
+		uint256 current_deadline = block.timestamp + 1 hours;
+		initial_nonce = morpherStaking.nonces(owner_addr);
+
+		// Approve token transfer
+		vm.prank(owner_addr);
+		morpherToken.approve(address(morpherStaking), stake_amount);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, stake_amount, owner_addr, initial_nonce, current_deadline));
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+		// Sign
+		(uint8 v_sig, bytes32 r_sig, bytes32 s_sig) = vm.sign(TEST_USER_PK, digest);
+
+		// Pre-calculate expected values
+		expectedPoolSharesVal = stake_amount / morpherStaking.poolShareValue();
+		expectedLockedUntilVal = block.timestamp + morpherStaking.lockupPeriod();
+		initialTotalSharesVal = morpherStaking.totalShares();
+		initialBalanceVal = morpherToken.balanceOf(owner_addr);
+
+		// Emit event check before the call
+		vm.expectEmit(true, true, true, true);
+		emit Staked(owner_addr, stake_amount, expectedPoolSharesVal, expectedLockedUntilVal);
+
+		// Call stakeWithPermit
+		actualPoolShares = morpherStaking.stakeWithPermit(stake_amount, owner_addr, current_deadline, v_sig, r_sig, s_sig);
+	}
+
+	function testStakeWithPermit_Success_StakingState() public {
+		vm.warp(1617094819); // Set consistent time - MOVED TO HELPER
 
 		// Keep essential variables, inline others
 		address owner_addr = testUserWithPK;
