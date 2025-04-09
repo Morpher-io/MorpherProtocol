@@ -30,11 +30,7 @@ contract MorkpherStakingTest is BaseSetup {
 		// Fund the test user with PK
 		morpherToken.mint(testUserWithPK, 1_000_000 * 1e18);
 
-		// Re-initialize staking contract proxy with EIP712 info if needed (assuming BaseSetup deploys proxy)
-		// If BaseSetup deploys implementation directly, this isn't needed.
-		// If BaseSetup uses DeployOrUpgradeV5 script, ensure that script calls initialize correctly.
-		// For simplicity here, we assume BaseSetup provides a ready `morpherStaking` instance
-		// that was initialized correctly with EIP712 name/version.
+		// EIP712 domain is now hardcoded in the contract via override, no special init needed for tests.
 	}
 
 	// ADMINISTRATIVE FUNCTIONS --------------------------------------------------------------------
