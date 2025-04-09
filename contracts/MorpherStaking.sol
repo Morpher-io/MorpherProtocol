@@ -63,13 +63,10 @@ contract MorpherStaking is
 	mapping(address => PoolShares) public poolShares;
 
 	// --- Remove manual EIP712 Permit state variables ---
-	// --- Hardcoded EIP712 Domain details ---
-	// solhint-disable-next-line var-name-mixedcase
-	bytes32 private constant _HASHED_NAME = keccak256("MorpherStaking");
-	// solhint-disable-next-line var-name-mixedcase
-	bytes32 private constant _HASHED_VERSION = keccak256("1");
+	// --- EIP712 Domain details will be provided by overriding _EIP712Name and _EIP712Version ---
+	// bytes32 private constant _HASHED_NAME = keccak256("MorpherStaking"); // Removed
+	// bytes32 private constant _HASHED_VERSION = keccak256("1"); // Removed
 	// --- _TYPE_HASH is handled by EIP712Upgradeable ---
-	// bytes32 private constant _TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 	// bytes32 public constant _STAKE_TYPEHASH = ...; // Keep action-specific hashes public
 	// bytes32 public constant _UNSTAKE_TYPEHASH = ...;
 	// mapping(address => CountersUpgradeable.Counter) private _nonces; // Replaced by NoncesUpgradeable internal mapping
@@ -307,17 +304,19 @@ contract MorpherStaking is
 	// function _hashTypedDataV4(...) ... // Provided by EIP712Upgradeable - We still use this
 
     /**
-     * @dev Overrides the EIP712 name hash calculation.
+     * @dev Overrides the EIP712 name calculation.
      */
-    function _EIP712NameHash() internal pure override returns (bytes32) {
-        return _HASHED_NAME;
+    // solhint-disable-next-line func-name-mixedcase
+    function _EIP712Name() internal pure override returns (string memory) {
+        return "MorpherStaking";
     }
 
     /**
-     * @dev Overrides the EIP712 version hash calculation.
+     * @dev Overrides the EIP712 version calculation.
      */
-    function _EIP712VersionHash() internal pure override returns (bytes32) {
-        return _HASHED_VERSION;
+    // solhint-disable-next-line func-name-mixedcase
+    function _EIP712Version() internal pure override returns (string memory) {
+        return "1";
     }
 
 	function stakeWithPermit(
