@@ -488,14 +488,21 @@ contract MorkpherStakingTest is BaseSetup {
 
 		// Prepare unstake permit
 		sharesToUnstake = stakedShares / 2;
-		uint256 deadline = block.timestamp + 1 hours;
+		// uint256 deadline = block.timestamp + 1 hours; // Inlined below
 		nonce = morpherStaking.nonces(owner);
 
-		// Hash struct
-		bytes32 structHash = keccak256(abi.encode(UNSTAKE_TYPEHASH, sharesToUnstake, owner, nonce, deadline));
-		// Calculate EIP712 digest
-		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
-		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+		// Calculate EIP712 digest directly
+		bytes32 digest = keccak256(abi.encodePacked(
+			"\x19\x01",
+			morpherStaking.DOMAIN_SEPARATOR(),
+			keccak256(abi.encode(
+				UNSTAKE_TYPEHASH,
+				sharesToUnstake,
+				owner,
+				nonce,
+				block.timestamp + 1 hours // Inlined deadline
+			))
+		));
 		// Sign
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
 
@@ -508,8 +515,8 @@ contract MorkpherStakingTest is BaseSetup {
 		vm.expectEmit(true, true, true, true);
 		emit Unstaked(owner, expectedAmountOut, sharesToUnstake);
 
-		// Call unstakeWithPermit
-		actualAmountOut = morpherStaking.unstakeWithPermit(sharesToUnstake, owner, deadline, v, r, s);
+		// Call unstakeWithPermit (inlining deadline)
+		actualAmountOut = morpherStaking.unstakeWithPermit(sharesToUnstake, owner, block.timestamp + 1 hours, v, r, s);
 	}
 
 
