@@ -3,9 +3,10 @@ pragma solidity ^0.8.20; // Update pragma if needed
 
 // --- V5 Imports ---
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
-import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol"; // Add Context back
-// Remove EIP712Upgradeable, ECDSAUpgradeable, CountersUpgradeable if only used for permit
-// import {CountersUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/CountersUpgradeable.sol";
+import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
+import {EIP712Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/EIP712Upgradeable.sol"; // Added
+import {NoncesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/NoncesUpgradeable.sol"; // Added
+import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Added non-upgradeable ECDSA
 
 import "./MorpherState.sol"; // Use adapted v5 interface
 import "./MorpherUserBlocking.sol"; // Use adapted v5 interface
@@ -21,9 +22,11 @@ import "./MorpherInterestRateManager.sol";
 
 contract MorpherStaking is
 	UUPSUpgradeable,
-	ContextUpgradeable // Inherit UUPSUpgradeable and ContextUpgradeable
+	ContextUpgradeable, // Inherit UUPSUpgradeable and ContextUpgradeable
+	EIP712Upgradeable, // Added
+	NoncesUpgradeable // Added
 {
-	// using CountersUpgradeable for CountersUpgradeable.Counter; // Keep only if Counters are used elsewhere
+	// using CountersUpgradeable for CountersUpgradeable.Counter; // Replaced by NoncesUpgradeable
 
 	MorpherState public morpherState;
 
@@ -65,8 +68,16 @@ contract MorpherStaking is
 	// bytes32 public constant _TYPE_HASH = ...;
 	// bytes32 public constant _STAKE_TYPEHASH = ...;
 	// bytes32 public constant _UNSTAKE_TYPEHASH = ...;
-	// mapping(address => CountersUpgradeable.Counter) private _nonces;
-	// address private msgSenderOverride;
+	// mapping(address => CountersUpgradeable.Counter) private _nonces; // Replaced by NoncesUpgradeable internal mapping
+	address private msgSenderOverride; // Added for permit functions
+
+	// --- Action-specific typehashes ---
+	// solhint-disable-next-line var-name-mixedcase
+	bytes32 public constant _STAKE_TYPEHASH =
+		keccak256("Stake(uint256 amount,address owner,uint256 nonce,uint256 deadline)");
+	// solhint-disable-next-line var-name-mixedcase
+	bytes32 public constant _UNSTAKE_TYPEHASH =
+		keccak256("Unstake(uint256 shares,address owner,uint256 nonce,uint256 deadline)");
 
 	// END STATE ----------------------------------------------------------------------------
 
@@ -102,10 +113,14 @@ contract MorpherStaking is
 	function initialize(
 		address _morpherStateAddress,
 		uint256 _initialPoolShareValue,
-		uint256 _initialLastReward
+		uint256 _initialLastReward,
+		string memory _eip712Name, // Added EIP712 params
+		string memory _eip712Version // Added EIP712 params
 	) public initializer {
 		__UUPSUpgradeable_init(); // Initialize UUPS
 		__Context_init(); // Initialize Context
+		__EIP712_init(_eip712Name, _eip712Version); // Initialize EIP712
+		__Nonces_init(); // Initialize Nonces
 
 		morpherState = MorpherState(_morpherStateAddress);
 		lastReward = _initialLastReward; // Set lastReward from parameter
@@ -133,8 +148,15 @@ contract MorpherStaking is
 		);
 	}
 
-	// --- Remove _msgSender override ---
-	// function _msgSender() ...
+	/**
+	 * Overrides the msgSender Context to understand when a call by signature happened
+	 */
+	function _msgSender() internal view override(ContextUpgradeable) returns (address sender) {
+		if (msgSenderOverride != address(0)) {
+			return msgSenderOverride;
+		}
+		return super._msgSender();
+	}
 
 	// ----------------------------------------------------------------------------
 	// updatePoolShareValue
@@ -257,15 +279,102 @@ contract MorpherStaking is
 	// Getter functions
 	// ----------------------------------------------------------------------------
 
-	// --- Remove manual EIP712 Permit functions ---
-	// function _useNonce(...) ...
-	// function _domainSeparatorV4() ...
-	// function _buildDomainSeparator(...) ...
-	// function _hashTypedDataV4(...) ...
-	// function nonces(...) ...
-	// function DOMAIN_SEPARATOR() ...
-	// function stakeWithPermit(...) ...
-	// function unstakeWithPermit(...) ...
+	// --- EIP712 Permit functions ---
+
+	/**
+	 * @dev See {IERC20Permit-nonces}. Returns the nonce used by NoncesUpgradeable.
+	 */
+	function nonces(address owner) public view virtual override(NoncesUpgradeable) returns (uint256) {
+		return super.nonces(owner); // Use implementation from NoncesUpgradeable
+	}
+
+	/**
+	 * @dev See {IERC20Permit-DOMAIN_SEPARATOR}. Returns the domain separator provided by EIP712Upgradeable.
+	 */
+	// solhint-disable-next-line func-name-mixedcase
+	function DOMAIN_SEPARATOR() external view returns (bytes32) { // Remove override if not inheriting IERC20Permit
+		return _domainSeparatorV4(); // Use implementation from EIP712Upgradeable
+	}
+
+	// --- Remove manual helpers, use library implementations ---
+	// function _useNonce(...) ... // Provided by NoncesUpgradeable
+	// function _domainSeparatorV4() ... // Provided by EIP712Upgradeable
+	// function _buildDomainSeparator(...) ... // Handled by EIP712Upgradeable
+	// function _hashTypedDataV4(...) ... // Provided by EIP712Upgradeable
+
+	function stakeWithPermit(
+		uint256 _amount,
+		address _owner,
+		uint256 deadline,
+		uint8 v,
+		bytes32 r,
+		bytes32 s
+	) public virtual returns (uint256) {
+		require(block.timestamp <= deadline, "MorpherStaking: expired deadline");
+
+		// Use _useNonce from NoncesUpgradeable
+		uint256 currentNonce = _useNonce(_owner);
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_STAKE_TYPEHASH,
+				_amount,
+				_owner,
+				currentNonce, // Use consumed nonce
+				deadline
+			)
+		);
+
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
+
+		// Use ECDSA library directly
+		address signer = ECDSA.recover(digest, v, r, s);
+		require(signer == _owner, "MorpherStaking: invalid signature");
+
+		// Use msgSenderOverride for context
+		msgSenderOverride = _owner;
+		uint256 _poolShares = stake(_amount);
+		msgSenderOverride = address(0);
+		return _poolShares;
+	}
+
+	function unstakeWithPermit(
+		uint256 _shares,
+		address _owner,
+		uint256 deadline,
+		uint8 v,
+		bytes32 r,
+		bytes32 s
+	) public virtual returns (uint256) {
+		require(block.timestamp <= deadline, "MorpherStaking: expired deadline");
+
+		// Use _useNonce from NoncesUpgradeable
+		uint256 currentNonce = _useNonce(_owner);
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_UNSTAKE_TYPEHASH,
+				_shares,
+				_owner,
+				currentNonce, // Use consumed nonce
+				deadline
+			)
+		);
+
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
+
+		// Use ECDSA library directly
+		address signer = ECDSA.recover(digest, v, r, s);
+		require(signer == _owner, "MorpherStaking: invalid signature");
+
+		// Use msgSenderOverride for context
+		msgSenderOverride = _owner;
+		uint256 _amount = unstake(_shares);
+		msgSenderOverride = address(0);
+		return _amount;
+	}
 
 	function getTotalPooledValue() public view returns (uint256 _totalPooled) {
 		// Only accurate if poolShareValue is up to date

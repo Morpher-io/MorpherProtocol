@@ -13,9 +13,28 @@ contract MorkpherStakingTest is BaseSetup {
 	event Staked(address indexed userAddress, uint256 indexed amount, uint256 poolShares, uint256 lockedUntil);
 	event Unstaked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);
 
+	// EIP712 typehashes (must match contract)
+	bytes32 constant STAKE_TYPEHASH = keccak256("Stake(uint256 amount,address owner,uint256 nonce,uint256 deadline)");
+	bytes32 constant UNSTAKE_TYPEHASH = keccak256("Unstake(uint256 shares,address owner,uint256 nonce,uint256 deadline)");
+
+	// Test user private key
+	uint256 constant TEST_USER_PK = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
+	address testUserWithPK = vm.addr(TEST_USER_PK);
+
+
 	function setUp() public override {
 		super.setUp();
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), testUserWithPK); // Mint for test user
+
+		// Fund the test user with PK
+		morpherToken.mint(testUserWithPK, 1_000_000 * 1e18);
+
+		// Re-initialize staking contract proxy with EIP712 info if needed (assuming BaseSetup deploys proxy)
+		// If BaseSetup deploys implementation directly, this isn't needed.
+		// If BaseSetup uses DeployOrUpgradeV5 script, ensure that script calls initialize correctly.
+		// For simplicity here, we assume BaseSetup provides a ready `morpherStaking` instance
+		// that was initialized correctly with EIP712 name/version.
 	}
 
 	// ADMINISTRATIVE FUNCTIONS --------------------------------------------------------------------
@@ -319,4 +338,163 @@ contract MorkpherStakingTest is BaseSetup {
 		(uint _value, ) = morpherStaking.getStakeValue(user);
 		assertEq(_value, expectedShareValue);
 	}
+
+	// --- Permit Tests ---
+
+	function testStakeWithPermit_Success() public {
+		vm.warp(1617094819); // Set consistent time
+
+		address owner = testUserWithPK;
+		uint256 amount = 300_000 * 1e18;
+		uint256 deadline = block.timestamp + 1 hours;
+		uint256 nonce = morpherStaking.nonces(owner);
+
+		// Approve token transfer first (Permit in Staking is for the action, not token transfer)
+		vm.prank(owner);
+		morpherToken.approve(address(morpherStaking), amount);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
+		// Hash EIP712
+		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Sign
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
+
+		// Call stakeWithPermit
+		uint256 initialTotalShares = morpherStaking.totalShares();
+		uint256 initialBalance = morpherToken.balanceOf(owner);
+		uint256 expectedPoolShares = amount / morpherStaking.poolShareValue();
+		uint256 expectedLockedUntil = block.timestamp + morpherStaking.lockupPeriod();
+
+		vm.expectEmit(true, true, true, true);
+		emit Staked(owner, amount, expectedPoolShares, expectedLockedUntil);
+		uint256 actualPoolShares = morpherStaking.stakeWithPermit(amount, owner, deadline, v, r, s);
+
+		// Assertions
+		assertEq(actualPoolShares, expectedPoolShares, "Incorrect pool shares returned");
+		assertEq(morpherToken.balanceOf(owner), initialBalance - (expectedPoolShares * morpherStaking.poolShareValue()), "Owner balance incorrect");
+		assertEq(morpherStaking.totalShares(), initialTotalShares + expectedPoolShares, "Total shares incorrect");
+		(uint numPoolShares, uint lockedUntil) = morpherStaking.poolShares(owner);
+		assertEq(numPoolShares, expectedPoolShares, "Stored pool shares incorrect");
+		assertEq(lockedUntil, expectedLockedUntil, "Lockup incorrect");
+		assertEq(morpherStaking.nonces(owner), nonce + 1, "Nonce not incremented");
+	}
+
+	function testStakeWithPermit_Revert_InvalidSignature() public {
+		address owner = testUserWithPK;
+		uint256 amount = 300_000 * 1e18;
+		uint256 deadline = block.timestamp + 1 hours;
+		uint256 nonce = morpherStaking.nonces(owner);
+
+		// Approve token transfer
+		vm.prank(owner);
+		morpherToken.approve(address(morpherStaking), amount);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
+		// Hash EIP712
+		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Sign with wrong key
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(0xBADBADBAD, digest); // Use a different PK
+
+		vm.expectRevert("MorpherStaking: invalid signature");
+		morpherStaking.stakeWithPermit(amount, owner, deadline, v, r, s);
+	}
+
+	function testStakeWithPermit_Revert_ExpiredDeadline() public {
+		address owner = testUserWithPK;
+		uint256 amount = 300_000 * 1e18;
+		uint256 deadline = block.timestamp - 1 seconds; // Expired
+		uint256 nonce = morpherStaking.nonces(owner);
+
+		// Approve token transfer
+		vm.prank(owner);
+		morpherToken.approve(address(morpherStaking), amount);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
+		// Hash EIP712
+		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Sign
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
+
+		vm.expectRevert("MorpherStaking: expired deadline");
+		morpherStaking.stakeWithPermit(amount, owner, deadline, v, r, s);
+	}
+
+
+	function testUnstakeWithPermit_Success() public {
+		vm.warp(1617094819); // Set consistent time
+		address owner = testUserWithPK;
+		uint256 stakeAmount = 300_000 * 1e18;
+
+		// Initial stake
+		vm.prank(owner);
+		morpherToken.approve(address(morpherStaking), stakeAmount);
+		vm.prank(owner);
+		uint256 stakedShares = morpherStaking.stake(stakeAmount);
+
+		// Warp time past lockup
+		vm.warp(block.timestamp + morpherStaking.lockupPeriod() + 1 days);
+		morpherStaking.updatePoolShareValue(); // Update value before unstake
+
+		// Prepare unstake permit
+		uint256 sharesToUnstake = stakedShares / 2;
+		uint256 deadline = block.timestamp + 1 hours;
+		uint256 nonce = morpherStaking.nonces(owner);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(UNSTAKE_TYPEHASH, sharesToUnstake, owner, nonce, deadline));
+		// Hash EIP712
+		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Sign
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
+
+		// Call unstakeWithPermit
+		uint256 initialTotalShares = morpherStaking.totalShares();
+		uint256 initialBalance = morpherToken.balanceOf(owner);
+		uint256 expectedAmountOut = sharesToUnstake * morpherStaking.poolShareValue();
+
+		vm.expectEmit(true, true, true, true);
+		emit Unstaked(owner, expectedAmountOut, sharesToUnstake);
+		uint256 actualAmountOut = morpherStaking.unstakeWithPermit(sharesToUnstake, owner, deadline, v, r, s);
+
+		// Assertions
+		assertEq(actualAmountOut, expectedAmountOut, "Incorrect amount returned");
+		assertEq(morpherToken.balanceOf(owner), initialBalance + expectedAmountOut, "Owner balance incorrect");
+		assertEq(morpherStaking.totalShares(), initialTotalShares - sharesToUnstake, "Total shares incorrect");
+		(uint numPoolShares, ) = morpherStaking.poolShares(owner);
+		assertEq(numPoolShares, stakedShares - sharesToUnstake, "Stored pool shares incorrect");
+		assertEq(morpherStaking.nonces(owner), nonce + 1, "Nonce not incremented");
+	}
+
+	function testUnstakeWithPermit_Revert_LockupActive() public {
+		vm.warp(1617094819); // Set consistent time
+		address owner = testUserWithPK;
+		uint256 stakeAmount = 300_000 * 1e18;
+
+		// Initial stake
+		vm.prank(owner);
+		morpherToken.approve(address(morpherStaking), stakeAmount);
+		vm.prank(owner);
+		uint256 stakedShares = morpherStaking.stake(stakeAmount);
+
+		// Don't warp time past lockup
+
+		// Prepare unstake permit
+		uint256 sharesToUnstake = stakedShares / 2;
+		uint256 deadline = block.timestamp + 1 hours;
+		uint256 nonce = morpherStaking.nonces(owner);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(UNSTAKE_TYPEHASH, sharesToUnstake, owner, nonce, deadline));
+		// Hash EIP712
+		bytes32 digest = morpherStaking.eip712Domain().hashStruct(structHash);
+		// Sign
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
+
+		vm.expectRevert("MorpherStaking: cannot unstake before lockup expiration");
+		morpherStaking.unstakeWithPermit(sharesToUnstake, owner, deadline, v, r, s);
+	}
+
 }
