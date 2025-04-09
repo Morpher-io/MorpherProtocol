@@ -433,10 +433,8 @@ contract MorkpherStakingTest is BaseSetup {
 			uint256 initial_nonce,
 			, // expectedPoolSharesVal not needed
 			, // expectedLockedUntilVal not needed
-			, // initialTotalSharesVal not needed
-			, // initialBalanceVal not needed
-			/* actualPoolShares not needed */
-		) = _setupAndStakeWithPermit();
+			/* actualPoolShares not needed (6th value) */
+		) = _setupAndStakeWithPermit(); // Now correctly expects 6 values
 
 		// Assertion for nonce
 		assertEq(morpherStaking.nonces(owner_addr), initial_nonce + 1, "Nonce not incremented");
