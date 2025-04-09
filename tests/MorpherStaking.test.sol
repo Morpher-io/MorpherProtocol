@@ -480,9 +480,60 @@ contract MorkpherStakingTest is BaseSetup {
 		morpherStaking.stakeWithPermit(amount, owner, deadline, v, r, s);
 	}
 
-
-	function testUnstakeWithPermit_Success() public {
+	// Internal helper for unstakeWithPermit success tests
+	function _setupAndUnstakeWithPermit() internal returns (
+		address owner,
+		uint256 stakedShares,
+		uint256 sharesToUnstake,
+		uint256 nonce,
+		uint256 initialTotalShares,
+		uint256 initialBalance,
+		uint256 expectedAmountOut,
+		uint256 actualAmountOut
+	) {
 		vm.warp(1617094819); // Set consistent time
+		owner = testUserWithPK;
+		uint256 stakeAmount = 300_000 * 1e18;
+
+		// Initial stake
+		vm.prank(owner);
+		morpherToken.approve(address(morpherStaking), stakeAmount);
+		vm.prank(owner);
+		stakedShares = morpherStaking.stake(stakeAmount);
+
+		// Warp time past lockup
+		vm.warp(block.timestamp + morpherStaking.lockupPeriod() + 1 days);
+		morpherStaking.updatePoolShareValue(); // Update value before unstake
+
+		// Prepare unstake permit
+		sharesToUnstake = stakedShares / 2;
+		uint256 deadline = block.timestamp + 1 hours;
+		nonce = morpherStaking.nonces(owner);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(UNSTAKE_TYPEHASH, sharesToUnstake, owner, nonce, deadline));
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+		// Sign
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
+
+		// Pre-calculate values
+		initialTotalShares = morpherStaking.totalShares();
+		initialBalance = morpherToken.balanceOf(owner);
+		expectedAmountOut = sharesToUnstake * morpherStaking.poolShareValue();
+
+		// Emit check
+		vm.expectEmit(true, true, true, true);
+		emit Unstaked(owner, expectedAmountOut, sharesToUnstake);
+
+		// Call unstakeWithPermit
+		actualAmountOut = morpherStaking.unstakeWithPermit(sharesToUnstake, owner, deadline, v, r, s);
+	}
+
+
+	function testUnstakeWithPermit_Success_Amount() public {
+		vm.warp(1617094819); // Set consistent time - MOVED TO HELPER
 		address owner = testUserWithPK;
 		uint256 stakeAmount = 300_000 * 1e18;
 
