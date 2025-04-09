@@ -82,12 +82,14 @@ contract BaseSetup is Test {
 		vm.warp(1);
 
 		//deploy staking
-		vm.warp(1617094819);
-		morpherStaking = new MorpherStaking();
-		morpherStaking.initialize(address(morpherState));
-		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherStaking));
-		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherStaking));
-		morpherState.setMorpherStaking(payable(address(morpherStaking)));
+ 		//deploy staking
+ 		vm.warp(1617094819);
+ 		morpherStaking = new MorpherStaking();
+ 		// Initialize with PRECISION (1e8) and current timestamp for tests
+ 		morpherStaking.initialize(address(morpherState), 10**8, block.timestamp);
+ 		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherStaking));
+ 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherStaking));
+ 		morpherState.setMorpherStakingAddress(payable(address(morpherStaking)));
 		morpherAccessControl.grantRole(morpherStaking.STAKINGADMIN_ROLE(), address(this));
 		morpherStaking.setInterestRate(50000);
 		vm.warp(1);

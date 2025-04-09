@@ -60,7 +60,7 @@ contract MorpherStateTest is BaseSetup, MorpherState {
 
 		vm.expectEmit(true, true, false, false);
 		emit SetMorpherStakingAddress(morpherState.morpherStakingAddress(), _newAddress);
-		morpherState.setMorpherStaking(payable(_newAddress));
+		morpherState.setMorpherStakingAddress(payable(_newAddress));
 		assertEq(morpherState.morpherStakingAddress(), _newAddress);
 
 		vm.expectEmit(true, true, false, false);

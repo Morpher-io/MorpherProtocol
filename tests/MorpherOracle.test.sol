@@ -924,12 +924,12 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		);
 
 		vm.prank(owner.addr);
-		morpherOracle.createOrderFromToken(str, inputToken);
+		bytes32 orderIdFromToken = morpherOracle.createOrderFromToken(str, inputToken);
 
 		vm.warp(block.timestamp + 2);
 
 		morpherOracle.__callback(
-			bytes32(0xcb9f2da0a98770797be5af78dfa27085d73dc98713711199274acce9b68b317f),
+			orderIdFromToken,
 			50050 * PRECISION,
 			50050 * PRECISION,
 			10 * PRECISION,
@@ -938,9 +938,8 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 			0
 		);
 
-		uint expectedShareValue = 49540 * 1e8; // calculated in t.e. test
 		assertEq(morpherToken.balanceOf(owner.addr), 0);
-		assertEq(WMATIC.balanceOf(owner.addr), expectedShareValue * 1e8);
+		assertEq(WMATIC.balanceOf(owner.addr), 49540 * 1e8 * 1e8);
 	}
 
 	function testLiquidationOrder() public {

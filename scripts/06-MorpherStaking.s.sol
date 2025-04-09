@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 
+
 // --- Import and Inherit from DeployOrUpgradeV5 ---
 import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 
@@ -18,7 +19,7 @@ contract DeployMorpherStaking is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherStaking";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "MorpherStaking.sol:MorpherStaking";
+    string constant CONTRACT_NAME = "MorpherStaking.sol";
 
     function run() public {
         // Load dependencies
@@ -71,7 +72,7 @@ contract DeployMorpherStaking is DeployOrUpgradeV5 {
             console.log("Granted MINTER/BURNER roles to Staking contract.");
 
             // Set staking contract address in state
-            state.setMorpherStaking(payable(stakingProxy)); // Ensure setMorpherStaking takes payable if needed
+            state.setMorpherStakingAddress(payable(stakingProxy)); // Ensure setMorpherStaking takes payable if needed
             console.log("Set MorpherStaking address in MorpherState.");
         }
 

@@ -18,7 +18,7 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 
 	string constant CONTRACT_KEY = "MorpherSidechainToBaseMigration";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "MorpherSidechainToBaseMigration.sol:MorpherSidechainToBaseMigration";
+	string constant CONTRACT_NAME = "MorpherSidechainToBaseMigration.sol";
 
 	function run() public {
 		vm.startBroadcast();

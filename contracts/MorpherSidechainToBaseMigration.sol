@@ -32,11 +32,9 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
     // Track migrated positions and balances to prevent double-claiming
     mapping(bytes32 => bool) public migratedPositions;
     mapping(address => bool) public migratedBalances;
-       mapping(address => bool) public migratedStakes; // Added
 
     // Migration statistics
     uint256 public totalPositionsMigrated;
-       uint256 public totalStakesMigrated; // Added
     uint256 public totalBalancesMigrated;
     uint256 public totalUsersMigrated;
     
@@ -46,6 +44,10 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
     // Position migration tracking
     mapping(address => uint256) public lastMigratedPositionIndex;
     mapping(address => bytes32[]) public userPositionIds;
+
+
+    uint256 public totalStakesMigrated; // Added
+    mapping(address => bool) public migratedStakes; // Added
     
     // Role-based access control
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");

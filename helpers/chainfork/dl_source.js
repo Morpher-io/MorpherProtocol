@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+//node --env-file=../../.env dl_source.js 84532
 const NETWORKS = {
     1: {
         name: 'Ethereum Mainnet',
