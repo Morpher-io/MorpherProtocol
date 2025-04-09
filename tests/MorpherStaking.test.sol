@@ -550,7 +550,7 @@ contract MorkpherStakingTest is BaseSetup {
 
 	function testUnstakeWithPermit_Success_StakingState() public {
 		// Call helper
-		(address owner, uint256 stakedShares, uint256 sharesToUnstake, , uint256 initialTotalShares,,,,) = _setupAndUnstakeWithPermit();
+		(address owner, uint256 stakedShares, uint256 sharesToUnstake, , uint256 initialTotalShares,,,) = _setupAndUnstakeWithPermit(); // Removed trailing comma
 
 		// Assertions
 		assertEq(morpherStaking.totalShares(), initialTotalShares - sharesToUnstake, "Total shares incorrect");
