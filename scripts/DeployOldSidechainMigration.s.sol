@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 // Removed: import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
-import {MorpherSidechainToBaseMigration} from "../contracts/MorpherSidechainMigrationSelfcontained.sol";
+import {MorpherSidechainMigrationSelfcontained} from "../contracts/MorpherSidechainMigrationSelfcontained.sol";
 
 // Minimal interface for the MorpherState contract to call grantAccess
 interface IMorpherStateForAccess {
@@ -59,12 +59,12 @@ forge script scripts/DeployOldSidechainMigration.s.sol --rpc-url anvilfork --slo
 		require(currentAdminOracle == ownerAddress, "OWNER_ADDRESS is not the administrator on MorpherState");
 
 		// --- Deploy Migration Contract ---
-		console.log("Deploying MorpherSidechainToBaseMigration...");
+		console.log("Deploying MorpherSidechainMigrationSelfcontained...");
 		console.log("  State Address:", stateAddress);
 		console.log("  Oracle Address:", oracleAddress);
 		console.log("  Target Chain ID:", targetChainId);
 		vm.startBroadcast(ownerAddress);
-		MorpherSidechainToBaseMigration migrationContract = new MorpherSidechainToBaseMigration(
+		MorpherSidechainMigrationSelfcontained migrationContract = new MorpherSidechainMigrationSelfcontained(
 			stateAddress,
 			oracleAddress,
 			targetChainId

@@ -41,13 +41,13 @@ interface IMorpherOracle {
 // --- Contract ---
 
 /**
- * @title MorpherSidechainToBaseMigration
+ * @title MorpherSidechainMigrationSelfcontained
  * @notice Handles the migration of user assets (positions and tokens) from a sidechain
  *         to a target chain (e.g., Base L2) by verifying a user signature that includes
  *         the target chain ID. Migration can only be initiated by authorized Oracle callback addresses.
  * @dev Implements custom ECDSA signature recovery to avoid external libraries.
  */
-contract MorpherSidechainToBaseMigration {
+contract MorpherSidechainMigrationSelfcontained {
     // --- State Variables ---
 
     IMorpherState public morpherState;
