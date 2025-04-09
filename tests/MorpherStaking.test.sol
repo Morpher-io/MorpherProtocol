@@ -392,8 +392,8 @@ contract MorkpherStakingTest is BaseSetup {
 			uint256 expectedPoolSharesVal,
 			uint256 expectedLockedUntilVal,
 			// uint256 initialTotalSharesVal, // Removed from return
-			, // initialBalanceVal not needed
-			uint256 actualPoolShares
+			// initialBalanceVal not needed (placeholder for 6th value if needed)
+			uint256 actualPoolShares // This is the 6th value returned
 		) = _setupAndStakeWithPermit();
 
 		// Assertions for staking state
