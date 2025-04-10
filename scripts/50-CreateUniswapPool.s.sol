@@ -87,14 +87,14 @@ contract CreateUniswapPool is DeployOrUpgrade {
         console.log("Using Nonfungible Position Manager:", NONFUNGIBLE_POSITION_MANAGER);
         
         // Load MorpherToken address
-        address morpherTokenAddress = 0x036CbD53842c5426634e7929541eC2318f3dCF7e; //loadAddress("MorpherToken");
+        address morpherTokenAddress = loadAddress("MorpherToken");
         require(morpherTokenAddress != address(0), "MorpherToken must be deployed first");
         
         console.log("MorpherToken address:", morpherTokenAddress);
         console.log("WETH address:", WETH);
 
         // Check for existing positions and burn them
-        // checkAndBurnPositions();
+        checkAndBurnPositions();
         
         // Initialize or get pool
         address poolAddress = initializeOrGetPool(morpherTokenAddress);
@@ -146,13 +146,13 @@ contract CreateUniswapPool is DeployOrUpgrade {
             if (pool.token0() == morpherTokenAddress) {
                 // If MPH is token0, price = WETH/MPH = 1/100000 = 0.00001
                 // sqrt(0.00001) * 2^96 = sqrt(1/100000) * 2^96
-                sqrtPriceX96 = 2505414483809435;
+                sqrtPriceX96 = 250541448375048000000000000;
                 console.log("MPH is token0, WETH is token1");
                 console.log("Setting price: 100,000 MPH per 1 WETH");
             } else {
                 // If MPH is token1, price = MPH/WETH = 100000
                 // sqrt(100000) * 2^96
-                sqrtPriceX96 = 25054144837438405210904448839064;
+                sqrtPriceX96 = 25054144837504800000000000000000;
                 console.log("WETH is token0, MPH is token1");
                 console.log("Setting price: 100,000 MPH per 1 WETH");
             }
@@ -183,11 +183,11 @@ contract CreateUniswapPool is DeployOrUpgrade {
         
         // Prepare to add liquidity with the correct ratio
         // We want 100,000 MPH = 1 WETH (ratio 100,000:1)
-        uint256 ethAmount = 0.25 ether;
-        uint256 mphAmount = 500_000_000; // 100,000 MPH tokens (with 18 decimals)
+        uint256 ethAmount = 1 ether;
+        uint256 mphAmount = 100_000 ether; // 100,000 MPH tokens (with 18 decimals)
         
         // // Convert ETH to WETH
-        // IWETH9(WETH).deposit{value: ethAmount}();
+        IWETH9(WETH).deposit{value: ethAmount}();
         
         // Check WETH balance
         console.log("WETH balance:", IWETH9(WETH).balanceOf(address(this)) / 1e18);
