@@ -111,8 +111,6 @@ async function getAndWriteContract(contractAddress, network, level = 1) {
             }
         }
     } else {
-        console.log("Skipping " + contractAddress + " source code is empty")
-    } else {
         console.log(`Skipping ${contractAddress} - Source code is empty in API response.`);
         // Optionally log the full response for debugging empty source codes:
         // console.log("API Response:", JSON.stringify(json, null, 2));
