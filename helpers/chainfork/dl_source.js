@@ -108,7 +108,7 @@ async function getAndWriteContract(contractAddress, network, level = 1) {
     }
 
 
-    if (json.result[0].Implementation != '' && level <= 2) {
+    if (json.result[0].Implementation != '' && level <= 3) {
         await new Promise((res) => setTimeout(res, 5000))
         await getAndWriteContract(json.result[0].Implementation, network, level + 1);
     }
