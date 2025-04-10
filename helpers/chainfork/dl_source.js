@@ -83,33 +83,48 @@ async function getAndWriteContract(contractAddress, network, level = 1) {
                     }
 
                     fs.writeFileSync(`./../../contracts/prev/${file.replace('@openzeppelin/', 'contracts/@openzeppelin/')}`, multiPartSourceCode.sources[file].content);
-                    console.log(`Written ${file}`);
+                    console.log(`Written ${file} for ${contractAddress}`);
                     // file written successfully
                 } catch (err) {
-                    console.error(err);
+                    console.error(`Error writing file ${file} for ${contractAddress}:`, err);
                 }
             }
         } catch (e) {
-            console.error(e);
-            console.error(json);
+            console.error(`Error parsing source code JSON for ${contractAddress}:`, e);
+            // console.error("Raw SourceCode string:", json.result[0].SourceCode); // Uncomment for detailed debugging
+            // console.error("Full API JSON response:", json); // Uncomment for detailed debugging
             try {
+                // Fallback for single file source code
+                const contractName = json.result[0].ContractName;
+                if (!contractName) {
+                   console.error(`Could not determine ContractName for single file write at ${contractAddress}. Skipping.`);
+                   return;
+                }
                 if (!fs.existsSync(`./../../contracts/prev/`)) {
                     fs.mkdirSync(`./../../contracts/prev/`, { recursive: true });
                 }
                 fs.writeFileSync(`./../../contracts/prev/${json.result[0].ContractName}.sol`, json.result[0].SourceCode.replace(/@openzeppelin\/contracts-upgradeable\//g, "../lib/openzeppelin-contracts-upgradeable/contracts/"));
                 // file written successfully
-                console.log(`Written ${json.result[0].ContractName}.sol`)
+                console.log(`Written single file ${contractName}.sol for ${contractAddress}`);
             } catch (err) {
-                console.error(err);
+                console.error(`Error writing single file for ${contractAddress}:`, err);
             }
         }
     } else {
         console.log("Skipping " + contractAddress + " source code is empty")
+    } else {
+        console.log(`Skipping ${contractAddress} - Source code is empty in API response.`);
+        // Optionally log the full response for debugging empty source codes:
+        // console.log("API Response:", JSON.stringify(json, null, 2));
     }
 
 
     if (json.result[0].Implementation != '' && level <= 3) {
-        await new Promise((res) => setTimeout(res, 5000))
-        await getAndWriteContract(json.result[0].Implementation, network, level + 1);
+        const implementationAddress = json.result[0].Implementation;
+        console.log(`Found implementation for ${contractAddress} at ${implementationAddress}. Making recursive call (level ${level + 1})...`);
+        await new Promise((res) => setTimeout(res, 5000));
+        await getAndWriteContract(implementationAddress, network, level + 1);
+    } else if (level <= 3) {
+        console.log(`No implementation address found for ${contractAddress} in API response, or level > 3.`);
     }
 }
