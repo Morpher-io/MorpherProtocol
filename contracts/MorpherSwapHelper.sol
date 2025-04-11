@@ -270,28 +270,26 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
     function swapMphToTokenPermitted(
         MphPermitSwapStruct calldata input
     ) public whenNotPaused {
-        address mphToken = state.morpherTokenAddress();
+        // Inlined variables: mphToken, minAmountOut, fee
         address owner = input.owner;
         address targetToken = input.targetTokenAddress;
         uint256 totalAmountIn = input.value; // Total MPH user permits spending
-        uint256 minAmountOut = input.minOutValue;
         address recipient = input.recipient;
         address relayer = _msgSender();
-        uint256 fee = relayerFee;
 
         require(owner != address(0), "SwapHelper: Invalid owner address");
-        require(mphToken != address(0), "SwapHelper: MPH address not set in state");
+        require(state.morpherTokenAddress() != address(0), "SwapHelper: MPH address not set in state");
         require(targetToken != address(0), "SwapHelper: Invalid target token");
         require(recipient != address(0), "SwapHelper: Invalid recipient address");
-        require(targetToken != mphToken, "SwapHelper: Target token cannot be MPH");
+        require(targetToken != state.morpherTokenAddress(), "SwapHelper: Target token cannot be MPH");
         require(
             targetToken == wethAddress || whitelistedTokens[targetToken],
             "SwapHelper: Target token not WETH or whitelisted"
         );
-        require(totalAmountIn > fee, "SwapHelper: Input amount must be greater than fee");
+        require(totalAmountIn > relayerFee, "SwapHelper: Input amount must be greater than fee"); // Use relayerFee directly
 
         // 1. Use the permit to gain approval for the *total* amount (including fee)
-        IERC20Permit(mphToken).permit(
+        IERC20Permit(state.morpherTokenAddress()).permit( // Use state.morpherTokenAddress()
             owner,
             address(this), // spender is this contract
             totalAmountIn,
@@ -303,44 +301,37 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
 
         // 2. Transfer fee from owner to relayer
         // Requires owner to have approved 'totalAmountIn' via permit
-        IERC20(mphToken).safeTransferFrom(owner, relayer, fee);
+        IERC20(state.morpherTokenAddress()).safeTransferFrom(owner, relayer, relayerFee); // Use relayerFee directly
 
         // 3. Transfer the remaining MPH to swap from owner to this contract
-        uint256 amountInToSwap = totalAmountIn - fee;
-        IERC20(mphToken).safeTransferFrom(owner, address(this), amountInToSwap);
+        uint256 amountInToSwap = totalAmountIn - relayerFee; // Use relayerFee directly
+        IERC20(state.morpherTokenAddress()).safeTransferFrom(owner, address(this), amountInToSwap); // Use state.morpherTokenAddress()
 
         // 4. Approve the Uniswap Router to spend the MPH to be swapped
-        IERC20(mphToken).approve(uniswapRouter, amountInToSwap);
+        IERC20(state.morpherTokenAddress()).approve(uniswapRouter, amountInToSwap); // Use state.morpherTokenAddress()
 
-        // 5. Prepare the swap path
-        bytes memory path;
-        if (targetToken == wethAddress) {
-            // Path: MPH -> WETH
-            path = abi.encodePacked(mphToken, poolFee, wethAddress);
-        } else {
-            // Path: MPH -> WETH -> TargetToken
-            path = abi.encodePacked(mphToken, poolFee, wethAddress, poolFee, targetToken);
-        }
-
-        // 6. Execute the swap via Uniswap V3 Router
-        IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
-            path: path,
-            recipient: address(this), // Swap sends output to this contract first
-            amountIn: amountInToSwap,
-            amountOutMinimum: minAmountOut // Slippage protection from input struct
-        });
-
-        uint256 amountOutTotal = IV3SwapRouter(uniswapRouter).exactInput(params);
+        // 5 & 6. Prepare path and execute swap via Uniswap V3 Router (inlining path and params)
+        uint256 amountOutTotal = IV3SwapRouter(uniswapRouter).exactInput(
+            IV3SwapRouter.ExactInputParams({
+                path: targetToken == wethAddress
+                    ? abi.encodePacked(state.morpherTokenAddress(), poolFee, wethAddress) // Path: MPH -> WETH
+                    : abi.encodePacked(state.morpherTokenAddress(), poolFee, wethAddress, poolFee, targetToken), // Path: MPH -> WETH -> TargetToken
+                recipient: address(this), // Swap sends output to this contract first
+                amountIn: amountInToSwap,
+                amountOutMinimum: input.minOutValue // Inline minAmountOut from input struct
+            })
+        );
 
         // 7. Reset approval for the router (good practice)
-        IERC20(mphToken).approve(uniswapRouter, 0);
+        IERC20(state.morpherTokenAddress()).approve(uniswapRouter, 0); // Use state.morpherTokenAddress()
 
         // 8. Handle and send the output
         if (targetToken == wethAddress) {
             // Unwrap WETH to ETH and send to recipient
             IWETH9(wethAddress).withdraw(amountOutTotal);
-            (bool success, ) = recipient.call{value: amountOutTotal}("");
-            require(success, "SwapHelper: ETH transfer failed");
+            // Inline success check
+            (bool sent, ) = recipient.call{value: amountOutTotal}("");
+            require(sent, "SwapHelper: ETH transfer failed");
         } else {
             // Transfer ERC20 token to recipient
             IERC20(targetToken).safeTransfer(recipient, amountOutTotal);
@@ -349,9 +340,9 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         emit SwapMphExecuted(
             owner,
             relayer,
-            mphToken,
+            state.morpherTokenAddress(), // Use state.morpherTokenAddress()
             totalAmountIn,
-            fee,
+            relayerFee, // Use relayerFee directly
             amountInToSwap,
             targetToken, // Log the target ERC20 address (even if WETH was unwrapped)
             amountOutTotal,
