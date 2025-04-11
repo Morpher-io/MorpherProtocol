@@ -154,6 +154,10 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         emit RelayerFeeSet(0, relayerFee);
     }
 
+    // --- Receive ETH ---
+    // Required to receive ETH from WETH unwrapping
+    receive() external payable {}
+
     // --- UUPS Upgrade ---
     function _authorizeUpgrade(address /** unused */)
         internal
