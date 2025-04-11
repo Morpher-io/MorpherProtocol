@@ -125,6 +125,5 @@ async function getAndWriteContract(contractAddress, network, level = 1) {
     } else if (level <= 3) {
         console.log(`No implementation address found for ${contractAddress} in API response, or level > 3.`);
         // Log the response to see why implementation is missing
-        console.log(`API Response for ${contractAddress} (level ${level}):`, JSON.stringify(json, null, 2));
     }
 }

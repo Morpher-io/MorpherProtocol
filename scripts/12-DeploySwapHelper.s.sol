@@ -14,12 +14,14 @@ import {MorpherState} from "../contracts/MorpherState.sol";
 contract DeploySwapHelper is DeployOrUpgradeV5 {
 	string constant CONTRACT_KEY = "MorpherSwapHelper";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "MorpherSwapHelper.sol:MorpherSwapHelper";
+	string constant CONTRACT_NAME = "MorpherSwapHelper.sol";
 
 	// Chain specific addresses
 	address public UNISWAP_V3_ROUTER;
 	address public WETH_ADDRESS; // Use variable for clarity, though constant on Base
 	address public USDC_ADDRESS;
+
+	uint public relayerFee = 100 ether; //100MPH
 
 	// Set up addresses based on the chain we're deploying to
 	function setupAddresses() internal {
@@ -33,7 +35,7 @@ contract DeploySwapHelper is DeployOrUpgradeV5 {
 			USDC_ADDRESS = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913; // Base Mainnet USDC
 		} else if (chainId == 84532) {
 			// Base Sepolia
-			UNISWAP_V3_ROUTER = 0x2626664c2603336E57B271c5C0b26F421741e481; // Same router address
+			UNISWAP_V3_ROUTER = 0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4; // Same router address
 			WETH_ADDRESS = 0x4200000000000000000000000000000000000006;
 			USDC_ADDRESS = 0x036CbD53842c5426634e7929541eC2318f3dCF7e; // Base Sepolia USDC (as requested)
 		} else {
@@ -104,6 +106,10 @@ contract DeploySwapHelper is DeployOrUpgradeV5 {
 			swapHelper.whitelistToken(USDC_ADDRESS);
 			console.log("Whitelisted USDC token:", USDC_ADDRESS);
 
+			// Setting the correct relayer fee to 100MPH
+			swapHelper.setRelayerFee(relayerFee);
+			console.log("Relayer Fee set to:", swapHelper.relayerFee());
+
 			// Renounce temporary ADMIN role
 			accessControl.renounceRole(adminRole, deployer);
 			console.log("Renounced temporary ADMIN role from deployer.");
@@ -163,6 +169,16 @@ contract DeploySwapHelper is DeployOrUpgradeV5 {
 
 				if (!hadAdminRole) accessControl.renounceRole(adminRole, deployer);
 				console.log("USDC token whitelisted.");
+			}
+
+			if (swapHelper.relayerFee() != relayerFee) {
+				console.log("Setting relayer fee to 100MPH...");
+				bool hadAdminRole = accessControl.hasRole(adminRole, deployer);
+				if (!hadAdminRole) accessControl.grantRole(adminRole, deployer);
+				// Setting the correct relayer fee to 100MPH
+				swapHelper.setRelayerFee(relayerFee);
+				if (!hadAdminRole) accessControl.renounceRole(adminRole, deployer);
+				console.log("Relayer Fee set to:", swapHelper.relayerFee());
 			}
 		}
 
