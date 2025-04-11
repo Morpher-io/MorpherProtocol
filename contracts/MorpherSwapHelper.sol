@@ -33,6 +33,9 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
 
     uint256 public relayerFee; // Fee in MPH (with decimals) paid to msg.sender
 
+    // --- Internal State ---
+    bool private _allowReceiveETH; // Flag to allow ETH reception only during WETH withdrawal
+
     // --- Roles (fetched from MorpherAccessControl via MorpherState) ---
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -155,8 +158,10 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
     }
 
     // --- Receive ETH ---
-    // Required to receive ETH from WETH unwrapping
-    receive() external payable {}
+    // Required to receive ETH from WETH unwrapping, protected by a flag
+    receive() external payable {
+        require(_allowReceiveETH, "SwapHelper: Direct ETH transfers not allowed");
+    }
 
     // --- UUPS Upgrade ---
     function _authorizeUpgrade(address /** unused */)
@@ -331,9 +336,12 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
 
         // 8. Handle and send the output
         if (targetToken == wethAddress) {
-            // Unwrap WETH to ETH and send to recipient
+            // Temporarily allow receiving ETH, unwrap WETH, then disallow again
+            _allowReceiveETH = true;
             IWETH9(wethAddress).withdraw(amountOutTotal);
-            // Inline success check
+            _allowReceiveETH = false; // Disallow immediately after withdrawal
+
+            // Send received ETH to recipient
             (bool sent, ) = recipient.call{value: amountOutTotal}("");
             require(sent, "SwapHelper: ETH transfer failed");
         } else {
