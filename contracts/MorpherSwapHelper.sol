@@ -56,6 +56,20 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         bytes32 s;            // Permit signature s
     }
 
+    // Struct for swapping MPH -> Token via Permit
+    struct MphPermitSwapStruct {
+        // address mphTokenAddress; // Implicitly fetched from state
+        address owner;        // The user who owns MPH and signed the permit
+        uint256 value;        // Amount of MPH to permit (includes fee)
+        address targetTokenAddress; // The token to receive (e.g., WETH, USDC)
+        uint256 minOutValue;  // Minimum amount of target token expected
+        address recipient;    // Final destination address for output token/ETH
+        uint256 deadline;     // Permit deadline
+        uint8 v;              // Permit signature v
+        bytes32 r;            // Permit signature r
+        bytes32 s;            // Permit signature s
+    }
+
     // --- Events ---
     event LinkState(address indexed oldAddress, address indexed newAddress);
     event LinkUniswapRouter(address indexed oldAddress, address indexed newAddress);
@@ -80,6 +94,17 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         uint256 amountIn,
         uint256 amountOutTotal,
         uint256 requiredFee
+    );
+    event SwapMphExecuted( // Event for MPH -> Token swap
+        address indexed user,          // The owner who signed the permit
+        address indexed relayer,       // The msg.sender executing the swap
+        address tokenIn,       // Should always be MPH token
+        uint256 totalAmountIn, // Total MPH permitted by user (value from struct)
+        uint256 feeTaken,      // MPH fee taken by relayer
+        uint256 amountInSwapped, // MPH amount actually swapped (totalAmountIn - feeTaken)
+        address tokenOut,      // The target token address (e.g., WETH, USDC)
+        uint256 amountOutTotal,    // Amount of tokenOut received from swap (or ETH if unwrapped)
+        address recipient      // Final recipient of tokenOut/ETH
     );
 
 
@@ -234,6 +259,103 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
             amountOutTotal,
             amountOutUser,
             fee
+        );
+    }
+
+    /**
+     * @notice Swaps user's MPH for a target token (or ETH) using a permit signature.
+     * @dev The caller (`msg.sender`) acts as a relayer, pays gas, takes a fee in MPH before the swap.
+     * @param input Struct containing MPH amount, target token, recipient, permit signature, etc.
+     */
+    function swapMphToTokenPermitted(
+        MphPermitSwapStruct calldata input
+    ) public whenNotPaused {
+        address mphToken = state.morpherTokenAddress();
+        address owner = input.owner;
+        address targetToken = input.targetTokenAddress;
+        uint256 totalAmountIn = input.value; // Total MPH user permits spending
+        uint256 minAmountOut = input.minOutValue;
+        address recipient = input.recipient;
+        address relayer = _msgSender();
+        uint256 fee = relayerFee;
+
+        require(owner != address(0), "SwapHelper: Invalid owner address");
+        require(mphToken != address(0), "SwapHelper: MPH address not set in state");
+        require(targetToken != address(0), "SwapHelper: Invalid target token");
+        require(recipient != address(0), "SwapHelper: Invalid recipient address");
+        require(targetToken != mphToken, "SwapHelper: Target token cannot be MPH");
+        require(
+            targetToken == wethAddress || whitelistedTokens[targetToken],
+            "SwapHelper: Target token not WETH or whitelisted"
+        );
+        require(totalAmountIn > fee, "SwapHelper: Input amount must be greater than fee");
+
+        // 1. Use the permit to gain approval for the *total* amount (including fee)
+        IERC20Permit(mphToken).permit(
+            owner,
+            address(this), // spender is this contract
+            totalAmountIn,
+            input.deadline,
+            input.v,
+            input.r,
+            input.s
+        );
+
+        // 2. Transfer fee from owner to relayer
+        // Requires owner to have approved 'totalAmountIn' via permit
+        IERC20(mphToken).safeTransferFrom(owner, relayer, fee);
+
+        // 3. Transfer the remaining MPH to swap from owner to this contract
+        uint256 amountInToSwap = totalAmountIn - fee;
+        IERC20(mphToken).safeTransferFrom(owner, address(this), amountInToSwap);
+
+        // 4. Approve the Uniswap Router to spend the MPH to be swapped
+        IERC20(mphToken).approve(uniswapRouter, amountInToSwap);
+
+        // 5. Prepare the swap path
+        bytes memory path;
+        if (targetToken == wethAddress) {
+            // Path: MPH -> WETH
+            path = abi.encodePacked(mphToken, poolFee, wethAddress);
+        } else {
+            // Path: MPH -> WETH -> TargetToken
+            path = abi.encodePacked(mphToken, poolFee, wethAddress, poolFee, targetToken);
+        }
+
+        // 6. Execute the swap via Uniswap V3 Router
+        IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
+            path: path,
+            recipient: address(this), // Swap sends output to this contract first
+            amountIn: amountInToSwap,
+            amountOutMinimum: minAmountOut // Slippage protection from input struct
+        });
+
+        uint256 amountOutTotal = IV3SwapRouter(uniswapRouter).exactInput(params);
+
+        // 7. Reset approval for the router (good practice)
+        IERC20(mphToken).approve(uniswapRouter, 0);
+
+        // 8. Handle and send the output
+        if (targetToken == wethAddress) {
+            // Unwrap WETH to ETH and send to recipient
+            IWETH9(wethAddress).withdraw(amountOutTotal);
+            (bool success, ) = recipient.call{value: amountOutTotal}("");
+            require(success, "SwapHelper: ETH transfer failed");
+        } else {
+            // Transfer ERC20 token to recipient
+            IERC20(targetToken).safeTransfer(recipient, amountOutTotal);
+        }
+
+        emit SwapMphExecuted(
+            owner,
+            relayer,
+            mphToken,
+            totalAmountIn,
+            fee,
+            amountInToSwap,
+            targetToken, // Log the target ERC20 address (even if WETH was unwrapped)
+            amountOutTotal,
+            recipient
         );
     }
 
