@@ -857,4 +857,209 @@ contract MorpherTokenTest is
 		// Sign the digest
 		(v, r, s) = vm.sign(owner.key, finalHash);
 	}
+
+	// --- Tests for getTransferableBalanceToday ---
+
+	function testTransferableBalance_InitialState() public {
+		address user = makeAddr("user");
+		assertEq(morpherToken.getTransferableBalanceToday(user), 0, "Initial balance should be 0");
+
+		// Mint some tokens (as admin, counts as transferred-in)
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+		// Without daily limit set, all should be transferable
+		assertEq(morpherToken.getTransferableBalanceToday(user), 10 ether, "Admin minted balance should be transferable");
+	}
+
+	function testTransferableBalance_MintedByLimiter_NoLimit() public {
+		address user = makeAddr("user");
+		// Mint tokens as MintingLimiter (does not count as transferred-in)
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+		// Without daily limit set, all should be transferable (limit is effectively infinity)
+		assertEq(morpherToken.getTransferableBalanceToday(user), 10 ether, "Limiter minted balance transferable without limit");
+	}
+
+	function testTransferableBalance_MintedByLimiter_WithLimit() public {
+		address user = makeAddr("user");
+		// Set daily limit
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(3 ether);
+		vm.stopPrank();
+
+		// Mint tokens as MintingLimiter (does not count as transferred-in)
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+
+		// Transferable balance should be capped by the daily limit
+		assertEq(morpherToken.getTransferableBalanceToday(user), 3 ether, "Limiter minted balance capped by limit");
+	}
+
+	function testTransferableBalance_TransferredIn() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+
+		// Mint to user1 (as admin, counts as transferred-in for user1 initially)
+		vm.startPrank(_admin);
+		morpherToken.mint(user1, 10 ether);
+		vm.stopPrank();
+
+		assertEq(morpherToken.getTransferableBalanceToday(user1), 10 ether, "User1 initial transferable");
+		assertEq(morpherToken.getTransferableBalanceToday(user2), 0 ether, "User2 initial transferable");
+
+		// User1 transfers to User2
+		vm.startPrank(user1);
+		morpherToken.transfer(user2, 7 ether);
+		vm.stopPrank();
+
+		// User1's transferable balance decreases
+		assertEq(morpherToken.getTransferableBalanceToday(user1), 3 ether, "User1 transferable after sending");
+		// User2's transferable balance increases by the transferred amount
+		assertEq(morpherToken.getTransferableBalanceToday(user2), 7 ether, "User2 transferable after receiving");
+		assertEq(morpherToken.getTransferredInTokens(user2), 7 ether, "User2 transferred-in tokens correct");
+	}
+
+	function testTransferableBalance_LockedRewards() public {
+		address user = makeAddr("user");
+		// Grant AIRDROPADMIN_ROLE to admin for reward locking
+		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), _admin);
+
+		// Mint tokens (as admin, counts as transferred-in)
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 10 ether);
+		assertEq(morpherToken.getTransferableBalanceToday(user), 10 ether, "Transferable before lock");
+
+		// Lock rewards
+		morpherToken.lockRewards(user, 4 ether);
+		vm.stopPrank();
+
+		// Transferable balance should exclude locked rewards
+		assertEq(morpherToken.getTransferableBalanceToday(user), 6 ether, "Transferable after lock");
+		assertEq(morpherToken.balanceOf(user), 6 ether, "balanceOf excludes locked");
+		assertEq(morpherToken.getTradeableBalanceOf(user), 10 ether, "tradeableBalanceOf includes locked");
+	}
+
+	function testTransferableBalance_TimeLock() public {
+		address user = makeAddr("user");
+		uint256 lockDuration = 30 days;
+
+		// Mint tokens (as admin, counts as transferred-in)
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 10 ether);
+		assertEq(morpherToken.getTransferableBalanceToday(user), 10 ether, "Transferable before time lock");
+
+		// Lock tokens
+		morpherToken.lockTokensForTime(user, 6 ether, lockDuration);
+		vm.stopPrank();
+
+		// Transferable balance should exclude time-locked tokens
+		assertEq(morpherToken.getTransferableBalanceToday(user), 4 ether, "Transferable during time lock");
+		assertEq(morpherToken.balanceOf(user), 4 ether, "balanceOf excludes time lock");
+
+		// Warp past lock duration
+		vm.warp(block.timestamp + lockDuration + 1 days);
+
+		// Transferable balance should now include the unlocked tokens
+		assertEq(morpherToken.getTransferableBalanceToday(user), 10 ether, "Transferable after time lock expired");
+		assertEq(morpherToken.balanceOf(user), 10 ether, "balanceOf after time lock expired");
+	}
+
+	function testTransferableBalance_MintedByTradeEngine() public {
+		address user = makeAddr("user");
+		// Set daily limit
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(5 ether);
+		vm.stopPrank();
+
+		// Mint tokens as TradeEngine (does not count as transferred-in)
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+
+		// Transferable balance should be capped by the daily limit
+		assertEq(morpherToken.getTransferableBalanceToday(user), 5 ether, "TradeEngine minted balance capped by limit");
+	}
+
+	function testTransferableBalance_Combined() public {
+		address user1 = makeAddr("user1");
+		address user2 = makeAddr("user2");
+
+		// Set daily limit
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(5 ether);
+		// Mint some tokens to user1 (counts as transferred-in)
+		morpherToken.mint(user1, 10 ether);
+		vm.stopPrank();
+
+		// User1 transfers 6 ether to user2
+		vm.startPrank(user1);
+		morpherToken.transfer(user2, 6 ether);
+		vm.stopPrank();
+
+		// User2 now has 6 ether (transferred-in)
+		assertEq(morpherToken.getTransferredInTokens(user2), 6 ether, "User2 transferred-in correct");
+		assertEq(morpherToken.getTransferableBalanceToday(user2), 6 ether, "User2 transferable is transferred-in amount");
+
+		// MintingLimiter mints 10 ether to user2 (minted)
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
+		morpherToken.mint(user2, 10 ether);
+		vm.stopPrank();
+
+		// User2 has 6 (transferred) + 10 (minted) = 16 total
+		// Transferable = 6 (transferred) + min(10 minted, 5 daily limit) = 11
+		assertEq(morpherToken.balanceOf(user2), 16 ether, "User2 total balance");
+		assertEq(morpherToken.getTransferableBalanceToday(user2), 11 ether, "User2 transferable combined");
+
+		// User2 transfers 8 ether out
+		vm.startPrank(user2);
+		morpherToken.transfer(user1, 8 ether);
+		vm.stopPrank();
+
+		// Should use 6 transferred-in first, then 2 from minted (counts towards daily limit)
+		assertEq(morpherToken.getTransferredInTokens(user2), 0, "User2 transferred-in after transfer");
+		assertEq(morpherToken.getDailyMintedTransfers(user2), 2 ether, "User2 daily minted transferred");
+		assertEq(morpherToken.balanceOf(user2), 8 ether, "User2 balance after transfer"); // 16 - 8
+
+		// Remaining daily limit = 5 - 2 = 3
+		// Remaining minted balance = 10 - 2 = 8
+		// Transferable = 0 (transferred) + min(8 minted, 3 remaining limit) = 3
+		assertEq(morpherToken.getTransferableBalanceToday(user2), 3 ether, "User2 transferable after transfer");
+	}
+
+	function testTransferableBalance_NextDayReset() public {
+		address user = makeAddr("user");
+		// Set daily limit
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(5 ether);
+		vm.stopPrank();
+
+		// Mint tokens as MintingLimiter
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+
+		// Transferable is capped
+		assertEq(morpherToken.getTransferableBalanceToday(user), 5 ether, "Transferable day 1");
+
+		// Transfer some minted tokens
+		vm.startPrank(user);
+		morpherToken.transfer(makeAddr("recipient"), 3 ether);
+		vm.stopPrank();
+
+		// Remaining limit is 2
+		assertEq(morpherToken.getTransferableBalanceToday(user), 2 ether, "Transferable day 1 after transfer");
+		assertEq(morpherToken.getDailyMintedTransfers(user), 3 ether, "Daily transferred day 1");
+
+		// Warp to the next day
+		vm.warp(block.timestamp + 1 days);
+
+		// Daily limit should reset
+		// Remaining minted balance = 10 - 3 = 7
+		// Transferable = min(7 minted, 5 new daily limit) = 5
+		assertEq(morpherToken.getTransferableBalanceToday(user), 5 ether, "Transferable day 2 (limit reset)");
+		assertEq(morpherToken.getDailyMintedTransfers(user), 0 ether, "Daily transferred day 2 (reset)");
+	}
 }
