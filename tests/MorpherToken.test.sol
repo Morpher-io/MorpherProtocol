@@ -874,12 +874,25 @@ contract MorpherTokenTest is
 
 	function testTransferableBalance_MintedByLimiter_NoLimit() public {
 		address user = makeAddr("user");
+
+		vm.startPrank(_admin);
+		morpherToken.setDailyMintedTransferLimit(type(uint256).max);
 		// Mint tokens as MintingLimiter (does not count as transferred-in)
 		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 10 ether);
 		vm.stopPrank();
-		// Without daily limit set, all should be transferable (limit is effectively infinity)
+		// With the daily limit set to uint256 max all should be transferable (limit is effectively infinity)
 		assertEq(morpherToken.getTransferableBalanceToday(user), 10 ether, "Limiter minted balance transferable without limit");
+	}
+	function testTransferableBalance_MintedByLimiter_NoLimitSet() public {
+		address user = makeAddr("user");
+
+		// Mint tokens as MintingLimiter (does not count as transferred-in)
+		vm.startPrank(morpherState.morpherMintingLimiterAddress());
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+		// Without daily limit set nothing should be transferrablöe
+		assertEq(morpherToken.getTransferableBalanceToday(user), 0, "Limiter minted balance transferable without limit");
 	}
 
 	function testTransferableBalance_MintedByLimiter_WithLimit() public {
