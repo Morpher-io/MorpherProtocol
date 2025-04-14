@@ -425,6 +425,47 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		return _dailyMintedTransfers[account][block.timestamp / 1 days];
 	}
 
+	/**
+	 * @dev Calculates the total amount of tokens an account can transfer out *today*.
+	 * This considers the available balance (excluding locked rewards/time-locks),
+	 * the freely transferable 'transferred-in' tokens, and the daily limit
+	 * applied to the remaining 'minted' tokens.
+	 * @param account The address of the account to query.
+	 * @return The total amount of tokens transferable today.
+	 */
+	function getTransferableBalanceToday(address account) public view returns (uint256) {
+		// 1. Get available balance (already excludes locked rewards and time-locks)
+		uint256 availableBalance = balanceOf(account);
+
+		// 2. Get freely transferable 'transferred-in' tokens
+		uint256 transferredIn = _transferredInTokens[account];
+
+		// 3. Calculate remaining daily limit for minted tokens
+		uint256 transferredToday = _dailyMintedTransfers[account][block.timestamp / 1 days];
+		uint256 remainingDailyLimit = 0;
+		if (_dailyMintedTransferLimit > transferredToday) {
+			remainingDailyLimit = _dailyMintedTransferLimit - transferredToday;
+		}
+
+		// 4. Calculate the portion of available balance that is 'minted'
+		uint256 availableMinted = 0;
+		if (availableBalance > transferredIn) {
+			availableMinted = availableBalance - transferredIn;
+		}
+
+		// 5. Determine the amount transferable from the 'minted' bucket today
+		// It's the minimum of what's available in the minted bucket and the remaining daily limit
+		uint256 transferableMintedToday = availableMinted < remainingDailyLimit ? availableMinted : remainingDailyLimit; // Equivalent to min(availableMinted, remainingDailyLimit)
+
+		// 6. Determine the amount transferable from the 'transferred-in' bucket
+		// It's the minimum of what's available in the bucket and the overall available balance
+		uint256 transferableFromTransferredIn = availableBalance < transferredIn ? availableBalance : transferredIn; // Equivalent to min(availableBalance, transferredIn)
+
+		// 7. Total transferable is the sum of transferable amounts from both buckets
+		return transferableFromTransferredIn + transferableMintedToday;
+	}
+
+
 	// --- Override _update instead of _beforeTokenTransfer ---
 	function _update(address from, address to, uint256 amount)
 		internal
