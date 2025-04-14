@@ -15,7 +15,7 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 
 	string constant CONTRACT_KEY = "MorpherToken";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "MorpherToken.sol:MorpherToken";
+	string constant CONTRACT_NAME = "MorpherToken.sol";
 	// Define the EIP712 domain name for the permit function
 	string constant PERMIT_NAME = "MorpherToken"; // Or "MorpherToken" - should match what users expect
 

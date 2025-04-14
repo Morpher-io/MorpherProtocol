@@ -86,7 +86,7 @@ contract DeploySwapHelper is DeployOrUpgradeV5 {
 		// --- Post-Deployment/Upgrade Setup ---
 
 		MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
-		MorpherSwapHelper swapHelper = MorpherSwapHelper(swapHelperProxy); // Interact via proxy address
+		MorpherSwapHelper swapHelper = MorpherSwapHelper(payable(swapHelperProxy)); // Interact via proxy address
 		address deployer = msg.sender;
 
 		// Define roles needed by SwapHelper (using the contract type for constants)

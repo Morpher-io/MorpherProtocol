@@ -33,8 +33,6 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
 
     uint256 public relayerFee; // Fee in MPH (with decimals) paid to msg.sender
 
-    // --- Internal State ---
-    bool private _allowReceiveETH; // Flag to allow ETH reception only during WETH withdrawal
 
     // --- Roles (fetched from MorpherAccessControl via MorpherState) ---
     bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
@@ -45,6 +43,8 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
     // --- Uniswap V3 Pool Fee Tier ---
     // TODO: Consider making this configurable if different pools are needed
     uint24 public constant poolFee = 3000; // 0.3%
+
+    bool private _allowReceiveETH; // Flag to allow ETH reception only during WETH withdrawal
 
     // --- Structs ---
     // Replicated from MorpherOracle for compatibility with frontend/signing logic
