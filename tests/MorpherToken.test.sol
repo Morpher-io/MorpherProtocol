@@ -222,9 +222,7 @@ contract MorpherTokenTest is
 		// Check balances - time lock should be expired but rewards lock remains
 		assertEq(morpherToken.balanceOf(user), 5 ether); // 8 - 3 (rewards)
 
-		// Manually trigger unlock
-		vm.prank(user);
-		morpherToken.unlockExpiredTokens(user);
+		// Removed call to unlockExpiredTokens
 
 		// Unlock rewards
 		vm.startPrank(_admin);

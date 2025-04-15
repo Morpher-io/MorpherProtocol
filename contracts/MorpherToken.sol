@@ -92,8 +92,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	// Mapping to track locked tokens per user
 	mapping(address => TokenLock) private _timeLocks;
 
-	// Total amount of time-locked tokens across all users
-	uint256 private _totalTimeLocked;
+	// Total amount of time-locked tokens across all users (Removed)
+	// uint256 private _totalTimeLocked;
 
 
 	event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);
@@ -370,33 +370,16 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 			// Create new lock
 			_timeLocks[account] = TokenLock(amount, unlockTime);
 		}
-		
-		_totalTimeLocked += amount;
-		
-		
+
+		// _totalTimeLocked += amount; // Removed update
+
+
 		emit TokensLocked(account, amount, unlockTime);
-		
+
 	}
 
-	/**
-	 * @dev Manually unlocks tokens if the lock period has expired
-	 * @param account Address to unlock tokens for
-	 */
-	function unlockExpiredTokens(address account) public {
-		TokenLock storage lock = _timeLocks[account];
-		
-		if (lock.amount > 0 && block.timestamp >= lock.lockedUntil) {
-			uint256 amountToUnlock = lock.amount;
-			_totalTimeLocked -= amountToUnlock;
-			
-			// Clear the lock
-			lock.amount = 0;
-			lock.lockedUntil = 0;
-			
-			emit TokensUnlocked(account, amountToUnlock);
-		}
-	}
-	
+	// Removed unlockExpiredTokens function
+
 	/**
 	 * @dev Sets the daily transfer limit for minted tokens
 	 * @param limit New daily transfer limit
