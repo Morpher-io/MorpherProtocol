@@ -179,35 +179,3 @@ And to transfer the ownership, potentially to a 0x0 address:
 ```
 transferOwnership(ownerAddress)
 ```
-
-# Deployed Contracts
-
-The Smart Contracts are deployed on the Ethereum Mainnet and on the Morpher Sidechain, as well as Polygon.
-
-Mainchain and Sidechain contains a mix of Proxied and non-proxied contracts. To understand which ones are which, please consult the [Master-Branch Readme](https://github.com/Morpher-io/MorpherProtocol) which gives an overview
-
-Polygon and all Test-Networks contains exclusively the Proxied contracts. Run:
-
-`truffle dashboard` to connect to MetaMask and select the right network. 
-Then run `truffle exec ./helpers/printAddresses.js --network dashboard` to print the addresses.
-
-At the time of writing, these are the addresses for Polygon:
-
-```
-ChainID : 137
-MorpherAccessControl : 0x139950831d8338487db6807c6FdAeD1827726dF2
-MorpherAdmin : NO NETWORK DETECTED
-MorpherAdministratorProxy : NO NETWORK DETECTED
-MorpherAirdrop : NO NETWORK DETECTED
-MorpherBridge : 0xE409f27e977E6bC10cc0a064eD3004F78A40A648
-MorpherFaucet : NO NETWORK DETECTED
-MorpherGovernance : NO NETWORK DETECTED
-MorpherMintingLimiter : 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb
-MorpherOracle : 0x21Fd95b46FC655BfF75a8E74267Cfdc7efEBdb6A
-MorpherStaking : 0x0Fc936d3008d08F065BfD37FCAF7aa8515525417
-MorpherState : 0x1ce1efda5d52dE421BD3BC1CCc85977D7a0a0F1e
-MorpherToken : 0x65C9e3289e5949134759119DBc9F862E8d6F2fBE
-MorpherTradeEngine : 0x005cb9Ad7C713bfF25ED07F3d9e1C3945e543cd5
-MorpherUserBlocking : 0x92Ea01229335854000dc648Fcf4Ea2931A78c363
-MorpherDeprecatedTokenMapper : NO NETWORK DETECTED
-```

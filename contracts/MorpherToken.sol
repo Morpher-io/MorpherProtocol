@@ -201,14 +201,14 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		return super.balanceOf(account) - _lockedRewards[account] - timeLockedAmount;
 	}
 
-	function deposit(address user, bytes calldata depositData) external onlyRole(POLYGONMINTER_ROLE) {
-		uint256 amount = abi.decode(depositData, (uint256));
-		_mint(user, amount);
-	}
+	// function deposit(address user, bytes calldata depositData) external onlyRole(POLYGONMINTER_ROLE) {
+	// 	uint256 amount = abi.decode(depositData, (uint256));
+	// 	_mint(user, amount);
+	// }
 
-	function withdraw(uint256 amount) external onlyRole(POLYGONMINTER_ROLE) {
-		_burn(msg.sender, amount);
-	}
+	// function withdraw(uint256 amount) external onlyRole(POLYGONMINTER_ROLE) {
+	// 	_burn(msg.sender, amount);
+	// }
 
 	/**
 	 * @dev Creates `amount` new tokens for `to`.
@@ -354,7 +354,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * @param amount Amount of tokens to lock
 	 * @param lockDuration Duration in seconds for which tokens will be locked
 	 */
-	function lockTokensForTime(address account, uint256 amount, uint256 lockDuration) public onlyRole(ADMINISTRATOR_ROLE) {
+	function lockTokensForTime(address account, uint256 amount, uint256 lockDuration) public onlyRole(AIRDROPADMIN_ROLE) {
 		require(balanceOf(account) >= amount, "MorpherToken: insufficient balance for locking");
 		
 		uint256 unlockTime = block.timestamp + lockDuration;
