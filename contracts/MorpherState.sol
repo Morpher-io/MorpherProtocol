@@ -19,8 +19,7 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
     address public morpherGovernanceAddress;
     address public morpherMintingLimiterAddress;
     address public morpherOracleAddress;
-    address public morpherSidechainToBaseMigrationAddress; // Added
-    address public morpherStakingAddress; // Changed from payable
+    address payable public morpherStakingAddress;
     address public morpherTokenAddress;
     address public morpherTradeEngineAddress;
     address public morpherUserBlockingAddress;
@@ -59,6 +58,17 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
     uint256 public numberOfRequestsLimit;
 
 
+    bool public mainChain; 
+    
+    // ----------------------------------------------------------------------------
+    // New interest rate management
+    // ----------------------------------------------------------------------------
+
+    address public morpherInterestRateManagerAddress;
+    
+    address public morpherSidechainToBaseMigrationAddress; // Added
+
+
     // ----------------------------------------------------------------------------
     // Events
     // ----------------------------------------------------------------------------
@@ -77,15 +87,6 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
         require(MorpherAccessControl(morpherAccessControlAddress).hasRole(role, _msgSender()), "MorpherState: Permission denied.");
         _;
     }
-
-    bool public mainChain;
-
-
-    // ----------------------------------------------------------------------------
-    // New interest rate management
-    // ----------------------------------------------------------------------------
-
-    address public morpherInterestRateManagerAddress;
 
     // --- Initializer ---
     function initialize(bool _mainChain, address _morpherAccessControlAddress) public initializer {
@@ -164,7 +165,7 @@ contract MorpherState is UUPSUpgradeable, ContextUpgradeable { // --- Inherit UU
     function setMorpherStakingAddress(address _morpherStakingAddress) public onlyRole(ADMINISTRATOR_ROLE) { // Renamed and changed param type
         require(_morpherStakingAddress != address(0), "MorpherState: Address cannot be zero");
         emit SetMorpherStakingAddress(morpherStakingAddress, _morpherStakingAddress);
-        morpherStakingAddress = _morpherStakingAddress;
+        morpherStakingAddress = payable(_morpherStakingAddress);
     }
 
     event SetMorpherTokenAddress(address _oldAddress, address _newAddress);

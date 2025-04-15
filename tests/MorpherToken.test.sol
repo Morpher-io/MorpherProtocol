@@ -34,6 +34,7 @@ contract MorpherTokenTest is
 		morpherAccessControl.grantRole(morpherToken.POLYGONMINTER_ROLE(), _admin);
 		morpherAccessControl.grantRole(morpherToken.PAUSER_ROLE(), _pauser);
 		morpherAccessControl.grantRole(morpherToken.TOKENUPDATER_ROLE(), _tokenUpdater);
+		morpherAccessControl.grantRole(morpherToken.AIRDROPADMIN_ROLE(), _admin);
 
 		// Set a dummy migration address in state for testing purposes
 		vm.startPrank(_admin);
@@ -104,29 +105,30 @@ contract MorpherTokenTest is
 		morpherToken.permit(owner.addr, spender, value, deadline, v, r, s);
 	}
 
-	function testDepositWithdraw() public {
-		address user = address(0xabcdef);
-		vm.startPrank(_admin);
+//removed the functions from Polygon bridge
+	// function testDepositWithdraw() public {
+	// 	address user = address(0xabcdef);
+	// 	vm.startPrank(_admin);
 
-		vm.expectEmit(true, true, true, true);
-		emit Transfer(address(0), user, 1 ether);
-		morpherToken.deposit(user, bytes(abi.encode(1 ether)));
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit Transfer(address(0), user, 1 ether);
+	// 	morpherToken.deposit(user, bytes(abi.encode(1 ether)));
 
-		uint256 totalSupply = morpherToken.totalSupply();
-		assertEq(totalSupply, 1 ether);
+	// 	uint256 totalSupply = morpherToken.totalSupply();
+	// 	assertEq(totalSupply, 1 ether);
 
-		morpherToken.mint(_admin, 2 ether);
+	// 	morpherToken.mint(_admin, 2 ether);
 
-		totalSupply = morpherToken.totalSupply();
-		assertEq(totalSupply, 3 ether);
+	// 	totalSupply = morpherToken.totalSupply();
+	// 	assertEq(totalSupply, 3 ether);
 
-		vm.expectEmit(true, true, true, true);
-		emit Transfer(_admin, address(0), 1 ether);
-		morpherToken.withdraw(1 ether);
+	// 	vm.expectEmit(true, true, true, true);
+	// 	emit Transfer(_admin, address(0), 1 ether);
+	// 	morpherToken.withdraw(1 ether);
 
-		totalSupply = morpherToken.totalSupply();
-		assertEq(totalSupply, 2 ether);
-	}
+	// 	totalSupply = morpherToken.totalSupply();
+	// 	assertEq(totalSupply, 2 ether);
+	// }
 
 	function testTimeLockTokens() public {
 		address user = address(0xabcdef);

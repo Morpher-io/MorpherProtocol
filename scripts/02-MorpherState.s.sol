@@ -13,7 +13,7 @@ import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // K
 contract DeployMorpherState is DeployOrUpgradeV5 {
 	string constant CONTRACT_KEY = "MorpherState";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "MorpherState.sol:MorpherState";
+	string constant CONTRACT_NAME = "MorpherState.sol";
 
 	function run() public {
 		// Load dependencies
