@@ -11,7 +11,9 @@ contract MorkpherStakingTest is BaseSetup {
 
 	event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
 	event Staked(address indexed userAddress, uint256 indexed amount, uint256 poolShares, uint256 lockedUntil);
-	event Unstaked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);
+	event Unstaked(address indexed userAddress, uint256 indexed amount, uint256 poolShares);	
+	event StakingDisabledSet(bool disabled); // Added event
+
 
 	// EIP712 typehashes (must match contract)
 	bytes32 constant STAKE_TYPEHASH = keccak256("Stake(uint256 amount,address owner,uint256 nonce,uint256 deadline)");

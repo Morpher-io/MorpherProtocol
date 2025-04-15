@@ -36,7 +36,6 @@ contract MorpherStaking is
 	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 	bytes32 public constant STAKINGADMIN_ROLE = keccak256("STAKINGADMIN_ROLE");
 
-	bool public stakingDisabled; // Flag to disable new staking
 
 	//mapping(address => uint256) private poolShares;
 	//mapping(address => uint256) private lockup;
@@ -63,6 +62,9 @@ contract MorpherStaking is
 		uint256 lockedUntil;
 	}
 	mapping(address => PoolShares) public poolShares;
+
+
+	bool public stakingDisabled; // Flag to disable new staking
 
 	// --- Remove manual EIP712 Permit state variables ---
 	// --- EIP712 Domain details will be provided by overriding _EIP712Name and _EIP712Version ---

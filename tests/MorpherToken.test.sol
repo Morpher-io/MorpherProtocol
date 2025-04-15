@@ -418,10 +418,6 @@ contract MorpherTokenTest is
 		address stakingContract = morpherState.morpherStakingAddress();
 		require(stakingContract != address(0), "Staking address must be set in state for test");
 
-		// Grant MINTER_ROLE to staking contract
-		vm.startPrank(_admin);
-		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), stakingContract);
-		vm.stopPrank();
 
 		// Mint tokens as staking contract
 		vm.startPrank(stakingContract);
