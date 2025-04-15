@@ -36,6 +36,8 @@ contract MorpherStaking is
 	bytes32 public constant ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
 	bytes32 public constant STAKINGADMIN_ROLE = keccak256("STAKINGADMIN_ROLE");
 
+	bool public stakingDisabled; // Flag to disable new staking
+
 	//mapping(address => uint256) private poolShares;
 	//mapping(address => uint256) private lockup;
 
@@ -86,6 +88,7 @@ contract MorpherStaking is
 	event SetMinimumStake(uint256 newMinimumStake);
 	event InterestRateChanged(uint256 newInterestRate);
 	event LinkState(address stateAddress);
+	event StakingDisabledSet(bool disabled); // Added event
 
 	event PoolShareValueUpdated(uint256 indexed lastReward, uint256 poolShareValue);
 	event StakingRewardsMinted(uint256 indexed lastReward, uint256 delta);
@@ -197,6 +200,7 @@ contract MorpherStaking is
 	// ----------------------------------------------------------------------------
 
 	function stake(uint256 _amount) public virtual userNotBlocked returns (uint256 _poolShares) {
+		require(!stakingDisabled, "MorpherStaking: Staking is currently disabled"); // Added check
 		require(
 			MorpherToken(morpherState.morpherTokenAddress()).getTradeableBalanceOf(_msgSender()) >= _amount,
 			"MorpherStaking: insufficient MPH token balance"
@@ -256,6 +260,15 @@ contract MorpherStaking is
 		require(_interestRate <= 100000000, "MorpherStaking: Interest Rate cannot be larger than 100%");
 		interestRate = _interestRate;
 		emit InterestRateChanged(_interestRate);
+	}
+
+	/**
+	 * @notice Sets the staking disabled flag. Only callable by ADMINISTRATOR_ROLE.
+	 * @param _disabled True to disable staking, false to enable.
+	 */
+	function setStakingDisabled(bool _disabled) public onlyRole(ADMINISTRATOR_ROLE) {
+		stakingDisabled = _disabled;
+		emit StakingDisabledSet(_disabled);
 	}
 
 	/**
@@ -327,6 +340,7 @@ contract MorpherStaking is
 		bytes32 r,
 		bytes32 s
 	) public virtual returns (uint256) {
+		require(!stakingDisabled, "MorpherStaking: Staking is currently disabled"); // Added check
 		require(block.timestamp <= deadline, "MorpherStaking: expired deadline");
 
 		// Use _useNonce from NoncesUpgradeable

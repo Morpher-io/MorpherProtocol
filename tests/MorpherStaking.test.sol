@@ -76,6 +76,18 @@ contract MorkpherStakingTest is BaseSetup {
 		uint minimumStake = morpherStaking.minimumStake();
 		assertEq(minimumStake, 10 ** 24);
 
+		// Test staking disabled flag setter
+		vm.prank(admin);
+		vm.expectEmit(true, false, false, true); // address is not indexed
+		emit StakingDisabledSet(true);
+		morpherStaking.setStakingDisabled(true);
+		assertTrue(morpherStaking.stakingDisabled(), "Staking should be disabled");
+
+		vm.prank(admin);
+		vm.expectEmit(true, false, false, true);
+		emit StakingDisabledSet(false);
+		morpherStaking.setStakingDisabled(false);
+		assertFalse(morpherStaking.stakingDisabled(), "Staking should be enabled");
 	}
 
 	// UPDATE POOL SHARE VALUE ---------------------------------------------------------------------
@@ -343,6 +355,55 @@ contract MorkpherStakingTest is BaseSetup {
 		uint expectedShareValue = (resultingPoolShares / 2) * morpherStaking.poolShareValue();
 		(uint _value, ) = morpherStaking.getStakeValue(user);
 		assertEq(_value, expectedShareValue);
+	}
+
+	function testStakeFailWhenDisabled() public {
+		address user = address(0xff01);
+		uint256 stakeAmount = 300000 * 1e18;
+		morpherToken.mint(user, stakeAmount);
+		vm.prank(user);
+		morpherToken.approve(address(morpherStaking), stakeAmount);
+
+		// Disable staking
+		address admin = address(0x1234);
+		morpherAccessControl.grantRole(morpherStaking.ADMINISTRATOR_ROLE(), admin);
+		vm.prank(admin);
+		morpherStaking.setStakingDisabled(true);
+
+		// Attempt stake
+		vm.startPrank(user);
+		vm.expectRevert("MorpherStaking: Staking is currently disabled");
+		morpherStaking.stake(stakeAmount);
+		vm.stopPrank();
+	}
+
+	function testStakeWithPermitFailWhenDisabled() public {
+		address owner = testUserWithPK;
+		uint256 amount = 300_000 * 1e18;
+		uint256 deadline = block.timestamp + 1 hours;
+		uint256 nonce = morpherStaking.nonces(owner);
+
+		// Approve token transfer
+		vm.prank(owner);
+		morpherToken.approve(address(morpherStaking), amount);
+
+		// Disable staking
+		address admin = address(0x1234);
+		morpherAccessControl.grantRole(morpherStaking.ADMINISTRATOR_ROLE(), admin);
+		vm.prank(admin);
+		morpherStaking.setStakingDisabled(true);
+
+		// Hash struct
+		bytes32 structHash = keccak256(abi.encode(STAKE_TYPEHASH, amount, owner, nonce, deadline));
+		// Calculate EIP712 digest
+		bytes32 domainSeparator = morpherStaking.DOMAIN_SEPARATOR();
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+		// Sign
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_USER_PK, digest);
+
+		// Attempt stakeWithPermit
+		vm.expectRevert("MorpherStaking: Staking is currently disabled");
+		morpherStaking.stakeWithPermit(amount, owner, deadline, v, r, s);
 	}
 
 	// --- Permit Tests ---
