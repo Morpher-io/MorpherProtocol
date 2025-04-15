@@ -78,12 +78,15 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
             accessControl.grantRole(stakingAdminRole, migrationProxy);
             console.log("Granted STAKINGADMIN_ROLE to Migration Contract:", migrationProxy);
 
-			// Configure State with migration address and staking address
-            MorpherState stateContract = MorpherState(stateAddress);
-			stateContract.setMorpherSidechainToBaseMigrationAddress(migrationProxy);
-            stateContract.setMorpherStakingAddress(stakingAddress); // Set staking address in state
-			console.log("Set migration and staking addresses in MorpherState.");
+            // Role granting finished for new deployment
 		}
+
+        // --- Always configure State with migration address and staking address ---
+        MorpherState stateContract = MorpherState(stateAddress);
+        stateContract.setMorpherSidechainToBaseMigrationAddress(migrationProxy);
+        stateContract.setMorpherStakingAddress(stakingAddress); // Set staking address in state
+        console.log("Ensured migration and staking addresses are set in MorpherState.");
+        // --- End State Configuration ---
 
 		vm.stopBroadcast(); // Move outside the if block
 	}
