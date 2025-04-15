@@ -399,9 +399,8 @@ contract MorpherTokenTest is
 		require(migrationContract != address(0), "Migration address must be set in state for test");
 
 		// Grant MINTER_ROLE to migration contract
-		vm.startPrank(_admin);
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), migrationContract);
-		vm.stopPrank();
+
 
 		// Mint tokens as migration contract
 		vm.startPrank(migrationContract);
