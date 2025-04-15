@@ -313,12 +313,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		return (lock.amount, lock.lockedUntil);
 	}
 
-	/**
-	 * @dev Returns the total amount of time-locked tokens across all users
-	 */
-	function getTotalTimeLocked() public view returns (uint256) {
-		return _totalTimeLocked;
-	}
+	// Removed getTotalTimeLocked function
 
 	/**
 	 * @dev Locks tokens as rewards for an account

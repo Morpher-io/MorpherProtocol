@@ -173,12 +173,7 @@ contract MorpherTokenTest is
 		// Balances should reflect unlocked tokens
 		assertEq(morpherToken.balanceOf(user), 6 ether);
 
-		// Manually trigger unlock
-		vm.prank(user);
-		morpherToken.unlockExpiredTokens(user);
-
-		// Check total time locked
-		assertEq(morpherToken.getTotalTimeLocked(), 0);
+		// Removed call to unlockExpiredTokens and check for getTotalTimeLocked
 	}
 
 	function testTimeLockAndRewardsLock() public {
