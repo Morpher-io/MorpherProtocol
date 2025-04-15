@@ -413,6 +413,27 @@ contract MorpherTokenTest is
 		assertEq(morpherToken.getTransferredInTokens(user), 0 ether);
 	}
 
+	function testMintFromStakingContractNotTrackedAsTransferredIn() public {
+		address user = address(0xabcdef);
+		address stakingContract = morpherState.morpherStakingAddress();
+		require(stakingContract != address(0), "Staking address must be set in state for test");
+
+		// Grant MINTER_ROLE to staking contract
+		vm.startPrank(_admin);
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), stakingContract);
+		vm.stopPrank();
+
+		// Mint tokens as staking contract
+		vm.startPrank(stakingContract);
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+
+		// Check balance and transferred in tokens
+		assertEq(morpherToken.balanceOf(user), 10 ether);
+		// Transferred-in tokens should NOT increase when minted by staking contract
+		assertEq(morpherToken.getTransferredInTokens(user), 0 ether);
+	}
+
 
 	function testPositionWithProfitAndTransferLimit() public {
 		address user1 = address(0xabcdef);
