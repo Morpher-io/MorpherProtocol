@@ -34,6 +34,11 @@ contract MorpherTokenTest is
 		morpherAccessControl.grantRole(morpherToken.POLYGONMINTER_ROLE(), _admin);
 		morpherAccessControl.grantRole(morpherToken.PAUSER_ROLE(), _pauser);
 		morpherAccessControl.grantRole(morpherToken.TOKENUPDATER_ROLE(), _tokenUpdater);
+
+		// Set a dummy migration address in state for testing purposes
+		vm.startPrank(_admin);
+		morpherState.setMorpherSidechainToBaseMigrationAddress(address(this)); // Use test contract address as dummy
+		vm.stopPrank();
 	}
 
 	function testAdminFunctions() public {
