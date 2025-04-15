@@ -72,8 +72,12 @@ contract DeployMorpherStaking is DeployOrUpgradeV5 {
             console.log("Granted MINTER/BURNER roles to Staking contract.");
 
             // Set staking contract address in state
-            state.setMorpherStakingAddress(payable(stakingProxy)); // Ensure setMorpherStaking takes payable if needed
+            state.setMorpherStakingAddress(stakingProxy); // Changed to address type
             console.log("Set MorpherStaking address in MorpherState.");
+
+            // Disable staking initially
+            stakingContract.setStakingDisabled(true);
+            console.log("Initial staking disabled.");
         }
 
         vm.stopBroadcast();
