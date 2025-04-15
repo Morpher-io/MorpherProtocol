@@ -388,6 +388,28 @@ contract MorpherTokenTest is
 		assertEq(morpherToken.getTransferredInTokens(user), 10 ether); // Still 10 ether
 	}
 
+	function testMintFromMigrationContractNotTrackedAsTransferredIn() public {
+		address user = address(0xabcdef);
+		address migrationContract = morpherState.morpherSidechainToBaseMigrationAddress();
+		require(migrationContract != address(0), "Migration address must be set in state for test");
+
+		// Grant MINTER_ROLE to migration contract
+		vm.startPrank(_admin);
+		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), migrationContract);
+		vm.stopPrank();
+
+		// Mint tokens as migration contract
+		vm.startPrank(migrationContract);
+		morpherToken.mint(user, 10 ether);
+		vm.stopPrank();
+
+		// Check balance and transferred in tokens
+		assertEq(morpherToken.balanceOf(user), 10 ether);
+		// Transferred-in tokens should NOT increase when minted by migration contract
+		assertEq(morpherToken.getTransferredInTokens(user), 0 ether);
+	}
+
+
 	function testPositionWithProfitAndTransferLimit() public {
 		address user1 = address(0xabcdef);
 		address user2 = address(0x123456);
