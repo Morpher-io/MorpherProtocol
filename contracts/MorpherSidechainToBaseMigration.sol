@@ -220,7 +220,7 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
         // Verify balance hasn't been migrated already
         require(!migratedBalances[_msgSender()], "MorpherMigration: Balance already migrated");
         require(finalBalanceMerkleRoot != bytes32(0), "MorpherMigration: Final balance root not set");
-        require(_lockedAmount + _lockedRewardAmount <= _balance, "MorpherMigration: Locked amounts cannot exceed total balance");
+        // Removed check: require(_lockedAmount + _lockedRewardAmount <= _balance, "MorpherMigration: Locked amounts cannot exceed total balance");
         
         // Generate balance hash including lock information
         bytes32 balanceHash = keccak256(abi.encodePacked(_msgSender(), _balance, _lockedAmount, _lockDuration, _lockedRewardAmount));
@@ -376,7 +376,7 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
         
         // Verify balance hasn't been migrated already
         require(!migratedBalances[_user], "MorpherMigration: Balance already migrated");
-        require(_lockedAmount + _lockedRewardAmount <= _balance, "MorpherMigration: Locked amounts cannot exceed total balance");
+        // Removed check: require(_lockedAmount + _lockedRewardAmount <= _balance, "MorpherMigration: Locked amounts cannot exceed total balance");
         
         // Mark balance as migrated
         migratedBalances[_user] = true;
