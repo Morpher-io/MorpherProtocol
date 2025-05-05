@@ -15,7 +15,7 @@ contract DeployMorpherUserBlocking is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherUserBlocking";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "MorpherUserBlocking.sol:MorpherUserBlocking";
+    string constant CONTRACT_NAME = "MorpherUserBlocking.sol";
 
     function run() public {
         // Load dependencies
@@ -51,9 +51,10 @@ contract DeployMorpherUserBlocking is DeployOrUpgradeV5 {
             MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
             bytes32 userBlockingAdminRole = keccak256("USERBLOCKINGADMIN_ROLE"); // As defined in MorpherUserBlocking
 
-            // Grant role to deployer
-            accessControl.grantRole(userBlockingAdminRole, msg.sender);
-            console.log("Granted USERBLOCKINGADMIN_ROLE to deployer:", msg.sender);
+            // Deployer does not need this role on Base, commented out.
+            // // Grant role to deployer
+            // accessControl.grantRole(userBlockingAdminRole, msg.sender);
+            // console.log("Granted USERBLOCKINGADMIN_ROLE to deployer:", msg.sender);
 
             // Grant role to environment address if specified
             address envUserBlockingAdmin = vm.envOr("USERBLOCKING_ADMIN", address(0));
