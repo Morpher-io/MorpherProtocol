@@ -43,12 +43,31 @@ contract DeployMorpherUserBlocking is DeployOrUpgradeV5 {
 
         // Set UserBlocking address in State and grant roles if this is a new deployment
         if (isNewDeployment) {
+            MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+            bytes32 adminRole = keccak256("ADMINISTRATOR_ROLE"); // Role needed to call setMorpherUserBlocking
+            bool senderHadAdminRole = accessControl.hasRole(adminRole, msg.sender);
+            bool roleGrantedTemporarily = false;
+
+            // Temporarily grant ADMIN_ROLE if deployer doesn't have it
+            if (!senderHadAdminRole) {
+                console.log("Temporarily granting ADMINISTRATOR_ROLE to deployer:", msg.sender);
+                accessControl.grantRole(adminRole, msg.sender);
+                roleGrantedTemporarily = true;
+            }
+
+            // Set the address in MorpherState
             console.log("Setting MorpherUserBlocking address in MorpherState...");
             MorpherState(stateProxyAddress).setMorpherUserBlocking(userBlockingProxy);
 
+            // Revoke ADMIN_ROLE if it was granted temporarily
+            if (roleGrantedTemporarily) {
+                console.log("Revoking temporary ADMINISTRATOR_ROLE from deployer:", msg.sender);
+                accessControl.revokeRole(adminRole, msg.sender);
+            }
+
             // Grant USERBLOCKINGADMIN_ROLE
             console.log("Granting initial roles on AccessControl for MorpherUserBlocking...");
-            MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
+            // MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress); // Instance already created above
             bytes32 userBlockingAdminRole = keccak256("USERBLOCKINGADMIN_ROLE"); // As defined in MorpherUserBlocking
 
             // Deployer does not need this role on Base, commented out.
