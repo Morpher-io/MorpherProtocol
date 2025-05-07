@@ -14,7 +14,7 @@ contract DeployMorpherAccessControl is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherAccessControl";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "MorpherAccessControl.sol:MorpherAccessControl";
+    string constant CONTRACT_NAME = "MorpherAccessControl.sol";
 
     function run() public {
         // Check if deploying fresh by seeing if the address already exists

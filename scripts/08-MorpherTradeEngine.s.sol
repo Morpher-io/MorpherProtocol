@@ -18,7 +18,7 @@ contract DeployMorpherTradeEngine is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherTradeEngine";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "MorpherTradeEngine.sol:MorpherTradeEngine";
+    string constant CONTRACT_NAME = "MorpherTradeEngine.sol";
 
     function run() public {
         // Load dependencies
@@ -68,9 +68,9 @@ contract DeployMorpherTradeEngine is DeployOrUpgradeV5 {
 
             // Grant position admin role to trade engine proxy (so it can call setPosition on itself?) - Check if this is correct logic
             // Or should an external admin have this role? Assuming external admin for now.
-            address envPositionAdmin = vm.envOr("POSITION_ADMIN_ADDRESS", msg.sender);
-            accessControl.grantRole(positionAdminRole, envPositionAdmin);
-            console.log("Granted POSITIONADMIN_ROLE to:", envPositionAdmin);
+            // address envPositionAdmin = vm.envOr("POSITION_ADMIN_ADDRESS", msg.sender);
+            // accessControl.grantRole(positionAdminRole, envPositionAdmin);
+            // console.log("Granted POSITIONADMIN_ROLE to:", envPositionAdmin);
 
             // Set TradeEngine address in State
             MorpherState(stateAddress).setMorpherTradeEngine(tradeEngineProxy);

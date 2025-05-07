@@ -18,6 +18,11 @@ const NETWORKS = {
         apiKey: process.env.BASE_API_KEY,
         apiUrl: 'https://api-sepolia.basescan.org'
     },
+    8453: {
+        name: 'Base',
+        apiKey: process.env.BASE_API_KEY,
+        apiUrl: 'https://api.basescan.org'
+    },
     137: {
         name: 'Polygon Mainnet',
         apiKey: process.env.POLYGON_KEY,

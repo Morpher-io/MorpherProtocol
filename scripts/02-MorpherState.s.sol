@@ -66,6 +66,7 @@ contract DeployMorpherState is DeployOrUpgradeV5 {
 				accessControl.grantRole(governanceRole, envGovernance);
 				console.log("Granted GOVERNANCE role to env address:", envGovernance);
 			}
+			accessControl.revokeRole(adminRole, msg.sender);
 		}
 
 		vm.stopBroadcast();

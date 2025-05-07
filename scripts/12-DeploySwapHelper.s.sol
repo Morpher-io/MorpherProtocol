@@ -110,14 +110,14 @@ contract DeploySwapHelper is DeployOrUpgradeV5 {
 			swapHelper.setRelayerFee(relayerFee);
 			console.log("Relayer Fee set to:", swapHelper.relayerFee());
 
-			// Renounce temporary ADMIN role
-			accessControl.renounceRole(adminRole, deployer);
-			console.log("Renounced temporary ADMIN role from deployer.");
+			// // Renounce temporary ADMIN role
+			// accessControl.renounceRole(adminRole, deployer);
+			// console.log("Renounced temporary ADMIN role from deployer.");
 
-			// 2. Grant Permanent Roles on AccessControl for the SwapHelper contract
-			// Grant roles to deployer initially
-			accessControl.grantRole(adminRole, deployer);
-			console.log("Granted ADMIN/PAUSER/PROXYUPDATER roles for SwapHelper to deployer:", deployer);
+			// // 2. Grant Permanent Roles on AccessControl for the SwapHelper contract
+			// // Grant roles to deployer initially
+			// accessControl.grantRole(adminRole, deployer);
+			// console.log("Granted ADMIN/PAUSER/PROXYUPDATER roles for SwapHelper to deployer:", deployer);
 
 			// Grant roles to environment addresses if specified
 			address envAdmin = vm.envOr("MORPHER_ADMINISTRATOR", address(0));

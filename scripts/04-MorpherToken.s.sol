@@ -63,12 +63,14 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 			accessControl.grantRole(tokenContract.ADMINISTRATOR_ROLE(), envAdmin);
 			accessControl.grantRole(tokenContract.TOKENUPDATER_ROLE(), envTokenUpdater);
 			accessControl.grantRole(tokenContract.AIRDROPADMIN_ROLE(), envAirdropAdmin);
-			// Grant MINTER_ROLE initially to deployer for initial mint, revoke later if needed
-			accessControl.grantRole(minterRole, msg.sender);
-			// Grant BURNER_ROLE to deployer initially if needed for setup, revoke later
-			accessControl.grantRole(burnerRole, msg.sender);
 
-			console.log("Granted PAUSER/ADMIN/UPDATER/AIRDROP roles.");
+			// we are not minting anything on base, because everything will be bridged over from sidechain
+			// // Grant MINTER_ROLE initially to deployer for initial mint, revoke later if needed
+			// accessControl.grantRole(minterRole, msg.sender);
+			// // Grant BURNER_ROLE to deployer initially if needed for setup, revoke later
+			// accessControl.grantRole(burnerRole, msg.sender);
+
+			// console.log("Granted PAUSER/ADMIN/UPDATER/AIRDROP roles.");
 
 			// Get treasury address from environment or use deployer
 			// address treasuryAddress = vm.envOr("MORPHER_TREASURY", msg.sender);

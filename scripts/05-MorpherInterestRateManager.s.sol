@@ -17,7 +17,7 @@ contract DeployMorpherInterestRateManager is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherInterestRateManager";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "MorpherInterestRateManager.sol:MorpherInterestRateManager";
+    string constant CONTRACT_NAME = "MorpherInterestRateManager.sol";
 
     function run() public {
         // Load dependencies

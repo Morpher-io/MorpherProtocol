@@ -5,7 +5,6 @@ import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {MorpherAccessControl} from "../../contracts/MorpherAccessControl.sol";
-import {MorpherAdmin} from "../../contracts/MorpherAdmin.sol";
 import {MorpherState} from "../../contracts/MorpherState.sol";
 import {DeployOrUpgrade} from "../deployOrUpgrade.sol";
 
@@ -15,50 +14,44 @@ import {DeployOrUpgrade} from "../deployOrUpgrade.sol";
 contract EnableMarkets is DeployOrUpgrade {
     using stdJson for string;
 
+struct Markets {
+    string marketid;
+    // string markethash;
+}
 
+struct JsonFileStruct {
+    Markets[] marketsarray;
+    string name;
+}
     function run() public {
         // Read and process markets.json
         vm.startBroadcast();
-
-        // Deploy or upgrade MorpherAdmin
-        address existingAdmin = loadAddress("MorpherAdmin");
-        require(existingAdmin != address(0x0), "MorpherAdmin must be deployed for this network");
-
-        address accessControlAddress = loadAddress("MorpherAccessControl");
-        console.log("AccessControl address:", accessControlAddress);
-        console.log("Granting ADMINISTRATOR_ROLE to:", existingAdmin);
+        address stateAddress = loadAddress("MorpherState");
         
-        // Verify MorpherAdmin is initialized
-        try MorpherAdmin(existingAdmin).state() returns (MorpherState stateAddr) {
-            console.log("MorpherAdmin state address:", address(stateAddr));
-            require(address(stateAddr) != address(0), "MorpherAdmin not properly initialized");
-        } catch {
-            revert("Failed to query MorpherAdmin state - contract may not be initialized");
-        }
-        
-        MorpherAccessControl(accessControlAddress).grantRole(keccak256("ADMINISTRATOR_ROLE"), existingAdmin);
+       
+        // MorpherAccessControl(accessControlAddress).grantRole(keccak256("ADMINISTRATOR_ROLE"), existingAdmin);
 
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deployments/market_ids.json");
         string memory json = vm.readFile(path);
-        string[] memory marketIds = abi.decode(
-            vm.parseJson(json, ""),
-            (string[])
-        );
+        bytes memory data = vm.parseJson(json, "");
 
-        console.log(marketIds[19]);
+        JsonFileStruct memory marketIds = abi.decode(data,(JsonFileStruct));
+
+        console.log(marketIds.marketsarray[0].marketid);
 
        
         uint256 batchCount = 0;
+        uint256 batchSize = 40;
         
-        bytes32[] memory marketsToAdd = new bytes32[](20);
-        for (uint256 i = 0; i < marketIds.length; i++) {
+        bytes32[] memory marketsToAdd = new bytes32[](batchSize);
+        for (uint256 i = 0; i < marketIds.marketsarray.length; i++) {
             // Add market to current batch
-             // Process markets in batches of 20
-            marketsToAdd[i % 20] = keccak256(abi.encodePacked(marketIds[i]));
+             // Process markets in batches of 100
+            marketsToAdd[i % batchSize] = keccak256(abi.encodePacked(marketIds.marketsarray[i].marketid));
             
             // When batch is full or we're at the end, process it
-            if ((i + 1) % 20 == 0 || i == marketIds.length - 1) {
+            if ((i + 1) % batchSize == 0 || i == marketIds.marketsarray.length - 1) {
                 // Validate the batch
                 uint256 validCount = 0;
                 for(uint256 j = 0; j < marketsToAdd.length; j++) {
@@ -71,9 +64,9 @@ contract EnableMarkets is DeployOrUpgrade {
                 
                 // console.log(abi.encodePacked("Processing batch", string(batchCount), "with", string(validCount), "valid markets"));
                 console.log("Calling bulkActivateMarkets from address:", address(this));
-                console.log("MorpherAdmin address:", existingAdmin);
+                console.log("MorpherState address:", stateAddress);
                 
-                try MorpherAdmin(existingAdmin).bulkActivateMarkets(marketsToAdd) {
+                try MorpherState(stateAddress).activateMarket(marketsToAdd) {
                     console.log("Successfully added batch", batchCount);
                 } catch Error(string memory reason) {
                     console.log("Failed to add batch with reason:", reason);
@@ -84,7 +77,7 @@ contract EnableMarkets is DeployOrUpgrade {
                 }
                 
                 batchCount++;
-                marketsToAdd = new bytes32[](20);
+                marketsToAdd = new bytes32[](batchSize);
             }
         }
 

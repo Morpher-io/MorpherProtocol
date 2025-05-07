@@ -92,8 +92,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	// Mapping to track locked tokens per user
 	mapping(address => TokenLock) private _timeLocks;
 
-	// Total amount of time-locked tokens across all users (Removed)
-	// uint256 private _totalTimeLocked;
+	// Total amount of time-locked tokens across all users (Removed but left here for proxy updates)
+	uint256 private _totalTimeLocked;
 
 
 	event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);
@@ -198,6 +198,9 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 */
 	function balanceOf(address account) public view virtual override returns (uint256) {
 		(uint256 timeLockedAmount, ) = getTimeLock(account);
+		if((timeLockedAmount + _lockedRewards[account]) > super.balanceOf(account)) {
+			return 0; //fix underflow error
+		}
 		return super.balanceOf(account) - _lockedRewards[account] - timeLockedAmount;
 	}
 
