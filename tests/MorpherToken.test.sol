@@ -1113,4 +1113,81 @@ contract MorpherTokenTest is
 		assertEq(morpherToken.getTransferableBalanceToday(user), 5 ether, "Transferable day 2 (limit reset)");
 		assertEq(morpherToken.getDailyMintedTransfers(user), 0 ether, "Daily transferred day 2 (reset)");
 	}
+
+	function testBalanceOf_UnderflowProtection_LockedExceedsSuperBalance() public {
+		address user = makeAddr("userWithLocks");
+
+		// 1. Mint initial tokens
+		vm.startPrank(_admin);
+		morpherToken.mint(user, 100 ether);
+		vm.stopPrank();
+
+		assertEq(morpherToken.getTradeableBalanceOf(user), 100 ether, "Initial tradeable balance");
+		assertEq(morpherToken.balanceOf(user), 100 ether, "Initial liquid balance");
+
+		// 2. Lock rewards
+		vm.startPrank(_admin);
+		morpherToken.lockRewards(user, 30 ether); // Lock 30 as rewards
+		vm.stopPrank();
+
+		assertEq(morpherToken.getTradeableBalanceOf(user), 100 ether, "Tradeable balance after reward lock");
+		assertEq(morpherToken.balanceOf(user), 70 ether, "Liquid balance after reward lock"); // 100 - 30
+
+		// 3. Time-lock tokens
+		vm.startPrank(_admin);
+		morpherToken.lockTokensForTime(user, 40 ether, 1 days); // Lock 40 for time
+		vm.stopPrank();
+
+		// At this point:
+		// super.balanceOf(user) = 100 ether
+		// _lockedRewards[user] = 30 ether
+		// timeLockedAmount = 40 ether
+		// Sum of locks = 30 + 40 = 70 ether
+		// balanceOf(user) = 100 - 70 = 30 ether
+		assertEq(morpherToken.getTradeableBalanceOf(user), 100 ether, "Tradeable balance after time lock");
+		assertEq(morpherToken.balanceOf(user), 30 ether, "Liquid balance after time lock");
+
+		// 4. Burn tokens to make super.balanceOf < sum of locks
+		// Burn 60 tokens. super.balanceOf will become 100 - 60 = 40 ether.
+		// Sum of locks is still 70 ether (30 rewards + 40 time-locked).
+		// Now, 70 (sum of locks) > 40 (super.balanceOf)
+		vm.startPrank(_admin);
+		morpherToken.burn(user, 60 ether);
+		vm.stopPrank();
+
+		// getTradeableBalanceOf should reflect the new super.balanceOf
+		assertEq(morpherToken.getTradeableBalanceOf(user), 40 ether, "Tradeable balance after burn");
+
+		// 5. Check balanceOf - should return 0 due to underflow protection
+		// (timeLockedAmount (40) + _lockedRewards (30)) = 70
+		// super.balanceOf(user) = 40
+		// Since 70 > 40, balanceOf should return 0.
+		assertEq(morpherToken.balanceOf(user), 0, "Liquid balance should be 0 due to underflow protection (combined locks)");
+
+		// Scenario 2: Only reward lock, then burn, making reward lock > super.balanceOf
+		address user2 = makeAddr("userWithRewardLockOnly");
+		vm.startPrank(_admin);
+		morpherToken.mint(user2, 100 ether);
+		morpherToken.lockRewards(user2, 80 ether); // _lockedRewards = 80
+		// super.balanceOf(user2) = 100, balanceOf(user2) = 20
+		morpherToken.burn(user2, 50 ether); // super.balanceOf(user2) becomes 50
+		// Now _lockedRewards (80) > super.balanceOf (50)
+		vm.stopPrank();
+
+		assertEq(morpherToken.getTradeableBalanceOf(user2), 50 ether, "User2: Tradeable balance after burn");
+		assertEq(morpherToken.balanceOf(user2), 0, "User2: Liquid balance should be 0 (reward lock > super balance)");
+
+		// Scenario 3: Only time lock, then burn, making time lock > super.balanceOf
+		address user3 = makeAddr("userWithTimeLockOnly");
+		vm.startPrank(_admin);
+		morpherToken.mint(user3, 100 ether);
+		morpherToken.lockTokensForTime(user3, 80 ether, 1 days); // timeLockedAmount = 80
+		// super.balanceOf(user3) = 100, balanceOf(user3) = 20
+		morpherToken.burn(user3, 50 ether); // super.balanceOf(user3) becomes 50
+		// Now timeLockedAmount (80) > super.balanceOf (50)
+		vm.stopPrank();
+
+		assertEq(morpherToken.getTradeableBalanceOf(user3), 50 ether, "User3: Tradeable balance after burn");
+		assertEq(morpherToken.balanceOf(user3), 0, "User3: Liquid balance should be 0 (time lock > super balance)");
+	}
 }
