@@ -290,7 +290,7 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         require(state.morpherTokenAddress() != address(0), "SwapHelper: MPH address not set in state");
         require(targetToken != address(0), "SwapHelper: Invalid target token");
         require(recipient != address(0), "SwapHelper: Invalid recipient address");
-        require(targetToken != state.morpherTokenAddress(), "SwapHelper: Target token cannot be MPH");
+        // require(targetToken != state.morpherTokenAddress(), "SwapHelper: Target token cannot be MPH"); //commented out, target token might still be MPH if we transfer the token from one address to another gasless
         require(
             targetToken == wethAddress || whitelistedTokens[targetToken],
             "SwapHelper: Target token not WETH or whitelisted"
