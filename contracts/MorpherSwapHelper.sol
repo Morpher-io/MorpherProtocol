@@ -291,9 +291,10 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
         require(targetToken != address(0), "SwapHelper: Invalid target token");
         require(recipient != address(0), "SwapHelper: Invalid recipient address");
         // require(targetToken != state.morpherTokenAddress(), "SwapHelper: Target token cannot be MPH"); //commented out, target token might still be MPH if we transfer the token from one address to another gasless
+        // Target token can be MPH (for direct transfer), WETH, or a whitelisted token.
         require(
-            targetToken == wethAddress || whitelistedTokens[targetToken],
-            "SwapHelper: Target token not WETH or whitelisted"
+            targetToken == state.morpherTokenAddress() || targetToken == wethAddress || whitelistedTokens[targetToken],
+            "SwapHelper: Target token not MPH, WETH, or whitelisted"
         );
         require(totalAmountIn > relayerFee, "SwapHelper: Input amount must be greater than fee"); // Use relayerFee directly
 
@@ -308,6 +309,30 @@ contract MorpherSwapHelper is UUPSUpgradeable, ContextUpgradeable, PausableUpgra
             input.s
         );
 
+        if (targetToken == state.morpherTokenAddress()) {
+            // MPH to MPH transfer: permit allows 'this' contract to move 'totalAmountIn' from 'owner'.
+            // 1. Transfer fee from owner to relayer.
+            IERC20(state.morpherTokenAddress()).safeTransferFrom(owner, relayer, relayerFee);
+
+            // 2. Transfer remaining MPH from owner to recipient.
+            uint256 amountToRecipient = totalAmountIn - relayerFee;
+            IERC20(state.morpherTokenAddress()).safeTransferFrom(owner, recipient, amountToRecipient);
+
+            emit SwapMphExecuted(
+                owner,
+                relayer,
+                state.morpherTokenAddress(), // tokenIn is MPH
+                totalAmountIn,               // total MPH permitted by user
+                relayerFee,                  // fee taken by relayer
+                amountToRecipient,           // MPH "swapped" (actually transferred to recipient)
+                targetToken,                 // tokenOut is MPH
+                amountToRecipient,           // amountOutTotal is amount sent to recipient
+                recipient
+            );
+            return;
+        }
+
+        // For non-MPH target tokens, proceed with Uniswap swap logic:
         // 2. Transfer fee from owner to relayer
         // Requires owner to have approved 'totalAmountIn' via permit
         IERC20(state.morpherTokenAddress()).safeTransferFrom(owner, relayer, relayerFee); // Use relayerFee directly
