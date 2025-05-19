@@ -459,67 +459,82 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		// --- Custom Logic Start ---
 		// This logic runs *before* the balance update and pause check from super._update
 
-		// Transfer restriction checks (only for actual transfers, not mint/burn)
-		if (from != address(0) && to != address(0)) {
+		bool isActualTransfer = from != address(0) && to != address(0);
+		// A user-initiated burn is when 'to' is address(0), 'from' is not address(0),
+		// and the initiator (_msgSender()) is not the MorpherTradeEngine.
+		bool isUserInitiatedBurn = to == address(0) && from != address(0) && _msgSender() != morpherState.morpherTradeEngineAddress();
+
+		// Apply custom logic for actual transfers OR for user-initiated burns.
+		if (isActualTransfer || isUserInitiatedBurn) {
+			// Generic transfer/operation restriction checks
 			require(
 				!_restrictTransfers ||
 					morpherAccessControl.hasRole(TRANSFER_ROLE, _msgSender()) ||
-					morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()) || // Allow minters/burners? Check if needed
+					morpherAccessControl.hasRole(MINTER_ROLE, _msgSender()) ||
 					morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()) ||
-					morpherAccessControl.hasRole(TRANSFER_ROLE, from), // Allow sender if they have TRANSFER_ROLE
-				"MorpherToken: Transfer denied by restriction"
+					morpherAccessControl.hasRole(TRANSFER_ROLE, from),
+				"MorpherToken: Operation denied by restriction" // Generalized message
 			);
 
 			require(
 				!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, from), // Check sender block
-				"MorpherToken: Transfer for sender is blocked."
-			);
-			require(
-				!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, to), // Check receiver block
-				"MorpherToken: Transfer for receiver is blocked."
+				"MorpherToken: Operation for sender is blocked." // Generalized message
 			);
 
-			// Check locked rewards and time locks against the *full* balance before transfer
+			if (isActualTransfer) { // Receiver block check only applies to actual transfers
+				require(
+					!morpherAccessControl.hasRole(TRANSFERBLOCKED_ROLE, to), // Check receiver block
+					"MorpherToken: Transfer for receiver is blocked."
+				);
+			}
+
+			// Check locked rewards and time locks against the *full* balance before the operation
 			(uint256 timeLockedAmount, ) = getTimeLock(from);
 			require(
 				super.balanceOf(from) >= _lockedRewards[from] + timeLockedAmount + amount,
-				"MorpherToken: transfer amount exceeds available balance (locked)"
+				"MorpherToken: operation amount exceeds available balance (locked)" // Generalized message
 			);
 
-			// Daily limit logic (only if not called by TradeEngine)
+			// Daily limit logic (applies if not called by TradeEngine for transfers, and for user-initiated burns)
+			// The isUserInitiatedBurn flag already ensures _msgSender() != morpherState.morpherTradeEngineAddress() for burns.
+			// For actual transfers, the _msgSender() check exempts the TradeEngine.
 			if (_msgSender() != morpherState.morpherTradeEngineAddress()) {
-				// Track tokens transferred in for the receiver
-				_transferredInTokens[to] += amount;
-				emit TokensTransferredIn(to, amount);
+				// If it's an actual transfer, track tokens transferred in for the receiver
+				if (isActualTransfer) {
+					_transferredInTokens[to] += amount;
+					emit TokensTransferredIn(to, amount);
+				}
 
-				// Apply daily limit logic to the sender
-				uint256 transferAmountFromMinted = amount;
+				// Apply daily limit logic to the sender (applies to 'from' for both transfers and user-initiated burns)
+				uint256 amountSubjectToDailyLimit = amount;
 
 				// Use transferred-in tokens first (not subject to daily limit)
 				if (_transferredInTokens[from] > 0) {
-					uint256 useFromTransferredIn = transferAmountFromMinted > _transferredInTokens[from]
+					uint256 useFromTransferredIn = amountSubjectToDailyLimit > _transferredInTokens[from]
 						? _transferredInTokens[from]
-						: transferAmountFromMinted;
+						: amountSubjectToDailyLimit;
 					_transferredInTokens[from] -= useFromTransferredIn;
-					transferAmountFromMinted -= useFromTransferredIn;
+					amountSubjectToDailyLimit -= useFromTransferredIn;
 				}
 
 				// Any remaining amount comes from minted balance and is subject to daily limit
-				if (transferAmountFromMinted > 0 && _dailyMintedTransferLimit > 0) {
+				if (amountSubjectToDailyLimit > 0 && _dailyMintedTransferLimit > 0) {
 					uint256 today = block.timestamp / 1 days;
 					uint256 transferredToday = _dailyMintedTransfers[from][today];
 
-					// Check if this transfer exceeds the daily limit
+					// Check if this operation exceeds the daily limit for minted tokens
 					require(
-						transferredToday + transferAmountFromMinted <= _dailyMintedTransferLimit ||
-							morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()) || // Admins bypass limit 
-							morpherAccessControl.hasRole(UNRESTRICTEDTRANSFER_ROLE, _msgSender()), // Admins bypass limit
-						"MorpherToken: daily minted token transfer limit exceeded"
+						transferredToday + amountSubjectToDailyLimit <= _dailyMintedTransferLimit ||
+							morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()) || 
+							morpherAccessControl.hasRole(UNRESTRICTEDTRANSFER_ROLE, _msgSender()),
+						"MorpherToken: daily minted token operation limit exceeded" // Generalized message
 					);
 
-					// Update the daily transfer amount
-					_dailyMintedTransfers[from][today] += transferAmountFromMinted;
-					emit MintedTokensTransferred(from, to, transferAmountFromMinted);
+					// Update the daily transfer/operation amount from minted supply
+					_dailyMintedTransfers[from][today] += amountSubjectToDailyLimit;
+					// For burns, 'to' will be address(0). This event logs the portion of the operation
+					// that came from the "minted" bucket and was subject to the limit.
+					emit MintedTokensTransferred(from, to, amountSubjectToDailyLimit);
 				}
 			}
 		}
