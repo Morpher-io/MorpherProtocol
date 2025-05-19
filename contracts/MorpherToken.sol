@@ -44,6 +44,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	bytes32 public constant POLYGONMINTER_ROLE = keccak256("POLYGONMINTER_ROLE");
 	bytes32 public constant TOKENUPDATER_ROLE = keccak256("TOKENUPDATER_ROLE");
 	bytes32 public constant AIRDROPADMIN_ROLE = keccak256("AIRDROPADMIN_ROLE");
+	bytes32 public constant UNRESTRICTEDTRANSFER_ROLE = keccak256("UNRESTRICTEDTRANSFER_ROLE");
 
 	uint256 private _totalTokensInPositions;
 	bool private _restrictTransfers;
@@ -511,7 +512,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 					// Check if this transfer exceeds the daily limit
 					require(
 						transferredToday + transferAmountFromMinted <= _dailyMintedTransferLimit ||
-							morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()), // Admins bypass limit
+							morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()) || // Admins bypass limit 
+							morpherAccessControl.hasRole(UNRESTRICTEDTRANSFER_ROLE, _msgSender()), // Admins bypass limit
 						"MorpherToken: daily minted token transfer limit exceeded"
 					);
 
