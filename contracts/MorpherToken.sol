@@ -253,6 +253,20 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	}
 
 	/**
+	 * @dev Destroys `amount` tokens from the caller.
+	 *
+	 * See {ERC20-_burn}.
+	 *
+	 * Requirements:
+	 *
+	 * - the caller must have the `BURNER_ROLE`.
+	 */
+	function burn(uint256 amount) public virtual {
+		require(morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()), "MorpherToken: must have burner role to burn");
+		_burn(_msgSender(), amount);
+	}
+
+	/**
 	 * @dev Pauses all token transfers.
 	 *
 	 * See {ERC20Pausable} and {Pausable-_pause}.
