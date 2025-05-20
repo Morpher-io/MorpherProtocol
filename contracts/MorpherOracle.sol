@@ -34,8 +34,10 @@ pragma solidity ^0.8.15;
 *  
 **/
 
-import "./MorpherTradeEngine.sol";
-import "./MorpherState.sol";
+// import "./MorpherTradeEngine.sol"; // Replaced with interface
+// import "./MorpherState.sol";       // Replaced with interface
+import "../interfaces/IMorpherState.sol"; // New interface
+import "../interfaces/IMorpherTradeEngine.sol"; // New interface
 import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 
 // --- V5 Imports ---
@@ -66,7 +68,7 @@ import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 // ----------------------------------------------------------------------------------
 
 contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeable, EIP712Upgradeable, NoncesUpgradeable { // Update inheritance
-	MorpherState public state; // read only, Oracle doesn't need writing access to state
+	IMorpherState public state; // read only, Oracle doesn't need writing access to state
 
 	bool public useWhiteList; //always false at the moment
 
@@ -302,7 +304,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		__EIP712_init(_eip712Name, _eip712Version); // Initialize EIP712
 		__Nonces_init(); // Initialize Nonces
 
-		state = MorpherState(_morpherState);
+		state = IMorpherState(_morpherState);
 
 		callBackCollectionAddress = _gasCollectionAddress; // Set directly, avoid extra function call if possible
 		gasForCallback = _gasForCallback; // Set directly
@@ -335,7 +337,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	// ----------------------------------------------------------------------------------
 
 	function setStateAddress(address _address) public onlyRole(ADMINISTRATOR_ROLE) {
-		state = MorpherState(_address);
+		state = IMorpherState(_address);
 		emit LinkMorpherState(_address);
 	}
 
@@ -435,7 +437,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 			);
 			callBackCollectionAddress.transfer(msg.value);
 		}
-		_orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
+		_orderId = IMorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
 			_msgSender(),
 			createOrderParams._marketId,
 			createOrderParams._closeSharesAmount,
@@ -447,9 +449,9 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		//if the market was deactivated, and the trader didn't fail yet, then we got an orderId to close the position with a locked in price
 		if (state.getMarketActive(createOrderParams._marketId) == false) {
 			//price will come from the position where price is stored forever
-			MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(
+			IMorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(
 				_orderId,
-				MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(
+				IMorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(
 					createOrderParams._marketId
 				),
 				0,
@@ -459,7 +461,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 
 			emit OrderProcessed(
 				_orderId,
-				MorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(
+				IMorpherTradeEngine(state.morpherTradeEngineAddress()).getDeactivatedMarketPrice(
 					createOrderParams._marketId
 				),
 				0,
@@ -819,7 +821,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	// ----------------------------------------------------------------------------------
 	function cancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
 		require(orderCancellationRequested[_orderId] == true, "MorpherOracle: Order-Cancellation was not requested.");
-		MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+		IMorpherTradeEngine _tradeEngine = IMorpherTradeEngine(state.morpherTradeEngineAddress());
 		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
 		_tradeEngine.cancelOrder(_orderId, userId);
 		clearOrderConditions(_orderId);
@@ -831,7 +833,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	// User or Administrator can cancel their own orders before the _callback has been executed
 	// ----------------------------------------------------------------------------------
 	function adminCancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
-		MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+		IMorpherTradeEngine _tradeEngine = IMorpherTradeEngine(state.morpherTradeEngineAddress());
 		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
 		_tradeEngine.cancelOrder(_orderId, userId);
 		clearOrderConditions(_orderId);
@@ -901,7 +903,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 			);
 			callBackCollectionAddress.transfer(msg.value);
 		}
-		_orderId = MorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
+		_orderId = IMorpherTradeEngine(state.morpherTradeEngineAddress()).requestOrderId(
 			_address,
 			_marketId,
 			0,
@@ -926,13 +928,20 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		uint256 _liquidationTimestamp,
 		uint256 _timeStamp,
 		uint256 _gasForNextCallback
-	) public onlyRole(ORACLEOPERATOR_ROLE) whenNotPaused returns (MorpherTradeEngine.position memory createdPosition) {
+	) public onlyRole(ORACLEOPERATOR_ROLE) whenNotPaused returns (IMorpherTradeEngine.position memory createdPosition) {
 		require(checkOrderConditions(_orderId, _price), "MorpherOracle Error: Order Conditions are not met");
-		(address positionOwnerAddress, , , , , , , , , , , ) = MorpherTradeEngine(state.morpherTradeEngineAddress())
-			.orders(_orderId);
+		
+        address positionOwnerAddress;
+        // Use getOrder to retrieve the userId (positionOwnerAddress)
+        // (address _userId, , , , , , ) = IMorpherTradeEngine(state.morpherTradeEngineAddress()).getOrder(_orderId);
+        // positionOwnerAddress = _userId;
+        // The direct access to .orders(_orderId) was only to get the userId.
+        // Let's use getOrder for this.
+        (positionOwnerAddress, , , , , , ) = IMorpherTradeEngine(state.morpherTradeEngineAddress()).getOrder(_orderId);
+
 		uint balanceBeforeClose = IERC20(state.morpherTokenAddress()).balanceOf(positionOwnerAddress);
 
-		createdPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(
+		createdPosition = IMorpherTradeEngine(state.morpherTradeEngineAddress()).processOrder(
 			_orderId,
 			_price,
 			_spread,
