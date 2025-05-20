@@ -771,7 +771,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	// function _useNonce(...) ... // Provided by NoncesUpgradeable
 
 	function initiateCancelOrder(bytes32 _orderId) public virtual {
-		MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+		IMorpherTradeEngine _tradeEngine = IMorpherTradeEngine(state.morpherTradeEngineAddress());
 		require(orderCancellationRequested[_orderId] == false, "MorpherOracle: Order was already canceled.");
 		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
 		require(userId == _msgSender(), "MorpherOracle: Only the user can request an order cancellation.");
