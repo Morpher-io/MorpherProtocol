@@ -36,8 +36,8 @@ pragma solidity ^0.8.15;
 
 // import "./MorpherTradeEngine.sol"; // Replaced with interface
 // import "./MorpherState.sol";       // Replaced with interface
-import "../interfaces/IMorpherState.sol"; // New interface
-import "../interfaces/IMorpherTradeEngine.sol"; // New interface
+import "./interfaces/IMorpherState.sol"; // New interface
+import "./interfaces/IMorpherTradeEngine.sol"; // New interface
 import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 
 // --- V5 Imports ---
@@ -53,9 +53,9 @@ import {IERC20Permit} from "../lib/openzeppelin-contracts-5/contracts/token/ERC2
 import {IERC20} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol"; // Keep external interface
+import {IV3SwapRouter} from "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol"; // Keep external interface
 import "../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
-import "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
+import {IWETH9} from "../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol";
 import "../lib/universal-router/contracts/interfaces/IUniversalRouter.sol";
 
 // ----------------------------------------------------------------------------------
@@ -820,25 +820,29 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	// User or Administrator can cancel their own orders before the _callback has been executed
 	// ----------------------------------------------------------------------------------
 	function cancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
-		require(orderCancellationRequested[_orderId] == true, "MorpherOracle: Order-Cancellation was not requested.");
+		// require(orderCancellationRequested[_orderId] == true, "MorpherOracle: Order-Cancellation was not requested."); //removed this, because contract size too big
+		//new logic is to call cancelOrder always and if the user didn't request it, its as if we call adminCancelOrder
 		IMorpherTradeEngine _tradeEngine = IMorpherTradeEngine(state.morpherTradeEngineAddress());
 		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
 		_tradeEngine.cancelOrder(_orderId, userId);
 		clearOrderConditions(_orderId);
-		emit OrderCancelled(_orderId, userId, _msgSender());
+		if(orderCancellationRequested[_orderId]) {
+			emit OrderCancelled(_orderId, userId, _msgSender());
+		} else {
+			emit AdminOrderCancelled(_orderId, userId, _msgSender());
+		}
 	}
 
-	// ----------------------------------------------------------------------------------
-	// adminCancelOrder(bytes32  _orderId)
-	// User or Administrator can cancel their own orders before the _callback has been executed
-	// ----------------------------------------------------------------------------------
-	function adminCancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
-		IMorpherTradeEngine _tradeEngine = IMorpherTradeEngine(state.morpherTradeEngineAddress());
-		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
-		_tradeEngine.cancelOrder(_orderId, userId);
-		clearOrderConditions(_orderId);
-		emit AdminOrderCancelled(_orderId, userId, _msgSender());
-	}
+	// // ----------------------------------------------------------------------------------
+	// // adminCancelOrder(bytes32  _orderId)
+	// // User or Administrator can cancel their own orders before the _callback has been executed
+	// // ----------------------------------------------------------------------------------
+	// function adminCancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
+	// 	IMorpherTradeEngine _tradeEngine = IMorpherTradeEngine(state.morpherTradeEngineAddress());
+	// 	(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
+	// 	_tradeEngine.cancelOrder(_orderId, userId);
+	// 	clearOrderConditions(_orderId);
+	// }
 
 	// ------------------------------------------------------------------------
 	// checkOrderConditions(bytes32 _orderId, uint256 _price)

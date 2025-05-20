@@ -181,6 +181,11 @@ contract MorpherStaking is
 		return poolShareValue;
 	}
 
+	// function setPoolShareValue(uint _newPoolShareValue) public onlyRole(ADMINISTRATOR_ROLE) {
+	// 	poolShareValue = _newPoolShareValue;
+	// 	emit PoolShareValueUpdated(lastReward, poolShareValue);
+	// }
+
 	// ----------------------------------------------------------------------------
 	// Staking rewards are minted if necessary
 	// ----------------------------------------------------------------------------
