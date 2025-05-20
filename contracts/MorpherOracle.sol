@@ -826,6 +826,18 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		emit OrderCancelled(_orderId, userId, _msgSender());
 	}
 
+	// ----------------------------------------------------------------------------------
+	// adminCancelOrder(bytes32  _orderId)
+	// User or Administrator can cancel their own orders before the _callback has been executed
+	// ----------------------------------------------------------------------------------
+	function adminCancelOrder(bytes32 _orderId) public onlyRole(ORACLEOPERATOR_ROLE) {
+		MorpherTradeEngine _tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
+		(address userId, , , , , , ) = _tradeEngine.getOrder(_orderId);
+		_tradeEngine.cancelOrder(_orderId, userId);
+		clearOrderConditions(_orderId);
+		emit AdminOrderCancelled(_orderId, userId, _msgSender());
+	}
+
 	// ------------------------------------------------------------------------
 	// checkOrderConditions(bytes32 _orderId, uint256 _price)
 	// Checks if callback satisfies the order conditions
