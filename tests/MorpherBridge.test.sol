@@ -305,34 +305,38 @@ contract MorpherBridgeTest is BaseSetup {
 
 
     function testWithdrawalLimits_Daily() public {
-        // Inlined: dailyLimit = morpherBridge.withdrawalLimitPerUserDaily(); // 200k
-        // Inlined: amount1 = morpherBridge.withdrawalLimitPerUserDaily() - 100 ether;
-        // Inlined: amount2 = 50 ether;
-        // Inlined: amount3 = 60 ether; 
+        uint256 dailyUserLimit = morpherBridge.withdrawalLimitPerUserDaily(); // 200k ether
+        uint256 val1 = 100000 ether; // Must be >= 100 ether (withdrawalCost)
+        uint256 val2 = 99900 ether;  // Must be >= 100 ether (withdrawalCost)
+        uint256 val3_fail = 101 ether; // Must be >= 100 ether. (val1 + val2 + val3_fail > dailyUserLimit)
+        uint256 val4_next_day = 150 ether; // Must be >= 100 ether
 
-        // User 1: amount1
+        require(val1 >= 100 ether && val2 >= 100 ether && val3_fail >= 100 ether && val4_next_day >= 100 ether, "Test values < withdrawalCost");
+        require(val1 + val2 <= dailyUserLimit, "Test setup error: val1 + val2 exceeds limit");
+        require(val1 + val2 + val3_fail > dailyUserLimit, "Test setup error: val1 + val2 + val3_fail does not exceed limit");
+
         vm.startPrank(user1.addr);
-        morpherBridge.stageTokensForTransfer(morpherBridge.withdrawalLimitPerUserDaily() - 100 ether, 137); 
+        
+        // User 1: val1
+        morpherBridge.stageTokensForTransfer(val1, 137); 
                                                           
-        // User 1: amount2
-        // vm.prank(user1.addr);
-        morpherBridge.stageTokensForTransfer(50 ether, 137);
+        // User 1: val2
+        morpherBridge.stageTokensForTransfer(val2, 137);
 
-        // Inlined: totalForUser1 = (morpherBridge.withdrawalLimitPerUserDaily() - 100 ether) + 50 ether;
-        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (morpherBridge.withdrawalLimitPerUserDaily() - 100 ether) + 50 ether);
+        uint256 totalStagedDay1 = val1 + val2;
+        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), totalStagedDay1);
 
-        // User 1: amount3 - should fail
-        // vm.prank(user1.addr);
+        // User 1: val3_fail - should fail
         vm.expectRevert("MorpherBridge: Withdrawal Amount exceeds daily limit");
-        morpherBridge.stageTokensForTransfer(60 ether, 137);
+        morpherBridge.stageTokensForTransfer(val3_fail, 137);
 
         // Warp time to next day
         vm.warp(block.timestamp + 1 days + 1 hours);
 
-        // User 1: amount3 - should succeed now
-        // vm.prank(user1.addr);
-        morpherBridge.stageTokensForTransfer(60 ether, 137);
-        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (60 ether));
+        // User 1: val4_next_day - should succeed now
+        morpherBridge.stageTokensForTransfer(val4_next_day, 137);
+        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), val4_next_day);
+        
         vm.stopPrank();
     }
 
