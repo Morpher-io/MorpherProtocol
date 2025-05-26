@@ -385,7 +385,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
                 tokenOut: IPeripheryImmutableState(address(swapRouter)).WETH9(),
                 fee: poolFee,
                 recipient: address(this),
-                deadline: block.timestamp,
+                deadline: block.timestamp + 60, // Set deadline 60 seconds in the future
                 amountIn: _numOfToken,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -451,7 +451,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
                 tokenOut: IPeripheryImmutableState(address(swapRouter)).WETH9(),
                 fee: poolFee,
                 recipient: address(this),
-                deadline: block.timestamp,
+                deadline: block.timestamp + 60, // Set deadline 60 seconds in the future
                 amountIn: _numOfToken - fee,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
