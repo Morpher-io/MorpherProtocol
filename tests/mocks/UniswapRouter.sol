@@ -8,6 +8,16 @@ import "../../lib/forge-std/src/console2.sol";
 
 contract MockUniswapRouter is IV3SwapRouter {
 	uint256 public mockAmountOut;
+	address public mockWethAddress; // To store the address of the mock WETH
+
+	function setWethAddress(address _wethAddress) public { // Setter for mock WETH address
+		mockWethAddress = _wethAddress;
+	}
+
+	function WETH9() external view returns (address) { // Implementation of WETH9
+		require(mockWethAddress != address(0), "MockUniswapRouter: Mock WETH address not set");
+		return mockWethAddress;
+	}
 
 	function setAmountOut(uint256 _amountOut) public {
 		mockAmountOut = _amountOut;

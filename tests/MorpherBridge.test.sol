@@ -77,6 +77,8 @@ contract MorpherBridgeTest is BaseSetup {
 
         // Deploy MockUniswapRouter
         mockSwapRouter = new MockUniswapRouter();
+        mockSwapRouter.setWethAddress(address(wethMock)); // Set the mock WETH address in the router
+
         // Seed router with WETH and MorpherToken for mock swaps
         wethMock.mint(address(mockSwapRouter), 1_000_000 ether);
 
