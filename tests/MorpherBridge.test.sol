@@ -262,7 +262,7 @@ contract MorpherBridgeTest is BaseSetup {
         // Inlined: messageHash = keccak256(abi.encodePacked(uint256(1200 ether), user1.addr, block.chainid));
         // Inlined: ethSignedMessageHash = keccak256(abi.encodePacked(uint256(1200 ether), user1.addr, block.chainid)).toEthSignedMessageHash();
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(uint256(1200 ether), user1.addr, block.chainid)).toEthSignedMessageHash());
-        // Inlined: userSignature = abi.encodePacked(r, s, v);
+        bytes memory userSignature = abi.encodePacked(r, s, v); // Re-introduce userSignature variable
 
         bytes32[] memory treeElements = new bytes32[](1);
         // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, uint256(2000 ether), block.chainid));
@@ -291,7 +291,7 @@ contract MorpherBridgeTest is BaseSetup {
             m.getProof(treeElements, 0), // proof
             payable(user1.addr),
             m.getRoot(treeElements), // merkleRoot
-            abi.encodePacked(r, s, v) // userSignature
+            userSignature // Pass the pre-calculated variable
         );
         assertEq(returnedAmount, (1200 ether - 20 ether), "Returned amount incorrect");
 
