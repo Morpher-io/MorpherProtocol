@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
+import {Upgrades} from "forge-std/Upgrades.sol"; // Added import for Upgrades
 import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
 import {MerkleProof} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MerkleProof.sol";
@@ -16,6 +17,10 @@ import {IWETH9} from '../lib/uniswap-v3-periphery/contracts/interfaces/external/
 
 contract MorpherBridgeTest is BaseSetup {
     using MessageHashUtils for bytes32;
+
+    // Define UPGRADE_PROXY_PATTERN if not provided by BaseSetup
+    // Assuming UUPS proxies are the standard, so true.
+    bool constant UPGRADE_PROXY_PATTERN = true; 
 
     MorpherBridge internal morpherBridge;
     MockUniswapRouter internal mockSwapRouter;
@@ -85,23 +90,23 @@ contract MorpherBridgeTest is BaseSetup {
         morpherBridge = MorpherBridge(payable(deployProxy(CONTRACT_KEY_BRIDGE, address(bridgeImplementation), initializerCall)));
 
         // Set bridge address in state
-        vm.prank(address(morpherAdmin)); // Assuming morpherAdmin has role to set addresses in state
+        vm.prank(admin.addr); // Assuming admin has role to set addresses in state
         morpherState.setMorpherBridgeAddress(address(morpherBridge));
 
         // Grant roles on MorpherBridge
-        vm.prank(address(morpherAdmin)); // morpherAdmin grants roles via AccessControl
+        vm.prank(admin.addr); // admin grants roles via AccessControl
         morpherAccessControl.grantRole(morpherBridge.ADMINISTRATOR_ROLE(), admin.addr);
-        vm.prank(address(morpherAdmin));
+        vm.prank(admin.addr);
         morpherAccessControl.grantRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), sidechainOperator.addr);
 
         // Grant roles on MorpherToken to MorpherBridge for minting/burning
-        vm.prank(address(morpherAdmin));
+        vm.prank(admin.addr);
         morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherBridge));
-        vm.prank(address(morpherAdmin));
+        vm.prank(admin.addr);
         morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherBridge));
 
         // Mint some MPH to user1 for testing
-        vm.prank(address(morpherAdmin)); // Assuming morpherAdmin has MINTER_ROLE on token
+        vm.prank(admin.addr); // Assuming admin has MINTER_ROLE on token
         morpherToken.mint(user1.addr, 1_000_000 ether);
 
         // Set WETH address in mockSwapRouter (if it has such a setter, or ensure it's known)
