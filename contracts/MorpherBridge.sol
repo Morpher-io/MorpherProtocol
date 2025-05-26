@@ -9,6 +9,7 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.20; // Update pragma if needed
 
+import "../lib/forge-std/src/console2.sol"; // Added console2 import
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherAccessControl.sol";
