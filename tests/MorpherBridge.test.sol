@@ -201,69 +201,58 @@ contract MorpherBridgeTest is BaseSetup {
     }
 
     function testClaimStagedTokensConvertAndSendForUser_Signature() public {
-        uint256 numOfTokenToClaim = 1000 ether;
-        uint256 fee = 10 ether;
-        uint256 claimLimitOnSidechain = 1500 ether; // User's total available from sidechain
-
+        // Inlined: numOfTokenToClaim = 1000 ether; fee = 10 ether; claimLimitOnSidechain = 1500 ether;
+        
         // User signs the message
-        bytes32 messageHash = keccak256(abi.encodePacked(numOfTokenToClaim, user1.addr, block.chainid));
-        bytes32 ethSignedMessageHash = messageHash.toEthSignedMessageHash();
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, ethSignedMessageHash);
-        bytes memory userSignature = abi.encodePacked(r, s, v);
+        // Inlined: messageHash = keccak256(abi.encodePacked(1000 ether, user1.addr, block.chainid));
+        // Inlined: ethSignedMessageHash = keccak256(abi.encodePacked(1000 ether, user1.addr, block.chainid)).toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(1000 ether, user1.addr, block.chainid)).toEthSignedMessageHash());
+        // Inlined: userSignature = abi.encodePacked(r, s, v);
 
         // Operator prepares Merkle tree and proof
         bytes32[] memory treeElements = new bytes32[](1);
-        bytes32 leaf = keccak256(abi.encodePacked(user1.addr, claimLimitOnSidechain, block.chainid));
-        treeElements[0] = leaf;
+        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, 1500 ether, block.chainid));
+        treeElements[0] = keccak256(abi.encodePacked(user1.addr, 1500 ether, block.chainid));
 
         Merkle m = new Merkle(); // Use Murky
-        bytes32 merkleRoot = m.getRoot(treeElements); // Use Murky
-        bytes32[] memory proof = m.getProof(treeElements, 0); // Use Murky
-
-        // Mock WETH address (assuming it's what the router would return for WETH9())
-        // We need to ensure our mockSwapRouter can handle this.
-        // For simplicity, we'll assume the mock router handles the swap correctly if called.
-        // The actual WETH address is not directly used by the bridge if the router handles wrapping.
-
-        uint256 initialFeeRecipientBalance = morpherToken.balanceOf(feeRecipient.addr);
-        uint256 initialUser1EthBalance = user1.addr.balance;
-
-        // Mock the swap: Bridge will receive (numOfTokenToClaim - fee) MPH, then swap it.
-        // MockUniswapRouter's exactInput will transfer (numOfTokenToClaim - fee) from bridge to itself,
-        // then transfer some amount of WETH (mocked as ETH for simplicity here) to user1.addr.
-        // Let's say 1 MPH = 0.0001 ETH for the mock.
-        uint256 tokensToSwap = numOfTokenToClaim - fee;
-        uint256 expectedEthOut = tokensToSwap / 10000; // Mock conversion rate
-        mockSwapRouter.setAmountOut(expectedEthOut); // Configure mock router for the expected output
+        // Inlined: merkleRoot = m.getRoot(treeElements);
+        // Inlined: proof = m.getProof(treeElements, 0);
+        
+        uint256 initialFeeRecipientBalance = morpherToken.balanceOf(feeRecipient.addr); // Keep
+        uint256 initialUser1EthBalance = user1.addr.balance; // Keep
+        
+        // Inlined: tokensToSwap = 1000 ether - 10 ether;
+        // Inlined: expectedEthOut = (1000 ether - 10 ether) / 10000;
+        mockSwapRouter.setAmountOut(((1000 ether - 10 ether) / 10000)); 
 
         vm.prank(sidechainOperator.addr);
         vm.expectEmit(true, false, false, true); // TrustlessWithdrawFromSideChain
-        emit TrustlessWithdrawFromSideChain(user1.addr, numOfTokenToClaim);
+        emit TrustlessWithdrawFromSideChain(user1.addr, 1000 ether);
         vm.expectEmit(true, false, false, true); // WithdrawalSuccess
-        emit WithdrawalSuccess(user1.addr, expectedEthOut, true);
+        emit WithdrawalSuccess(user1.addr, ((1000 ether - 10 ether) / 10000), true);
 
         uint256 returnedAmountOut = morpherBridge.claimStagedTokensConvertAndSendForUser(
             user1.addr,
-            numOfTokenToClaim,
-            fee,
+            1000 ether, // numOfTokenToClaim
+            10 ether,   // fee
             feeRecipient.addr,
-            claimLimitOnSidechain,
-            proof,
+            1500 ether, // claimLimitOnSidechain
+            m.getProof(treeElements, 0), // proof
             payable(user1.addr),
-            merkleRoot,
-            userSignature
+            m.getRoot(treeElements), // merkleRoot
+            abi.encodePacked(r, s, v) // userSignature
         );
-        assertEq(returnedAmountOut, expectedEthOut, "Returned amountOut from swap incorrect");
+        assertEq(returnedAmountOut, ((1000 ether - 10 ether) / 10000), "Returned amountOut from swap incorrect");
 
         (bytes32 currentMerkleRoot, ) = morpherBridge.withdrawalData();
-        assertEq(currentMerkleRoot, merkleRoot, "Merkle root not updated by operator");
-        assertEq(morpherToken.balanceOf(feeRecipient.addr), initialFeeRecipientBalance + fee, "Fee not transferred");
-        assertEq(user1.addr.balance, initialUser1EthBalance + expectedEthOut, "ETH not received by user");
+        assertEq(currentMerkleRoot, m.getRoot(treeElements), "Merkle root not updated by operator");
+        assertEq(morpherToken.balanceOf(feeRecipient.addr), initialFeeRecipientBalance + (10 ether), "Fee not transferred");
+        assertEq(user1.addr.balance, initialUser1EthBalance + ((1000 ether - 10 ether) / 10000), "ETH not received by user");
         (uint256 amountClaimed, ) = morpherBridge.tokenClaimedOnThisChain(user1.addr);
-        assertEq(amountClaimed, numOfTokenToClaim, "tokenClaimedOnThisChain incorrect for user");
+        assertEq(amountClaimed, (1000 ether), "tokenClaimedOnThisChain incorrect for user");
 
         // Check withdrawal limits for user1
-        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), numOfTokenToClaim);
+        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (1000 ether));
     }
 
 
