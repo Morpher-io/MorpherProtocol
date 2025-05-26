@@ -31,9 +31,27 @@ contract MockUniswapRouter is IV3SwapRouter {
 		}
 		(address start, address end) = extractFirstAndLastAddress(params.path);
 		IERC20 tokenIn = IERC20(start);
-		IERC20 tokenOut = IERC20(end);
-		tokenIn.transferFrom(msg.sender, address(this), params.amountIn);
-		tokenOut.transfer(params.recipient, amountOut);
+		IERC20 tokenOut = IERC20(end); // This should be wethMock
+
+		console2.log("MockUniswapRouter.exactInput CALLED");
+		console2.log("  Router WETH balance (tokenOut) BEFORE tokenIn.transferFrom:", tokenOut.balanceOf(address(this)));
+		console2.log("  Bridge WETH balance (params.recipient) BEFORE tokenIn.transferFrom:", tokenOut.balanceOf(params.recipient));
+		console2.log("  Bridge MPH balance (tokenIn) BEFORE tokenIn.transferFrom:", tokenIn.balanceOf(msg.sender));
+		console2.log("  Router MPH balance (tokenIn) BEFORE tokenIn.transferFrom:", tokenIn.balanceOf(address(this)));
+		
+		tokenIn.transferFrom(msg.sender, address(this), params.amountIn); // Bridge -> Router (MPH)
+		
+		console2.log("MockUniswapRouter.exactInput - AFTER tokenIn.transferFrom");
+		console2.log("  Router WETH balance (tokenOut) AFTER tokenIn.transferFrom:", tokenOut.balanceOf(address(this)));
+		console2.log("  Bridge WETH balance (params.recipient) AFTER tokenIn.transferFrom:", tokenOut.balanceOf(params.recipient));
+		console2.log("  Bridge MPH balance (tokenIn) AFTER tokenIn.transferFrom:", tokenIn.balanceOf(msg.sender));
+		console2.log("  Router MPH balance (tokenIn) AFTER tokenIn.transferFrom:", tokenIn.balanceOf(address(this)));
+
+		tokenOut.transfer(params.recipient, amountOut); // Router -> Bridge (WETH)
+
+		console2.log("MockUniswapRouter.exactInput - AFTER tokenOut.transfer");
+		console2.log("  Router WETH balance (tokenOut) AFTER tokenOut.transfer:", tokenOut.balanceOf(address(this)));
+		console2.log("  Bridge WETH balance (params.recipient) AFTER tokenOut.transfer:", tokenOut.balanceOf(params.recipient));
 	}
 
 	function exactInputSingle(ExactInputSingleParams calldata params) external payable override returns (uint256 amountOut) { 
