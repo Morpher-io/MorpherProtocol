@@ -435,14 +435,6 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(state.morpherTokenAddress(), address(swapRouter), _numOfToken - fee);
 
-        console2.log("[Bridge] Before exactInputSingle:");
-        console2.log("  TokenIn (MPH):", state.morpherTokenAddress());
-        console2.log("  TokenOut (WETH):", IPeripheryImmutableState(address(swapRouter)).WETH9());
-        console2.log("  AmountIn (to swap):", _numOfToken - fee);
-        console2.log("  Recipient (Bridge itself):", address(this));
-        uint256 allowanceForRouter = IERC20(state.morpherTokenAddress()).allowance(address(this), address(swapRouter));
-        console2.log("  Allowance of MPH for Router from Bridge:", allowanceForRouter);
-
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
         IV3SwapRouter.ExactInputSingleParams memory params =
@@ -458,9 +450,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
             });
 
         // The call to `exactInputSingle` executes the swap.
-        console2.log("[Bridge] About to call exactInputSingle...");
         uint amountOut = swapRouter.exactInputSingle(params);
-        console2.log("[Bridge] Returned from exactInputSingle. AmountOut:", amountOut);
 
         //weth -> eth conversion
         IWETH9(IPeripheryImmutableState(address(swapRouter)).WETH9()).withdraw(amountOut);

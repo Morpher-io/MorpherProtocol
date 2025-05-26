@@ -65,8 +65,6 @@ contract MorpherBridgeTest is BaseSetup {
         super.setUp();
 
         user1 = makeAccount("user1");
-        console.log("user1.addr:", user1.addr);
-        console.log("address(this) for MorpherBridgeTest:", address(this));
         user2 = makeAccount("user2");
         sidechainOperator = makeAccount("sidechainOperator");
         admin = makeAccount("admin");
