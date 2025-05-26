@@ -5,14 +5,14 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
-import {MerkleProofUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
+import {MerkleProof} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MerkleProof.sol";
 
 import "./BaseSetup.sol";
 import "./mocks/ERC20.sol"; // Assuming MorpherToken is ERC20-like for testing burn/mint
 import "./mocks/UniswapRouter.sol"; // Mock Uniswap Router
 import "../contracts/MorpherBridge.sol";
 import "../contracts/MorpherToken.sol"; // For MINTER_ROLE, BURNER_ROLE constants
-import {IPeripheryImmutableState} from '../lib/uniswap-v3-periphery/contracts/interfaces/external/IPeripheryImmutableState.sol'; // For WETH9 address from router
+import {IWETH9} from '../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol'; // For WETH9 address from router
 
 contract MorpherBridgeTest is BaseSetup {
     using MessageHashUtils for bytes32;
@@ -167,13 +167,13 @@ contract MorpherBridgeTest is BaseSetup {
         bytes32[] memory treeElements = new bytes32[](1);
         bytes32 leaf = keccak256(abi.encodePacked(user1.addr, userClaimLimitOnSidechain, block.chainid));
         treeElements[0] = leaf;
-        bytes32 merkleRoot = MerkleProofUpgradeable.merkleRoot(treeElements); // Simplified tree for testing
+        bytes32 merkleRoot = MerkleProof.merkleRoot(treeElements); // Simplified tree for testing
 
         vm.prank(sidechainOperator.addr);
         morpherBridge.updateSideChainMerkleRoot(merkleRoot);
 
         // User prepares proof
-        bytes32[] memory proof = MerkleProofUpgradeable.generateProof(treeElements, 0);
+        bytes32[] memory proof = MerkleProof.generateProof(treeElements, 0);
 
         uint256 initialUserBalance = morpherToken.balanceOf(user1.addr);
 
@@ -212,8 +212,8 @@ contract MorpherBridgeTest is BaseSetup {
         bytes32[] memory treeElements = new bytes32[](1);
         bytes32 leaf = keccak256(abi.encodePacked(user1.addr, claimLimitOnSidechain, block.chainid));
         treeElements[0] = leaf;
-        bytes32 merkleRoot = MerkleProofUpgradeable.merkleRoot(treeElements);
-        bytes32[] memory proof = MerkleProofUpgradeable.generateProof(treeElements, 0);
+        bytes32 merkleRoot = MerkleProof.merkleRoot(treeElements);
+        bytes32[] memory proof = MerkleProof.generateProof(treeElements, 0);
 
         // Mock WETH address (assuming it's what the router would return for WETH9())
         // We need to ensure our mockSwapRouter can handle this.
@@ -274,8 +274,8 @@ contract MorpherBridgeTest is BaseSetup {
         bytes32[] memory treeElements = new bytes32[](1);
         bytes32 leaf = keccak256(abi.encodePacked(user1.addr, claimLimitOnSidechain, block.chainid));
         treeElements[0] = leaf;
-        bytes32 merkleRoot = MerkleProofUpgradeable.merkleRoot(treeElements);
-        bytes32[] memory proof = MerkleProofUpgradeable.generateProof(treeElements, 0);
+        bytes32 merkleRoot = MerkleProof.merkleRoot(treeElements);
+        bytes32[] memory proof = MerkleProof.generateProof(treeElements, 0);
 
         uint256 initialFeeRecipientBalance = morpherToken.balanceOf(feeRecipient.addr);
         uint256 initialUser1MphBalance = morpherToken.balanceOf(user1.addr);
