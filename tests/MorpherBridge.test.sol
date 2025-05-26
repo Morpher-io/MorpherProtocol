@@ -77,8 +77,13 @@ contract MorpherBridgeTest is BaseSetup {
         mockSwapRouter = new MockUniswapRouter();
         // Seed router with WETH and MorpherToken for mock swaps
         wethMock.mint(address(mockSwapRouter), 1_000_000 ether);
-        // Minting to mockSwapRouter needs MINTER_ROLE for address(this) or admin.addr
-        vm.prank(admin.addr); // Assuming admin has MINTER_ROLE on morpherToken
+
+        // Grant MINTER_ROLE to the admin account for minting tokens
+        vm.prank(address(this)); // address(this) should have DEFAULT_ADMIN_ROLE from BaseSetup
+        morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), admin.addr);
+
+        // Minting to mockSwapRouter needs MINTER_ROLE for admin.addr
+        vm.prank(admin.addr); 
         morpherToken.mint(address(mockSwapRouter), 1_000_000 ether);
 
         // MorpherBridge is now deployed and initialized in BaseSetup.
