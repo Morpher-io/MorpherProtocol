@@ -11,7 +11,7 @@ import {MorpherState} from "../contracts/MorpherState.sol";
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // For roles
 
 // Interfaces
-import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol"; // Keep external interface
 
 contract DeployMorpherBridge is DeployOrUpgradeV5 {
     string constant CONTRACT_KEY = "MorpherBridge";
@@ -55,7 +55,7 @@ contract DeployMorpherBridge is DeployOrUpgradeV5 {
         address bridgeProxy = deployOrUpgradeV5(
             CONTRACT_KEY,
             CONTRACT_NAME,
-            abi.encodeCall(MorpherBridge.initialize, (stateAddress, recoveryEnabled, ISwapRouter(swapRouterAddress))),
+            abi.encodeCall(MorpherBridge.initialize, (stateAddress, recoveryEnabled, IV3SwapRouter(swapRouterAddress))),
             bytes("") // No upgrade call data needed for this example
         );
 
