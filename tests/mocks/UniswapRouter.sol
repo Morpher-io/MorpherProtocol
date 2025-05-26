@@ -37,18 +37,19 @@ contract MockUniswapRouter is IV3SwapRouter {
 	}
 
 	function exactInputSingle(ExactInputSingleParams calldata params) external payable override returns (uint256 amountOut) { 
-		if (mockAmountOut > 0) {
-			amountOut = mockAmountOut;
-		} else {
-			amountOut = params.amountOutMinimum;
-		}
 		console2.log("MockUniswapRouter.exactInputSingle: MINIMAL ENTRY"); 
-		// Temporarily comment out all logic to isolate the entry/revert issue.
+		
 		if (mockAmountOut > 0) {
 			amountOut = mockAmountOut;
 		} else {
-			amountOut = params.amountOutMinimum;
+			// Temporarily avoid using params to see if params decoding is the issue
+			amountOut = 0; // Default to 0 if mockAmountOut is not set
+			// amountOut = params.amountOutMinimum; 
 		}
+
+		// The rest of the logic is already commented out, which is good for this diagnostic step.
+		// We will uncomment and restore it once we confirm the function entry.
+
 		// IERC20 tokenIn = IERC20(params.tokenIn);
 		// IERC20 tokenOut = IERC20(params.tokenOut);
 
