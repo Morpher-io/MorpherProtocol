@@ -17,6 +17,7 @@ import "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/Initial
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol"; // Added UUPSUpgradeable
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
 import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
+import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol"; // Added MessageHashUtils
 import "./MorpherTradeEngine.sol";
 
 import '../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol';
@@ -409,7 +410,9 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     // ------------------------------------------------------------------------
     function claimStagedTokensConvertAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
         // msg.sender must approve this contract
-        require(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid)).toEthSignedMessageHash().recover(_userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
+        bytes32 messageHash = keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid));
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash); // Use MessageHashUtils
+        require(ECDSA.recover(ethSignedMessageHash, _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
         updateSideChainMerkleRoot(_rootHash);
         bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
@@ -471,7 +474,9 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     // ------------------------------------------------------------------------
     function claimStagedTokensAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
         // msg.sender must approve this contract
-        require(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid)).toEthSignedMessageHash().recover(_userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
+        bytes32 messageHash = keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid));
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash); // Use MessageHashUtils
+        require(ECDSA.recover(ethSignedMessageHash, _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
         updateSideChainMerkleRoot(_rootHash);
         bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
         uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
