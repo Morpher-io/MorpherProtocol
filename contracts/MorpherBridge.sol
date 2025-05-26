@@ -458,7 +458,9 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
             });
 
         // The call to `exactInputSingle` executes the swap.
+        console2.log("[Bridge] About to call exactInputSingle...");
         uint amountOut = swapRouter.exactInputSingle(params);
+        console2.log("[Bridge] Returned from exactInputSingle. AmountOut:", amountOut);
 
         //weth -> eth conversion
         IWETH9(IPeripheryImmutableState(address(swapRouter)).WETH9()).withdraw(amountOut);

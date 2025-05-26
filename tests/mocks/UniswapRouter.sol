@@ -42,35 +42,40 @@ contract MockUniswapRouter is IV3SwapRouter {
 		} else {
 			amountOut = params.amountOutMinimum;
 		}
-		console2.log("MockUniswapRouter.exactInputSingle: ENTERED"); // Make this the very first line
+		console2.log("MockUniswapRouter.exactInputSingle: MINIMAL ENTRY"); 
+		// Temporarily comment out all logic to isolate the entry/revert issue.
+		if (mockAmountOut > 0) {
+			amountOut = mockAmountOut;
+		} else {
+			amountOut = params.amountOutMinimum;
+		}
+		// IERC20 tokenIn = IERC20(params.tokenIn);
+		// IERC20 tokenOut = IERC20(params.tokenOut);
 
-		IERC20 tokenIn = IERC20(params.tokenIn);
-		IERC20 tokenOut = IERC20(params.tokenOut);
+		// console2.log("  MockUniswapRouter - msg.sender (Bridge):", msg.sender);
+		// console2.log("  MockUniswapRouter - Router address (this):", address(this));
+		// console2.log("  tokenIn:", address(tokenIn));
+		// console2.log("  tokenOut:", address(tokenOut));
+		// console2.log("  params.amountIn:", params.amountIn);
+		// console2.log("  calculated amountOut:", amountOut);
+		// console2.log("  params.recipient (should be Bridge):", params.recipient);
 
-		console2.log("  MockUniswapRouter - msg.sender (Bridge):", msg.sender);
-		console2.log("  MockUniswapRouter - Router address (this):", address(this));
-		console2.log("  tokenIn:", address(tokenIn));
-		console2.log("  tokenOut:", address(tokenOut));
-		console2.log("  params.amountIn:", params.amountIn);
-		console2.log("  calculated amountOut:", amountOut);
-		console2.log("  params.recipient (should be Bridge):", params.recipient);
+		// uint256 allowance = tokenIn.allowance(msg.sender, address(this));
+		// console2.log("  Allowance tokenIn for router by bridge:", allowance);
+		// uint256 bridgeTokenInBalance = tokenIn.balanceOf(msg.sender);
+		// console2.log("  Bridge balance of tokenIn:", bridgeTokenInBalance);
 
-		uint256 allowance = tokenIn.allowance(msg.sender, address(this));
-		console2.log("  Allowance tokenIn for router by bridge:", allowance);
-		uint256 bridgeTokenInBalance = tokenIn.balanceOf(msg.sender);
-		console2.log("  Bridge balance of tokenIn:", bridgeTokenInBalance);
+		// // Router receives tokenIn from the caller (MorpherBridge)
+		// tokenIn.transferFrom(msg.sender, address(this), params.amountIn);
+		// console2.log("  tokenIn.transferFrom successful");
 
-		// Router receives tokenIn from the caller (MorpherBridge)
-		tokenIn.transferFrom(msg.sender, address(this), params.amountIn);
-		console2.log("  tokenIn.transferFrom successful");
+		// uint256 routerTokenOutBalance = tokenOut.balanceOf(address(this));
+		// console2.log("  Router balance of tokenOut:", routerTokenOutBalance);
 
-		uint256 routerTokenOutBalance = tokenOut.balanceOf(address(this));
-		console2.log("  Router balance of tokenOut:", routerTokenOutBalance);
-
-		// Router sends tokenOut to the recipient
-		// Ensure the mock router has enough tokenOut balance (seeded in test setup)
-		tokenOut.transfer(params.recipient, amountOut);
-		console2.log("  tokenOut.transfer successful");
+		// // Router sends tokenOut to the recipient
+		// // Ensure the mock router has enough tokenOut balance (seeded in test setup)
+		// tokenOut.transfer(params.recipient, amountOut);
+		// console2.log("  tokenOut.transfer successful");
 	}
 
 	function exactOutput(ExactOutputParams calldata  /*unused*/) external payable returns (uint256 amountIn) {
