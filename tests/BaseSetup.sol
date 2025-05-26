@@ -124,32 +124,8 @@ contract BaseSetup is Test {
 		morpherAccessControl.grantRole(morpherOracle.ORACLEOPERATOR_ROLE(), address(this));
 
 		//deploy MorpherBridge
-		address morpherBridgeImplementation = address(new MorpherBridge());
-		bytes memory bridgeInitializerCall = abi.encodeCall(
-			MorpherBridge.initialize,
-			(address(morpherState), recoveryEnabled_baseSetup, swapRouter_baseSetup)
-		);
-		// Using a generic key for proxy deployment within BaseSetup, assuming a helper or direct UUPS deployment
-		// For simplicity, directly instantiating the proxy logic here if no generic helper exists in BaseSetup.
-		// This part might need adjustment if BaseSetup has a specific proxy deployment pattern.
-		// For now, we'll assume a direct UUPS deployment pattern similar to how tests might do it.
-		// However, since we removed Upgrades.sol, we'll deploy it as a simple contract for now and tests can wrap it if needed,
-		// or we assume a proxy deployment mechanism is available.
-		// For test purposes, direct instantiation of the logic contract is often sufficient if proxy behavior isn't the focus.
-		// Let's deploy it as a UUPS proxy using a basic pattern if Upgrades.sol is not available.
-		// We'll use a simple proxy pattern for now.
-		// NOTE: For robust UUPS testing, a proper proxy deployment mechanism is needed.
-		// This is a simplified approach for BaseSetup.
-		bytes memory proxyCode = MinimalProxy.getCreationCode(morpherBridgeImplementation);
-        address payable bridgeProxyAddress;
-        assembly {
-            bridgeProxyAddress := create(0, add(proxyCode, 0x20), mload(proxyCode))
-        }
-        require(bridgeProxyAddress != address(0), "Bridge proxy deployment failed");
-        morpherBridge = MorpherBridge(bridgeProxyAddress);
-        (bool success, ) = bridgeProxyAddress.call(bridgeInitializerCall);
-        require(success, "Bridge initialization failed");
-
+		morpherBridge = new MorpherBridge();
+		morpherBridge.initialize(address(morpherState), recoveryEnabled_baseSetup, swapRouter_baseSetup);
 
 		morpherState.setMorpherBridgeAddress(address(morpherBridge));
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherBridge));
@@ -162,20 +138,4 @@ contract BaseSetup is Test {
 
 		morpherAccessControl.revokeRole(morpherState.ADMINISTRATOR_ROLE(), address(this));
 	}
-}
-
-// Minimal Proxy contract code (EIP-1167)
-contract MinimalProxy {
-    // Adapted from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/proxy/ERC1967/ERC1967Proxy.sol
-    // This is a very basic version for EIP-1167.
-    // A more robust UUPS proxy would typically use ERC1967Proxy.
-    // solhint-disable-next-line func-name-mixedcase
-    function getCreationCode(address _logic) internal pure returns (bytes memory) {
-        bytes20 logic_ = bytes20(_logic);
-        return abi.encodePacked(
-            hex"3d602d80600a3d3981f3363d3d373d3d3d363d73",
-            logic_,
-            hex"5af43d82803e903d91602b57fd5bf3"
-        );
-    }
 }
