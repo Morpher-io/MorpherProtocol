@@ -132,8 +132,9 @@ contract MorpherBridgeTest is BaseSetup {
         vm.expectEmit(true, false, false, true);
         emit SideChainMerkleRootUpdated(newRoot);
         morpherBridge.updateSideChainMerkleRoot(newRoot);
-        assertEq(morpherBridge.withdrawalData().merkleRoot, newRoot, "Merkle root not updated");
-        assertTrue(morpherBridge.withdrawalData().lastUpdatedAt > 0, "Last updated time not set");
+        (bytes32 updatedMerkleRoot, uint256 updatedLastAt) = morpherBridge.withdrawalData();
+        assertEq(updatedMerkleRoot, newRoot, "Merkle root not updated");
+        assertTrue(updatedLastAt > 0, "Last updated time not set");
 
         vm.prank(user1.addr);
         vm.expectRevert("MorpherBridge: Permission denied.");
@@ -255,7 +256,8 @@ contract MorpherBridgeTest is BaseSetup {
         );
         assertEq(returnedAmountOut, expectedEthOut, "Returned amountOut from swap incorrect");
 
-        assertEq(morpherBridge.withdrawalData().merkleRoot, merkleRoot, "Merkle root not updated by operator");
+        (bytes32 currentMerkleRoot, ) = morpherBridge.withdrawalData();
+        assertEq(currentMerkleRoot, merkleRoot, "Merkle root not updated by operator");
         assertEq(morpherToken.balanceOf(feeRecipient.addr), initialFeeRecipientBalance + fee, "Fee not transferred");
         assertEq(user1.addr.balance, initialUser1EthBalance + expectedEthOut, "ETH not received by user");
         (uint256 amountClaimed, ) = morpherBridge.tokenClaimedOnThisChain(user1.addr);
@@ -305,7 +307,8 @@ contract MorpherBridgeTest is BaseSetup {
         );
         assertEq(returnedAmount, expectedMphToUser, "Returned amount incorrect");
 
-        assertEq(morpherBridge.withdrawalData().merkleRoot, merkleRoot, "Merkle root not updated by operator");
+        (bytes32 currentMerkleRootUser, ) = morpherBridge.withdrawalData();
+        assertEq(currentMerkleRootUser, merkleRoot, "Merkle root not updated by operator");
         assertEq(morpherToken.balanceOf(feeRecipient.addr), initialFeeRecipientBalance + fee, "Fee not transferred");
         assertEq(morpherToken.balanceOf(user1.addr), initialUser1MphBalance + expectedMphToUser, "MPH not received by user");
         (uint256 amountClaimed, ) = morpherBridge.tokenClaimedOnThisChain(user1.addr);
