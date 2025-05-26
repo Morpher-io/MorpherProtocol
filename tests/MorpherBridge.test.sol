@@ -168,8 +168,8 @@ contract MorpherBridgeTest is BaseSetup {
 
         // Operator updates merkle root
         bytes32[] memory treeElements = new bytes32[](1);
-        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, 1000 ether, block.chainid));
-        treeElements[0] = keccak256(abi.encodePacked(user1.addr, 1000 ether, block.chainid));
+        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, uint256(1000 ether), block.chainid));
+        treeElements[0] = keccak256(abi.encodePacked(user1.addr, uint256(1000 ether), block.chainid));
         
         Merkle m = new Merkle(); // Use Murky
         // Inlined: merkleRoot = m.getRoot(treeElements);
@@ -204,15 +204,15 @@ contract MorpherBridgeTest is BaseSetup {
         // Inlined: numOfTokenToClaim = 1000 ether; fee = 10 ether; claimLimitOnSidechain = 1500 ether;
         
         // User signs the message
-        // Inlined: messageHash = keccak256(abi.encodePacked(1000 ether, user1.addr, block.chainid));
-        // Inlined: ethSignedMessageHash = keccak256(abi.encodePacked(1000 ether, user1.addr, block.chainid)).toEthSignedMessageHash();
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(1000 ether, user1.addr, block.chainid)).toEthSignedMessageHash());
+        // Inlined: messageHash = keccak256(abi.encodePacked(uint256(1000 ether), user1.addr, block.chainid));
+        // Inlined: ethSignedMessageHash = keccak256(abi.encodePacked(uint256(1000 ether), user1.addr, block.chainid)).toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(uint256(1000 ether), user1.addr, block.chainid)).toEthSignedMessageHash());
         // Inlined: userSignature = abi.encodePacked(r, s, v);
 
         // Operator prepares Merkle tree and proof
         bytes32[] memory treeElements = new bytes32[](1);
-        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, 1500 ether, block.chainid));
-        treeElements[0] = keccak256(abi.encodePacked(user1.addr, 1500 ether, block.chainid));
+        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, uint256(1500 ether), block.chainid));
+        treeElements[0] = keccak256(abi.encodePacked(user1.addr, uint256(1500 ether), block.chainid));
 
         Merkle m = new Merkle(); // Use Murky
         // Inlined: merkleRoot = m.getRoot(treeElements);
@@ -259,14 +259,14 @@ contract MorpherBridgeTest is BaseSetup {
     function testClaimStagedTokensAndSendForUser_Signature() public {
         // Inlined: numOfTokenToClaim = 1200 ether; fee = 20 ether; claimLimitOnSidechain = 2000 ether;
 
-        // Inlined: messageHash = keccak256(abi.encodePacked(1200 ether, user1.addr, block.chainid));
-        // Inlined: ethSignedMessageHash = keccak256(abi.encodePacked(1200 ether, user1.addr, block.chainid)).toEthSignedMessageHash();
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(1200 ether, user1.addr, block.chainid)).toEthSignedMessageHash());
+        // Inlined: messageHash = keccak256(abi.encodePacked(uint256(1200 ether), user1.addr, block.chainid));
+        // Inlined: ethSignedMessageHash = keccak256(abi.encodePacked(uint256(1200 ether), user1.addr, block.chainid)).toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(uint256(1200 ether), user1.addr, block.chainid)).toEthSignedMessageHash());
         // Inlined: userSignature = abi.encodePacked(r, s, v);
 
         bytes32[] memory treeElements = new bytes32[](1);
-        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, 2000 ether, block.chainid));
-        treeElements[0] = keccak256(abi.encodePacked(user1.addr, 2000 ether, block.chainid));
+        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, uint256(2000 ether), block.chainid));
+        treeElements[0] = keccak256(abi.encodePacked(user1.addr, uint256(2000 ether), block.chainid));
 
         Merkle m = new Merkle(); // Use Murky
         // Inlined: merkleRoot = m.getRoot(treeElements);
