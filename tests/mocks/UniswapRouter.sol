@@ -36,8 +36,20 @@ contract MockUniswapRouter is IV3SwapRouter {
 		tokenOut.transfer(params.recipient, amountOut);
 	}
 
-	function exactInputSingle(ExactInputSingleParams calldata /*unused*/) external payable returns (uint256 amountOut) { 
-		amountOut = 0;
+	function exactInputSingle(ExactInputSingleParams calldata params) external payable override returns (uint256 amountOut) { 
+		if (mockAmountOut > 0) {
+			amountOut = mockAmountOut;
+		} else {
+			amountOut = params.amountOutMinimum;
+		}
+		IERC20 tokenIn = IERC20(params.tokenIn);
+		IERC20 tokenOut = IERC20(params.tokenOut);
+
+		// Router receives tokenIn from the caller (MorpherBridge)
+		tokenIn.transferFrom(msg.sender, address(this), params.amountIn);
+		// Router sends tokenOut to the recipient
+		// Ensure the mock router has enough tokenOut balance (seeded in test setup)
+		tokenOut.transfer(params.recipient, amountOut);
 	}
 
 	function exactOutput(ExactOutputParams calldata  /*unused*/) external payable returns (uint256 amountIn) {
