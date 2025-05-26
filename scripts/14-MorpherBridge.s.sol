@@ -81,6 +81,25 @@ contract DeployMorpherBridge is DeployOrUpgradeV5 {
             address sidechainOperator = vm.envOr("SIDECHAIN_OPERATOR_ADDRESS", msg.sender); // Default to deployer
             accessControl.grantRole(MorpherBridge(bridgeProxy).SIDECHAINOPERATOR_ROLE(), sidechainOperator);
             console.log("Granted SIDECHAINOPERATOR_ROLE on MorpherBridge to:", sidechainOperator);
+
+            // Grant MINTER_ROLE and BURNER_ROLE on MorpherToken to the MorpherBridge
+            address tokenAddress = loadAddress("MorpherToken");
+            require(tokenAddress != address(0), "V5 MorpherToken must be deployed first for role granting");
+            
+            // These role constants are typically defined in MorpherToken.sol
+            // For the script, we can use keccak256 directly if MorpherToken.sol is not imported
+            // or if we want to avoid importing the full contract just for role constants.
+            // However, it's better practice to use the constants from the contract if available.
+            // Assuming MorpherToken.MINTER_ROLE and MorpherToken.BURNER_ROLE are accessible
+            // If not, replace with keccak256("MINTER_ROLE") and keccak256("BURNER_ROLE")
+            // For now, let's assume we need to define them or fetch from an interface/stub if not directly importing MorpherToken
+            bytes32 MINTER_ROLE = keccak256("MINTER_ROLE"); // As defined in MorpherToken.sol
+            bytes32 BURNER_ROLE = keccak256("BURNER_ROLE"); // As defined in MorpherToken.sol
+
+            accessControl.grantRole(MINTER_ROLE, bridgeProxy);
+            console.log("Granted MINTER_ROLE on MorpherToken to MorpherBridge:", bridgeProxy);
+            accessControl.grantRole(BURNER_ROLE, bridgeProxy);
+            console.log("Granted BURNER_ROLE on MorpherToken to MorpherBridge:", bridgeProxy);
         }
 
         vm.stopBroadcast();
