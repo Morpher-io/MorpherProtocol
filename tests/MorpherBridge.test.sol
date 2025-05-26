@@ -86,29 +86,18 @@ contract MorpherBridgeTest is BaseSetup {
         vm.prank(admin.addr); 
         morpherToken.mint(address(mockSwapRouter), 1_000_000 ether);
 
-        // MorpherBridge is now deployed and initialized in BaseSetup.
-        // We need to update its swapRouter to the mockSwapRouter for these tests.
-        vm.prank(admin.addr); // admin should have ADMINISTRATOR_ROLE on bridge from BaseSetup
-        morpherBridge.updateSwapRouter(ISwapRouter(address(mockSwapRouter)));
-
-
-        // Roles on MorpherBridge (ADMINISTRATOR_ROLE, SIDECHAINOPERATOR_ROLE)
-        // and roles for MorpherBridge on MorpherToken (MINTER_ROLE, BURNER_ROLE)
-        // are now set in BaseSetup.
-        // We might need to re-grant to specific test accounts if BaseSetup grants to address(this)
-        // For now, assume BaseSetup grants to address(this) or a general admin.
-        // Let's ensure the test-specific accounts (admin, sidechainOperator) have their roles.
-        // If BaseSetup granted to address(this), we re-grant to our specific test accounts.
-        // If BaseSetup already granted to admin.addr (e.g. if admin.addr == address(this) in BaseSetup context), this is redundant but harmless.
-
         // Grant ADMINISTRATOR_ROLE on MorpherBridge to test's admin account
-        vm.prank(address(this)); // Assuming address(this) has admin role from BaseSetup to grant further
+        vm.prank(address(this)); // address(this) has DEFAULT_ADMIN_ROLE on MorpherAccessControl
         morpherAccessControl.grantRole(morpherBridge.ADMINISTRATOR_ROLE(), admin.addr);
         
         // Grant SIDECHAINOPERATOR_ROLE on MorpherBridge to test's sidechainOperator account
-        vm.prank(admin.addr); // Now admin.addr can grant roles on the bridge
+        vm.prank(address(this)); // address(this) has DEFAULT_ADMIN_ROLE on MorpherAccessControl
         morpherAccessControl.grantRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), sidechainOperator.addr);
 
+        // MorpherBridge is now deployed and initialized in BaseSetup.
+        // We need to update its swapRouter to the mockSwapRouter for these tests.
+        vm.prank(admin.addr); // Now admin.addr has ADMINISTRATOR_ROLE on the bridge
+        morpherBridge.updateSwapRouter(ISwapRouter(address(mockSwapRouter)));
 
         // Mint some MPH to user1 for testing
         vm.prank(admin.addr); // Assuming admin has MINTER_ROLE on token
