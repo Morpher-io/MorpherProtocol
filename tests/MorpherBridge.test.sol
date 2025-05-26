@@ -104,9 +104,7 @@ contract MorpherBridgeTest is BaseSetup {
         // Mint some MPH to user1 for testing
         vm.prank(admin.addr); // Assuming admin has MINTER_ROLE on token
         morpherToken.mint(user1.addr, 1_000_000 ether);
-        // Also mint to the test contract itself, in case _msgSender() resolves to address(this)
-        // when pranking user1 for calls to the bridge.
-        morpherToken.mint(address(this), 1_000_000 ether);
+
 
 
         // Set WETH address in mockSwapRouter (if it has such a setter, or ensure it's known)
