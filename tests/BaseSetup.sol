@@ -125,9 +125,9 @@ contract BaseSetup is Test {
 
 		//deploy MorpherBridge
 		morpherBridge = new MorpherBridge();
-		morpherBridge.initialize(address(morpherState), recoveryEnabled_baseSetup, swapRouter_baseSetup);
+		morpherBridge.initialize(address(morpherState), recoveryEnabled_baseSetup, IV3SwapRouter(address(swapRouter_baseSetup)));
 
-		morpherState.setMorpherBridgeAddress(address(morpherBridge));
+		morpherState.setMorpherBridge(address(morpherBridge));
 		morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherBridge));
 		morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherBridge));
 		// Grant bridge admin and operator roles to the test contract (address(this)) for now

@@ -52,12 +52,12 @@ contract DeployMorpherBridge is DeployOrUpgradeV5 {
         vm.startBroadcast();
 
         // Deploy or upgrade using the V5 UUPS logic
-        address bridgeProxy = deployOrUpgradeV5(
+        address payable bridgeProxy = payable(deployOrUpgradeV5(
             CONTRACT_KEY,
             CONTRACT_NAME,
             abi.encodeCall(MorpherBridge.initialize, (stateAddress, recoveryEnabled, IV3SwapRouter(swapRouterAddress))),
             bytes("") // No upgrade call data needed for this example
-        );
+        ));
 
         saveAddress(CONTRACT_KEY, bridgeProxy);
         console.log("MorpherBridge V5 Proxy at:", bridgeProxy);
@@ -69,7 +69,7 @@ contract DeployMorpherBridge is DeployOrUpgradeV5 {
             console.log("Performing initial configuration for MorpherBridge...");
 
             // Set MorpherBridge address in MorpherState
-            MorpherState(stateAddress).setMorpherBridgeAddress(bridgeProxy);
+            MorpherState(stateAddress).setMorpherBridge(bridgeProxy);
             console.log("Set MorpherBridge address in MorpherState.");
 
             // Grant ADMINISTRATOR_ROLE on the bridge
