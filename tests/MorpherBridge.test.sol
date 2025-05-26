@@ -179,9 +179,9 @@ contract MorpherBridgeTest is BaseSetup {
         // Inlined: proof = m.getProof(treeElements, 0);
         uint256 initialUserBalance = morpherToken.balanceOf(user1.addr); // Keep this
 
-        vm.prank(user1.addr);
         vm.expectEmit(true, false, false, true);
         emit TrustlessWithdrawFromSideChain(user1.addr, 500 ether);
+        vm.startPrank(user1.addr);
         morpherBridge.claimStagedTokens(500 ether, 1000 ether, m.getProof(treeElements, 0));
 
         assertEq(morpherToken.balanceOf(user1.addr), initialUserBalance + (500 ether), "Tokens not minted correctly");
@@ -194,9 +194,10 @@ contract MorpherBridgeTest is BaseSetup {
 
         // Test invalid proof
         bytes32[] memory invalidProof = new bytes32[](0);
-        vm.prank(user1.addr);
+        // vm.prank(user1.addr);
         vm.expectRevert("MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
         morpherBridge.claimStagedTokens(500 ether, 1000 ether, invalidProof);
+        vm.stopPrank();
     }
 
     function testClaimStagedTokensConvertAndSendForUser_Signature() public {
