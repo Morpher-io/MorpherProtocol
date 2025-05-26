@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import {Upgrades} from "forge-std/Upgrades.sol"; // Added import for Upgrades
+// import {Upgrades} from "forge-std/Upgrades.sol"; // Removed import for Upgrades
 import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
 import {MerkleProof} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MerkleProof.sol";
@@ -18,12 +18,11 @@ import {IWETH9} from '../lib/uniswap-v3-periphery/contracts/interfaces/external/
 contract MorpherBridgeTest is BaseSetup {
     using MessageHashUtils for bytes32;
 
-    // Define UPGRADE_PROXY_PATTERN if not provided by BaseSetup
-    // Assuming UUPS proxies are the standard, so true.
-    bool constant UPGRADE_PROXY_PATTERN = true; 
+    // MorpherBridge is now inherited from BaseSetup
+    // bool constant UPGRADE_PROXY_PATTERN = true; // Removed
 
-    MorpherBridge internal morpherBridge;
-    MockUniswapRouter internal mockSwapRouter;
+    // MorpherBridge internal morpherBridge; // Inherited
+    MockUniswapRouter internal mockSwapRouter; // Keep mock router for specific bridge tests
     MockERC20 internal wethMock; // Mock WETH for testing swaps
 
     Account internal user1;
@@ -78,32 +77,33 @@ contract MorpherBridgeTest is BaseSetup {
         mockSwapRouter = new MockUniswapRouter();
         // Seed router with WETH and MorpherToken for mock swaps
         wethMock.mint(address(mockSwapRouter), 1_000_000 ether);
-        morpherToken.mint(address(mockSwapRouter), 1_000_000 ether); // Assuming morpherToken is mintable by setup
+        // Minting to mockSwapRouter needs MINTER_ROLE for address(this) or admin.addr
+        vm.prank(admin.addr); // Assuming admin has MINTER_ROLE on morpherToken
+        morpherToken.mint(address(mockSwapRouter), 1_000_000 ether);
 
-        // Deploy MorpherBridge (or get from BaseSetup if deployed there)
-        // For this test, we deploy it directly to control initialization.
-        address bridgeImplementation = address(new MorpherBridge());
-        bytes memory initializerCall = abi.encodeCall(
-            MorpherBridge.initialize,
-            (address(morpherState), false, ISwapRouter(address(mockSwapRouter)))
-        );
-        morpherBridge = MorpherBridge(payable(deployProxy(CONTRACT_KEY_BRIDGE, address(bridgeImplementation), initializerCall)));
+        // MorpherBridge is now deployed and initialized in BaseSetup.
+        // We need to update its swapRouter to the mockSwapRouter for these tests.
+        vm.prank(admin.addr); // admin should have ADMINISTRATOR_ROLE on bridge from BaseSetup
+        morpherBridge.updateSwapRouter(ISwapRouter(address(mockSwapRouter)));
 
-        // Set bridge address in state
-        vm.prank(admin.addr); // Assuming admin has role to set addresses in state
-        morpherState.setMorpherBridgeAddress(address(morpherBridge));
 
-        // Grant roles on MorpherBridge
-        vm.prank(admin.addr); // admin grants roles via AccessControl
+        // Roles on MorpherBridge (ADMINISTRATOR_ROLE, SIDECHAINOPERATOR_ROLE)
+        // and roles for MorpherBridge on MorpherToken (MINTER_ROLE, BURNER_ROLE)
+        // are now set in BaseSetup.
+        // We might need to re-grant to specific test accounts if BaseSetup grants to address(this)
+        // For now, assume BaseSetup grants to address(this) or a general admin.
+        // Let's ensure the test-specific accounts (admin, sidechainOperator) have their roles.
+        // If BaseSetup granted to address(this), we re-grant to our specific test accounts.
+        // If BaseSetup already granted to admin.addr (e.g. if admin.addr == address(this) in BaseSetup context), this is redundant but harmless.
+
+        // Grant ADMINISTRATOR_ROLE on MorpherBridge to test's admin account
+        vm.prank(address(this)); // Assuming address(this) has admin role from BaseSetup to grant further
         morpherAccessControl.grantRole(morpherBridge.ADMINISTRATOR_ROLE(), admin.addr);
-        vm.prank(admin.addr);
+        
+        // Grant SIDECHAINOPERATOR_ROLE on MorpherBridge to test's sidechainOperator account
+        vm.prank(admin.addr); // Now admin.addr can grant roles on the bridge
         morpherAccessControl.grantRole(morpherBridge.SIDECHAINOPERATOR_ROLE(), sidechainOperator.addr);
 
-        // Grant roles on MorpherToken to MorpherBridge for minting/burning
-        vm.prank(admin.addr);
-        morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(morpherBridge));
-        vm.prank(admin.addr);
-        morpherAccessControl.grantRole(morpherToken.BURNER_ROLE(), address(morpherBridge));
 
         // Mint some MPH to user1 for testing
         vm.prank(admin.addr); // Assuming admin has MINTER_ROLE on token
@@ -345,16 +345,13 @@ contract MorpherBridgeTest is BaseSetup {
         assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), amount3);
     }
 
-    // --- Helper to deploy proxy for tests ---
-    string constant CONTRACT_KEY_BRIDGE = "MorpherBridgeTestInstance";
-    function deployProxy(string memory contractKey, address implementation, bytes memory initializeData) internal returns (address payable proxyAddress) {
-        if (UPGRADE_PROXY_PATTERN) {
-            proxyAddress = payable(Upgrades.deployUUPSProxy(contractKey, implementation, initializeData));
-        } else {
-            // Simplified proxy deployment for testing if not using full UUPS pattern from BaseSetup
-            // This part might need adjustment based on how BaseSetup handles proxy deployments
-            // For now, assume a direct deployment or a simple proxy pattern if Upgrades lib isn't fully set up for this context
-            revert("UPGRADE_PROXY_PATTERN not set or simple proxy not implemented here");
-        }
-    }
+    // --- Helper to deploy proxy for tests --- // Removed as bridge is deployed in BaseSetup
+    // string constant CONTRACT_KEY_BRIDGE = "MorpherBridgeTestInstance";
+    // function deployProxy(string memory contractKey, address implementation, bytes memory initializeData) internal returns (address payable proxyAddress) {
+    //     if (UPGRADE_PROXY_PATTERN) {
+    //         proxyAddress = payable(Upgrades.deployUUPSProxy(contractKey, implementation, initializeData));
+    //     } else {
+    //         revert("UPGRADE_PROXY_PATTERN not set or simple proxy not implemented here");
+    //     }
+    // }
 }
