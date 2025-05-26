@@ -30,8 +30,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     using ECDSA for bytes32;
 
 
-    MorpherState state;
-    MorpherBridge previousBridge;
+    MorpherState public state;
 
     uint256 public withdrawalLimitPerUserDaily; //200k MPH per day
     uint256 public withdrawalLimitPerUserMonthly; //1M MPH per month
