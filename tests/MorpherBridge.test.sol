@@ -305,18 +305,18 @@ contract MorpherBridgeTest is BaseSetup {
         // Inlined: amount3 = 60 ether; 
 
         // User 1: amount1
-        vm.prank(user1.addr);
+        vm.startPrank(user1.addr);
         morpherBridge.stageTokensForTransfer(morpherBridge.withdrawalLimitPerUserDaily() - 100 ether, 137); 
                                                           
         // User 1: amount2
-        vm.prank(user1.addr);
+        // vm.prank(user1.addr);
         morpherBridge.stageTokensForTransfer(50 ether, 137);
 
         // Inlined: totalForUser1 = (morpherBridge.withdrawalLimitPerUserDaily() - 100 ether) + 50 ether;
         assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (morpherBridge.withdrawalLimitPerUserDaily() - 100 ether) + 50 ether);
 
         // User 1: amount3 - should fail
-        vm.prank(user1.addr);
+        // vm.prank(user1.addr);
         vm.expectRevert("MorpherBridge: Withdrawal Amount exceeds daily limit");
         morpherBridge.stageTokensForTransfer(60 ether, 137);
 
@@ -324,9 +324,10 @@ contract MorpherBridgeTest is BaseSetup {
         vm.warp(block.timestamp + 1 days + 1 hours);
 
         // User 1: amount3 - should succeed now
-        vm.prank(user1.addr);
+        // vm.prank(user1.addr);
         morpherBridge.stageTokensForTransfer(60 ether, 137);
         assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (60 ether));
+        vm.stopPrank();
     }
 
     // --- Helper to deploy proxy for tests --- // Removed as bridge is deployed in BaseSetup
