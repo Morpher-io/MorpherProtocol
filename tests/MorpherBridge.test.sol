@@ -165,9 +165,10 @@ contract MorpherBridgeTest is BaseSetup {
         // Inlined: claimAmount = 500 ether; userClaimLimitOnSidechain = 1000 ether;
 
         // Operator updates merkle root
-        bytes32[] memory treeElements = new bytes32[](1);
+        bytes32[] memory treeElements = new bytes32[](2); // Changed size to 2
         // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, uint256(1000 ether), block.chainid));
         treeElements[0] = keccak256(abi.encodePacked(user1.addr, uint256(1000 ether), block.chainid));
+        treeElements[1] = keccak256(abi.encodePacked("dummyLeaf1")); // Added dummy leaf
         
         Merkle m = new Merkle(); // Use Murky
         // Inlined: merkleRoot = m.getRoot(treeElements);
@@ -208,9 +209,10 @@ contract MorpherBridgeTest is BaseSetup {
         bytes memory userSignature = abi.encodePacked(r, s, v); // Re-introduce userSignature variable
 
         // Operator prepares Merkle tree and proof
-        bytes32[] memory treeElements = new bytes32[](1);
+        bytes32[] memory treeElements = new bytes32[](2); // Changed size to 2
         // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, uint256(1500 ether), block.chainid));
         treeElements[0] = keccak256(abi.encodePacked(user1.addr, uint256(1500 ether), block.chainid));
+        treeElements[1] = keccak256(abi.encodePacked("dummyLeaf2")); // Added dummy leaf
 
         Merkle m = new Merkle(); // Use Murky
         // Inlined: merkleRoot = m.getRoot(treeElements);
@@ -262,9 +264,10 @@ contract MorpherBridgeTest is BaseSetup {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(uint256(1200 ether), user1.addr, block.chainid)).toEthSignedMessageHash());
         bytes memory userSignature = abi.encodePacked(r, s, v); // Re-introduce userSignature variable
 
-        bytes32[] memory treeElements = new bytes32[](1);
+        bytes32[] memory treeElements = new bytes32[](2); // Changed size to 2
         // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, uint256(2000 ether), block.chainid));
         treeElements[0] = keccak256(abi.encodePacked(user1.addr, uint256(2000 ether), block.chainid));
+        treeElements[1] = keccak256(abi.encodePacked("dummyLeaf3")); // Added dummy leaf
 
         Merkle m = new Merkle(); // Use Murky
         // Inlined: merkleRoot = m.getRoot(treeElements);
