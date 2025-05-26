@@ -3,16 +3,16 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {MerkleProofUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
+import {MerkleProofUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
 
 import "./BaseSetup.sol";
 import "./mocks/ERC20.sol"; // Assuming MorpherToken is ERC20-like for testing burn/mint
 import "./mocks/UniswapRouter.sol"; // Mock Uniswap Router
 import "../contracts/MorpherBridge.sol";
 import "../contracts/MorpherToken.sol"; // For MINTER_ROLE, BURNER_ROLE constants
-import {IPeripheryImmutableState} from '@uniswap/v3-periphery/contracts/interfaces/external/IPeripheryImmutableState.sol'; // For WETH9 address from router
+import {IPeripheryImmutableState} from '../lib/uniswap-v3-periphery/contracts/interfaces/external/IPeripheryImmutableState.sol'; // For WETH9 address from router
 
 contract MorpherBridgeTest is BaseSetup {
     using MessageHashUtils for bytes32;
