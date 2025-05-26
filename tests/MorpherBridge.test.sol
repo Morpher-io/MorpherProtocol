@@ -74,6 +74,7 @@ contract MorpherBridgeTest is BaseSetup {
 
         // Deploy Mock WETH
         wethMock = new MockERC20("Wrapped Ether Mock", "WMETH");
+        vm.deal(address(wethMock), 100 ether); // Fund wethMock with some ETH for withdrawals
 
         // Deploy MockUniswapRouter
         mockSwapRouter = new MockUniswapRouter();
