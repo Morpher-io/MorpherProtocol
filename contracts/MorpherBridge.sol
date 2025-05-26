@@ -409,21 +409,17 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     // ------------------------------------------------------------------------
     function claimStagedTokensConvertAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
         // msg.sender must approve this contract
-        bytes32 messageHash = keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid));
-        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash); // Use MessageHashUtils
-        require(ECDSA.recover(ethSignedMessageHash, _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
+        require(ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid))), _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
         updateSideChainMerkleRoot(_rootHash);
-        bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
-        uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
-        require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
-        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
+        require(mProof(_proof, keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid))), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
+        require(tokenClaimedOnThisChain[_usrAddr].amount + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
 
         verifyUpdateDailyLimit(_usrAddr, _numOfToken); //for usrAddr
         verifyUpdateMonthlyLimit(_usrAddr, _numOfToken);
         verifyUpdateYearlyLimit(_usrAddr, _numOfToken);        
 
         //mint the tokens
-        tokenClaimedOnThisChain[_usrAddr].amount = _tokenClaimed + _numOfToken;
+        tokenClaimedOnThisChain[_usrAddr].amount = tokenClaimedOnThisChain[_usrAddr].amount + _numOfToken;
         tokenClaimedOnThisChain[_usrAddr].lastTransferAt = block.timestamp;
         MorpherToken(state.morpherTokenAddress()).mint(address(this), _numOfToken);
         emit TrustlessWithdrawFromSideChain(_usrAddr, _numOfToken);
@@ -434,12 +430,9 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
         MorpherToken(state.morpherTokenAddress()).transfer(feeRecipient, fee);
         
         
-        uint convertTokens = _numOfToken - fee;
-
-
         // Transfer the specified amount of DAI to this contract.
         // Approve the router to spend DAI.
-        TransferHelper.safeApprove(state.morpherTokenAddress(), address(swapRouter), convertTokens);
+        TransferHelper.safeApprove(state.morpherTokenAddress(), address(swapRouter), _numOfToken - fee);
 
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
@@ -450,7 +443,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp,
-                amountIn: convertTokens,
+                amountIn: _numOfToken - fee,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
             });
@@ -473,21 +466,17 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     // ------------------------------------------------------------------------
     function claimStagedTokensAndSendForUser(address _usrAddr, uint256 _numOfToken, uint256 fee, address feeRecipient, uint256 _claimLimit, bytes32[] memory _proof, address payable _finalOutput, bytes32 _rootHash, bytes memory _userConfirmationSignature) public onlyRole(SIDECHAINOPERATOR_ROLE) returns(uint) {
         // msg.sender must approve this contract
-        bytes32 messageHash = keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid));
-        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash); // Use MessageHashUtils
-        require(ECDSA.recover(ethSignedMessageHash, _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
+        require(ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(keccak256(abi.encodePacked(_numOfToken,_finalOutput,block.chainid))), _userConfirmationSignature) == _usrAddr, "MorpherBridge: Users signature does not validate");
         updateSideChainMerkleRoot(_rootHash);
-        bytes32 leaf = keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid));
-        uint256 _tokenClaimed = tokenClaimedOnThisChain[_usrAddr].amount;  
-        require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
-        require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
+        require(mProof(_proof, keccak256(abi.encodePacked(_usrAddr, _claimLimit, block.chainid))), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
+        require(tokenClaimedOnThisChain[_usrAddr].amount + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
 
         verifyUpdateDailyLimit(_usrAddr, _numOfToken); //for usrAddr
         verifyUpdateMonthlyLimit(_usrAddr, _numOfToken);
         verifyUpdateYearlyLimit(_usrAddr, _numOfToken);        
 
         //mint the tokens
-        tokenClaimedOnThisChain[_usrAddr].amount = _tokenClaimed + _numOfToken;
+        tokenClaimedOnThisChain[_usrAddr].amount = tokenClaimedOnThisChain[_usrAddr].amount + _numOfToken;
         tokenClaimedOnThisChain[_usrAddr].lastTransferAt = block.timestamp;
         MorpherToken(state.morpherTokenAddress()).mint(address(this), _numOfToken);
         emit TrustlessWithdrawFromSideChain(_usrAddr, _numOfToken);
@@ -498,14 +487,14 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
         MorpherToken(state.morpherTokenAddress()).transfer(feeRecipient, fee);
         
         
-        uint convertTokens = _numOfToken - fee;
+        uint256 tokensToSend = _numOfToken - fee;
 
 
         // Transfer the specified amount
-        MorpherToken(state.morpherTokenAddress()).transfer( _finalOutput, convertTokens);
+        MorpherToken(state.morpherTokenAddress()).transfer( _finalOutput, tokensToSend);
         
-        emit WithdrawalSuccess(_finalOutput, convertTokens, false);
-        return convertTokens;
+        emit WithdrawalSuccess(_finalOutput, tokensToSend, false);
+        return tokensToSend;
     }
     
     // ------------------------------------------------------------------------
