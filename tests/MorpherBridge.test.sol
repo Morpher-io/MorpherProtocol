@@ -101,7 +101,7 @@ contract MorpherBridgeTest is BaseSetup {
         // MorpherBridge is now deployed and initialized in BaseSetup.
         // We need to update its swapRouter to the mockSwapRouter for these tests.
         vm.prank(admin.addr); // Now admin.addr has ADMINISTRATOR_ROLE on the bridge
-        morpherBridge.updateSwapRouter(ISwapRouter(address(mockSwapRouter)));
+        morpherBridge.updateSwapRouter(IV3SwapRouter(address(mockSwapRouter)));
 
         // Mint some MPH to user1 for testing
         vm.prank(admin.addr); // Assuming admin has MINTER_ROLE on token
@@ -228,7 +228,7 @@ contract MorpherBridgeTest is BaseSetup {
         // Inlined: expectedEthOut = (1000 ether - 10 ether) / 10000;
         mockSwapRouter.setAmountOut(((1000 ether - 10 ether) / 10000)); 
 
-        vm.prank(sidechainOperator.addr);
+        vm.startPrank(sidechainOperator.addr);
         vm.expectEmit(true, false, false, true); // TrustlessWithdrawFromSideChain
         emit TrustlessWithdrawFromSideChain(user1.addr, 1000 ether);
         vm.expectEmit(true, false, false, true); // WithdrawalSuccess
@@ -256,6 +256,7 @@ contract MorpherBridgeTest is BaseSetup {
 
         // Check withdrawal limits for user1
         assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (1000 ether));
+        vm.stopPrank();
     }
 
 
