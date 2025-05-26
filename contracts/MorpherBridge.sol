@@ -12,11 +12,11 @@ pragma solidity ^0.8.20; // Update pragma if needed
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherAccessControl.sol";
-import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
+import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MerkleProof.sol";
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/Initializable.sol";
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol"; // Added UUPSUpgradeable
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
-import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/ECDSAUpgradeable.sol";
+import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
 import "./MorpherTradeEngine.sol";
 
 import '../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol';
@@ -26,7 +26,7 @@ import '../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryImmutableStat
 
 contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { // Added UUPSUpgradeable
 
-    using ECDSAUpgradeable for bytes32;
+    using ECDSA for bytes32;
 
 
     MorpherState state;
@@ -523,7 +523,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     // Computes merkle proof against the root hash of the sidechain stored in Morpher state
     // ------------------------------------------------------------------------
     function mProof(bytes32[] memory _proof, bytes32 _leaf) public view returns(bool _isTrue) {
-        return MerkleProofUpgradeable.verify(_proof, withdrawalData.merkleRoot, _leaf);
+        return MerkleProof.verify(_proof, withdrawalData.merkleRoot, _leaf);
     }
 
     function getBalanceHash(address _address, uint256 _balance) public pure returns (bytes32 _hash) {
