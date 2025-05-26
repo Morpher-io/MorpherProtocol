@@ -7,8 +7,18 @@ import "../../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol"
 import "../../lib/forge-std/src/console2.sol";
 
 contract MockUniswapRouter is IV3SwapRouter {
+	uint256 public mockAmountOut;
+
+	function setAmountOut(uint256 _amountOut) public {
+		mockAmountOut = _amountOut;
+	}
+
 	function exactInput(ExactInputParams calldata params) external payable override returns (uint256 amountOut) {
-		amountOut = params.amountOutMinimum;
+		if (mockAmountOut > 0) {
+			amountOut = mockAmountOut;
+		} else {
+			amountOut = params.amountOutMinimum;
+		}
 		(address start, address end) = extractFirstAndLastAddress(params.path);
 		IERC20 tokenIn = IERC20(start);
 		IERC20 tokenOut = IERC20(end);
