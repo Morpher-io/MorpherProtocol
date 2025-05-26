@@ -142,67 +142,62 @@ contract MorpherBridgeTest is BaseSetup {
     }
 
     function testStageTokensForTransfer() public {
-        uint256 tokensToStage = 1000 ether;
-        uint256 initialBalance = morpherToken.balanceOf(user1.addr);
-        uint256 withdrawalCost = 100 ether;
-        uint256 expectedTokensToWithdraw = tokensToStage - withdrawalCost;
+        // Inlined: tokensToStage = 1000 ether; withdrawalCost = 100 ether; expectedTokensToWithdraw = 1000 ether - 100 ether;
+        uint256 initialBalance = morpherToken.balanceOf(user1.addr); // Keep this as it's used before the state change
 
         vm.prank(user1.addr);
         vm.expectEmit(true, true, false, true); // from, tokens, totalTokenSent, timeStamp, transferNonce, targetChainId, transferHash
-        emit TransferToLinkedChain(user1.addr, expectedTokensToWithdraw, expectedTokensToWithdraw, block.timestamp, 1, 137, bytes32(0)); // transferHash is dynamic
-        morpherBridge.stageTokensForTransfer(tokensToStage, 137); // 137 for Polygon mainnet example
+        emit TransferToLinkedChain(user1.addr, (1000 ether - 100 ether), (1000 ether - 100 ether), block.timestamp, 1, 137, bytes32(0)); // transferHash is dynamic
+        morpherBridge.stageTokensForTransfer(1000 ether, 137); // 137 for Polygon mainnet example
 
-        assertEq(morpherToken.balanceOf(user1.addr), initialBalance - tokensToStage, "Tokens not burned correctly");
+        assertEq(morpherToken.balanceOf(user1.addr), initialBalance - (1000 ether), "Tokens not burned correctly");
         (uint256 amountSent, uint256 lastTransferAt) = morpherBridge.tokenSentToLinkedChain(user1.addr, 137);
-        assertEq(amountSent, expectedTokensToWithdraw, "tokenSentToLinkedChain amount incorrect");
+        assertEq(amountSent, (1000 ether - 100 ether), "tokenSentToLinkedChain amount incorrect");
         assertTrue(lastTransferAt > 0, "tokenSentToLinkedChain lastTransferAt not set");
         assertEq(morpherBridge.bridgeNonce(), 1, "Bridge nonce not incremented");
 
         // Check withdrawal limits
-        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), tokensToStage);
-        assertEq(morpherBridge.withdrawalsGlobalDaily(block.timestamp / ONE_DAY), tokensToStage);
+        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (1000 ether));
+        assertEq(morpherBridge.withdrawalsGlobalDaily(block.timestamp / ONE_DAY), (1000 ether));
     }
 
     function testClaimStagedTokens() public {
         // 1. Stage tokens (implicitly tested elsewhere, setup state manually for focus)
         // For this test, let's assume operator updates root, then user claims.
-        uint256 claimAmount = 500 ether;
-        uint256 userClaimLimitOnSidechain = 1000 ether; // User's total available to claim from sidechain
+        // Inlined: claimAmount = 500 ether; userClaimLimitOnSidechain = 1000 ether;
 
         // Operator updates merkle root
         bytes32[] memory treeElements = new bytes32[](1);
-        bytes32 leaf = keccak256(abi.encodePacked(user1.addr, userClaimLimitOnSidechain, block.chainid));
-        treeElements[0] = leaf;
+        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, 1000 ether, block.chainid));
+        treeElements[0] = keccak256(abi.encodePacked(user1.addr, 1000 ether, block.chainid));
         
         Merkle m = new Merkle(); // Use Murky
-        bytes32 merkleRoot = m.getRoot(treeElements); // Use Murky
-
+        // Inlined: merkleRoot = m.getRoot(treeElements);
         vm.prank(sidechainOperator.addr);
-        morpherBridge.updateSideChainMerkleRoot(merkleRoot);
+        morpherBridge.updateSideChainMerkleRoot(m.getRoot(treeElements));
 
         // User prepares proof
-        bytes32[] memory proof = m.getProof(treeElements, 0); // Use Murky
-
-        uint256 initialUserBalance = morpherToken.balanceOf(user1.addr);
+        // Inlined: proof = m.getProof(treeElements, 0);
+        uint256 initialUserBalance = morpherToken.balanceOf(user1.addr); // Keep this
 
         vm.prank(user1.addr);
         vm.expectEmit(true, false, false, true);
-        emit TrustlessWithdrawFromSideChain(user1.addr, claimAmount);
-        morpherBridge.claimStagedTokens(claimAmount, userClaimLimitOnSidechain, proof);
+        emit TrustlessWithdrawFromSideChain(user1.addr, 500 ether);
+        morpherBridge.claimStagedTokens(500 ether, 1000 ether, m.getProof(treeElements, 0));
 
-        assertEq(morpherToken.balanceOf(user1.addr), initialUserBalance + claimAmount, "Tokens not minted correctly");
+        assertEq(morpherToken.balanceOf(user1.addr), initialUserBalance + (500 ether), "Tokens not minted correctly");
         (uint256 amountClaimed, ) = morpherBridge.tokenClaimedOnThisChain(user1.addr);
-        assertEq(amountClaimed, claimAmount, "tokenClaimedOnThisChain incorrect");
+        assertEq(amountClaimed, (500 ether), "tokenClaimedOnThisChain incorrect");
 
         // Check withdrawal limits
-        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), claimAmount);
-        assertEq(morpherBridge.withdrawalsGlobalDaily(block.timestamp / ONE_DAY), claimAmount);
+        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (500 ether));
+        assertEq(morpherBridge.withdrawalsGlobalDaily(block.timestamp / ONE_DAY), (500 ether));
 
         // Test invalid proof
         bytes32[] memory invalidProof = new bytes32[](0);
         vm.prank(user1.addr);
         vm.expectRevert("MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
-        morpherBridge.claimStagedTokens(claimAmount, userClaimLimitOnSidechain, invalidProof);
+        morpherBridge.claimStagedTokens(500 ether, 1000 ether, invalidProof);
     }
 
     function testClaimStagedTokensConvertAndSendForUser_Signature() public {
@@ -273,85 +268,82 @@ contract MorpherBridgeTest is BaseSetup {
 
 
     function testClaimStagedTokensAndSendForUser_Signature() public {
-        uint256 numOfTokenToClaim = 1200 ether;
-        uint256 fee = 20 ether;
-        uint256 claimLimitOnSidechain = 2000 ether;
+        // Inlined: numOfTokenToClaim = 1200 ether; fee = 20 ether; claimLimitOnSidechain = 2000 ether;
 
-        bytes32 messageHash = keccak256(abi.encodePacked(numOfTokenToClaim, user1.addr, block.chainid));
-        bytes32 ethSignedMessageHash = messageHash.toEthSignedMessageHash();
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, ethSignedMessageHash);
-        bytes memory userSignature = abi.encodePacked(r, s, v);
+        // Inlined: messageHash = keccak256(abi.encodePacked(1200 ether, user1.addr, block.chainid));
+        // Inlined: ethSignedMessageHash = keccak256(abi.encodePacked(1200 ether, user1.addr, block.chainid)).toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1.key, keccak256(abi.encodePacked(1200 ether, user1.addr, block.chainid)).toEthSignedMessageHash());
+        // Inlined: userSignature = abi.encodePacked(r, s, v);
 
         bytes32[] memory treeElements = new bytes32[](1);
-        bytes32 leaf = keccak256(abi.encodePacked(user1.addr, claimLimitOnSidechain, block.chainid));
-        treeElements[0] = leaf;
+        // Inlined: leaf = keccak256(abi.encodePacked(user1.addr, 2000 ether, block.chainid));
+        treeElements[0] = keccak256(abi.encodePacked(user1.addr, 2000 ether, block.chainid));
 
         Merkle m = new Merkle(); // Use Murky
-        bytes32 merkleRoot = m.getRoot(treeElements); // Use Murky
-        bytes32[] memory proof = m.getProof(treeElements, 0); // Use Murky
+        // Inlined: merkleRoot = m.getRoot(treeElements);
+        // Inlined: proof = m.getProof(treeElements, 0);
 
-        uint256 initialFeeRecipientBalance = morpherToken.balanceOf(feeRecipient.addr);
-        uint256 initialUser1MphBalance = morpherToken.balanceOf(user1.addr);
-        uint256 expectedMphToUser = numOfTokenToClaim - fee;
+        uint256 initialFeeRecipientBalance = morpherToken.balanceOf(feeRecipient.addr); // Keep
+        uint256 initialUser1MphBalance = morpherToken.balanceOf(user1.addr); // Keep
+        // Inlined: expectedMphToUser = 1200 ether - 20 ether;
 
         vm.prank(sidechainOperator.addr);
         vm.expectEmit(true, false, false, true); // TrustlessWithdrawFromSideChain
-        emit TrustlessWithdrawFromSideChain(user1.addr, numOfTokenToClaim);
+        emit TrustlessWithdrawFromSideChain(user1.addr, 1200 ether);
         vm.expectEmit(true, false, false, true); // WithdrawalSuccess
-        emit WithdrawalSuccess(user1.addr, expectedMphToUser, false); // false because it's ERC20
+        emit WithdrawalSuccess(user1.addr, (1200 ether - 20 ether), false); // false because it's ERC20
 
         uint returnedAmount = morpherBridge.claimStagedTokensAndSendForUser(
             user1.addr,
-            numOfTokenToClaim,
-            fee,
+            1200 ether, // numOfTokenToClaim
+            20 ether,   // fee
             feeRecipient.addr,
-            claimLimitOnSidechain,
-            proof,
+            2000 ether, // claimLimitOnSidechain
+            m.getProof(treeElements, 0), // proof
             payable(user1.addr),
-            merkleRoot,
-            userSignature
+            m.getRoot(treeElements), // merkleRoot
+            abi.encodePacked(r, s, v) // userSignature
         );
-        assertEq(returnedAmount, expectedMphToUser, "Returned amount incorrect");
+        assertEq(returnedAmount, (1200 ether - 20 ether), "Returned amount incorrect");
 
         (bytes32 currentMerkleRootUser, ) = morpherBridge.withdrawalData();
-        assertEq(currentMerkleRootUser, merkleRoot, "Merkle root not updated by operator");
-        assertEq(morpherToken.balanceOf(feeRecipient.addr), initialFeeRecipientBalance + fee, "Fee not transferred");
-        assertEq(morpherToken.balanceOf(user1.addr), initialUser1MphBalance + expectedMphToUser, "MPH not received by user");
+        assertEq(currentMerkleRootUser, m.getRoot(treeElements), "Merkle root not updated by operator");
+        assertEq(morpherToken.balanceOf(feeRecipient.addr), initialFeeRecipientBalance + (20 ether), "Fee not transferred");
+        assertEq(morpherToken.balanceOf(user1.addr), initialUser1MphBalance + (1200 ether - 20 ether), "MPH not received by user");
         (uint256 amountClaimed, ) = morpherBridge.tokenClaimedOnThisChain(user1.addr);
-        assertEq(amountClaimed, numOfTokenToClaim, "tokenClaimedOnThisChain incorrect for user");
+        assertEq(amountClaimed, (1200 ether), "tokenClaimedOnThisChain incorrect for user");
     }
 
 
     function testWithdrawalLimits_Daily() public {
-        uint256 dailyLimit = morpherBridge.withdrawalLimitPerUserDaily(); // 200k
-        uint256 amount1 = dailyLimit - 100 ether;
-        uint256 amount2 = 50 ether;
-        uint256 amount3 = 60 ether; // This will exceed (amount1 + amount2 + amount3 > dailyLimit)
+        // Inlined: dailyLimit = morpherBridge.withdrawalLimitPerUserDaily(); // 200k
+        // Inlined: amount1 = morpherBridge.withdrawalLimitPerUserDaily() - 100 ether;
+        // Inlined: amount2 = 50 ether;
+        // Inlined: amount3 = 60 ether; 
 
         // User 1: amount1
         vm.prank(user1.addr);
-        morpherBridge.stageTokensForTransfer(amount1, 137); // withdrawalCost is 100, so actual tokens staged is amount1-100
-                                                          // but limits are checked on `tokensToStage` which is `amount1`
-
+        morpherBridge.stageTokensForTransfer(morpherBridge.withdrawalLimitPerUserDaily() - 100 ether, 137); 
+                                                          
         // User 1: amount2
         vm.prank(user1.addr);
-        morpherBridge.stageTokensForTransfer(amount2, 137);
+        morpherBridge.stageTokensForTransfer(50 ether, 137);
 
-        uint256 totalForUser1 = amount1 + amount2;
-        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), totalForUser1);
+        // Inlined: totalForUser1 = (morpherBridge.withdrawalLimitPerUserDaily() - 100 ether) + 50 ether;
+        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (morpherBridge.withdrawalLimitPerUserDaily() - 100 ether) + 50 ether);
 
         // User 1: amount3 - should fail
         vm.prank(user1.addr);
         vm.expectRevert("MorpherBridge: Withdrawal Amount exceeds daily limit");
-        morpherBridge.stageTokensForTransfer(amount3, 137);
+        morpherBridge.stageTokensForTransfer(60 ether, 137);
 
         // Warp time to next day
         vm.warp(block.timestamp + 1 days + 1 hours);
 
         // User 1: amount3 - should succeed now
         vm.prank(user1.addr);
-        morpherBridge.stageTokensForTransfer(amount3, 137);
-        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), amount3);
+        morpherBridge.stageTokensForTransfer(60 ether, 137);
+        assertEq(morpherBridge.withdrawalPerUserPerDay(user1.addr, block.timestamp / ONE_DAY), (60 ether));
     }
 
     // --- Helper to deploy proxy for tests --- // Removed as bridge is deployed in BaseSetup
