@@ -340,8 +340,8 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     // ------------------------------------------------------------------------
     function claimStagedTokens(uint256 _numOfToken, uint256 _claimLimit, bytes32[] memory _proof) public userNotBlocked {
         bytes32 leaf = keccak256(abi.encodePacked(_msgSender(), _claimLimit, block.chainid));
-        uint256 _tokenClaimed = tokenClaimedOnThisChain[_msgSender()].amount;  
         require(mProof(_proof, leaf), "MorpherBridge: Merkle Proof failed. Please make sure you entered the correct claim limit.");
+        uint256 _tokenClaimed = tokenClaimedOnThisChain[_msgSender()].amount;  
         require(_tokenClaimed + _numOfToken <= _claimLimit, "MorpherBridge: Token amount exceeds token deleted on linked chain."); 
 
         verifyUpdateDailyLimit(_msgSender(), _numOfToken);
