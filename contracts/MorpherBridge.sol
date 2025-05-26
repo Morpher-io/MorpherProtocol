@@ -14,6 +14,7 @@ import "./MorpherUserBlocking.sol";
 import "./MorpherAccessControl.sol";
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/Initializable.sol";
+import "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol"; // Added UUPSUpgradeable
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
 import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 import "./MorpherTradeEngine.sol";
@@ -23,7 +24,7 @@ import '../lib/uniswap-v3-periphery/contracts/libraries/TransferHelper.sol';
 import '../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol';
 import '../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 
-contract MorpherBridge is Initializable, ContextUpgradeable {
+contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { // Added UUPSUpgradeable
 
     using ECDSAUpgradeable for bytes32;
 
@@ -122,6 +123,8 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
     event WithdrawalSuccess(address _destination, uint _amount, bool _convertedToGasToken);
 
     function initialize(address _stateAddress, bool _recoveryEnabled, ISwapRouter _swapRouter) public initializer {
+        __UUPSUpgradeable_init();
+        __Context_init();
         //as of June 14, Martin :
         //User: daily 200k / monthly 1m / yearly 5m
         //Global: daily 3m / monthly 10m / yearly 50m
@@ -534,5 +537,17 @@ contract MorpherBridge is Initializable, ContextUpgradeable {
 
     receive() external payable {
         //needed to convert the weth to eth and send to user
+    }
+
+    function _authorizeUpgrade(address /* newImplementation */) internal view override {
+        address accessControlAddress = state.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "MorpherBridge: AccessControl not set in State");
+        require(
+            MorpherAccessControl(accessControlAddress).hasRole(
+                MorpherAccessControl(accessControlAddress).PROXYUPDATER_ROLE(),
+                msg.sender // Use msg.sender directly for upgrade authorization
+            ),
+            "MorpherBridge: Caller is not the proxy updater"
+        );
     }
 }
