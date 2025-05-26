@@ -42,12 +42,13 @@ contract MockUniswapRouter is IV3SwapRouter {
 		} else {
 			amountOut = params.amountOutMinimum;
 		}
+		console2.log("MockUniswapRouter.exactInputSingle: ENTERED"); // Make this the very first line
+
 		IERC20 tokenIn = IERC20(params.tokenIn);
 		IERC20 tokenOut = IERC20(params.tokenOut);
 
-		console2.log("MockUniswapRouter.exactInputSingle called");
-		console2.log("  msg.sender (Bridge):", msg.sender);
-		console2.log("  Router address (this):", address(this));
+		console2.log("  MockUniswapRouter - msg.sender (Bridge):", msg.sender);
+		console2.log("  MockUniswapRouter - Router address (this):", address(this));
 		console2.log("  tokenIn:", address(tokenIn));
 		console2.log("  tokenOut:", address(tokenOut));
 		console2.log("  params.amountIn:", params.amountIn);
