@@ -12,16 +12,16 @@ pragma solidity ^0.8.20; // Update pragma if needed
 import "./MorpherState.sol";
 import "./MorpherUserBlocking.sol";
 import "./MorpherAccessControl.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/MerkleProofUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/Initializable.sol";
+import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/ContextUpgradeable.sol";
+import "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 import "./MorpherTradeEngine.sol";
 
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
+import '../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol';
+import '../lib/uniswap-v3-periphery/contracts/libraries/TransferHelper.sol';
+import '../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol';
+import '../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 
 contract MorpherBridge is Initializable, ContextUpgradeable {
 
