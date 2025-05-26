@@ -7,7 +7,7 @@
 // 72 hours positions and balaces from side chain can be transferred to main chain.
 // ------------------------------------------------------------------------
 //SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.20; // Update pragma if needed
+pragma solidity ^0.8.15;
 
 import "../lib/forge-std/src/console2.sol"; // Added console2 import
 import "./MorpherState.sol";
@@ -21,7 +21,7 @@ import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
 import "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol"; // Added MessageHashUtils
 import "./MorpherTradeEngine.sol";
 
-import '../lib/uniswap-v3-periphery/contracts/interfaces/ISwapRouter.sol';
+import "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol"; // Keep external interface
 import '../lib/uniswap-v3-periphery/contracts/libraries/TransferHelper.sol';
 import '../lib/uniswap-v3-periphery/contracts/interfaces/external/IWETH9.sol';
 import '../lib/uniswap-v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
@@ -63,7 +63,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
     bool public recoveryEnabled;
     mapping(bytes32 => bool) public claimFromInactivity;
 
-    ISwapRouter public swapRouter;
+    IV3SwapRouter public swapRouter;
 
     // For this example, we will set the pool fee to 0.3%.
     uint24 public constant poolFee = 3000;
@@ -123,7 +123,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
      */
     event WithdrawalSuccess(address _destination, uint _amount, bool _convertedToGasToken);
 
-    function initialize(address _stateAddress, bool _recoveryEnabled, ISwapRouter _swapRouter) public initializer {
+    function initialize(address _stateAddress, bool _recoveryEnabled, IV3SwapRouter _swapRouter) public initializer {
         __UUPSUpgradeable_init();
         __Context_init();
         //as of June 14, Martin :
@@ -175,7 +175,7 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
         emit LinkState(_stateAddress);
     }
 
-    function updateSwapRouter(ISwapRouter _swapRouter) public onlyRole(ADMINISTRATOR_ROLE) {
+    function updateSwapRouter(IV3SwapRouter _swapRouter) public onlyRole(ADMINISTRATOR_ROLE) {
         swapRouter = _swapRouter;
     }
 
@@ -379,13 +379,13 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
 
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
+        IV3SwapRouter.ExactInputSingleParams memory params =
+            IV3SwapRouter.ExactInputSingleParams({
                 tokenIn: state.morpherTokenAddress(),
                 tokenOut: IPeripheryImmutableState(address(swapRouter)).WETH9(),
                 fee: poolFee,
                 recipient: address(this),
-                deadline: block.timestamp + 60, // Set deadline 60 seconds in the future
+                // deadline: block.timestamp + 60, // Set deadline 60 seconds in the future //router 02 doesn't have a deadline
                 amountIn: _numOfToken,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -445,13 +445,13 @@ contract MorpherBridge is Initializable, ContextUpgradeable, UUPSUpgradeable { /
 
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
+        IV3SwapRouter.ExactInputSingleParams memory params =
+            IV3SwapRouter.ExactInputSingleParams({
                 tokenIn: state.morpherTokenAddress(),
                 tokenOut: IPeripheryImmutableState(address(swapRouter)).WETH9(),
                 fee: poolFee,
                 recipient: address(this),
-                deadline: block.timestamp + 60, // Set deadline 60 seconds in the future
+                // deadline: block.timestamp + 60, // Set deadline 60 seconds in the future
                 amountIn: _numOfToken - fee,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
