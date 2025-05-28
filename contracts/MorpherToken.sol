@@ -380,7 +380,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * @param lockDuration Duration in seconds for which tokens will be locked
 	 */
 	function lockTokensForTime(address account, uint256 amount, uint256 lockDuration) public onlyRole(AIRDROPADMIN_ROLE) {
-		require(balanceOf(account) >= amount, "MorpherToken: insufficient balance for locking");
+		// require(balanceOf(account) >= amount, "MorpherToken: insufficient balance for locking"); //we should be able to set the timelock 
 		
 		uint256 unlockTime = block.timestamp + lockDuration;
 		
