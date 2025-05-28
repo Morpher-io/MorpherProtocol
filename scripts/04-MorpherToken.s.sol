@@ -115,25 +115,25 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 				tokenContract.setMorpherStateAddress(stateAddress);
 			}
 			// Example: Update daily limit if changed
-			// uint256 newDailyLimit = 250_000 ether; // Example value
-			// if (tokenContract.getDailyMintedTransferLimit() != newDailyLimit) {
-			//     console.log("Updating daily minted transfer limit to:", newDailyLimit / 1 ether);
-			//     tokenContract.setDailyMintedTransferLimit(newDailyLimit);
-			// }
+			uint256 newDailyLimit = 200_000 ether; // Example value
+			if (tokenContract.getDailyMintedTransferLimit() != newDailyLimit) {
+			    console.log("Updating daily minted transfer limit to:", newDailyLimit / 1 ether);
+			    tokenContract.setDailyMintedTransferLimit(newDailyLimit);
+			}
 
 			// Example: Update monthly limit if changed or not set (0 means effectively no limit if not intended)
-			// uint256 newMonthlyLimit = 1_000_000 ether; // Example: 1M MPH
-			// if (tokenContract.getMonthlyMintedTransferLimit() != newMonthlyLimit) {
-			//     console.log("Updating monthly minted transfer limit to:", newMonthlyLimit / 1 ether);
-			//     tokenContract.setMonthlyMintedTransferLimit(newMonthlyLimit);
-			// }
+			uint256 newMonthlyLimit = 1_000_000 ether; // Example: 1M MPH
+			if (tokenContract.getMonthlyMintedTransferLimit() != newMonthlyLimit) {
+			    console.log("Updating monthly minted transfer limit to:", newMonthlyLimit / 1 ether);
+			    tokenContract.setMonthlyMintedTransferLimit(newMonthlyLimit);
+			}
 
 			// Example: Update yearly limit if changed or not set
-			// uint256 newYearlyLimit = 5_000_000 ether; // Example: 5M MPH
-			// if (tokenContract.getYearlyMintedTransferLimit() != newYearlyLimit) {
-			//     console.log("Updating yearly minted transfer limit to:", newYearlyLimit / 1 ether);
-			//     tokenContract.setYearlyMintedTransferLimit(newYearlyLimit);
-			// }
+			uint256 newYearlyLimit = 5_000_000 ether; // Example: 5M MPH
+			if (tokenContract.getYearlyMintedTransferLimit() != newYearlyLimit) {
+			    console.log("Updating yearly minted transfer limit to:", newYearlyLimit / 1 ether);
+			    tokenContract.setYearlyMintedTransferLimit(newYearlyLimit);
+			}
 		}
 
 		vm.stopBroadcast();

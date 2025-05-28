@@ -471,14 +471,14 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * @dev Returns the amount of minted tokens transferred this month for an account
 	 */
 	function getMonthlyMintedTransfers(address account) public view returns (uint256) {
-		return _monthlyMintedTransfers[account][block.timestamp / 1 months];
+		return _monthlyMintedTransfers[account][block.timestamp / 30 days];
 	}
 
 	/**
 	 * @dev Returns the amount of minted tokens transferred this year for an account
 	 */
 	function getYearlyMintedTransfers(address account) public view returns (uint256) {
-		return _yearlyMintedTransfers[account][block.timestamp / 1 years];
+		return _yearlyMintedTransfers[account][block.timestamp / 365 days];
 	}
 
 	/**
@@ -503,13 +503,13 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 			remainingDailyLimit = _dailyMintedTransferLimit - transferredToday;
 		}
 
-		uint256 transferredThisMonth = _monthlyMintedTransfers[account][block.timestamp / 1 months];
+		uint256 transferredThisMonth = _monthlyMintedTransfers[account][block.timestamp / 30 days];
 		uint256 remainingMonthlyLimit = 0;
 		if (_monthlyMintedTransferLimit > transferredThisMonth) {
 			remainingMonthlyLimit = _monthlyMintedTransferLimit - transferredThisMonth;
 		}
 
-		uint256 transferredThisYear = _yearlyMintedTransfers[account][block.timestamp / 1 years];
+		uint256 transferredThisYear = _yearlyMintedTransfers[account][block.timestamp / 365 days];
 		uint256 remainingYearlyLimit = 0;
 		if (_yearlyMintedTransferLimit > transferredThisYear) {
 			remainingYearlyLimit = _yearlyMintedTransferLimit - transferredThisYear;
@@ -608,12 +608,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 				// Any remaining amount comes from minted balance and is subject to daily, monthly, and yearly limits
 				if (amountSubjectToLimits > 0) {
 					uint256 today = block.timestamp / 1 days;
-					uint256 currentMonth = block.timestamp / 1 months;
-					uint256 currentYear = block.timestamp / 1 years;
-
-					uint256 transferredToday = _dailyMintedTransfers[from][today];
-					uint256 transferredThisMonth = _monthlyMintedTransfers[from][currentMonth];
-					uint256 transferredThisYear = _yearlyMintedTransfers[from][currentYear];
+					uint256 currentMonth = block.timestamp / 30 days;
+					uint256 currentYear = block.timestamp / 365 days;
 
 					bool isAdminOrUnrestricted = morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()) ||
 												 morpherAccessControl.hasRole(UNRESTRICTEDTRANSFER_ROLE, _msgSender());
@@ -621,19 +617,19 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 					// Check if this operation exceeds any of the limits for minted tokens
 					if (_dailyMintedTransferLimit > 0) {
 						require(
-							transferredToday + amountSubjectToLimits <= _dailyMintedTransferLimit || isAdminOrUnrestricted,
+							_dailyMintedTransfers[from][today] + amountSubjectToLimits <= _dailyMintedTransferLimit || isAdminOrUnrestricted,
 							"MorpherToken: daily minted token operation limit exceeded"
 						);
 					}
 					if (_monthlyMintedTransferLimit > 0) {
 						require(
-							transferredThisMonth + amountSubjectToLimits <= _monthlyMintedTransferLimit || isAdminOrUnrestricted,
+							_monthlyMintedTransfers[from][currentMonth] + amountSubjectToLimits <= _monthlyMintedTransferLimit || isAdminOrUnrestricted,
 							"MorpherToken: monthly minted token operation limit exceeded"
 						);
 					}
 					if (_yearlyMintedTransferLimit > 0) {
 						require(
-							transferredThisYear + amountSubjectToLimits <= _yearlyMintedTransferLimit || isAdminOrUnrestricted,
+							_yearlyMintedTransfers[from][currentYear] + amountSubjectToLimits <= _yearlyMintedTransferLimit || isAdminOrUnrestricted,
 							"MorpherToken: yearly minted token operation limit exceeded"
 						);
 					}
