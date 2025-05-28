@@ -67,6 +67,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	event TokensUnlocked(address indexed account, uint256 amount);
 	event MigrationTokensLocked(address indexed account, uint256 amount, uint256 lockedUntil);
 	event DailyMintedTransferLimitUpdated(uint256 oldLimit, uint256 newLimit);
+	event MonthlyMintedTransferLimitUpdated(uint256 oldLimit, uint256 newLimit);
+	event YearlyMintedTransferLimitUpdated(uint256 oldLimit, uint256 newLimit);
 	event MintedTokensTransferred(address indexed from, address indexed to, uint256 amount);
 	event TokensTransferredIn(address indexed to, uint256 amount);
 
@@ -95,6 +97,16 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 
 	// Total amount of time-locked tokens across all users (Removed but left here for proxy updates)
 	uint256 private _totalTimeLocked;
+
+	// Mapping to track monthly transfers of net minted tokens
+	mapping(address => mapping(uint256 => uint256)) private _monthlyMintedTransfers;
+	// Monthly transfer limit for net minted tokens
+	uint256 private _monthlyMintedTransferLimit;
+
+	// Mapping to track yearly transfers of net minted tokens
+	mapping(address => mapping(uint256 => uint256)) private _yearlyMintedTransfers;
+	// Yearly transfer limit for net minted tokens
+	uint256 private _yearlyMintedTransferLimit;
 
 
 	event SetTotalTokensOnOtherChain(uint256 _oldValue, uint256 _newValue);
@@ -401,12 +413,44 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		emit DailyMintedTransferLimitUpdated(_dailyMintedTransferLimit, limit);
 		_dailyMintedTransferLimit = limit;
 	}
+
+	/**
+	 * @dev Sets the monthly transfer limit for minted tokens
+	 * @param limit New monthly transfer limit
+	 */
+	function setMonthlyMintedTransferLimit(uint256 limit) public onlyRole(ADMINISTRATOR_ROLE) {
+		emit MonthlyMintedTransferLimitUpdated(_monthlyMintedTransferLimit, limit);
+		_monthlyMintedTransferLimit = limit;
+	}
+
+	/**
+	 * @dev Sets the yearly transfer limit for minted tokens
+	 * @param limit New yearly transfer limit
+	 */
+	function setYearlyMintedTransferLimit(uint256 limit) public onlyRole(ADMINISTRATOR_ROLE) {
+		emit YearlyMintedTransferLimitUpdated(_yearlyMintedTransferLimit, limit);
+		_yearlyMintedTransferLimit = limit;
+	}
 	
 	/**
 	 * @dev Returns the daily transfer limit for minted tokens
 	 */
 	function getDailyMintedTransferLimit() public view returns (uint256) {
 		return _dailyMintedTransferLimit;
+	}
+
+	/**
+	 * @dev Returns the monthly transfer limit for minted tokens
+	 */
+	function getMonthlyMintedTransferLimit() public view returns (uint256) {
+		return _monthlyMintedTransferLimit;
+	}
+
+	/**
+	 * @dev Returns the yearly transfer limit for minted tokens
+	 */
+	function getYearlyMintedTransferLimit() public view returns (uint256) {
+		return _yearlyMintedTransferLimit;
 	}
 	
 	/**
@@ -421,6 +465,20 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 */
 	function getDailyMintedTransfers(address account) public view returns (uint256) {
 		return _dailyMintedTransfers[account][block.timestamp / 1 days];
+	}
+
+	/**
+	 * @dev Returns the amount of minted tokens transferred this month for an account
+	 */
+	function getMonthlyMintedTransfers(address account) public view returns (uint256) {
+		return _monthlyMintedTransfers[account][block.timestamp / 1 months];
+	}
+
+	/**
+	 * @dev Returns the amount of minted tokens transferred this year for an account
+	 */
+	function getYearlyMintedTransfers(address account) public view returns (uint256) {
+		return _yearlyMintedTransfers[account][block.timestamp / 1 years];
 	}
 
 	/**
@@ -445,6 +503,18 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 			remainingDailyLimit = _dailyMintedTransferLimit - transferredToday;
 		}
 
+		uint256 transferredThisMonth = _monthlyMintedTransfers[account][block.timestamp / 1 months];
+		uint256 remainingMonthlyLimit = 0;
+		if (_monthlyMintedTransferLimit > transferredThisMonth) {
+			remainingMonthlyLimit = _monthlyMintedTransferLimit - transferredThisMonth;
+		}
+
+		uint256 transferredThisYear = _yearlyMintedTransfers[account][block.timestamp / 1 years];
+		uint256 remainingYearlyLimit = 0;
+		if (_yearlyMintedTransferLimit > transferredThisYear) {
+			remainingYearlyLimit = _yearlyMintedTransferLimit - transferredThisYear;
+		}
+
 		// 4. Calculate the portion of available balance that is 'minted'
 		uint256 availableMinted = 0;
 		if (availableBalance > transferredIn) {
@@ -452,8 +522,12 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		}
 
 		// 5. Determine the amount transferable from the 'minted' bucket today
-		// It's the minimum of what's available in the minted bucket and the remaining daily limit
-		uint256 transferableMintedToday = availableMinted < remainingDailyLimit ? availableMinted : remainingDailyLimit; // Equivalent to min(availableMinted, remainingDailyLimit)
+		// It's the minimum of what's available in the minted bucket and the remaining daily, monthly, and yearly limits
+		uint256 transferableMintedToday = availableMinted;
+		transferableMintedToday = transferableMintedToday < remainingDailyLimit ? transferableMintedToday : remainingDailyLimit;
+		transferableMintedToday = transferableMintedToday < remainingMonthlyLimit ? transferableMintedToday : remainingMonthlyLimit;
+		transferableMintedToday = transferableMintedToday < remainingYearlyLimit ? transferableMintedToday : remainingYearlyLimit;
+
 
 		// 6. Determine the amount transferable from the 'transferred-in' bucket
 		// It's the minimum of what's available in the bucket and the overall available balance
@@ -519,36 +593,59 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 					emit TokensTransferredIn(to, amount);
 				}
 
-				// Apply daily limit logic to the sender (applies to 'from' for both transfers and user-initiated burns)
-				uint256 amountSubjectToDailyLimit = amount;
+				// Apply transfer limit logic to the sender (applies to 'from' for both transfers and user-initiated burns)
+				uint256 amountSubjectToLimits = amount;
 
-				// Use transferred-in tokens first (not subject to daily limit)
+				// Use transferred-in tokens first (not subject to limits)
 				if (_transferredInTokens[from] > 0) {
-					uint256 useFromTransferredIn = amountSubjectToDailyLimit > _transferredInTokens[from]
+					uint256 useFromTransferredIn = amountSubjectToLimits > _transferredInTokens[from]
 						? _transferredInTokens[from]
-						: amountSubjectToDailyLimit;
+						: amountSubjectToLimits;
 					_transferredInTokens[from] -= useFromTransferredIn;
-					amountSubjectToDailyLimit -= useFromTransferredIn;
+					amountSubjectToLimits -= useFromTransferredIn;
 				}
 
-				// Any remaining amount comes from minted balance and is subject to daily limit
-				if (amountSubjectToDailyLimit > 0 && _dailyMintedTransferLimit > 0) {
+				// Any remaining amount comes from minted balance and is subject to daily, monthly, and yearly limits
+				if (amountSubjectToLimits > 0) {
 					uint256 today = block.timestamp / 1 days;
+					uint256 currentMonth = block.timestamp / 1 months;
+					uint256 currentYear = block.timestamp / 1 years;
+
 					uint256 transferredToday = _dailyMintedTransfers[from][today];
+					uint256 transferredThisMonth = _monthlyMintedTransfers[from][currentMonth];
+					uint256 transferredThisYear = _yearlyMintedTransfers[from][currentYear];
 
-					// Check if this operation exceeds the daily limit for minted tokens
-					require(
-						transferredToday + amountSubjectToDailyLimit <= _dailyMintedTransferLimit ||
-							morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()) || 
-							morpherAccessControl.hasRole(UNRESTRICTEDTRANSFER_ROLE, _msgSender()),
-						"MorpherToken: daily minted token operation limit exceeded" // Generalized message
-					);
+					bool isAdminOrUnrestricted = morpherAccessControl.hasRole(ADMINISTRATOR_ROLE, _msgSender()) ||
+												 morpherAccessControl.hasRole(UNRESTRICTEDTRANSFER_ROLE, _msgSender());
 
-					// Update the daily transfer/operation amount from minted supply
-					_dailyMintedTransfers[from][today] += amountSubjectToDailyLimit;
+					// Check if this operation exceeds any of the limits for minted tokens
+					if (_dailyMintedTransferLimit > 0) {
+						require(
+							transferredToday + amountSubjectToLimits <= _dailyMintedTransferLimit || isAdminOrUnrestricted,
+							"MorpherToken: daily minted token operation limit exceeded"
+						);
+					}
+					if (_monthlyMintedTransferLimit > 0) {
+						require(
+							transferredThisMonth + amountSubjectToLimits <= _monthlyMintedTransferLimit || isAdminOrUnrestricted,
+							"MorpherToken: monthly minted token operation limit exceeded"
+						);
+					}
+					if (_yearlyMintedTransferLimit > 0) {
+						require(
+							transferredThisYear + amountSubjectToLimits <= _yearlyMintedTransferLimit || isAdminOrUnrestricted,
+							"MorpherToken: yearly minted token operation limit exceeded"
+						);
+					}
+
+					// Update the transfer/operation amounts from minted supply
+					_dailyMintedTransfers[from][today] += amountSubjectToLimits;
+					_monthlyMintedTransfers[from][currentMonth] += amountSubjectToLimits;
+					_yearlyMintedTransfers[from][currentYear] += amountSubjectToLimits;
+					
 					// For burns, 'to' will be address(0). This event logs the portion of the operation
-					// that came from the "minted" bucket and was subject to the limit.
-					emit MintedTokensTransferred(from, to, amountSubjectToDailyLimit);
+					// that came from the "minted" bucket and was subject to the limits.
+					emit MintedTokensTransferred(from, to, amountSubjectToLimits);
 				}
 			}
 		}

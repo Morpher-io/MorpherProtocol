@@ -87,9 +87,18 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 			console.log("Set MorpherToken address in MorpherState.");
 
 			// Set initial daily transfer limit
-			uint256 dailyLimit = 200_000 ether;
+			uint256 dailyLimit = 200_000 ether; // 200k MPH
 			tokenContract.setDailyMintedTransferLimit(dailyLimit);
 			console.log("Set daily minted transfer limit to:", dailyLimit / 1 ether);
+
+			// Set initial monthly and yearly transfer limits
+			// Placeholder: monthly = 30 * daily, yearly = 365 * daily. Adjust as needed.
+			uint256 monthlyLimit = dailyLimit * 30; // Approx 6M MPH
+			uint256 yearlyLimit = dailyLimit * 365; // Approx 73M MPH
+			tokenContract.setMonthlyMintedTransferLimit(monthlyLimit);
+			console.log("Set monthly minted transfer limit to:", monthlyLimit / 1 ether);
+			tokenContract.setYearlyMintedTransferLimit(yearlyLimit);
+			console.log("Set yearly minted transfer limit to:", yearlyLimit / 1 ether);
 
 			// Revoke deployer's MINTER/BURNER roles if no longer needed
 			if (msg.sender != envAdmin) { // Keep if admin is deployer
@@ -107,10 +116,24 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 				tokenContract.setMorpherStateAddress(stateAddress);
 			}
 			// Example: Update daily limit if changed
-			// uint256 newDailyLimit = 250_000 ether;
+			// uint256 newDailyLimit = 250_000 ether; // Example value
 			// if (tokenContract.getDailyMintedTransferLimit() != newDailyLimit) {
-			//     console.log("Updating daily minted transfer limit...");
+			//     console.log("Updating daily minted transfer limit to:", newDailyLimit / 1 ether);
 			//     tokenContract.setDailyMintedTransferLimit(newDailyLimit);
+			// }
+
+			// Example: Update monthly limit if changed or not set (0 means effectively no limit if not intended)
+			// uint256 newMonthlyLimit = (200_000 ether) * 30; // Example: 6M MPH
+			// if (tokenContract.getMonthlyMintedTransferLimit() != newMonthlyLimit) {
+			//     console.log("Updating monthly minted transfer limit to:", newMonthlyLimit / 1 ether);
+			//     tokenContract.setMonthlyMintedTransferLimit(newMonthlyLimit);
+			// }
+
+			// Example: Update yearly limit if changed or not set
+			// uint256 newYearlyLimit = (200_000 ether) * 365; // Example: 73M MPH
+			// if (tokenContract.getYearlyMintedTransferLimit() != newYearlyLimit) {
+			//     console.log("Updating yearly minted transfer limit to:", newYearlyLimit / 1 ether);
+			//     tokenContract.setYearlyMintedTransferLimit(newYearlyLimit);
 			// }
 		}
 
