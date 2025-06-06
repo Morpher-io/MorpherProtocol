@@ -13,7 +13,7 @@ import {IWETH9} from "../lib/uniswap-v3-periphery/contracts/interfaces/external/
 import {IV3SwapRouter} from "../lib/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 
 import "./interfaces/IMorpherStateForAccessControl.sol";
-import "./interfaces/IMorpherTradeEngineExtended.sol";
+import "./interfaces/IMorpherTradeEngine.sol"; // Changed from IMorpherTradeEngineExtended
 import "./interfaces/IMorpherTokenMintable.sol";
 import "./interfaces/IMorpherAccessControlConstants.sol";
 
@@ -140,7 +140,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         );
 
         pendingOrderToBeneficiary[orderId] = beneficiaryAddress;
-        IMorpherTradeEngineExtended(morpherTradeEngineAddress).markOrderAsReferred(orderId);
+        IMorpherTradeEngine(morpherTradeEngineAddress).markOrderAsReferred(orderId); // Changed type cast
         
         // The MTE will call recordReferralOpen upon successful opening.
         // Here we emit an event that the referral order process has started.
@@ -209,7 +209,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         );
 
         pendingOrderToBeneficiary[orderId] = beneficiaryAddress;
-        IMorpherTradeEngineExtended(morpherTradeEngineAddress).markOrderAsReferred(orderId);
+        IMorpherTradeEngine(morpherTradeEngineAddress).markOrderAsReferred(orderId); // Changed type cast
 
         // Revoke allowance after MTE interaction is expected to be complete (or MTE should handle it)
         // For safety, could be done by MTE callback, or assume MTE consumes it.

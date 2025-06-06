@@ -47,4 +47,6 @@ interface IMorpherTradeEngine {
     );
     
     function cancelOrder(bytes32 _orderId, address _address) external;
+
+    function markOrderAsReferred(bytes32 orderId) external;
 }

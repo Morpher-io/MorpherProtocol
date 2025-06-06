@@ -32,6 +32,7 @@ import "./MorpherUserBlocking.sol";
 import "./MorpherMintingLimiter.sol";
 import "./MorpherAccessControl.sol";
 import "./MorpherInterestRateManager.sol";
+import "./interfaces/IMorpherReferralOracle.sol"; // Added import
 
 // ----------------------------------------------------------------------------------
 // Tradeengine of the Morpher platform
@@ -62,6 +63,9 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 	uint256 public deployedTimeStamp;
 
 	bool public escrowOpenOrderEnabled;
+
+    address public morpherReferralOracleAddress;
+    mapping(bytes32 => bool) public isReferredOrder;
 
 	struct InterestRate {
 		uint256 validFrom;
@@ -215,6 +219,8 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 	event LinkState(address stateAddress);
 
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
+    event MorpherReferralOracleAddressSet(address indexed oldAddress, address indexed newAddress);
+
 
 	// --- Updated Initializer ---
 	function initialize(
@@ -265,6 +271,12 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 		morpherState = MorpherState(_stateAddress);
 		emit LinkState(_stateAddress);
 	}
+
+    function setMorpherReferralOracleAddress(address _newAddress) external onlyRole(ADMINISTRATOR_ROLE) {
+        address oldAddress = morpherReferralOracleAddress;
+        morpherReferralOracleAddress = _newAddress;
+        emit MorpherReferralOracleAddressSet(oldAddress, _newAddress);
+    }
 
 	function setEscrowOpenOrderEnabled(bool _isEnabled) public onlyRole(ADMINISTRATOR_ROLE) {
 		escrowOpenOrderEnabled = _isEnabled;
@@ -429,6 +441,13 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 		return _orderId;
 	}
 
+    function markOrderAsReferred(bytes32 orderId) external override {
+        // Access control for this function can be msg.sender == morpherReferralOracleAddress
+        // or a specific role if preferred. For now, direct address check.
+        require(msg.sender == morpherReferralOracleAddress || MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(ORACLE_ROLE, msg.sender) , "MTE: Caller not MRO or Oracle");
+        isReferredOrder[orderId] = true;
+    }
+
 	// ----------------------------------------------------------------------------
 	// Getter functions for orders, shares, and positions
 	// ----------------------------------------------------------------------------
@@ -553,6 +572,17 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 		orders[_orderId].timeStamp = _timeStampInMS;
 		orders[_orderId].liquidationTimestamp = _liquidationTimestamp;
 
+        // --- Referral Logic Start ---
+        if (isReferredOrder[_orderId] && morpherReferralOracleAddress != address(0)) {
+            // Check if this order resulted in opening/increasing a position
+            // This check needs to happen *after* openLong/openShort calculates modifyPosition.balanceDown
+            // but *before* _setPosition clears parts of modifyPosition or nets balances.
+            // The actual call will be in setPositionInState or just before it.
+            // For now, we are just noting that this order is referred.
+            // The actual callbacks to MRO will be triggered from setPositionInState.
+        }
+        // --- Referral Logic End ---
+
 		/**
 		 * If the market is deactivated, then override the price with the locked in market price
 		 * if the price wasn't locked in: error out.
@@ -582,7 +612,16 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 
 		address _address = orders[_orderId].userId;
 		bytes32 _marketId = orders[_orderId].marketId;
-		delete orders[_orderId];
+
+        // Store a local copy of isReferred for cleanup, as orders[_orderId] will be deleted.
+        bool wasReferred = isReferredOrder[_orderId];
+
+		delete orders[_orderId]; // Original position of delete
+
+        if (wasReferred) {
+            delete isReferredOrder[_orderId];
+        }
+
 		emit OrderProcessed(
 			_orderId,
 			_marketPrice,
@@ -1171,6 +1210,37 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 			"MorpherTradeEngine: insufficient funds."
 		);
 		computeLiquidationPrice(_orderId);
+
+        // --- Referral Callback Logic ---
+        if (isReferredOrder[_orderId] && morpherReferralOracleAddress != address(0)) {
+            // Callback for opening a referred position
+            if (orders[_orderId].openMPHTokenAmount > 0 && orders[_orderId].modifyPosition.balanceDown > 0) {
+                IMorpherReferralOracle(morpherReferralOracleAddress).recordReferralOpen(
+                    _orderId,
+                    orders[_orderId].userId,
+                    orders[_orderId].marketId,
+                    orders[_orderId].modifyPosition.balanceDown // Gross cost of the new position part
+                );
+            }
+
+            // Callback for closing a referred position
+            // Check if the position was actually open before this trade and is now fully closed by this trade.
+            position storage currentPortfolioPos = portfolio[orders[_orderId].userId][orders[_orderId].marketId];
+            bool wasPositionOpen = currentPortfolioPos.longShares > 0 || currentPortfolioPos.shortShares > 0;
+
+            if (wasPositionOpen &&
+                orders[_orderId].modifyPosition.newLongShares == 0 && 
+                orders[_orderId].modifyPosition.newShortShares == 0 &&
+                orders[_orderId].modifyPosition.balanceUp > 0) {
+                IMorpherReferralOracle(morpherReferralOracleAddress).processReferralClose(
+                    orders[_orderId].userId,
+                    orders[_orderId].marketId,
+                    orders[_orderId].modifyPosition.balanceUp // Gross payout from closing
+                );
+            }
+        }
+        // --- End Referral Callback Logic ---
+
 		// Net balanceUp and balanceDown
 		if (orders[_orderId].modifyPosition.balanceUp > orders[_orderId].modifyPosition.balanceDown) {
 			orders[_orderId].modifyPosition.balanceUp -= (orders[_orderId].modifyPosition.balanceDown);
