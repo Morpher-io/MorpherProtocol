@@ -50,6 +50,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
     uint256 public referralPercentage; // e.g., 1000 for 10.00% (value * 1000 / REFERRAL_PERCENTAGE_PRECISION)
     uint256 public constant REFERRAL_PERCENTAGE_PRECISION = 10000;
 
+    mapping(bytes32 => address) public pendingOrderToBeneficiary; // Maps orderId to beneficiary before MTE processing
     mapping(address => mapping(bytes32 => StoredReferralOpenInfo)) public activeReferrals;
 
     // Roles (can be fetched from AccessControl or defined if static and known)
@@ -128,25 +129,20 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
 
         // Gas for callback logic removed
 
-        IMorpherTradeEngineExtended.CreateOrderParams memory mteParams = IMorpherTradeEngineExtended.CreateOrderParams({
-            _marketId: createOrderParams._marketId,
-            _closeSharesAmount: createOrderParams._closeSharesAmount,
-            _openMPHTokenAmount: createOrderParams._openMPHTokenAmount,
-            _tradeDirection: createOrderParams._tradeDirection,
-            _orderLeverage: createOrderParams._orderLeverage,
-            _onlyIfPriceAbove: createOrderParams._onlyIfPriceAbove,
-            _onlyIfPriceBelow: createOrderParams._onlyIfPriceBelow,
-            _goodUntil: createOrderParams._goodUntil,
-            _goodFrom: createOrderParams._goodFrom
-        });
-
-        orderId = IMorpherTradeEngineExtended(morpherTradeEngineAddress).requestReferredOrderId(
+        // Call standard requestOrderId on MorpherTradeEngine
+        orderId = IMorpherTradeEngine(morpherTradeEngineAddress).requestOrderId(
             _msgSender(),
-            mteParams,
-            beneficiaryAddress
+            createOrderParams._marketId,
+            createOrderParams._closeSharesAmount,
+            createOrderParams._openMPHTokenAmount,
+            createOrderParams._tradeDirection,
+            createOrderParams._orderLeverage
         );
+
+        pendingOrderToBeneficiary[orderId] = beneficiaryAddress;
+        IMorpherTradeEngineExtended(morpherTradeEngineAddress).markOrderAsReferred(orderId);
         
-        // The MTE will call storeReferralOpenDetails upon successful opening.
+        // The MTE will call recordReferralOpen upon successful opening.
         // Here we emit an event that the referral order process has started.
         emit ReferralOrderCreated(
             orderId,
@@ -202,28 +198,18 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         // Temporarily grant allowance to Trade Engine for the received MPH tokens
         // The Trade Engine will pull these tokens when processing the order via its escrow mechanism or direct burn.
         IMorpherTokenMintable(morpherTokenAddress).safeApprove(morpherTradeEngineAddress, mphReceived);
-
-        IMorpherTradeEngineExtended.CreateOrderParams memory mteParams = IMorpherTradeEngineExtended.CreateOrderParams({
-            _marketId: finalOrderParams._marketId,
-            _closeSharesAmount: finalOrderParams._closeSharesAmount,
-            _openMPHTokenAmount: finalOrderParams._openMPHTokenAmount,
-            _tradeDirection: finalOrderParams._tradeDirection,
-            _orderLeverage: finalOrderParams._orderLeverage,
-            _onlyIfPriceAbove: finalOrderParams._onlyIfPriceAbove,
-            _onlyIfPriceBelow: finalOrderParams._onlyIfPriceBelow,
-            _goodUntil: finalOrderParams._goodUntil,
-            _goodFrom: finalOrderParams._goodFrom
-        });
         
-        // Need to override msg.sender for the call to MTE if MTE uses _msgSender() for trader
-        // However, requestReferredOrderId explicitly takes 'trader' as a parameter.
-        // If MTE's buildupEscrow uses _msgSender(), this needs careful handling.
-        // For now, assuming MTE handles token transfer from this contract based on approval.
-        orderId = IMorpherTradeEngineExtended(morpherTradeEngineAddress).requestReferredOrderId(
+        orderId = IMorpherTradeEngine(morpherTradeEngineAddress).requestOrderId(
             _msgSender(), // The original user is the trader
-            mteParams,
-            beneficiaryAddress
+            finalOrderParams._marketId,
+            finalOrderParams._closeSharesAmount,
+            finalOrderParams._openMPHTokenAmount,
+            finalOrderParams._tradeDirection,
+            finalOrderParams._orderLeverage
         );
+
+        pendingOrderToBeneficiary[orderId] = beneficiaryAddress;
+        IMorpherTradeEngineExtended(morpherTradeEngineAddress).markOrderAsReferred(orderId);
 
         // Revoke allowance after MTE interaction is expected to be complete (or MTE should handle it)
         // For safety, could be done by MTE callback, or assume MTE consumes it.
@@ -246,39 +232,30 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
 
     // --- Referral Data Management (called by MorpherTradeEngine) ---
 
-    function storeReferralOpenDetails(
+    function recordReferralOpen(
+        bytes32 orderId,
         address traderAddress,
         bytes32 marketId,
-        address beneficiary,
         uint256 initialInvestmentValue
     ) external virtual whenNotPaused {
         require(msg.sender == morpherTradeEngineAddress, "MRO: Caller must be MorpherTradeEngine");
+        address beneficiary = pendingOrderToBeneficiary[orderId];
+        require(beneficiary != address(0), "MRO: No pending beneficiary for orderId");
+
         activeReferrals[traderAddress][marketId] = StoredReferralOpenInfo(beneficiary, initialInvestmentValue);
+        delete pendingOrderToBeneficiary[orderId]; // Clean up pending entry
         emit ReferralOpenDetailsStored(traderAddress, marketId, beneficiary, initialInvestmentValue);
     }
 
-    function getActiveReferralInfo(
-        address traderAddress,
-        bytes32 marketId
-    ) external view virtual returns (bool hasActiveReferral, address beneficiary, uint256 initialInvestmentValue) {
-        StoredReferralOpenInfo storage referralInfo = activeReferrals[traderAddress][marketId];
-        if (referralInfo.beneficiary != address(0)) {
-            return (true, referralInfo.beneficiary, referralInfo.initialInvestmentValue);
-        }
-        return (false, address(0), 0);
-    }
-
-    function processReferralPayout(
+    function processReferralClose(
         address traderAddress,
         bytes32 marketId,
-        // uint256 expectedInitialInvestment, // To verify against stored value
         uint256 finalPayoutValue // Amount trader received upon closing
     ) external virtual whenNotPaused {
         require(msg.sender == morpherTradeEngineAddress, "MRO: Caller must be MorpherTradeEngine");
         require(morpherTokenAddress != address(0), "MRO: Morpher token address not set");
 
         StoredReferralOpenInfo storage referralInfo = activeReferrals[traderAddress][marketId];
-        // require(referralInfo.initialInvestmentValue == expectedInitialInvestment, "MRO: Investment mismatch");
         require(referralInfo.beneficiary != address(0), "MRO: No active referral found or already processed");
 
         uint256 initialInvestment = referralInfo.initialInvestmentValue;

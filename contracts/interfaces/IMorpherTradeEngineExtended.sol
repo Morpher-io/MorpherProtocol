@@ -4,23 +4,10 @@ pragma solidity ^0.8.15;
 import "./IMorpherTradeEngine.sol"; // Assuming this base interface exists
 
 interface IMorpherTradeEngineExtended is IMorpherTradeEngine {
-    struct CreateOrderParams { // Replicating for clarity, could be imported if visible
-        bytes32 _marketId;
-        uint256 _closeSharesAmount;
-        uint256 _openMPHTokenAmount;
-        bool _tradeDirection;
-        uint256 _orderLeverage;
-        uint256 _onlyIfPriceAbove;
-        uint256 _onlyIfPriceBelow;
-        uint256 _goodUntil;
-        uint256 _goodFrom;
-    }
+    function markOrderAsReferred(bytes32 orderId) external;
 
-    function requestReferredOrderId(
-        address trader,
-        CreateOrderParams calldata params,
-        address beneficiaryAddress
-    ) external returns (bytes32 orderId);
-
-    function getDeactivatedMarketPrice(bytes32 _marketId) external view returns (uint256); // From base MorpherOracle
+    function getDeactivatedMarketPrice(bytes32 _marketId) external view returns (uint256); // From base MorpherOracle // Retaining as it's part of extended functionality used by MorpherOracle
+    // Note: If getDeactivatedMarketPrice is only used by MorpherOracle and not MRO,
+    // it could potentially be moved to a more specific interface or kept if MRO might need it.
+    // For now, keeping it as it was present.
 }
