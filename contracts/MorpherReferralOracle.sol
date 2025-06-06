@@ -43,9 +43,6 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
     address public morpherTradeEngineAddress;
     address public morpherTokenAddress;
 
-    uint256 public gasForCallback;
-    address payable public callBackCollectionAddress; // Address to send gas fee to
-
     address public wethAddress; // WETH address on Base
     address public uniswapRouter;
     uint24 public constant POOL_FEE = 3000; // Default Uniswap V3 pool fee
@@ -81,8 +78,6 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         address _morpherStateAddress,
         address _morpherTradeEngineAddress,
         address _morpherTokenAddress,
-        address payable _gasCollectionAddress,
-        uint256 _gasForCallback,
         address _wethAddress,
         address _uniswapRouterAddress,
         uint256 _initialReferralPercentage,
@@ -98,8 +93,6 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         morpherState = IMorpherStateForAccessControl(_morpherStateAddress);
         morpherTradeEngineAddress = _morpherTradeEngineAddress;
         morpherTokenAddress = _morpherTokenAddress;
-        callBackCollectionAddress = _gasCollectionAddress;
-        gasForCallback = _gasForCallback;
         wethAddress = _wethAddress;
         uniswapRouter = _uniswapRouterAddress;
         referralPercentage = _initialReferralPercentage;
@@ -107,8 +100,6 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         emit ReferralAdminAddressSet(msg.sender, _morpherStateAddress, "MorpherStateAddress", _morpherStateAddress);
         emit ReferralAdminAddressSet(msg.sender, _morpherTradeEngineAddress, "MorpherTradeEngineAddress", _morpherTradeEngineAddress);
         emit ReferralAdminAddressSet(msg.sender, _morpherTokenAddress, "MorpherTokenAddress", _morpherTokenAddress);
-        emit ReferralAdminAddressSet(msg.sender, _gasCollectionAddress, "CallBackCollectionAddress", _gasCollectionAddress);
-        emit ReferralAdminSet(msg.sender, address(this), "GasForCallback", _gasForCallback);
         emit ReferralAdminAddressSet(msg.sender, _wethAddress, "WethAddress", _wethAddress);
         emit ReferralAdminAddressSet(msg.sender, _uniswapRouterAddress, "UniswapRouter", _uniswapRouterAddress);
         emit ReferralAdminSet(msg.sender, address(this), "ReferralPercentage", _initialReferralPercentage);
@@ -135,10 +126,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         require(beneficiaryAddress != address(0), "MRO: Beneficiary address cannot be zero");
         require(beneficiaryAddress != _msgSender(), "MRO: Beneficiary cannot be trader");
 
-        if (gasForCallback > 0) {
-            require(msg.value >= gasForCallback, "MRO: Insufficient fee for Oracle Callback");
-            callBackCollectionAddress.transfer(msg.value);
-        }
+        // Gas for callback logic removed
 
         IMorpherTradeEngineExtended.CreateOrderParams memory mteParams = IMorpherTradeEngineExtended.CreateOrderParams({
             _marketId: createOrderParams._marketId,
@@ -183,14 +171,8 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         require(uniswapRouter != address(0), "MRO: Uniswap router not set");
         require(morpherTokenAddress != address(0), "MRO: Morpher token address not set");
 
-        uint256 ethForCallback = 0;
-        if (gasForCallback > 0) {
-            require(msg.value > gasForCallback, "MRO: Insufficient fee for Oracle Callback and swap");
-            ethForCallback = gasForCallback;
-            callBackCollectionAddress.transfer(ethForCallback);
-        }
-        
-        uint256 ethForSwap = msg.value - ethForCallback;
+        // Gas for callback logic removed
+        uint256 ethForSwap = msg.value;
         
         IWETH9(wethAddress).deposit{value: ethForSwap}();
         
@@ -331,16 +313,6 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
     function setMorpherTokenAddress(address _newAddress) external virtual onlyRole(ADMINISTRATOR_ROLE) {
         morpherTokenAddress = _newAddress;
         emit ReferralAdminAddressSet(_msgSender(), _newAddress, "MorpherTokenAddress", _newAddress);
-    }
-
-    function setCallBackCollectionAddress(address payable _newAddress) external virtual onlyRole(ADMINISTRATOR_ROLE) {
-        callBackCollectionAddress = _newAddress;
-        emit ReferralAdminAddressSet(_msgSender(), _newAddress, "CallBackCollectionAddress", _newAddress);
-    }
-
-    function setGasForCallback(uint256 _newGasAmount) external virtual onlyRole(ADMINISTRATOR_ROLE) {
-        gasForCallback = _newGasAmount;
-        emit ReferralAdminSet(_msgSender(), address(this), "GasForCallback", _newGasAmount);
     }
 
     function setWethAddress(address _newAddress) external virtual onlyRole(ADMINISTRATOR_ROLE) {
