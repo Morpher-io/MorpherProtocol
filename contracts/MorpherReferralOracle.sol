@@ -63,7 +63,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         bytes32 indexed orderId,
         address indexed trader,
         address indexed beneficiary,
-        bytes32 indexed marketId,
+        bytes32 marketId, // Removed indexed
         uint256 openMPHTokenAmount,
         bool tradeDirection,
         uint256 orderLeverage
@@ -172,7 +172,11 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         
         IWETH9(wethAddress).deposit{value: ethForSwap}();
         
-        IWETH9(wethAddress).safeApprove(uniswapRouter, ethForSwap);
+        // Use SafeERC20.safeApprove by casting wethAddress to IERC20
+        // or ensure IWETH9 is compatible with SafeERC20 usage.
+        // Standard WETH `approve` is also an option.
+        // Given `using SafeERC20 for IWETH9;` let's use it correctly.
+        SafeERC20.safeApprove(IERC20(wethAddress), uniswapRouter, ethForSwap);
         
         bytes memory path = abi.encodePacked(
             wethAddress,
