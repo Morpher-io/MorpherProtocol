@@ -27,6 +27,7 @@
             // Add other contracts: MorpherSidechainToBaseMigration, MorpherSwapHelper?
             address sidechainMigration;
             address swapHelper;
+            address adminFunctions;
         }
 
         function getAddressesPath() internal view virtual returns (string memory) {
@@ -57,7 +58,7 @@
             string memory path = getAddressesPath();
             // Define the base JSON structure *without* proxyAdmin
             // Ensure all keys from the Addresses struct are present
-            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0"}'; // REMOVED proxyAdmin, added missing keys
+            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0", "MorpherAdminFunctions": "0x0"}'; // REMOVED proxyAdmin, added missing keys
 
             if (!vm.isFile(path)) {
                 vm.writeFile(path, baseJsonStructure);
@@ -71,13 +72,13 @@
                 address(0), address(0), address(0), address(0),
                 address(0), address(0), address(0), /* removed proxyAdmin */
                 address(0), address(0), address(0), address(0),
-                address(0), address(0), address(0) // Added sidechainMigration, swapHelper
+                address(0), address(0), address(0), address(0) // Added sidechainMigration, swapHelper
             );
         }
 
         function saveAddresses(Addresses memory addrs) internal virtual {
             string memory path = getAddressesPath();
-            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0"}'; // REMOVED proxyAdmin, added missing keys
+            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0", "MorpherAdminFunctions": "0x0"}'; // REMOVED proxyAdmin, added missing keys
 
             if (!vm.isFile(path)) {
                 vm.writeFile(path, baseJsonStructure);
@@ -98,6 +99,7 @@
             vm.writeJson(vm.toString(addrs.tradeEngine), path, ".MorpherTradeEngine");
             vm.writeJson(vm.toString(addrs.swapHelper), path, ".MorpherSwapHelper");
             vm.writeJson(vm.toString(addrs.userBlocking), path, ".MorpherUserBlocking");
+            vm.writeJson(vm.toString(addrs.adminFunctions), path, ".MorpherAdminFunctions");
         }
 
         function loadAddressesFromJson(string memory json) internal pure virtual returns (Addresses memory) {

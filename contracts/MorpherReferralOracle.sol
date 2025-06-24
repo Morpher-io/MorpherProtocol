@@ -176,7 +176,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         // or ensure IWETH9 is compatible with SafeERC20 usage.
         // Standard WETH `approve` is also an option.
         // Given `using SafeERC20 for IWETH9;` let's use it correctly.
-        SafeERC20.safeApprove(IERC20(wethAddress), uniswapRouter, ethForSwap);
+        IERC20(wethAddress).approve(uniswapRouter, ethForSwap);
         
         bytes memory path = abi.encodePacked(
             wethAddress,
@@ -187,7 +187,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         IV3SwapRouter.ExactInputParams memory swapParams = IV3SwapRouter.ExactInputParams({
             path: path,
             recipient: address(this), // Swap to this contract first
-            deadline: block.timestamp, // Using block.timestamp as deadline
+            // deadline: block.timestamp, // Using block.timestamp as deadline
             amountIn: ethForSwap,
             amountOutMinimum: createOrderParams._openMPHTokenAmount // User specifies min MPH out
         });
@@ -201,7 +201,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
 
         // Temporarily grant allowance to Trade Engine for the received MPH tokens
         // The Trade Engine will pull these tokens when processing the order via its escrow mechanism or direct burn.
-        IMorpherTokenMintable(morpherTokenAddress).safeApprove(morpherTradeEngineAddress, mphReceived);
+        IMorpherTokenMintable(morpherTokenAddress).approve(morpherTradeEngineAddress, mphReceived);
         
         orderId = IMorpherTradeEngine(morpherTradeEngineAddress).requestOrderId(
             _msgSender(), // The original user is the trader

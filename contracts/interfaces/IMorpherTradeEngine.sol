@@ -49,4 +49,27 @@ interface IMorpherTradeEngine {
     function cancelOrder(bytes32 _orderId, address _address) external;
 
     function markOrderAsReferred(bytes32 orderId) external;
+
+    function getMaxMappingIndex(bytes32 _marketId) external view returns (uint256 _maxMappingIndex);
+
+    function getExposureMappingIndex(bytes32 _marketId, address _address) external view returns (uint256 _mappingIndex);
+
+    function getExposureMappingAddress(
+		bytes32 _marketId,
+		uint256 _mappingIndex
+	) external view returns (address _address);
+
+    function getPosition(address _address, bytes32 _marketId) external view returns (position memory);
+
+    function setPosition(
+		address _address,
+		bytes32 _marketId,
+		uint256 _timeStamp,
+		uint256 _longShares,
+		uint256 _shortShares,
+		uint256 _meanEntryPrice,
+		uint256 _meanEntrySpread,
+		uint256 _meanEntryLeverage,
+		uint256 _liquidationPrice
+	) external;
 }
