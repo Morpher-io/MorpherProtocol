@@ -915,6 +915,8 @@ contract MorpherTokenTest is
 
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(type(uint256).max);
+		morpherToken.setMonthlyMintedTransferLimit(type(uint256).max);
+		morpherToken.setYearlyMintedTransferLimit(type(uint256).max);
 		// Mint tokens as MintingLimiter (does not count as transferred-in)
 		vm.startPrank(morpherState.morpherMintingLimiterAddress());
 		morpherToken.mint(user, 10 ether);
@@ -938,6 +940,8 @@ contract MorpherTokenTest is
 		// Set daily limit
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(3 ether);
+		morpherToken.setMonthlyMintedTransferLimit(3 ether);
+		morpherToken.setYearlyMintedTransferLimit(3 ether);
 		vm.stopPrank();
 
 		// Mint tokens as MintingLimiter (does not count as transferred-in)
@@ -1023,6 +1027,8 @@ contract MorpherTokenTest is
 		// Set daily limit
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(5 ether);
+		morpherToken.setMonthlyMintedTransferLimit(5 ether);
+		morpherToken.setYearlyMintedTransferLimit(5 ether);
 		vm.stopPrank();
 
 		// Mint tokens as TradeEngine (does not count as transferred-in)
@@ -1041,6 +1047,8 @@ contract MorpherTokenTest is
 		// Set daily limit
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(5 ether);
+		morpherToken.setMonthlyMintedTransferLimit(5 ether);
+		morpherToken.setYearlyMintedTransferLimit(5 ether);
 		// Mint some tokens to user1 (counts as transferred-in)
 		morpherToken.mint(user1, 10 ether);
 		vm.stopPrank();
@@ -1085,6 +1093,8 @@ contract MorpherTokenTest is
 		// Set daily limit
 		vm.startPrank(_admin);
 		morpherToken.setDailyMintedTransferLimit(5 ether);
+		morpherToken.setMonthlyMintedTransferLimit(50 ether);
+		morpherToken.setYearlyMintedTransferLimit(50 ether);
 		vm.stopPrank();
 
 		// Mint tokens as MintingLimiter
