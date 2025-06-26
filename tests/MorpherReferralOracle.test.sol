@@ -244,7 +244,7 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         // 1. Simulate order creation (not testing MRO.createOrder here, direct setup)
         bytes32 orderId = keccak256(abi.encodePacked("test_order_loss"));
-        this.setPendingOrderToBeneficiary(orderId, beneficiary.addr); // Helper for test
+        setPendingOrderToBeneficiary(orderId, beneficiary.addr); // Helper for test
 
         // 2. MTE calls recordReferralOpen
         vm.prank(address(morpherTradeEngine)); // Simulate call from MTE
@@ -284,7 +284,7 @@ contract MorpherReferralOracleTest is BaseSetup {
         uint256 initialInvestmentMPH = 500 * 1e18;
 
         bytes32 orderId = keccak256(abi.encodePacked("test_order_profit"));
-        this.setPendingOrderToBeneficiary(orderId, beneficiary.addr);
+        setPendingOrderToBeneficiary(orderId, beneficiary.addr);
 
         vm.prank(address(morpherTradeEngine));
         morpherReferralOracle.recordReferralOpen(orderId, trader.addr, marketId, initialInvestmentMPH);
@@ -320,7 +320,7 @@ contract MorpherReferralOracleTest is BaseSetup {
         // 1. Create order via MRO (simplified: directly get orderId from MTE for test)
         vm.prank(address(morpherReferralOracle)); // MRO calls MTE
         bytes32 orderId = morpherTradeEngine.requestOrderId(trader.addr, marketId, 0, openAmount, true, leverage);
-        this.setPendingOrderToBeneficiary(orderId, beneficiary.addr); // Manually set for test
+        setPendingOrderToBeneficiary(orderId, beneficiary.addr); // Manually set for test
         vm.prank(address(morpherReferralOracle)); // MRO calls MTE
         morpherTradeEngine.markOrderAsReferred(orderId);
 
