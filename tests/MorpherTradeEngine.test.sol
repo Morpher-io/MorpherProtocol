@@ -801,7 +801,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		
 		// Try to transfer more than the daily limit
 		vm.prank(user);
-		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		vm.expectRevert("MorpherToken: daily minted token operation limit exceeded");
 		morpherToken.transfer(recipient, 1007 ether);
 		
 		// Transfer within the limit
@@ -824,7 +824,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		
 		// Try another transfer that would exceed the limit
 		vm.prank(user);
-		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		vm.expectRevert("MorpherToken: daily minted token operation limit exceeded");
 		morpherToken.transfer(recipient, 1 ether);
 	}
 

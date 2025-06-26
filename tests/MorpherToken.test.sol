@@ -153,7 +153,7 @@ contract MorpherTokenTest is
 
 		// Try to transfer more than available balance
 		vm.startPrank(user);
-		vm.expectRevert("MorpherToken: transfer amount exceeds available balance (locked)");
+		vm.expectRevert("MorpherToken: operation amount exceeds available balance (locked)");
 		morpherToken.transfer(address(0x123), 6 ether);
 
 		// Transfer within available balance
@@ -202,7 +202,7 @@ contract MorpherTokenTest is
 
 		// Try to transfer more than available balance
 		vm.startPrank(user);
-		vm.expectRevert("MorpherToken: transfer amount exceeds available balance (locked)");
+		vm.expectRevert("MorpherToken: operation amount exceeds available balance (locked)");
 		morpherToken.transfer(address(0x123), 4 ether);
 
 		// Transfer within available balance
@@ -250,7 +250,7 @@ contract MorpherTokenTest is
 
 		// Try to transfer more than the daily limit
 		vm.startPrank(user);
-		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		vm.expectRevert("MorpherToken: daily minted token operation limit exceeded");
 		morpherToken.transfer(recipient, 6 ether);
 		vm.stopPrank();
 
@@ -267,7 +267,7 @@ contract MorpherTokenTest is
 
 		// Try another transfer that would exceed the limit
 		vm.startPrank(user);
-		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		vm.expectRevert("MorpherToken: daily minted token operation limit exceeded");
 		morpherToken.transfer(recipient, 2 ether);
 		vm.stopPrank();
 
@@ -475,7 +475,7 @@ contract MorpherTokenTest is
 
 		// Try to transfer more than the remaining daily limit
 		vm.startPrank(user2);
-		vm.expectRevert("MorpherToken: daily minted token transfer limit exceeded");
+		vm.expectRevert("MorpherToken: daily minted token operation limit exceeded");
 		morpherToken.transfer(user1, 4 ether); // Would exceed daily limit
 		vm.stopPrank();
 
@@ -504,7 +504,7 @@ contract MorpherTokenTest is
 
 		vm.startPrank(user1);
 		// User1 lacks TRANSFER_ROLE, MINTER_ROLE, BURNER_ROLE
-		vm.expectRevert("MorpherToken: Transfer denied by restriction");
+		vm.expectRevert("MorpherToken: Operation denied by restriction");
 		morpherToken.transfer(user2, 1 ether);
 		vm.stopPrank();
 	}
@@ -558,7 +558,7 @@ contract MorpherTokenTest is
 		vm.stopPrank();
 
 		vm.startPrank(user1);
-		vm.expectRevert("MorpherToken: Transfer for sender is blocked.");
+		vm.expectRevert("MorpherToken: Operation for sender is blocked.");
 		morpherToken.transfer(user2, 1 ether);
 		vm.stopPrank();
 	}
@@ -1151,7 +1151,7 @@ contract MorpherTokenTest is
 		// Burn 60 tokens. super.balanceOf will become 100 - 60 = 40 ether.
 		// Sum of locks is still 70 ether (30 rewards + 40 time-locked).
 		// Now, 70 (sum of locks) > 40 (super.balanceOf)
-		vm.startPrank(_admin);
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user, 60 ether);
 		vm.stopPrank();
 
@@ -1170,6 +1170,8 @@ contract MorpherTokenTest is
 		morpherToken.mint(user2, 100 ether);
 		morpherToken.lockRewards(user2, 80 ether); // _lockedRewards = 80
 		// super.balanceOf(user2) = 100, balanceOf(user2) = 20
+		vm.stopPrank();
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user2, 50 ether); // super.balanceOf(user2) becomes 50
 		// Now _lockedRewards (80) > super.balanceOf (50)
 		vm.stopPrank();
@@ -1182,7 +1184,9 @@ contract MorpherTokenTest is
 		vm.startPrank(_admin);
 		morpherToken.mint(user3, 100 ether);
 		morpherToken.lockTokensForTime(user3, 80 ether, 1 days); // timeLockedAmount = 80
+		vm.stopPrank();
 		// super.balanceOf(user3) = 100, balanceOf(user3) = 20
+		vm.startPrank(morpherState.morpherTradeEngineAddress());
 		morpherToken.burn(user3, 50 ether); // super.balanceOf(user3) becomes 50
 		// Now timeLockedAmount (80) > super.balanceOf (50)
 		vm.stopPrank();
