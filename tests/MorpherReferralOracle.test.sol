@@ -19,7 +19,8 @@ contract MorpherReferralOracleTest is BaseSetup {
     uint256 public constant PRECISION = 1e8;
 
 
-    // Events from MorpherReferralOracle
+    // Event declarations for vm.expectEmit
+    // From MorpherReferralOracle
     event ReferralOrderCreated(
         bytes32 indexed orderId,
         address indexed trader,
@@ -57,6 +58,27 @@ contract MorpherReferralOracleTest is BaseSetup {
         uint256 _newMeanEntry,
         uint256 _newMeanSprad,
         uint256 _newMeanLeverage,
+        uint256 _liquidationPrice
+    );
+    event ReferralAdminSet(address indexed admin, address indexed targetAddress, string setting, uint256 value); // From MRO
+    event Paused(address account); // From Pausable via MRO
+    event Unpaused(address account); // From Pausable via MRO
+
+    // From MorpherToken
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    // From MorpherTradeEngine
+    event OrderProcessed(
+        bytes32 _orderId,
+        uint256 _marketPrice,
+        uint256 _marketSpread,
+        uint256 _liquidationTimestamp,
+        uint256 _timeStamp,
+        uint256 _newLongShares,
+        uint256 _newShortShares,
+        uint256 _newAverageEntry,
+        uint256 _newAverageSpread,
+        uint256 _newAverageLeverage,
         uint256 _liquidationPrice
     );
 
