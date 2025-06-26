@@ -64,8 +64,8 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 
 	bool public escrowOpenOrderEnabled;
 
-    address public morpherReferralOracleAddress;
-    mapping(bytes32 => bool) public isReferredOrder;
+    address public morpherReferralOracleAddress; // Added
+    mapping(bytes32 => bool) public isReferredOrder; // Added
 
 	struct InterestRate {
 		uint256 validFrom;
@@ -219,7 +219,7 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 	event LinkState(address stateAddress);
 
 	event LockedPriceForClosingPositions(bytes32 _marketId, uint256 _price);
-    event MorpherReferralOracleAddressSet(address indexed oldAddress, address indexed newAddress);
+    event MorpherReferralOracleAddressSet(address indexed oldAddress, address indexed newAddress); // Keep if already there, or add if new
 
 
 	// --- Updated Initializer ---
@@ -275,7 +275,7 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
     function setMorpherReferralOracleAddress(address _newAddress) external onlyRole(ADMINISTRATOR_ROLE) {
         address oldAddress = morpherReferralOracleAddress;
         morpherReferralOracleAddress = _newAddress;
-        emit MorpherReferralOracleAddressSet(oldAddress, _newAddress);
+        emit MorpherReferralOracleAddressSet(oldAddress, _newAddress); // Ensure this event is declared if not already
     }
 
 	function setEscrowOpenOrderEnabled(bool _isEnabled) public onlyRole(ADMINISTRATOR_ROLE) {
@@ -442,9 +442,11 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 	}
 
     function markOrderAsReferred(bytes32 orderId) external {
-        // Access control for this function can be msg.sender == morpherReferralOracleAddress
-        // or a specific role if preferred. For now, direct address check.
-        require(msg.sender == morpherReferralOracleAddress || MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(ORACLE_ROLE, msg.sender) , "MTE: Caller not MRO or Oracle");
+        // Access control: Allow MorpherReferralOracle or an address with ORACLE_ROLE.
+        // This ensures that only authorized contracts/roles can mark an order as referred.
+        bool isMRO = msg.sender == morpherReferralOracleAddress;
+        bool isOracleRoleHolder = MorpherAccessControl(morpherState.morpherAccessControlAddress()).hasRole(ORACLE_ROLE, msg.sender);
+        require(isMRO || isOracleRoleHolder, "MTE: Caller not MRO or Oracle");
         isReferredOrder[orderId] = true;
     }
 
@@ -614,12 +616,12 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 		bytes32 _marketId = orders[_orderId].marketId;
 
         // Store a local copy of isReferred for cleanup, as orders[_orderId] will be deleted.
-        bool wasReferred = isReferredOrder[_orderId];
+        bool wasReferredOrder = isReferredOrder[_orderId];
 
 		delete orders[_orderId]; // Original position of delete
 
-        if (wasReferred) {
-            delete isReferredOrder[_orderId];
+        if (wasReferredOrder) {
+            delete isReferredOrder[_orderId]; // Clean up the referral tracking flag
         }
 
 		emit OrderProcessed(

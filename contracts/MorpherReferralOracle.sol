@@ -73,6 +73,20 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
     event ReferralAdminAddressSet(address indexed admin, address indexed targetAddress, string setting, address value);
     event ReferralOpenDetailsStored(address indexed trader, bytes32 indexed marketId, address indexed beneficiary, uint256 initialInvestmentValue);
     event ReferralBonusPaid(address indexed trader, bytes32 indexed marketId, address indexed beneficiary, uint256 lossAmount, uint256 bonusAmount);
+    event ReferralOrderProcessed( // New event for MRO callback
+        bytes32 indexed _orderId,
+        uint256 _price,
+        uint256 _unadjustedMarketPrice,
+        uint256 _spread,
+        uint256 _positionLiquidationTimestamp,
+        uint256 _timeStamp,
+        uint256 _newLongShares,
+        uint256 _newShortShares,
+        uint256 _newMeanEntry,
+        uint256 _newMeanSprad, // Consistent with MorpherOracle's event typo
+        uint256 _newMeanLeverage,
+        uint256 _liquidationPrice
+    );
 
 
     function initialize(
@@ -278,6 +292,49 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
 
         // Clear the referral info after processing
         delete activeReferrals[traderAddress][marketId];
+    }
+
+    function __callback(
+        bytes32 _orderId,
+        uint256 _price,
+        uint256 _unadjustedMarketPrice,
+        uint256 _spread,
+        uint256 _liquidationTimestamp, // This is the position's liquidation timestamp from the oracle, not market's
+        uint256 _timeStamp // Timestamp of the price data
+    ) public virtual whenNotPaused {
+        // Ensure the caller has the ORACLEOPERATOR_ROLE
+        // This role hash should be consistent with how it's defined/used elsewhere (e.g., MorpherOracle)
+        bytes32 oracleOperatorRole = keccak256("ORACLEOPERATOR_ROLE");
+        address accessControlAddress = morpherState.morpherAccessControlAddress();
+        require(accessControlAddress != address(0), "MRO: AccessControl not set in State");
+        require(IMorpherAccessControlConstants(accessControlAddress).hasRole(oracleOperatorRole, _msgSender()), "MRO: Caller not Oracle Operator");
+
+        // Orders from MRO do not have pre-set conditions like priceAbove/Below, goodUntil/From.
+        // Thus, no checkOrderConditions is needed here.
+
+        IMorpherTradeEngine.position memory createdPosition =
+            IMorpherTradeEngine(morpherTradeEngineAddress).processOrder(
+                _orderId,
+                _price,
+                _spread,
+                _liquidationTimestamp, // Pass through the liquidation timestamp for the specific position
+                _timeStamp
+            );
+
+        emit ReferralOrderProcessed(
+            _orderId,
+            _price,
+            _unadjustedMarketPrice,
+            _spread,
+            _liquidationTimestamp, // This is the position's liquidation timestamp
+            _timeStamp,
+            createdPosition.longShares,
+            createdPosition.shortShares,
+            createdPosition.meanEntryPrice,
+            createdPosition.meanEntrySpread, // Typo: meanEntrySprad
+            createdPosition.meanEntryLeverage,
+            createdPosition.liquidationPrice
+        );
     }
 
     // --- Admin Functions ---
