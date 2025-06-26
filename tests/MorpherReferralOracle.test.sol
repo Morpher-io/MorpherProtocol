@@ -252,8 +252,9 @@ contract MorpherReferralOracleTest is BaseSetup {
         emit ReferralOpenDetailsStored(trader.addr, marketId, beneficiary.addr, initialInvestmentMPH);
         morpherReferralOracle.recordReferralOpen(orderId, trader.addr, marketId, initialInvestmentMPH);
 
-        assertEq(morpherReferralOracle.activeReferrals(trader.addr, marketId).beneficiary, beneficiary.addr);
-        assertEq(morpherReferralOracle.activeReferrals(trader.addr, marketId).initialInvestmentValue, initialInvestmentMPH);
+        (address storedBeneficiary, uint256 storedInvestment) = morpherReferralOracle.activeReferrals(trader.addr, marketId);
+        assertEq(storedBeneficiary, beneficiary.addr);
+        assertEq(storedInvestment, initialInvestmentMPH);
         assertEq(morpherReferralOracle.pendingOrderToBeneficiary(orderId), address(0)); // Should be cleared
 
         // 3. MTE calls processReferralClose after position closes with a loss
@@ -272,7 +273,8 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         morpherReferralOracle.processReferralClose(trader.addr, marketId, finalPayoutValue);
 
-        assertEq(morpherReferralOracle.activeReferrals(trader.addr, marketId).beneficiary, address(0)); // Should be cleared
+        (address storedBeneficiaryAfterClose, ) = morpherReferralOracle.activeReferrals(trader.addr, marketId);
+        assertEq(storedBeneficiaryAfterClose, address(0)); // Should be cleared
         uint256 beneficiaryBalanceAfter = morpherToken.balanceOf(beneficiary.addr);
         assertEq(beneficiaryBalanceAfter, beneficiaryBalanceBefore + expectedBonus, "Beneficiary bonus incorrect");
     }
@@ -297,7 +299,8 @@ contract MorpherReferralOracleTest is BaseSetup {
         vm.prank(address(morpherTradeEngine));
         morpherReferralOracle.processReferralClose(trader.addr, marketId, finalPayoutValue);
 
-        assertEq(morpherReferralOracle.activeReferrals(trader.addr, marketId).beneficiary, address(0));
+        (address storedBeneficiaryAfterCloseProfit, ) = morpherReferralOracle.activeReferrals(trader.addr, marketId);
+        assertEq(storedBeneficiaryAfterCloseProfit, address(0));
         uint256 beneficiaryBalanceAfter = morpherToken.balanceOf(beneficiary.addr);
         assertEq(beneficiaryBalanceAfter, beneficiaryBalanceBefore, "Beneficiary should not receive bonus on profit");
     }
@@ -350,8 +353,9 @@ contract MorpherReferralOracleTest is BaseSetup {
         morpherReferralOracle.__callback(orderId, price, price, spread, liquidationTimestamp, priceTimestamp);
 
         // Verify referral details were stored
-        assertTrue(morpherReferralOracle.activeReferrals(trader.addr, marketId).initialInvestmentValue > 0, "Initial investment not stored");
-        assertEq(morpherReferralOracle.activeReferrals(trader.addr, marketId).beneficiary, beneficiary.addr);
+        (address storedBeneficiaryCallback, uint256 storedInvestmentCallback) = morpherReferralOracle.activeReferrals(trader.addr, marketId);
+        assertTrue(storedInvestmentCallback > 0, "Initial investment not stored");
+        assertEq(storedBeneficiaryCallback, beneficiary.addr);
     }
 
     // Admin functions tests
