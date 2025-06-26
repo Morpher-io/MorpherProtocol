@@ -743,6 +743,7 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 			// This is the average Leverage
 			_averageLeverage = _orderLeverage;
 		}
+
 		if (_marketPrice <= getLiquidationPrice(_averagePrice, _averageLeverage, true, _positionTimeStampInMs)) {
 			// Position is worthless
 			_shareValue = 0;
@@ -783,8 +784,9 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 		uint256 _positionTimeStampInMs
 	) public view returns (uint256) {
 		uint _marginInterest;
+
 		if (_positionTimeStampInMs / 1000 < deployedTimeStamp) {
-			_positionTimeStampInMs = deployedTimeStamp / 1000;
+			_positionTimeStampInMs = deployedTimeStamp * 1000;
 		}
 		_marginInterest = _averagePrice * (_averageLeverage - PRECISION);
 		_marginInterest = _marginInterest * (((block.timestamp - (_positionTimeStampInMs / 1000)) / 86400) + 1);
@@ -820,7 +822,6 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 				].shortShares;
 			}
 		}
-
 		//calculate the long shares, but only if the old position is completely closed out (if none exist shortSharesOrder = 0)
 		if (
 			orders[_orderId].modifyPosition.shortSharesOrder ==
@@ -841,6 +842,7 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 					)
 				);
 		}
+
 
 		// Investment equals number of shares now.
 		if (orders[_orderId].modifyPosition.shortSharesOrder > 0) {

@@ -120,7 +120,7 @@ contract MorpherReferralOracle is UUPSUpgradeable, ContextUpgradeable, PausableU
         emit ReferralAdminSet(msg.sender, address(this), "ReferralPercentage", _initialReferralPercentage);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override virtual {
+    function _authorizeUpgrade(address /** newImplementation*/) internal override virtual {
         address accessControlAddress = morpherState.morpherAccessControlAddress();
         require(accessControlAddress != address(0), "MRO: AccessControl not set in State");
         IMorpherAccessControlConstants ac = IMorpherAccessControlConstants(accessControlAddress);

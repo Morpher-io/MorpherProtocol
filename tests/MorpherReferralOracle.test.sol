@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/MessageHashUtils.sol";
+import {PausableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/PausableUpgradeable.sol";
 
 import "./BaseSetup.sol";
 import "./mocks/ERC20.sol";
@@ -102,7 +103,6 @@ contract MorpherReferralOracleTest is BaseSetup {
 
 
         // Deploy MorpherReferralOracle
-        vm.startBroadcast();
         morpherReferralOracle = new MorpherReferralOracle();
         morpherReferralOracle.initialize(
             address(morpherState),
@@ -114,10 +114,10 @@ contract MorpherReferralOracleTest is BaseSetup {
             "MorpherReferralOracle",
             "1"
         );
-        vm.stopBroadcast();
 
         // Configure MorpherTradeEngine with MorpherReferralOracle address
         morpherAccessControl.grantRole(morpherTradeEngine.ADMINISTRATOR_ROLE(), address(this));
+        morpherAccessControl.grantRole(morpherTradeEngine.ORACLE_ROLE(), address(morpherReferralOracle));
         morpherTradeEngine.setMorpherReferralOracleAddress(address(morpherReferralOracle));
 
 
@@ -146,6 +146,7 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         uint256 openAmount = 100 * 1e18; // 100 MPH
         bytes32 marketId = keccak256("CRYPTO_BTC");
+        morpherState.activateMarket(marketId);
         uint256 leverage = 2 * PRECISION;
 
         // Trader needs MPH
@@ -182,7 +183,7 @@ contract MorpherReferralOracleTest is BaseSetup {
         });
 
         vm.prank(trader.addr);
-        vm.expectEmit(true, true, true, true, address(morpherReferralOracle));
+        vm.expectEmit(false, true, true, true, address(morpherReferralOracle));
         emit ReferralOrderCreated(bytes32(0), trader.addr, beneficiary.addr, marketId, openAmount, true, leverage); // orderId is dynamic
 
         bytes32 orderId = morpherReferralOracle.createOrder(params, beneficiary.addr);
@@ -199,6 +200,7 @@ contract MorpherReferralOracleTest is BaseSetup {
         uint256 minMPHAmount = 95 * 1e18; // Expect at least 95 MPH
         uint256 ethToSend = 0.1 ether;
         bytes32 marketId = keccak256("STK_AAPL");
+        morpherState.activateMarket(marketId);
         uint256 leverage = 5 * PRECISION;
 
         vm.deal(trader.addr, ethToSend); // Give trader ETH
@@ -221,7 +223,7 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         vm.prank(trader.addr);
         // OrderId is dynamic, openMPHTokenAmount in event will be actual swapped amount
-        vm.expectEmit(true, true, true, true, address(morpherReferralOracle));
+        vm.expectEmit(false, true, true, false, address(morpherReferralOracle));
         emit ReferralOrderCreated(bytes32(0), trader.addr, beneficiary.addr, marketId, 100 * 1e18, false, leverage);
 
         bytes32 orderId = morpherReferralOracle.createOrderFromGasToken{value: ethToSend}(params, beneficiary.addr);
@@ -264,13 +266,14 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         uint256 beneficiaryBalanceBefore = morpherToken.balanceOf(beneficiary.addr);
 
-        vm.prank(address(morpherTradeEngine)); // Simulate call from MTE
+
+        vm.expectEmit(true, true, false, true, address(morpherToken)); // from, to, value (ignore from as it's complex with roles)
+        emit Transfer(address(0), beneficiary.addr, expectedBonus); // Mint event
         vm.expectEmit(true, true, true, true, address(morpherReferralOracle));
         emit ReferralBonusPaid(trader.addr, marketId, beneficiary.addr, expectedLoss, expectedBonus);
         // Also expect MPH mint event
-        vm.expectEmit(true, true, false, true, address(morpherToken)); // from, to, value (ignore from as it's complex with roles)
-        emit Transfer(address(0), beneficiary.addr, expectedBonus); // Mint event
 
+        vm.prank(address(morpherTradeEngine)); // Simulate call from MTE
         morpherReferralOracle.processReferralClose(trader.addr, marketId, finalPayoutValue);
 
         (address storedBeneficiaryAfterClose, ) = morpherReferralOracle.activeReferrals(trader.addr, marketId);
@@ -311,13 +314,15 @@ contract MorpherReferralOracleTest is BaseSetup {
         bytes32 marketId = keccak256("CRYPTO_ETH");
         uint256 openAmount = 200 * 1e18;
         uint256 leverage = 3 * PRECISION;
+        vm.warp(1750930226);
 
         // Trader approves MTE
-        vm.prank(trader.addr);
-        morpherToken.approve(address(morpherTradeEngine), openAmount);
+        // vm.prank(trader.addr);
+        // morpherToken.approve(address(morpherTradeEngine), openAmount);
         morpherAccessControl.grantRole(morpherToken.MINTER_ROLE(), address(this));
         morpherToken.mint(trader.addr, openAmount);
         morpherAccessControl.revokeRole(morpherToken.MINTER_ROLE(), address(this));
+        morpherState.activateMarket(marketId);
 
 
         // 1. Create order via MRO (simplified: directly get orderId from MTE for test)
@@ -330,7 +335,7 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         // 2. Simulate Oracle Operator calling MRO's __callback
         uint256 price = 3000 * PRECISION;
-        uint256 spread = 5 * PRECISION;
+        uint256 spread = 1 * PRECISION;
         uint256 liquidationTimestamp = 0; // No prior liquidation
         uint256 priceTimestamp = block.timestamp * 1000;
 
@@ -340,14 +345,16 @@ contract MorpherReferralOracleTest is BaseSetup {
         // Expect MRO to call MTE.processOrder
         // Expect MRO to call MTE.recordReferralOpen (from MTE.setPositionInState)
 
-        vm.expectEmit(true, true, true, true, address(morpherReferralOracle));
-        emit ReferralOrderProcessed(orderId, price, price, spread, liquidationTimestamp, priceTimestamp, 0,0,0,0,0,0); // Shares/etc are dynamic
+        vm.expectEmit(true, true, true, false, address(morpherReferralOracle)); // MRO.ReferralOpenDetailsStored
+        emit ReferralOpenDetailsStored(trader.addr, marketId, beneficiary.addr, 0); // initialInvestmentValue is dynamic
 
-        vm.expectEmit(true, true, true, true, address(morpherTradeEngine)); // MTE.OrderProcessed
+        vm.expectEmit(true, true, true, false, address(morpherTradeEngine)); // MTE.OrderProcessed
         emit OrderProcessed(orderId, price, spread, liquidationTimestamp, priceTimestamp,0,0,0,0,0,0); // Shares/etc are dynamic
 
-        vm.expectEmit(true, true, true, true, address(morpherReferralOracle)); // MRO.ReferralOpenDetailsStored
-        emit ReferralOpenDetailsStored(trader.addr, marketId, beneficiary.addr, 0); // initialInvestmentValue is dynamic
+        vm.expectEmit(true, true, true, false, address(morpherReferralOracle));
+        emit ReferralOrderProcessed(orderId, price, price, spread, liquidationTimestamp, priceTimestamp, 0,0,0,0,0,0); // Shares/etc are dynamic
+
+
 
         // Callback is from this test contract (granted ORACLEOPERATOR_ROLE)
         morpherReferralOracle.__callback(orderId, price, price, spread, liquidationTimestamp, priceTimestamp);
@@ -381,7 +388,7 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         // Attempt to call a whenNotPaused function
         MorpherReferralOracle.CreateOrderStruct memory params; // Dummy params
-        vm.expectRevert("Pausable: paused");
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         morpherReferralOracle.createOrder(params, makeAccount("beneficiary_pause").addr);
 
         vm.expectEmit(true, false, false, true, address(morpherReferralOracle)); // Unpaused event
