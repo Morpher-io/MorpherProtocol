@@ -217,7 +217,7 @@ contract MorpherReferralOracleTest is BaseSetup {
 
         // Mock Uniswap Router to return slightly more than minMPHAmount
         address mockRouterAddress = morpherReferralOracle.uniswapRouter();
-        MockUniswapRouter(mockRouterAddress).mockAmountOut = 100 * 1e18;
+        MockUniswapRouter(mockRouterAddress).setAmountOut(100 * 1e18);
 
         vm.prank(trader.addr);
         // OrderId is dynamic, openMPHTokenAmount in event will be actual swapped amount
