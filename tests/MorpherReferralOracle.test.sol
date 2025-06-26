@@ -381,8 +381,3 @@ contract MorpherReferralOracleTest is BaseSetup {
         vm.store(address(morpherReferralOracle), storageSlotForKey, bytes32(uint256(uint160(beneficiary))));
     }
 }
-```
-
-```solidity
-scripts/10-MorpherReferralOracle.s.sol
-<<<<<<< SEARCH
