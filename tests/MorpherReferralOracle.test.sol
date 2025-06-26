@@ -375,8 +375,10 @@ contract MorpherReferralOracleTest is BaseSetup {
         // This requires adding it to MorpherReferralOracle.sol or using vm.store/vm.etch.
         // Let's add a public setter in MRO for testing purposes only, or use vm.store.
         // Using vm.store is cleaner for tests.
-        bytes32 slot = keccak256(abi.encode(orderId, uint256(2))); // slot for pendingOrderToBeneficiary mapping
-        vm.store(address(morpherReferralOracle), slot, bytes32(uint256(uint160(beneficiary))));
+        // The mapping `pendingOrderToBeneficiary` itself is at slot index 6.
+        bytes32 mappingSlot = bytes32(uint256(6)); 
+        bytes32 storageSlotForKey = keccak256(abi.encode(orderId, mappingSlot)); // Compute storage slot for the key within the mapping
+        vm.store(address(morpherReferralOracle), storageSlotForKey, bytes32(uint256(uint160(beneficiary))));
     }
 }
 ```
