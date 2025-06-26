@@ -262,7 +262,7 @@ contract MorpherAirdropTest is BaseSetup {
 
 		// User should not be able to transfer locked rewards
 		vm.prank(user);
-		vm.expectRevert("MorpherToken: transfer amount exceeds available balance (locked)");
+		vm.expectRevert("MorpherToken: operation amount exceeds available balance (locked)");
 		MorpherToken(tokenAddr).transfer(address(0xdef), rewardAmount);
 	}
 }

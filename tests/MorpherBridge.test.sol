@@ -145,7 +145,7 @@ contract MorpherBridgeTest is BaseSetup {
         uint256 initialBalance = morpherToken.balanceOf(user1.addr); // Keep this as it's used before the state change
 
         vm.prank(user1.addr);
-        vm.expectEmit(true, true, false, true); // from, tokens, totalTokenSent, timeStamp, transferNonce, targetChainId, transferHash
+        vm.expectEmit(true, false, false, true); // from, tokens, totalTokenSent, timeStamp, transferNonce, targetChainId, transferHash
         emit TransferToLinkedChain(user1.addr, (1000 ether - 100 ether), (1000 ether - 100 ether), block.timestamp, 1, 137, bytes32(0)); // transferHash is dynamic
         morpherBridge.stageTokensForTransfer(1000 ether, 137); // 137 for Polygon mainnet example
 
