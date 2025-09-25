@@ -32,29 +32,6 @@ library SignatureVerifier {
     error ERC6492DeploymentFailed(bytes reason);
 
     /**
-     * @notice Verifies an EOA signature provided as v, r, s components.
-     * @param _signer The address of the account that should have signed the message.
-     * @param _hash The hash of the message that was signed.
-     * @param v The recovery ID of the signature.
-     * @param r The r value of the signature.
-     * @param s The s value of the signature.
-     * @return A boolean indicating if the signature is valid.
-     */
-    function isValidSignatureNow(
-        address _signer,
-        bytes32 _hash,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) internal pure returns (bool) {
-        if (v != 27 && v != 28) {
-            return false;
-        }
-        // ecrecover returns address(0) on failure.
-        return ecrecover(_hash, v, r, s) == _signer;
-    }
-
-    /**
      * @notice Verifies a signature, supporting EOA (ecrecover), EIP-1271 (deployed contracts), and EIP-6492 (undeployed contracts).
      * @dev The order of checks is critical as per EIP-6492.
      * This function can have side effects (contract deployment via EIP-6492) and should NOT be called from a view function.
@@ -99,7 +76,11 @@ library SignatureVerifier {
                 s := mload(add(_signature, 64))
                 v := byte(0, mload(add(_signature, 96)))
             }
-            return isValidSignatureNow(_signer, _hash, v, r, s);
+            if (v != 27 && v != 28) {
+                return false;
+            }
+            // ecrecover returns address(0) on failure.
+            return ecrecover(_hash, v, r, s) == _signer;
         }
 
         return false;
@@ -123,18 +104,9 @@ library SignatureVerifier {
         bytes32 _hash,
         bytes memory _signature
     ) private returns (bool) {
-        // The EIP-6492 signature format is `abi.encode(...) | magic_suffix`.
-        // To decode the prefix, we must copy all but the last 32 bytes into a new memory array,
-        // as slicing memory arrays is not supported in this way.
-        uint256 prefixLength = _signature.length - 32;
-        bytes memory prefix = new bytes(prefixLength);
-        for (uint256 i = 0; i < prefixLength; i++) {
-            prefix[i] = _signature[i];
-        }
-
         // Decode the wrapped signature to get deployment data and the original signature.
         (address factory, bytes memory factoryCalldata, bytes memory originalSignature) = abi.decode(
-            prefix,
+            _signature[0:_signature.length - 32],
             (address, bytes, bytes)
         );
 
