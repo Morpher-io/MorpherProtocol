@@ -48,6 +48,7 @@ import {PausableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/co
 import {EIP712Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/EIP712Upgradeable.sol";
 import {NoncesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/NoncesUpgradeable.sol"; // Use Nonces instead of Counters
 import "./libraries/SignatureVerifier.sol";
+import "./libraries/UniswapHelper.sol";
 import {IERC20Permit} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/extensions/IERC20Permit.sol"; // Use non-upgradeable interface
 
 import {IERC20} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/IERC20.sol";
@@ -130,20 +131,9 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		uint256 _goodFrom;
 	}
 
-	struct TokenPermitEIP712Struct {
-		address tokenAddress;
-		address owner;
-		uint256 value;
-		uint256 minOutValue;
-		uint256 deadline;
-		uint8 v;
-		bytes32 r;
-		bytes32 s;
-	}
-
 	uint24 public constant poolFee = 3000;
 
-	mapping(bytes32 => TokenPermitEIP712Struct) closeOrderIdSwapToToken; //tokenAddress will be the target address, the permit needs to be for MPH and needs to be larger than the MPH amount to be closed otherwise it will fail.
+	mapping(bytes32 => UniswapHelper.TokenPermitEIP712Struct) closeOrderIdSwapToToken; //tokenAddress will be the target address, the permit needs to be for MPH and needs to be larger than the MPH amount to be closed otherwise it will fail.
 
 	address private msgSenderOverride;
 
@@ -570,7 +560,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 
 	function createOrderFromToken(
 		CreateOrderStruct memory createOrderParams,
-		TokenPermitEIP712Struct memory inputToken,
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken,
 		address _addressPositionOwner,
 		uint256 deadline,
 		bytes memory _signature
@@ -603,7 +593,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	//sent directly from the owner
 	function createOrderFromToken(
 		CreateOrderStruct memory createOrderParams, //_openMphTokenAmount is the minimum swap amount (including slippage). the Actual token amount will be overwritten by the swapped output amount
-		TokenPermitEIP712Struct memory inputToken
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken
 	) public returns(bytes32) {
 		if (createOrderParams._openMPHTokenAmount > 0) {
 			uint mphTokenAmountAfterSwap = permitTransferAndSwap(inputToken, createOrderParams._openMPHTokenAmount);
@@ -619,7 +609,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 
 	function createOrderFromToken(
 		CreateOrderStruct memory createOrderParams,
-		TokenPermitEIP712Struct memory inputToken,
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken,
 		address _addressPositionOwner,
 		uint256 deadline,
 		uint8 v,
@@ -652,142 +642,33 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	}
 
 	function permitTransferAndSwap(
-		TokenPermitEIP712Struct memory inputToken,
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken,
 		uint256 mphTokenAmount
 	) internal returns (uint amountOut) {
-		//increase allowance
-		IERC20Permit(inputToken.tokenAddress).permit(
-			inputToken.owner,
-			address(this),
-			inputToken.value,
-			inputToken.deadline,
-			inputToken.v,
-			inputToken.r,
-			inputToken.s
+		return UniswapHelper.permitTransferAndSwap(
+			uniswapRouter,
+			wMaticAddress,
+			state.morpherTokenAddress(),
+			_msgSender(),
+			inputToken,
+			mphTokenAmount
 		);
-
-		// Transfer `amountIn` of inputToken to this contract.
-		SafeERC20.safeTransferFrom(
-			IERC20(inputToken.tokenAddress),
-			inputToken.owner,
-			address(this),
-			inputToken.value
-		);
-
-		// Approve the router to spend the token.
-		IERC20(inputToken.tokenAddress).approve(uniswapRouter, inputToken.value);
-		IERC20(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
-
-		bytes memory path;
-
-		if (inputToken.tokenAddress != wMaticAddress) {
-			path = abi.encodePacked( //reversed path for exactOutput! FU oz!
-					inputToken.tokenAddress,
-					poolFee,
-					wMaticAddress,
-					poolFee,
-					state.morpherTokenAddress()
-				);
-		} else {
-			path = abi.encodePacked(wMaticAddress, poolFee, state.morpherTokenAddress()); //reversed path for exactOutput! FU oz!
-		}
-
-		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
-		IV3SwapRouter.ExactInputParams memory inputSwapParams = IV3SwapRouter.ExactInputParams({
-			path: path,
-			recipient: _msgSender(),
-			amountOutMinimum: mphTokenAmount,
-			amountIn: inputToken.value //safeguarded by the permit functionality.
-		});
-
-		amountOut = swapRouter.exactInput(inputSwapParams);
-
-		// ISwapRouter swapRouter = ISwapRouter(UNISWAP_ROUTER);
-		// ISwapRouter.ExactOutputParams memory outputSwapParams = ISwapRouter.ExactOutputParams({
-		// 	path: path,
-		// 	recipient: _msgSender(),
-		// 	deadline: block.timestamp,
-		// 	amountOut: mphTokenAmount,
-		// 	amountInMaximum: inputToken.value //safeguarded by the permit functionality.
-		// });
-
-		// uint amountIn = swapRouter.exactOutput(outputSwapParams);
-
-		// //TransferBack the remainder
-		// IERC20(inputToken.tokenAddress).transfer(inputToken.owner, inputToken.value - amountIn);
-
-		//reset the approved amounts
-		IERC20(inputToken.tokenAddress).approve(uniswapRouter, 0);
-		IERC20(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 	}
 
 	function convertMphAndPayout(bytes32 orderId, uint mphTokenAmount) internal {
 		//convert the MPH paid out by the close order back to the
 		if (closeOrderIdSwapToToken[orderId].tokenAddress != address(0)) {
-			IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
-
-			TokenPermitEIP712Struct memory inputToken = closeOrderIdSwapToToken[orderId];
-			//increase allowance
-			IERC20Permit(state.morpherTokenAddress()).permit(
-				inputToken.owner,
-				address(this),
-				inputToken.value,
-				inputToken.deadline,
-				inputToken.v,
-				inputToken.r,
-				inputToken.s
-			);
+			UniswapHelper.TokenPermitEIP712Struct memory inputToken = closeOrderIdSwapToToken[orderId];
 			delete closeOrderIdSwapToToken[orderId];
 
-			// MorpherTradeEngine tradeEngine = MorpherTradeEngine(state.morpherTradeEngineAddress());
-			// (, , , , , , , , , , , MorpherTradeEngine.OrderModifier memory oldOrder) = tradeEngine.orders(orderId);
-			// uint mphTokenAmount = oldOrder.balanceUp; //never try to transfer more than the user gave permission for
-			if (mphTokenAmount > inputToken.value) {
-				emit MphCloseOrderSoftFail(orderId, mphTokenAmount, inputToken.value);
-				return; //do nothing here, don't error out, just keep the MPH.
-			}
-
-			// Transfer `MPH payout` of Close position to this contract.
-			SafeERC20.safeTransferFrom(
-				IERC20(state.morpherTokenAddress()),
-				inputToken.owner,
-				address(this),
-				mphTokenAmount
+			UniswapHelper.convertMphAndPayout(
+				uniswapRouter,
+				wMaticAddress,
+				state.morpherTokenAddress(),
+				orderId,
+				mphTokenAmount,
+				inputToken
 			);
-
-			// Approve the router to spend the token.
-			IERC20(state.morpherTokenAddress()).approve(uniswapRouter, mphTokenAmount);
-
-			// SafeERC20.safeApprove(
-			// 	IERC20(state.morpherTokenAddress()),
-			// 	address(swapRouter),
-			// 	mphTokenAmount
-			// );
-
-			bytes memory path;
-
-			if (inputToken.tokenAddress != wMaticAddress) {
-				path = abi.encodePacked(
-					state.morpherTokenAddress(),
-					poolFee,
-					wMaticAddress,
-					poolFee,
-					inputToken.tokenAddress
-				);
-			} else {
-				path = abi.encodePacked(state.morpherTokenAddress(), poolFee, wMaticAddress);
-			}
-
-			IV3SwapRouter.ExactInputParams memory backConvertParams = IV3SwapRouter.ExactInputParams({
-				path: path,
-				recipient: inputToken.owner,
-				amountIn: mphTokenAmount,
-				amountOutMinimum: inputToken.minOutValue
-			});
-
-			// swap the remaining token back
-			swapRouter.exactInput(backConvertParams);
-			IERC20(state.morpherTokenAddress()).approve(uniswapRouter, 0);
 		}
 	}
 
@@ -1178,31 +1059,14 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 	 * @return amountOut Amount of MPH tokens received
 	 */
 	function swapWETHForMPH(uint256 wethAmount, uint256 minMphAmount) internal returns (uint256 amountOut) {
-		// Approve the router to spend WETH
-		IWETH9(wMaticAddress).approve(uniswapRouter, wethAmount);
-		
-		// Create the swap path
-		bytes memory path = abi.encodePacked(
+		return UniswapHelper.swapWETHForMPH(
+			uniswapRouter,
 			wMaticAddress,
-			poolFee,
-			state.morpherTokenAddress()
+			state.morpherTokenAddress(),
+			_msgSender(),
+			wethAmount,
+			minMphAmount
 		);
-		
-		// Execute the swap
-		IV3SwapRouter swapRouter = IV3SwapRouter(uniswapRouter);
-		IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
-			path: path,
-			recipient: _msgSender(),
-			amountIn: wethAmount,
-			amountOutMinimum: minMphAmount
-		});
-		
-		amountOut = swapRouter.exactInput(params);
-		
-		// Reset approvals
-		IWETH9(wMaticAddress).approve(uniswapRouter, 0);
-		
-		return amountOut;
 	}
 
 
