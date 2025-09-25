@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: GPLv3
 pragma solidity ^0.8.15;
 
+/// @custom:oz-upgrades-from contracts/prev/contracts/MorpherOracle.sol:MorpherOracle
+
 /**
 *  
 *  
