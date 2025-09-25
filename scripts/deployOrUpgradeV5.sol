@@ -44,21 +44,24 @@ abstract contract DeployOrUpgradeV5 is
 			// Set referenceContract in opts if not using @custom:oz-upgrades-from annotation
 
 			opts.referenceContract = string.concat("contracts/", _getContractName(implementationContractName)); // Example
+			opts.unsafeAllow = "external-library-linking";
+
 			// You might need to dynamically determine the previous version artifact path
 			// For simplicity now, we rely on the @custom:oz-upgrades-from annotation in the contract
 
 			Upgrades.validateUpgrade(implementationContractName, opts); // Validate against previous version
-			bytes memory bytecode = vm.getCode(_getJsonPath(implementationContractName));
-			address anotherAddress;
-			assembly {
-				anotherAddress := create(0, add(bytecode, 0x20), mload(bytecode))
-			}
-			// Use upgradeProxy which handles deploying the new implementation and calling upgradeToAndCall
-			UnsafeUpgrades.upgradeProxy(
-				proxyAddress,
-				anotherAddress, // Name of the NEW implementation artifact
-				upgradeCallData // Optional data for post-upgrade call
-			);
+			// bytes memory bytecode = vm.getCode(_getJsonPath(implementationContractName));
+			// address anotherAddress;
+			// assembly {
+			// 	anotherAddress := create(0, add(bytecode, 0x20), mload(bytecode))
+			// }
+			// // Use upgradeProxy which handles deploying the new implementation and calling upgradeToAndCall
+			// UnsafeUpgrades.upgradeProxy(
+			// 	proxyAddress,
+			// 	anotherAddress, // Name of the NEW implementation artifact
+			// 	upgradeCallData // Optional data for post-upgrade call
+			// );
+			Upgrades.upgradeProxy(proxyAddress, implementationContractName, upgradeCallData, opts);
 			console.log(contractStorageKey, "V5 Proxy upgraded.");
 			// Proxy address remains the same
 		}
