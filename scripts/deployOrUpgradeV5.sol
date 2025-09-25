@@ -41,44 +41,17 @@ abstract contract DeployOrUpgradeV5 is
 			console.log("New implementation contract:", implementationContractName);
 
 			// Validate the upgrade (optional but recommended)
-			// Set referenceContract in opts if not using @custom:oz-upgrades-from annotation
-
-			opts.referenceContract = string.concat("contracts/", _getContractName(implementationContractName)); // Example
 			opts.unsafeAllow = "external-library-linking";
 
-			// You might need to dynamically determine the previous version artifact path
-			// For simplicity now, we rely on the @custom:oz-upgrades-from annotation in the contract
-
+			// By providing the fully qualified name for the implementation, the plugin can find the correct artifact.
+			// The plugin will automatically find the previous implementation from the proxy itself,
+			// so manually setting `opts.referenceContract` is not needed and can cause pathing issues.
 			Upgrades.validateUpgrade(implementationContractName, opts); // Validate against previous version
-			// bytes memory bytecode = vm.getCode(_getJsonPath(implementationContractName));
-			// address anotherAddress;
-			// assembly {
-			// 	anotherAddress := create(0, add(bytecode, 0x20), mload(bytecode))
-			// }
-			// // Use upgradeProxy which handles deploying the new implementation and calling upgradeToAndCall
-			// UnsafeUpgrades.upgradeProxy(
-			// 	proxyAddress,
-			// 	anotherAddress, // Name of the NEW implementation artifact
-			// 	upgradeCallData // Optional data for post-upgrade call
-			// );
+			
 			Upgrades.upgradeProxy(proxyAddress, implementationContractName, upgradeCallData, opts);
 			console.log(contractStorageKey, "V5 Proxy upgraded.");
 			// Proxy address remains the same
 		}
 		return proxyAddress;
-	}
-
-	function _getContractName(string memory fileName) private pure returns (string memory) {
-		strings.slice memory name = fileName.toSlice();
-		if (name.endsWith(".sol".toSlice())) {
-			return string.concat(fileName,":", name.until(".sol".toSlice()).toString());
-		}
-
-		return fileName;
-	}
-	function _getJsonPath(string memory fileName) private pure returns (string memory) {
-		strings.slice memory name = fileName.toSlice();
-		return
-			string.concat("build/", fileName, "/", name.until(".sol".toSlice()).toString(), ".json");
 	}
 }
