@@ -40,18 +40,39 @@ abstract contract DeployOrUpgradeV5 is
 			console.log("Upgrading V5 UUPS proxy for", contractStorageKey, "at", proxyAddress);
 			console.log("New implementation contract:", implementationContractName);
 
-			// Validate the upgrade (optional but recommended)
+			// Validate the upgrade by pointing to the previous contract version artifact.
+			opts.referenceContract = _getPrevArtifactPath(implementationContractName);
 			opts.unsafeAllow = "external-library-linking";
 
-			// By providing the fully qualified name for the implementation, the plugin can find the correct artifact.
-			// The plugin will automatically find the previous implementation from the proxy itself,
-			// so manually setting `opts.referenceContract` is not needed and can cause pathing issues.
-			Upgrades.validateUpgrade(implementationContractName, opts); // Validate against previous version
-			
-			Upgrades.upgradeProxy(proxyAddress, implementationContractName, upgradeCallData, opts);
+			Upgrades.validateUpgrade(implementationContractName, opts);
+
+			// Manually deploy the new implementation
+			bytes memory bytecode = vm.getCode(_getNewArtifactPath(implementationContractName));
+			address newImplementationAddress;
+			assembly {
+				newImplementationAddress := create(0, add(bytecode, 0x20), mload(bytecode))
+			}
+
+			// Manually upgrade the proxy to point to the new implementation
+			UnsafeUpgrades.upgradeProxy(
+				proxyAddress,
+				newImplementationAddress,
+				upgradeCallData
+			);
 			console.log(contractStorageKey, "V5 Proxy upgraded.");
-			// Proxy address remains the same
 		}
 		return proxyAddress;
+	}
+
+	function _getPrevArtifactPath(string memory fileName) private pure returns (string memory) {
+		strings.slice memory name = fileName.toSlice();
+		string memory contractName = name.until(".sol".toSlice()).toString();
+		return string.concat("contracts/prev/contracts/", fileName, ":", contractName);
+	}
+
+	function _getNewArtifactPath(string memory fileName) private pure returns (string memory) {
+		strings.slice memory name = fileName.toSlice();
+		string memory contractName = name.until(".sol".toSlice()).toString();
+		return string.concat("contracts/", fileName, ":", contractName);
 	}
 }
