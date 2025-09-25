@@ -104,9 +104,18 @@ library SignatureVerifier {
         bytes32 _hash,
         bytes memory _signature
     ) private returns (bool) {
+        // The EIP-6492 signature format is `abi.encode(...) | magic_suffix`.
+        // To decode the prefix, we must copy all but the last 32 bytes into a new memory array,
+        // as slicing memory arrays is not supported in this way.
+        uint256 prefixLength = _signature.length - 32;
+        bytes memory prefix = new bytes(prefixLength);
+        for (uint256 i = 0; i < prefixLength; i++) {
+            prefix[i] = _signature[i];
+        }
+
         // Decode the wrapped signature to get deployment data and the original signature.
         (address factory, bytes memory factoryCalldata, bytes memory originalSignature) = abi.decode(
-            _signature[0:_signature.length - 32],
+            prefix,
             (address, bytes, bytes)
         );
 
