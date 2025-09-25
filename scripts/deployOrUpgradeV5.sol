@@ -16,6 +16,8 @@ abstract contract DeployOrUpgradeV5 is
 	// --- Remove v4 specific helpers (deployProxyAdmin, deployProxy, upgradeProxy) ---
     using strings for *;
 
+    function deployImplementation() internal virtual returns (address);
+
 	// --- V5 deploy/upgrade function ---
 	function deployOrUpgradeV5(
 		string memory contractStorageKey, // e.g., "MorpherState" - used for loading/saving address
@@ -46,12 +48,8 @@ abstract contract DeployOrUpgradeV5 is
 
 			Upgrades.validateUpgrade(implementationContractName, opts);
 
-			// Manually deploy the new implementation
-			bytes memory bytecode = vm.getCode(_getNewArtifactPath(implementationContractName));
-			address newImplementationAddress;
-			assembly {
-				newImplementationAddress := create(0, add(bytecode, 0x20), mload(bytecode))
-			}
+			// Deploy the new implementation via the overridden function, which handles library linking.
+			address newImplementationAddress = deployImplementation();
 
 			// Manually upgrade the proxy to point to the new implementation
 			UnsafeUpgrades.upgradeProxy(
@@ -70,9 +68,4 @@ abstract contract DeployOrUpgradeV5 is
 		return string.concat("contracts/prev/contracts/", fileName, ":", contractName);
 	}
 
-	function _getNewArtifactPath(string memory fileName) private pure returns (string memory) {
-		strings.slice memory name = fileName.toSlice();
-		string memory contractName = name.until(".sol".toSlice()).toString();
-		return string.concat("contracts/", fileName, ":", contractName);
-	}
 }

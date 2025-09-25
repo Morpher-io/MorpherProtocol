@@ -16,6 +16,11 @@ import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol"; // U
 // --- Inherit from DeployOrUpgradeV5 ---
 contract DeployMorpherOracle is DeployOrUpgradeV5 {
 
+    function deployImplementation() internal override returns (address) {
+        MorpherOracle oracle = new MorpherOracle();
+        return address(oracle);
+    }
+
 	string constant CONTRACT_KEY = "MorpherOracle";
 	// Use fully qualified name or filename as required by the upgrades plugin
 	string constant CONTRACT_NAME = "MorpherOracle.sol";
