@@ -18,7 +18,7 @@ contract DeployMorpherOracle is DeployOrUpgradeV5 {
 
 	string constant CONTRACT_KEY = "MorpherOracle";
 	// Use fully qualified name or filename as required by the upgrades plugin
-	string constant CONTRACT_NAME = "contracts/MorpherOracle.sol:MorpherOracle";                                                                                    
+	string constant CONTRACT_NAME = "MorpherOracle.sol";
 	// Define EIP712 domain parameters
 	string constant EIP712_NAME = "MorpherOracle";
 	string constant EIP712_VERSION = "1";
