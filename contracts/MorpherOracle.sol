@@ -47,7 +47,7 @@ import {ContextUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/con
 import {PausableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/PausableUpgradeable.sol";
 import {EIP712Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/cryptography/EIP712Upgradeable.sol";
 import {NoncesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/NoncesUpgradeable.sol"; // Use Nonces instead of Counters
-import {ECDSA} from "../lib/openzeppelin-contracts-5/contracts/utils/cryptography/ECDSA.sol"; // Use non-upgradeable ECDSA
+import "./libraries/SignatureVerifier.sol";
 import {IERC20Permit} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/extensions/IERC20Permit.sol"; // Use non-upgradeable interface
 
 import {IERC20} from "../lib/openzeppelin-contracts-5/contracts/token/ERC20/IERC20.sol";
@@ -502,6 +502,40 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		CreateOrderStruct memory createOrderParams,
 		address _addressPositionOwner,
 		uint256 deadline,
+		bytes memory _signature
+	) public returns (bytes32 orderId) {
+		require(block.timestamp <= deadline, "MorpherOracle: expired deadline");
+
+		// Use _useNonce from NoncesUpgradeable
+		uint256 currentNonce = _useNonce(_addressPositionOwner);
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_PERMIT_TYPEHASH,
+				createOrderParams._marketId,
+				createOrderParams._closeSharesAmount,
+				createOrderParams._openMPHTokenAmount,
+				_addressPositionOwner,
+				currentNonce, // Use the consumed nonce
+				deadline
+			)
+		);
+
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
+
+		require(SignatureVerifier.isValidSignatureNow(_addressPositionOwner, digest, _signature), "MorpherOracle: invalid signature");
+
+		// Keep msgSenderOverride logic
+		msgSenderOverride = _addressPositionOwner;
+		orderId = createOrder(createOrderParams);
+		msgSenderOverride = address(0);
+	}
+
+	function createOrderPermittedBySignature(
+		CreateOrderStruct memory createOrderParams,
+		address _addressPositionOwner,
+		uint256 deadline,
 		uint8 v,
 		bytes32 r,
 		bytes32 s
@@ -526,13 +560,43 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		// Use _hashTypedDataV4 from EIP712Upgradeable
 		bytes32 digest = _hashTypedDataV4(structHash);
 
-		// Use ECDSA library directly
-		address signer = ECDSA.recover(digest, v, r, s); // Use ECDSA instead of ECDSAUpgradeable
-		require(signer == _addressPositionOwner, "MorpherOracle: invalid signature");
+		require(SignatureVerifier.isValidSignatureNow(_addressPositionOwner, digest, v, r, s), "MorpherOracle: invalid signature");
 
 		// Keep msgSenderOverride logic
 		msgSenderOverride = _addressPositionOwner;
 		orderId = createOrder(createOrderParams);
+		msgSenderOverride = address(0);
+	}
+
+	function createOrderFromToken(
+		CreateOrderStruct memory createOrderParams,
+		TokenPermitEIP712Struct memory inputToken,
+		address _addressPositionOwner,
+		uint256 deadline,
+		bytes memory _signature
+	) public {
+		require(block.timestamp <= deadline, "MorpherOracle: expired deadline");
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_PERMIT_TYPEHASH,
+				createOrderParams._marketId,
+				createOrderParams._closeSharesAmount,
+				createOrderParams._openMPHTokenAmount, //minimum amount of MPH token to be traded with, actual amount depends on the swap
+				_addressPositionOwner,
+				_useNonce(_addressPositionOwner),
+				deadline
+			)
+		);
+
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
+
+		require(SignatureVerifier.isValidSignatureNow(_addressPositionOwner, digest, _signature), "MorpherOracle: invalid signature");
+
+		// Keep msgSenderOverride logic
+		msgSenderOverride = _addressPositionOwner;
+		createOrderFromToken(createOrderParams, inputToken);
 		msgSenderOverride = address(0);
 	}
 
@@ -579,9 +643,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		// Use _hashTypedDataV4 from EIP712Upgradeable
 		bytes32 digest = _hashTypedDataV4(structHash);
 
-		// Use ECDSA library directly
-		address signer = ECDSA.recover(digest, v, r, s); // Use ECDSA instead of ECDSAUpgradeable
-		require(signer == _addressPositionOwner, "MorpherOracle: invalid signature");
+		require(SignatureVerifier.isValidSignatureNow(_addressPositionOwner, digest, v, r, s), "MorpherOracle: invalid signature");
 
 		// Keep msgSenderOverride logic
 		msgSenderOverride = _addressPositionOwner;
@@ -783,6 +845,38 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		bytes32 _orderId,
 		address _owner,
 		uint256 deadline,
+		bytes memory _signature
+	) public virtual {
+		require(block.timestamp <= deadline, "MorpherOracle: expired deadline");
+
+		// Use _useNonce from NoncesUpgradeable
+		uint256 currentNonce = _useNonce(_owner);
+
+		bytes32 structHash = keccak256(
+			abi.encode(
+				_CANCEL_ORDER_TYPEHASH,
+				_orderId,
+				_owner,
+				currentNonce, // Use consumed nonce
+				deadline
+			)
+		);
+
+		// Use _hashTypedDataV4 from EIP712Upgradeable
+		bytes32 digest = _hashTypedDataV4(structHash);
+
+		require(SignatureVerifier.isValidSignatureNow(_owner, digest, _signature), "MorpherOracle: invalid signature");
+
+		// Keep msgSenderOverride logic
+		msgSenderOverride = _owner;
+		initiateCancelOrder(_orderId);
+		msgSenderOverride = address(0);
+	}
+
+	function initiateCancelOrderPermitted(
+		bytes32 _orderId,
+		address _owner,
+		uint256 deadline,
 		uint8 v,
 		bytes32 r,
 		bytes32 s
@@ -805,9 +899,7 @@ contract MorpherOracle is UUPSUpgradeable, ContextUpgradeable, PausableUpgradeab
 		// Use _hashTypedDataV4 from EIP712Upgradeable
 		bytes32 digest = _hashTypedDataV4(structHash);
 
-		// Use ECDSA library directly
-		address signer = ECDSA.recover(digest, v, r, s); // Use ECDSA instead of ECDSAUpgradeable
-		require(signer == _owner, "MorpherOracle: invalid signature");
+		require(SignatureVerifier.isValidSignatureNow(_owner, digest, v, r, s), "MorpherOracle: invalid signature");
 
 		// Keep msgSenderOverride logic
 		msgSenderOverride = _owner;
