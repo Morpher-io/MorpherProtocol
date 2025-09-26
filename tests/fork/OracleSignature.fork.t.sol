@@ -3,15 +3,31 @@ pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {MorpherOracle} from "../../contracts/MorpherOracle.sol";
+import {UnsafeUpgrades} from "../../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 contract OracleSignatureForkTest is Test {
     MorpherOracle oracle;
-    address oracleProxyAddress = 0xe40F08b4B02aBe9bb826932fB58c7911372a4BC6;
+    address constant oracleProxyAddress = 0xe40F08b4B02aBe9bb826932fB58c7911372a4BC6;
+    address constant PROXY_UPDATER = 0x5b3b191986561405b610531515712534C4F7726d; // Address with PROXYUPDATER_ROLE on Base Sepolia
 
     function setUp() public {
         // The user will provide the RPC URL via the command line
-        // e.g., forge test --fork-url <your_base_sepolia_rpc_url>
-        // vm.createSelectFork(vm.rpcUrl("base_sepolia"));
+        vm.createSelectFork(vm.rpcUrl("base_sepolia"));
+
+        // Deploy a new implementation contract locally. This ensures it's compiled
+        // with our current source code, including console.log statements.
+        MorpherOracle newImplementation = new MorpherOracle();
+        console.log("Deployed new MorpherOracle implementation for testing at:", address(newImplementation));
+
+        // Impersonate the proxy updater to authorize the upgrade on the forked network.
+        vm.startPrank(PROXY_UPDATER);
+
+        // Upgrade the existing proxy to point to our new implementation.
+        UnsafeUpgrades.upgradeProxy(oracleProxyAddress, address(newImplementation), "");
+
+        vm.stopPrank();
+
+        // Point our test contract instance to the now-upgraded proxy.
         oracle = MorpherOracle(payable(oracleProxyAddress));
     }
 
@@ -36,14 +52,14 @@ contract OracleSignatureForkTest is Test {
         console.log("--- Decoded Calldata ---");
         console.log("Signer Address:", addressPositionOwner);
         console.log("Deadline:", deadline);
-        console.logBytes(signature);
+        console.logBytes("Signature:", signature);
         console.log("--- End Decoded Calldata ---");
         
         // This will test if the call reverts with the expected message.
         vm.expectRevert(bytes("MorpherOracle: invalid signature"));
 
         // Make the actual call
-        (bool success, ) = oracleProxyAddress.call(calldataPayload);
+        (bool success, ) = address(oracle).call(calldataPayload);
         require(!success, "Transaction did not revert as expected");
     }
 }
