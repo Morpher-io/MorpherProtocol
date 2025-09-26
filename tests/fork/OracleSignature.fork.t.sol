@@ -12,7 +12,7 @@ contract OracleSignatureForkTest is Test {
 
     function setUp() public {
         // The user will provide the RPC URL via the command line
-        // vm.createSelectFork(vm.rpcUrl("base_sepolia"));
+        vm.createSelectFork(vm.rpcUrl("base_sepolia"));
 
         // Deploy a new implementation contract locally. This ensures it's compiled
         // with our current source code, including console.log statements.
