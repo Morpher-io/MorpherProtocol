@@ -36,7 +36,7 @@ contract OracleSignatureForkTest is Test {
         console.log("--- Decoded Calldata ---");
         console.log("Signer Address:", addressPositionOwner);
         console.log("Deadline:", deadline);
-        console.logBytes("Signature:", signature);
+        console.logBytes(signature);
         console.log("--- End Decoded Calldata ---");
         
         // This will test if the call reverts with the expected message.
