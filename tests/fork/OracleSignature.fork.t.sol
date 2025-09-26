@@ -8,7 +8,7 @@ import {UnsafeUpgrades} from "../../lib/openzeppelin-foundry-upgrades/src/Upgrad
 contract OracleSignatureForkTest is Test {
     MorpherOracle oracle;
     address constant oracleProxyAddress = 0xe40F08b4B02aBe9bb826932fB58c7911372a4BC6;
-    address constant PROXY_UPDATER = 0x5b3b191986561405b610531515712534C4F7726d; // Address with PROXYUPDATER_ROLE on Base Sepolia
+    address constant PROXY_UPDATER = 0x720B9742632566b76B53B60Eee8d5FDC20aC74bE; // Address with PROXYUPDATER_ROLE on Base Sepolia
 
     function setUp() public {
         // The user will provide the RPC URL via the command line
