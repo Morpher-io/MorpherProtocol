@@ -76,14 +76,13 @@ library SignatureVerifier {
     ) public returns (bool) {
         console.log("--- SignatureVerifier ---");
         console.log("Expected Signer:", _signer);
-        console.log("Message Hash:", _hash);
+        console.logBytes32(_hash);
         console.log("Signature:");
         console.logBytes(_signature);
 
         // 1. EIP-6492 Check: Signature wrapping for counterfactual contracts.
         // This must be checked first to allow EIP-6492 signatures to remain valid even after the contract is deployed.
         if (_signature.length >= 32) {
-            bytes32 suffix;
             // Read the last 32 bytes of the signature without creating a memory copy.
             bytes32 suffix;
             assembly {
@@ -92,8 +91,8 @@ library SignatureVerifier {
                 // `_signature` (pointer) + `mload(_signature)` (length).
                 suffix := mload(add(_signature, mload(_signature)))
             }
-            console.log("Read Suffix:     ", suffix);
-            console.log("Expected Suffix: ", ERC6492_DETECTION_SUFFIX);
+            console.logBytes32(suffix);
+            console.logBytes32(ERC6492_DETECTION_SUFFIX);
             if (suffix == ERC6492_DETECTION_SUFFIX) {
                 console.log("Detected EIP-6492 Signature");
                 bool result = _verifyEIP6492(_signer, _hash, _signature);
