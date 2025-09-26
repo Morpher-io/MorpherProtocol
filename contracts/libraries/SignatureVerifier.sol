@@ -76,8 +76,8 @@ library SignatureVerifier {
     ) public returns (bool) {
         console.log("--- SignatureVerifier ---");
         console.log("Expected Signer:", _signer);
-        console.logBytes32(_hash);
-        console.logBytes(_signature);
+        console.log("Message Hash:", _hash);
+        console.logBytes("Signature:", _signature);
 
         // 1. EIP-6492 Check: Signature wrapping for counterfactual contracts.
         // This must be checked first to allow EIP-6492 signatures to remain valid even after the contract is deployed.
