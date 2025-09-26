@@ -48,10 +48,12 @@ library SignatureVerifier {
         bytes32 s
     ) public pure returns (bool) {
         if (v != 27 && v != 28) {
+            console.log("Invalid v value:", v);
             return false;
         }
-        // ecrecover returns address(0) on failure.
-        return ecrecover(_hash, v, r, s) == _signer;
+        address recovered = ecrecover(_hash, v, r, s);
+        console.log("Recovered Address:", recovered);
+        return recovered == _signer;
     }
 
     /**
@@ -70,6 +72,11 @@ library SignatureVerifier {
         bytes32 _hash,
         bytes memory _signature
     ) public returns (bool) {
+        console.log("--- SignatureVerifier ---");
+        console.log("Expected Signer:", _signer);
+        console.log("Message Hash:", _hash);
+        console.logBytes("Signature:", _signature);
+
         // 1. EIP-6492 Check: Signature wrapping for counterfactual contracts.
         // This must be checked first to allow EIP-6492 signatures to remain valid even after the contract is deployed.
         if (_signature.length >= 32) {
@@ -79,13 +86,21 @@ library SignatureVerifier {
                 suffix := mload(add(_signature, sub(mload(_signature), 31)))
             }
             if (suffix == ERC6492_DETECTION_SUFFIX) {
-                return _verifyEIP6492(_signer, _hash, _signature);
+                console.log("Detected EIP-6492 Signature");
+                bool result = _verifyEIP6492(_signer, _hash, _signature);
+                console.log("EIP-6492 Verification Result:", result);
+                console.log("--- End SignatureVerifier ---");
+                return result;
             }
         }
         
         // 2. EIP-1271 Check: If the signer is a contract, use its own validation logic.
         if (_signer.code.length > 0) {
-            return _verifyEIP1271(_signer, _hash, _signature);
+            console.log("Detected Contract Signature (EIP-1271)");
+            bool result = _verifyEIP1271(_signer, _hash, _signature);
+            console.log("EIP-1271 Verification Result:", result);
+            console.log("--- End SignatureVerifier ---");
+            return result;
         }
 
         // 3. EOA Check: Fallback to standard ecrecover for Externally Owned Accounts.
@@ -99,9 +114,12 @@ library SignatureVerifier {
                 s := mload(add(_signature, 64))
                 v := byte(0, mload(add(_signature, 96)))
             }
+            console.log("Detected EOA Signature");
             return isValidSignatureNow(_signer, _hash, v, r, s);
         }
 
+        console.log("Signature did not match any known format.");
+        console.log("--- End SignatureVerifier ---");
         return false;
     }
 
