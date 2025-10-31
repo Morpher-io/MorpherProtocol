@@ -19,6 +19,11 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 	// Define the EIP712 domain name for the permit function
 	string constant PERMIT_NAME = "MorpherToken"; // Or "MorpherToken" - should match what users expect
 
+    function deployImplementation() internal override returns (address) {
+        MorpherToken token = new MorpherToken();
+        return address(token);
+    }
+
 	function run() public {
 		// Load dependencies
 		address accessControlAddress = loadAddress("MorpherAccessControl");
