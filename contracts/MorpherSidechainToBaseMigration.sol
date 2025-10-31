@@ -313,7 +313,10 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
             );
             
             // Verify position hasn't been migrated already
-            require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
+            // require(!migratedPositions[positionHash], "MorpherMigration: Position already migrated");
+            if(migratedPositions[positionHash]) {
+                continue; //just do not process them twice
+            }
             
             // Check if user already has a position for this market
             MorpherTradeEngine.position memory existingPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(_user, pos.marketId);
@@ -413,6 +416,13 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
         } else {
             emit BalanceMigrated(_user, amountToMint);
         }
+    }
+
+    function resetUserMigrationFlags(address user, bool setFlag) public onlyRole(MIGRATION_OPERATOR_ROLE) migrationActive {
+        migratedBalances[user] = setFlag;
+        migratedStakes[user] = setFlag;
+
+
     }
     
     /**

@@ -274,7 +274,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * - the caller must have the `BURNER_ROLE`.
 	 */
 	function burn(uint256 amount) public virtual {
-		require(morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()), "MorpherToken: must have burner role to burn");
+		// require(morpherAccessControl.hasRole(BURNER_ROLE, _msgSender()), "MorpherToken: must have burner role to burn");
 		_burn(_msgSender(), amount);
 	}
 

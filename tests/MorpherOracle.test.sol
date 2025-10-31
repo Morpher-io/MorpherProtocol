@@ -9,6 +9,7 @@ import "./BaseSetup.sol";
 import "./mocks/ERC20.sol";
 import "./mocks/UniswapRouter.sol";
 import "../contracts/MorpherOracle.sol";
+import "../contracts/libraries/UniswapHelper.sol";
 
 // Remove inheritance from MorpherOracle implementation
 contract MorpherOracleTest is BaseSetup, MorpherOracle {
@@ -407,7 +408,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
-		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken = UniswapHelper.TokenPermitEIP712Struct(
 			address(WMATIC),
 			owner.addr,
 			50 ether,
@@ -522,7 +523,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
-		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken = UniswapHelper.TokenPermitEIP712Struct(
 			address(OTHER_ERC20),
 			owner.addr,
 			50 ether,
@@ -600,7 +601,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainHash, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
-		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken = UniswapHelper.TokenPermitEIP712Struct(
 			address(WMATIC),
 			owner.addr,
 			50 ether,
@@ -912,7 +913,7 @@ contract MorpherOracleTest is BaseSetup, MorpherOracle {
 		bytes32 finalHash = MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(owner.key, finalHash);
 
-		TokenPermitEIP712Struct memory inputToken = TokenPermitEIP712Struct(
+		UniswapHelper.TokenPermitEIP712Struct memory inputToken = UniswapHelper.TokenPermitEIP712Struct(
 			address(WMATIC),
 			owner.addr,
 			mphBalanceAfterClose,

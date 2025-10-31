@@ -62,10 +62,16 @@ abstract contract DeployOrUpgradeV5 is
 		return proxyAddress;
 	}
 
+	/**
+	* Despite contracts are in the prev folder, upon building, 
+	* they will land in the build/contracts/... folder. 
+	* The contracts not in the contracts/prev folder will land in the build folder
+	* It looks counter intuitive, but the path is correct to get the reference contract artifact.
+	*/
 	function _getPrevArtifactPath(string memory fileName) private pure returns (string memory) {
 		strings.slice memory name = fileName.toSlice();
 		string memory contractName = name.until(".sol".toSlice()).toString();
-		return string.concat("contracts/prev/contracts/", fileName, ":", contractName);
+		return string.concat("contracts/", fileName, ":", contractName);
 	}
 
 }

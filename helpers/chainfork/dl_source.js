@@ -15,12 +15,12 @@ const NETWORKS = {
     },
     84532: {
         name: 'Base Sepolia',
-        apiKey: process.env.BASE_API_KEY,
+        apiKey: process.env.ETHERSCAN_KEY,
         apiUrl: 'https://api-sepolia.basescan.org'
     },
     8453: {
         name: 'Base',
-        apiKey: process.env.BASE_API_KEY,
+        apiKey: process.env.ETHERSCAN_API_KEY,
         apiUrl: 'https://api.basescan.org'
     },
     137: {
@@ -72,7 +72,7 @@ const NETWORKS = {
 })()
 
 async function getAndWriteContract(contractAddress, network, level = 1) {
-    let content = await fetch(`${network.apiUrl}/api?module=contract&action=getsourcecode&address=${contractAddress}&apikey=${network.apiKey}`)
+    let content = await fetch(`https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=${contractAddress}&apikey=${network.apiKey}`)
     let json = await content.json();
 
     if (json.result[0].SourceCode != '') {
