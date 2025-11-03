@@ -578,11 +578,48 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 			}
 
 			// Check locked rewards and time locks against the *full* balance before the operation
-			(uint256 timeLockedAmount, ) = getTimeLock(from);
-			require(
-				super.balanceOf(from) >= _lockedRewards[from] + timeLockedAmount + amount,
-				"MorpherToken: operation amount exceeds available balance (locked)" // Generalized message
-			);
+			if (isUserInitiatedBurn) {
+				// For user-initiated burns, allow burning locked tokens if necessary,
+				// after unlocked tokens are used. Unlocked tokens are burned first, then
+				// time-locked tokens, and finally reward-locked tokens.
+				// The total balance check is handled by the parent _update function.
+
+				(uint256 timeLockedAmount, ) = getTimeLock(from);
+				uint256 lockedRewardsAmount = _lockedRewards[from];
+				uint256 totalLocked = timeLockedAmount + lockedRewardsAmount;
+				
+				uint256 unlockedBalance = 0;
+				if (super.balanceOf(from) > totalLocked) {
+					unlockedBalance = super.balanceOf(from) - totalLocked;
+				}
+
+				if (amount > unlockedBalance) {
+					uint256 burnFromLocked = amount - unlockedBalance;
+					
+					// Burn from time-locked first
+					if (timeLockedAmount > 0) {
+						uint256 burnFromTimeLock = burnFromLocked < timeLockedAmount ? burnFromLocked : timeLockedAmount;
+						_timeLocks[from].amount -= burnFromTimeLock;
+						burnFromLocked -= burnFromTimeLock;
+						emit TokensUnlocked(from, burnFromTimeLock);
+					}
+
+					// Then burn from rewards-locked
+					if (burnFromLocked > 0 && lockedRewardsAmount > 0) {
+						uint256 burnFromRewardsLock = burnFromLocked < lockedRewardsAmount ? burnFromLocked : lockedRewardsAmount;
+						_lockedRewards[from] -= burnFromRewardsLock;
+						_totalLockedRewards -= burnFromRewardsLock;
+						emit RewardsUnlocked(from, burnFromRewardsLock);
+					}
+				}
+			} else {
+				// Original logic for transfers: only transferable balance can be sent.
+				(uint256 timeLockedAmount, ) = getTimeLock(from);
+				require(
+					super.balanceOf(from) >= _lockedRewards[from] + timeLockedAmount + amount,
+					"MorpherToken: operation amount exceeds available balance (locked)" // Generalized message
+				);
+			}
 
 			// Daily limit logic (applies if not called by TradeEngine for transfers, and for user-initiated burns)
 			// The isUserInitiatedBurn flag already ensures _msgSender() != morpherState.morpherTradeEngineAddress() for burns.
