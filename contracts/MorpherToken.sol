@@ -384,15 +384,15 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		
 		uint256 unlockTime = block.timestamp + lockDuration;
 		
-		// If tokens are already locked, ensure we're not reducing the lock time
-		if (_timeLocks[account].amount > 0) {
+		// If tokens are already locked and the lock is still active, add to it
+		if (_timeLocks[account].amount > 0 && block.timestamp < _timeLocks[account].lockedUntil) {
 			require(unlockTime >= _timeLocks[account].lockedUntil, "MorpherToken: cannot reduce existing lock time");
 			
 			// Add to existing lock
 			_timeLocks[account].amount += amount;
 			_timeLocks[account].lockedUntil = unlockTime;
 		} else {
-			// Create new lock
+			// Create a new lock (this will also overwrite an expired lock)
 			_timeLocks[account] = TokenLock(amount, unlockTime);
 		}
 
