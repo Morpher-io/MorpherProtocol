@@ -1202,6 +1202,32 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 		return _liquidationPrice;
 	}
 
+	function calculatePrincipalOnClose(bytes32 _orderId) private view returns (uint256) {
+		address _userId = orders[_orderId].userId;
+		bytes32 _marketId = orders[_orderId].marketId;
+		position memory p = portfolio[_userId][_marketId];
+		uint256 sharesToClose;
+
+		// A "buy" order (tradeDirection=true) closes short positions.
+		// A "sell" order (tradeDirection=false) closes long positions.
+		if (orders[_orderId].tradeDirection) { // Closing short positions
+			sharesToClose = orders[_orderId].modifyPosition.shortSharesOrder;
+		} else { // Closing long positions
+			sharesToClose = orders[_orderId].modifyPosition.longSharesOrder;
+		}
+
+		if (sharesToClose == 0) {
+			return 0;
+		}
+
+		// Principal is calculated based on the average entry cost of the shares being closed.
+		// The formula for cost per share (long or short) is:
+		// meanEntryPrice + (meanEntrySpread * meanEntryLeverage / PRECISION)
+		uint256 costPerShare = p.meanEntryPrice + ((p.meanEntrySpread * p.meanEntryLeverage) / PRECISION);
+
+		return sharesToClose * costPerShare;
+	}
+
 	// ----------------------------------------------------------------------------
 	// setPositionInState(bytes32 _orderId)
 	// Updates the portfolio in Morpher State. Called by closeLong/closeShort/openLong/openShort
@@ -1254,10 +1280,23 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 			orders[_orderId].modifyPosition.balanceUp = 0;
 		}
 		if (orders[_orderId].modifyPosition.balanceUp > 0) {
-			MorpherMintingLimiter(morpherState.morpherMintingLimiterAddress()).mint(
-				orders[_orderId].userId,
-				orders[_orderId].modifyPosition.balanceUp
-			);
+			uint256 totalPayout = orders[_orderId].modifyPosition.balanceUp;
+			uint256 principal = calculatePrincipalOnClose(_orderId);
+
+			if (principal >= totalPayout) {
+				// No profit, or a loss. The entire payout is considered principal return.
+				MorpherToken(morpherState.morpherTokenAddress()).mint(orders[_orderId].userId, totalPayout);
+			} else {
+				// There is a profit. Split payout into principal and profit.
+				uint256 profit = totalPayout - principal;
+				// Mint principal directly, bypassing the limiter.
+				MorpherToken(morpherState.morpherTokenAddress()).mint(orders[_orderId].userId, principal);
+				// Mint profit through the limiter.
+				MorpherMintingLimiter(morpherState.morpherMintingLimiterAddress()).mint(
+					orders[_orderId].userId,
+					profit
+				);
+			}
 		}
 		if (orders[_orderId].modifyPosition.balanceDown > 0) {
 			MorpherToken(morpherState.morpherTokenAddress()).burn(
