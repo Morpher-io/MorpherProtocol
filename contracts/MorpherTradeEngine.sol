@@ -1254,7 +1254,7 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 			orders[_orderId].modifyPosition.balanceUp = 0;
 		}
 		if (orders[_orderId].modifyPosition.balanceUp > 0) {
-			MorpherToken(morpherState.morpherMintingLimiterAddress()).mint(
+			MorpherMintingLimiter(morpherState.morpherMintingLimiterAddress()).mint(
 				orders[_orderId].userId,
 				orders[_orderId].modifyPosition.balanceUp
 			);
