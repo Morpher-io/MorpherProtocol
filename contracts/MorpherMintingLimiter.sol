@@ -16,11 +16,13 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     uint256 public mintingLimitPerUser;
     uint256 public mintingLimitDaily;
+    uint256 public mintingLimitPerUserDaily;
     uint256 public timeLockingPeriod;
 
     mapping(address => uint256) public escrowedTokens;
     mapping(address => uint256) public lockedUntil;
     mapping(uint256 => uint256) public dailyMintedTokens;
+    mapping(address => mapping(uint256 => uint256)) public dailyMintedTokensPerUser;
 
     address tradeEngineAddress; 
     MorpherState state;
@@ -30,6 +32,7 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
     event MintingDenied(address _user, uint256 _tokenAmount);
     event MintingLimitUpdatedPerUser(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
     event MintingLimitUpdatedDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
+    event MintingLimitUpdatedPerUserDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
     event TimeLockPeriodUpdated(uint256 _timeLockPeriodOld, uint256 _timeLockPeriodNew);
     event TradeEngineAddressSet(address _tradeEngineAddress);
     event DailyMintedTokensReset();
@@ -52,12 +55,14 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
         address _stateAddress,
         uint256 _mintingLimitPerUser,
         uint256 _mintingLimitDaily,
+        uint256 _mintingLimitPerUserDaily,
         uint256 _timeLockingPeriodInSeconds
     ) public initializer {
         __UUPSUpgradeable_init(); // Initialize UUPS
         state = MorpherState(_stateAddress);
         mintingLimitPerUser = _mintingLimitPerUser;
         mintingLimitDaily = _mintingLimitDaily;
+        mintingLimitPerUserDaily = _mintingLimitPerUserDaily;
         timeLockingPeriod = _timeLockingPeriodInSeconds;
     }
 
@@ -94,6 +99,11 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
         mintingLimitPerUser = _newMintingLimit;
     }
 
+    function setMintingLimitPerUserDaily(uint256 _newMintingLimit) public onlyAdministrator {
+        emit MintingLimitUpdatedPerUserDaily(mintingLimitPerUserDaily, _newMintingLimit);
+        mintingLimitPerUserDaily = _newMintingLimit;
+    }
+
     function setTimeLockingPeriod(uint256 _newTimeLockingPeriodInSeconds) public onlyAdministrator {
         emit TimeLockPeriodUpdated(timeLockingPeriod, _newTimeLockingPeriodInSeconds);
         timeLockingPeriod = _newTimeLockingPeriodInSeconds;
@@ -101,10 +111,16 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     function mint(address _user, uint256 _tokenAmount) public onlyTradeEngine {
         uint256 mintingDay = block.timestamp / 1 days;
-        if((mintingLimitDaily == 0 || dailyMintedTokens[mintingDay] + (_tokenAmount) <= mintingLimitDaily) && (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser )) {
+        if (
+            (mintingLimitDaily == 0 || dailyMintedTokens[mintingDay] + _tokenAmount <= mintingLimitDaily) &&
+            (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser) &&
+            (mintingLimitPerUserDaily == 0 ||
+                dailyMintedTokensPerUser[_user][mintingDay] + _tokenAmount <= mintingLimitPerUserDaily)
+        ) {
             // This will track the minted tokens in the token contract
             MorpherToken(state.morpherTokenAddress()).mint(_user, _tokenAmount);
-            dailyMintedTokens[mintingDay] = dailyMintedTokens[mintingDay] + (_tokenAmount);
+            dailyMintedTokens[mintingDay] += _tokenAmount;
+            dailyMintedTokensPerUser[_user][mintingDay] += _tokenAmount;
         } else {
             escrowedTokens[_user] = escrowedTokens[_user] + (_tokenAmount);
             lockedUntil[_user] = block.timestamp + timeLockingPeriod;
@@ -138,5 +154,9 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     function getDailyMintedTokens() public view returns(uint256) {
         return dailyMintedTokens[block.timestamp / 1 days];
+    }
+
+    function getDailyMintedTokensPerUser(address _user) public view returns (uint256) {
+        return dailyMintedTokensPerUser[_user][block.timestamp / 1 days];
     }
 }

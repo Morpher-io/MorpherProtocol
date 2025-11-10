@@ -11,6 +11,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 	event MintingDenied(address _user, uint256 _tokenAmount);
 	event MintingLimitUpdatedPerUser(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
 	event MintingLimitUpdatedDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
+	event MintingLimitUpdatedPerUserDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
 	event TimeLockPeriodUpdated(uint256 _timeLockPeriodOld, uint256 _timeLockPeriodNew);
 	event TradeEngineAddressSet(address _morpherTradeEngineAddress);
 	event DailyMintedTokensReset();
@@ -50,6 +51,15 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		assertEq(newUserLimit, 0);
 
 		vm.expectRevert();
+		morpherMintingLimiter.setMintingLimitPerUserDaily(1 ether);
+		vm.prank(_admin);
+		vm.expectEmit(true, true, true, true);
+		emit MintingLimitUpdatedPerUserDaily(0, 1 ether);
+		morpherMintingLimiter.setMintingLimitPerUserDaily(1 ether);
+		uint newUserDailyLimit = morpherMintingLimiter.mintingLimitPerUserDaily();
+		assertEq(newUserDailyLimit, 1 ether);
+
+		vm.expectRevert();
 		morpherMintingLimiter.setTimeLockingPeriod(3600);
 		vm.prank(_admin);
 		vm.expectEmit(true, true, true, true);
@@ -61,6 +71,9 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 
 	function testMintBelowLimits() public {
 		uint256 tokenAmount = 500000000000000000000000;
+
+		vm.prank(_admin);
+		morpherMintingLimiter.setMintingLimitPerUserDaily(tokenAmount);
 
 		vm.prank(address(morpherTradeEngine));
 		vm.expectEmit(true, true, true, true);
@@ -77,6 +90,9 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 	function testResetDailyMintedTokens() public {
 		uint256 tokenAmount = 500000000000000000000000;
 
+		vm.prank(_admin);
+		morpherMintingLimiter.setMintingLimitPerUserDaily(tokenAmount);
+
 		vm.prank(address(morpherTradeEngine));
 		morpherMintingLimiter.mint(address(0xabc), tokenAmount);
 
@@ -89,6 +105,9 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 
 	function testMintAboveUserLimit() public {
 		uint256 tokenAmount = 500000000000000000000001;
+
+		vm.prank(_admin);
+		morpherMintingLimiter.setMintingLimitPerUserDaily(tokenAmount);
 
 		vm.prank(address(morpherTradeEngine));
 		vm.expectEmit(true, true, true, true);
@@ -108,6 +127,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 
 		vm.prank(_admin);
 		morpherMintingLimiter.setMintingLimitDaily(900000000000000000000000);
+		morpherMintingLimiter.setMintingLimitPerUserDaily(tokenAmount * 2);
 
 		vm.prank(address(morpherTradeEngine));
 		morpherMintingLimiter.mint(address(0x123), tokenAmount);
@@ -220,5 +240,37 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		// unchanged
 		balance = morpherToken.balanceOf(user);
 		assertEq(balance, 0);
+	}
+
+	function testMintAboveUserDailyLimit() public {
+		uint256 tokenAmount = 250001 * 10**18;
+		uint256 limit = 500000 * 10**18;
+		address user = address(0xabc);
+
+		vm.prank(_admin);
+		morpherMintingLimiter.setMintingLimitPerUserDaily(limit);
+
+		// Mint once, should be fine
+		vm.prank(address(morpherTradeEngine));
+		morpherMintingLimiter.mint(user, tokenAmount);
+
+		uint256 balance = morpherToken.balanceOf(user);
+		assertEq(balance, tokenAmount);
+
+		uint256 mintedToday = morpherMintingLimiter.getDailyMintedTokensPerUser(user);
+		assertEq(mintedToday, tokenAmount);
+
+		// Mint again, should push over the limit
+		vm.prank(address(morpherTradeEngine));
+		vm.expectEmit(true, true, true, true);
+		emit MintingEscrowed(user, tokenAmount);
+		morpherMintingLimiter.mint(user, tokenAmount);
+
+		// balance should be unchanged
+		balance = morpherToken.balanceOf(user);
+		assertEq(balance, tokenAmount);
+
+		uint256 escrowed = morpherMintingLimiter.escrowedTokens(user);
+		assertEq(escrowed, tokenAmount);
 	}
 }

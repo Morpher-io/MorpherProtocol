@@ -32,6 +32,7 @@ contract DeployMorpherMintingLimiter is DeployOrUpgradeV5 {
         // Get configuration from environment
         uint256 mintLimitPerUser = vm.envOr("MINTING_LIMIT_PER_USER", uint256(0));
         uint256 mintLimitDaily = vm.envOr("MINTING_LIMIT_DAILY", uint256(0));
+        uint256 mintLimitPerUserDaily = vm.envOr("MINTING_LIMIT_PER_USER_DAILY", 500000 ether);
         uint256 timelockPeriodMinting = vm.envOr("MINTING_TIME_LOCK_PERIOD", uint256(0));
 
         // Check if deploying fresh
@@ -47,7 +48,7 @@ contract DeployMorpherMintingLimiter is DeployOrUpgradeV5 {
             // Ensure initializer signature matches the adapted v5 contract
             abi.encodeCall(
                 MorpherMintingLimiter.initialize,
-                (stateAddress, mintLimitPerUser, mintLimitDaily, timelockPeriodMinting)
+                (stateAddress, mintLimitPerUser, mintLimitDaily, mintLimitPerUserDaily, timelockPeriodMinting)
             ),
             bytes("") // No upgrade call data needed for this example
         );
