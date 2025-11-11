@@ -17,18 +17,20 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     uint256 public mintingLimitPerUser;
     uint256 public mintingLimitDaily;
-    uint256 public mintingLimitPerUserDaily;
-    uint256 public mintingLimitPerMarketDaily;
     uint256 public timeLockingPeriod;
 
     mapping(address => uint256) public escrowedTokens;
     mapping(address => uint256) public lockedUntil;
     mapping(uint256 => uint256) public dailyMintedTokens;
-    mapping(address => mapping(uint256 => uint256)) public dailyMintedTokensPerUser;
-    mapping(bytes32 => mapping(uint256 => uint256)) public dailyMintedTokensPerMarket;
 
     address tradeEngineAddress; 
     MorpherState state;
+
+    // --- Appended variables for V2+ to preserve storage layout ---
+    uint256 public mintingLimitPerUserDaily;
+    uint256 public mintingLimitPerMarketDaily;
+    mapping(address => mapping(uint256 => uint256)) public dailyMintedTokensPerUser;
+    mapping(bytes32 => mapping(uint256 => uint256)) public dailyMintedTokensPerMarket;
 
     event MintingEscrowed(address _user, uint256 _tokenAmount);
     event EscrowReleased(address _user, uint256 _tokenAmount);
