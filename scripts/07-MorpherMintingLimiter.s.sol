@@ -20,6 +20,11 @@ contract DeployMorpherMintingLimiter is DeployOrUpgradeV5 {
     // Use fully qualified name or filename as required by the upgrades plugin
     string constant CONTRACT_NAME = "MorpherMintingLimiter.sol:MorpherMintingLimiter";
 
+    function deployImplementation() internal override returns (address) {
+        MorpherMintingLimiter mintingLimiter = new MorpherMintingLimiter();
+        return address(mintingLimiter);
+    }
+
     function run() public {
         // Load dependencies
         address stateAddress = loadAddress("MorpherState");
