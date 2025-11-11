@@ -20,6 +20,11 @@ contract DeployMorpherTradeEngine is DeployOrUpgradeV5 {
     // Use fully qualified name or filename as required by the upgrades plugin
     string constant CONTRACT_NAME = "MorpherTradeEngine.sol";
 
+    function deployImplementation() internal override returns (address) {
+        MorpherTradeEngine tradeEngine = new MorpherTradeEngine();
+        return address(tradeEngine);
+    }
+
     function run() public {
         // Load dependencies
         address stateAddress = loadAddress("MorpherState");
