@@ -1789,7 +1789,6 @@ contract MorkpherTradingEngineTest is BaseSetup {
 			uint256 meanEntrySpread,
 			uint256 meanEntryLeverage,
 			,
-			,
 		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
 
 		// 3. Close Position
@@ -1842,7 +1841,6 @@ contract MorkpherTradingEngineTest is BaseSetup {
 			,
 			uint256 longShares,
 			uint256 shortShares,
-			,
 			,
 			,
 			,
