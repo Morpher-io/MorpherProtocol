@@ -127,6 +127,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 
 		vm.prank(_admin);
 		morpherMintingLimiter.setMintingLimitDaily(900000000000000000000000);
+		vm.prank(_admin);
 		morpherMintingLimiter.setMintingLimitPerUserDaily(tokenAmount * 2);
 
 		vm.prank(address(morpherTradeEngine));
