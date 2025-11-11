@@ -13,6 +13,7 @@ import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contra
 contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     bytes32 constant public ADMINISTRATOR_ROLE = keccak256("ADMINISTRATOR_ROLE");
+    bytes32 constant public ESCROW_MANAGER_ROLE = keccak256("ESCROW_MANAGER_ROLE");
 
     uint256 public mintingLimitPerUser;
     uint256 public mintingLimitDaily;
@@ -47,6 +48,11 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     modifier onlyAdministrator() {
         require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(ADMINISTRATOR_ROLE, msg.sender), "MorpherMintingLimiter: Only Administrator can call this function");
+        _;
+    }
+
+    modifier onlyEscrowManager() {
+        require(MorpherAccessControl(state.morpherAccessControlAddress()).hasRole(ESCROW_MANAGER_ROLE, msg.sender), "MorpherMintingLimiter: Only Escrow Manager can call this function");
         _;
     }
 
@@ -149,13 +155,13 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
         emit EscrowReleased(_user, sendAmount);
     }
 
-    function adminApprovedMint(address _user, uint256 _tokenAmount) public onlyAdministrator {
+    function adminApprovedMint(address _user, uint256 _tokenAmount) public onlyEscrowManager {
         escrowedTokens[_user] = escrowedTokens[_user] - (_tokenAmount);
         MorpherToken(state.morpherTokenAddress()).mint(_user, _tokenAmount);
         emit EscrowReleased(_user, _tokenAmount);
     }
 
-    function adminDisapproveMint(address _user, uint256 _tokenAmount) public onlyAdministrator {
+    function adminDisapproveMint(address _user, uint256 _tokenAmount) public onlyEscrowManager {
         escrowedTokens[_user] = escrowedTokens[_user] - (_tokenAmount);
         emit MintingDenied(_user, _tokenAmount);
     }

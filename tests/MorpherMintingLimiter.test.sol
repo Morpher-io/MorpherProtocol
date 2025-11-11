@@ -22,6 +22,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 	function setUp() public override {
 		super.setUp();
 		morpherAccessControl.grantRole(morpherToken.ADMINISTRATOR_ROLE(), address(_admin));
+		morpherAccessControl.grantRole(morpherMintingLimiter.ESCROW_MANAGER_ROLE(), address(_admin));
 	}
 
 	function testAdministratorSettings() public {
