@@ -68,6 +68,29 @@ contract DeployMorpherMintingLimiter is DeployOrUpgradeV5 {
             MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
             accessControl.grantRole(token.MINTER_ROLE(), mintingLimiterProxy);
             console.log("Granted MINTER_ROLE to MintingLimiter contract.");
+        } else {
+            console.log("Updating existing MorpherMintingLimiter configuration...");
+            MorpherMintingLimiter mintingLimiter = MorpherMintingLimiter(mintingLimiterProxy);
+            if (mintingLimiter.mintingLimitPerUser() != mintLimitPerUser) {
+                mintingLimiter.setMintingLimitPerUser(mintLimitPerUser);
+                console.log("Updated mintingLimitPerUser.");
+            }
+            if (mintingLimiter.mintingLimitDaily() != mintLimitDaily) {
+                mintingLimiter.setMintingLimitDaily(mintLimitDaily);
+                console.log("Updated mintingLimitDaily.");
+            }
+            if (mintingLimiter.mintingLimitPerUserDaily() != mintLimitPerUserDaily) {
+                mintingLimiter.setMintingLimitPerUserDaily(mintLimitPerUserDaily);
+                console.log("Updated mintingLimitPerUserDaily.");
+            }
+            if (mintingLimiter.mintingLimitPerMarketDaily() != mintLimitPerMarketDaily) {
+                mintingLimiter.setMintingLimitPerMarketDaily(mintLimitPerMarketDaily);
+                console.log("Updated mintingLimitPerMarketDaily.");
+            }
+            if (mintingLimiter.timeLockingPeriod() != timelockPeriodMinting) {
+                mintingLimiter.setTimeLockingPeriod(timelockPeriodMinting);
+                console.log("Updated timeLockingPeriod.");
+            }
         }
 
         vm.stopBroadcast();
