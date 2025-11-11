@@ -1748,4 +1748,107 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		assertEq(morpherTradeEngine.getExposureMappingIndex(mId, addr4), 1);
 		assertEq(morpherTradeEngine.getExposureMappingAddress(mId, 1), addr4);
 	}
+
+	function testProfitSentToMintingLimiterAndPrincipalMintedDirectly() public {
+		// 1. Setup
+		address user = address(0xff01);
+		uint256 initialBalance = 2000 * 10**18;
+		morpherToken.mint(user, initialBalance);
+
+		// Set a very low per-user minting limit to ensure profit is escrowed
+		uint256 profitLimit = 1 * 10**18;
+		morpherMintingLimiter.setMintingLimitPerUser(profitLimit);
+		morpherMintingLimiter.setMintingLimitPerUserDaily(1000000 ether); // high user daily limit to not interfere
+		morpherMintingLimiter.setMintingLimitDaily(1000000 ether); // high daily limit to not interfere
+
+		// 2. Open Position
+		uint256 marketPriceOpen = 50000 * PRECISION;
+		uint256 marketSpreadOpen = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		uint256 openAmount = 1001 * 10**18;
+
+		vm.warp(SECOND_RATE_TS);
+		vm.prank(address(morpherOracle));
+		bytes32 orderIdOpen = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			openAmount,
+			true, // long
+			orderLeverage
+		);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderIdOpen, marketPriceOpen, marketSpreadOpen, 0, block.timestamp * 1000);
+
+		(
+			uint256 lastUpdated,
+			uint256 sharesOpened,
+			,
+			uint256 meanEntryPrice,
+			uint256 meanEntrySpread,
+			uint256 meanEntryLeverage,
+			,
+			,
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+
+		// 3. Close Position
+		vm.warp(block.timestamp + 1 days);
+		uint256 marketPriceClose = 51000 * PRECISION; // Price went up -> profit
+		uint256 marketSpreadClose = 10 * PRECISION;
+
+		vm.prank(address(morpherOracle));
+		bytes32 orderIdClose = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			sharesOpened,
+			0,
+			false, // closing long
+			PRECISION
+		);
+
+		uint256 balanceBeforeClose = morpherToken.getTradeableBalanceOf(user);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderIdClose, marketPriceClose, marketSpreadClose, 0, block.timestamp * 1000);
+
+		// 4. Verification
+		// Calculate expected principal and profit
+		uint256 costPerShare = meanEntryPrice + ((meanEntrySpread * meanEntryLeverage) / PRECISION);
+		uint256 principal = sharesOpened * costPerShare;
+
+		uint256 shareValueOnClose = morpherTradeEngine.longShareValue(
+			meanEntryPrice,
+			meanEntryLeverage,
+			lastUpdated,
+			marketPriceClose,
+			marketSpreadClose,
+			meanEntryLeverage,
+			true
+		);
+		uint256 totalPayout = sharesOpened * shareValueOnClose;
+		uint256 profit = totalPayout - principal;
+
+		// The profit should be escrowed because it's higher than profitLimit
+		assert(profit > profitLimit);
+		assertEq(morpherMintingLimiter.escrowedTokens(user), profit);
+
+		// The user's balance should have received the principal
+		uint256 balanceAfterClose = morpherToken.getTradeableBalanceOf(user);
+		assertEq(balanceAfterClose, balanceBeforeClose + principal);
+
+		// The position should be closed
+		(
+			,
+			uint256 longShares,
+			uint256 shortShares,
+			,
+			,
+			,
+			,
+			,
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+		assertEq(longShares, 0);
+		assertEq(shortShares, 0);
+	}
 }
