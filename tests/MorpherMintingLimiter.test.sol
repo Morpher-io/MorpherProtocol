@@ -12,6 +12,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 	event MintingLimitUpdatedPerUser(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
 	event MintingLimitUpdatedDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
 	event MintingLimitUpdatedPerUserDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
+	event MintingLimitUpdatedPerMarketDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
 	event TimeLockPeriodUpdated(uint256 _timeLockPeriodOld, uint256 _timeLockPeriodNew);
 	event TradeEngineAddressSet(address _morpherTradeEngineAddress);
 	event DailyMintedTokensReset();
@@ -60,6 +61,15 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		assertEq(newUserDailyLimit, 1 ether);
 
 		vm.expectRevert();
+		morpherMintingLimiter.setMintingLimitPerMarketDaily(1 ether);
+		vm.prank(_admin);
+		vm.expectEmit(true, true, true, true);
+		emit MintingLimitUpdatedPerMarketDaily(0, 1 ether);
+		morpherMintingLimiter.setMintingLimitPerMarketDaily(1 ether);
+		uint newMarketDailyLimit = morpherMintingLimiter.mintingLimitPerMarketDaily();
+		assertEq(newMarketDailyLimit, 1 ether);
+
+		vm.expectRevert();
 		morpherMintingLimiter.setTimeLockingPeriod(3600);
 		vm.prank(_admin);
 		vm.expectEmit(true, true, true, true);
@@ -78,7 +88,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		vm.prank(address(morpherTradeEngine));
 		vm.expectEmit(true, true, true, true);
 		emit Transfer(address(0), address(0xabc), tokenAmount);
-		morpherMintingLimiter.mint(address(0xabc), tokenAmount);
+		morpherMintingLimiter.mint(address(0xabc), tokenAmount, keccak256("CRYPTO_BTC"));
 
 		uint256 balance = morpherToken.balanceOf(address(0xabc));
 		assertEq(balance, tokenAmount);
@@ -94,7 +104,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		morpherMintingLimiter.setMintingLimitPerUserDaily(tokenAmount);
 
 		vm.prank(address(morpherTradeEngine));
-		morpherMintingLimiter.mint(address(0xabc), tokenAmount);
+		morpherMintingLimiter.mint(address(0xabc), tokenAmount, keccak256("CRYPTO_BTC"));
 
 		vm.prank(_admin);
 		morpherMintingLimiter.resetDailyMintedTokens();
@@ -112,7 +122,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		vm.prank(address(morpherTradeEngine));
 		vm.expectEmit(true, true, true, true);
 		emit MintingEscrowed(address(0xabc), tokenAmount);
-		morpherMintingLimiter.mint(address(0xabc), tokenAmount);
+		morpherMintingLimiter.mint(address(0xabc), tokenAmount, keccak256("CRYPTO_BTC"));
 
 		uint256 balance = morpherToken.balanceOf(address(0xabc));
 		assertEq(balance, 0);
@@ -131,12 +141,12 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		morpherMintingLimiter.setMintingLimitPerUserDaily(tokenAmount * 2);
 
 		vm.prank(address(morpherTradeEngine));
-		morpherMintingLimiter.mint(address(0x123), tokenAmount);
+		morpherMintingLimiter.mint(address(0x123), tokenAmount, keccak256("CRYPTO_BTC"));
 
 		vm.prank(address(morpherTradeEngine));
 		vm.expectEmit(true, true, true, true);
 		emit MintingEscrowed(address(0x456), tokenAmount);
-		morpherMintingLimiter.mint(address(0x456), tokenAmount);
+		morpherMintingLimiter.mint(address(0x456), tokenAmount, keccak256("CRYPTO_BTC"));
 
 		uint256 escrowed = morpherMintingLimiter.escrowedTokens(address(0x456));
 		assertEq(escrowed, tokenAmount);
@@ -151,7 +161,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		vm.prank(address(morpherTradeEngine));
 		vm.expectEmit(true, true, true, true);
 		emit MintingEscrowed(address(0x123), tokenAmount);
-		morpherMintingLimiter.mint(address(0x123), tokenAmount);
+		morpherMintingLimiter.mint(address(0x123), tokenAmount, keccak256("CRYPTO_BTC"));
 
 		escrowed = morpherMintingLimiter.escrowedTokens(address(0x123));
 		assertEq(escrowed, tokenAmount);
@@ -170,7 +180,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		vm.warp(morpherMintingLimiter.timeLockingPeriod());
 
 		vm.prank(address(morpherTradeEngine));
-		morpherMintingLimiter.mint(user, tokenAmount);
+		morpherMintingLimiter.mint(user, tokenAmount, keccak256("CRYPTO_BTC"));
 
 		vm.prank(user);
 		vm.expectRevert();
@@ -198,7 +208,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		uint256 tokenAmount = 500000000000000000000001;
 
 		vm.prank(address(morpherTradeEngine));
-		morpherMintingLimiter.mint(user, tokenAmount);
+		morpherMintingLimiter.mint(user, tokenAmount, keccak256("CRYPTO_BTC"));
 
 		vm.prank(_admin);
 		vm.expectEmit(true, true, true, true);
@@ -223,7 +233,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		uint256 tokenAmount = 500000000000000000000001;
 
 		vm.prank(address(morpherTradeEngine));
-		morpherMintingLimiter.mint(user, tokenAmount);
+		morpherMintingLimiter.mint(user, tokenAmount, keccak256("CRYPTO_BTC"));
 
 		vm.prank(_admin);
 		vm.expectEmit(true, true, true, true);
@@ -253,7 +263,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 
 		// Mint once, should be fine
 		vm.prank(address(morpherTradeEngine));
-		morpherMintingLimiter.mint(user, tokenAmount);
+		morpherMintingLimiter.mint(user, tokenAmount, keccak256("CRYPTO_BTC"));
 
 		uint256 balance = morpherToken.balanceOf(user);
 		assertEq(balance, tokenAmount);
@@ -265,7 +275,7 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 		vm.prank(address(morpherTradeEngine));
 		vm.expectEmit(true, true, true, true);
 		emit MintingEscrowed(user, tokenAmount);
-		morpherMintingLimiter.mint(user, tokenAmount);
+		morpherMintingLimiter.mint(user, tokenAmount, keccak256("CRYPTO_BTC"));
 
 		// balance should be unchanged
 		balance = morpherToken.balanceOf(user);
@@ -273,5 +283,40 @@ contract MorkpherMintingLimiterTest is BaseSetup {
 
 		uint256 escrowed = morpherMintingLimiter.escrowedTokens(user);
 		assertEq(escrowed, tokenAmount);
+	}
+
+	function testMintAboveMarketDailyLimit() public {
+		uint256 tokenAmount = 250001 * 10**18;
+		uint256 limit = 500000 * 10**18;
+		address user1 = address(0xabc);
+		address user2 = address(0xdef);
+		bytes32 marketId = keccak256("CRYPTO_BTC");
+
+		vm.prank(_admin);
+		morpherMintingLimiter.setMintingLimitPerMarketDaily(limit);
+
+		// Mint once for user1, should be fine
+		vm.prank(address(morpherTradeEngine));
+		morpherMintingLimiter.mint(user1, tokenAmount, marketId);
+
+		uint256 mintedToday = morpherMintingLimiter.getDailyMintedTokensPerMarket(marketId);
+		assertEq(mintedToday, tokenAmount);
+
+		// Mint again for user2, should push over the market limit
+		vm.prank(address(morpherTradeEngine));
+		vm.expectEmit(true, true, true, true);
+		emit MintingEscrowed(user2, tokenAmount);
+		morpherMintingLimiter.mint(user2, tokenAmount, marketId);
+
+		// balance should be 0 for user2 as it's escrowed
+		uint256 balance = morpherToken.balanceOf(user2);
+		assertEq(balance, 0);
+
+		uint256 escrowed = morpherMintingLimiter.escrowedTokens(user2);
+		assertEq(escrowed, tokenAmount);
+
+		// Total minted for market should not have increased
+		mintedToday = morpherMintingLimiter.getDailyMintedTokensPerMarket(marketId);
+		assertEq(mintedToday, tokenAmount);
 	}
 }

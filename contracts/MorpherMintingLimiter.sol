@@ -17,12 +17,14 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
     uint256 public mintingLimitPerUser;
     uint256 public mintingLimitDaily;
     uint256 public mintingLimitPerUserDaily;
+    uint256 public mintingLimitPerMarketDaily;
     uint256 public timeLockingPeriod;
 
     mapping(address => uint256) public escrowedTokens;
     mapping(address => uint256) public lockedUntil;
     mapping(uint256 => uint256) public dailyMintedTokens;
     mapping(address => mapping(uint256 => uint256)) public dailyMintedTokensPerUser;
+    mapping(bytes32 => mapping(uint256 => uint256)) public dailyMintedTokensPerMarket;
 
     address tradeEngineAddress; 
     MorpherState state;
@@ -33,6 +35,7 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
     event MintingLimitUpdatedPerUser(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
     event MintingLimitUpdatedDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
     event MintingLimitUpdatedPerUserDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
+    event MintingLimitUpdatedPerMarketDaily(uint256 _mintingLimitOld, uint256 _mintingLimitNew);
     event TimeLockPeriodUpdated(uint256 _timeLockPeriodOld, uint256 _timeLockPeriodNew);
     event TradeEngineAddressSet(address _tradeEngineAddress);
     event DailyMintedTokensReset();
@@ -56,6 +59,7 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
         uint256 _mintingLimitPerUser,
         uint256 _mintingLimitDaily,
         uint256 _mintingLimitPerUserDaily,
+        uint256 _mintingLimitPerMarketDaily,
         uint256 _timeLockingPeriodInSeconds
     ) public initializer {
         __UUPSUpgradeable_init(); // Initialize UUPS
@@ -63,6 +67,7 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
         mintingLimitPerUser = _mintingLimitPerUser;
         mintingLimitDaily = _mintingLimitDaily;
         mintingLimitPerUserDaily = _mintingLimitPerUserDaily;
+        mintingLimitPerMarketDaily = _mintingLimitPerMarketDaily;
         timeLockingPeriod = _timeLockingPeriodInSeconds;
     }
 
@@ -104,23 +109,31 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
         mintingLimitPerUserDaily = _newMintingLimit;
     }
 
+    function setMintingLimitPerMarketDaily(uint256 _newMintingLimit) public onlyAdministrator {
+        emit MintingLimitUpdatedPerMarketDaily(mintingLimitPerMarketDaily, _newMintingLimit);
+        mintingLimitPerMarketDaily = _newMintingLimit;
+    }
+
     function setTimeLockingPeriod(uint256 _newTimeLockingPeriodInSeconds) public onlyAdministrator {
         emit TimeLockPeriodUpdated(timeLockingPeriod, _newTimeLockingPeriodInSeconds);
         timeLockingPeriod = _newTimeLockingPeriodInSeconds;
     }
 
-    function mint(address _user, uint256 _tokenAmount) public onlyTradeEngine {
+    function mint(address _user, uint256 _tokenAmount, bytes32 _marketId) public onlyTradeEngine {
         uint256 mintingDay = block.timestamp / 1 days;
         if (
             (mintingLimitDaily == 0 || dailyMintedTokens[mintingDay] + _tokenAmount <= mintingLimitDaily) &&
             (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser) &&
             (mintingLimitPerUserDaily == 0 ||
-                dailyMintedTokensPerUser[_user][mintingDay] + _tokenAmount <= mintingLimitPerUserDaily)
+                dailyMintedTokensPerUser[_user][mintingDay] + _tokenAmount <= mintingLimitPerUserDaily) &&
+            (mintingLimitPerMarketDaily == 0 ||
+                dailyMintedTokensPerMarket[_marketId][mintingDay] + _tokenAmount <= mintingLimitPerMarketDaily)
         ) {
             // This will track the minted tokens in the token contract
             MorpherToken(state.morpherTokenAddress()).mint(_user, _tokenAmount);
             dailyMintedTokens[mintingDay] += _tokenAmount;
             dailyMintedTokensPerUser[_user][mintingDay] += _tokenAmount;
+            dailyMintedTokensPerMarket[_marketId][mintingDay] += _tokenAmount;
         } else {
             escrowedTokens[_user] = escrowedTokens[_user] + (_tokenAmount);
             lockedUntil[_user] = block.timestamp + timeLockingPeriod;
@@ -158,5 +171,9 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
 
     function getDailyMintedTokensPerUser(address _user) public view returns (uint256) {
         return dailyMintedTokensPerUser[_user][block.timestamp / 1 days];
+    }
+
+    function getDailyMintedTokensPerMarket(bytes32 _marketId) public view returns (uint256) {
+        return dailyMintedTokensPerMarket[_marketId][block.timestamp / 1 days];
     }
 }

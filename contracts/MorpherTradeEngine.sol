@@ -1294,7 +1294,8 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 				// Mint profit through the limiter.
 				MorpherMintingLimiter(morpherState.morpherMintingLimiterAddress()).mint(
 					orders[_orderId].userId,
-					profit
+					profit,
+					orders[_orderId].marketId
 				);
 			}
 		}
