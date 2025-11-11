@@ -149,6 +149,25 @@ contract MorpherMintingLimiter is UUPSUpgradeable { // Inherit UUPSUpgradeable
         }
     }
 
+    function mint(address _user, uint256 _tokenAmount) public onlyTradeEngine {
+        uint256 mintingDay = block.timestamp / 1 days;
+        if (
+            (mintingLimitDaily == 0 || dailyMintedTokens[mintingDay] + _tokenAmount <= mintingLimitDaily) &&
+            (mintingLimitPerUser == 0 || _tokenAmount <= mintingLimitPerUser) &&
+            (mintingLimitPerUserDaily == 0 ||
+                dailyMintedTokensPerUser[_user][mintingDay] + _tokenAmount <= mintingLimitPerUserDaily)
+        ) {
+            // This will track the minted tokens in the token contract
+            MorpherToken(state.morpherTokenAddress()).mint(_user, _tokenAmount);
+            dailyMintedTokens[mintingDay] += _tokenAmount;
+            dailyMintedTokensPerUser[_user][mintingDay] += _tokenAmount;
+        } else {
+            escrowedTokens[_user] = escrowedTokens[_user] + (_tokenAmount);
+            lockedUntil[_user] = block.timestamp + timeLockingPeriod;
+            emit MintingEscrowed(_user, _tokenAmount);
+        }
+    }
+
     function delayedMint(address _user) public {
         require(lockedUntil[_user] <= block.timestamp, "MorpherMintingLimiter: Funds are still time locked");
         uint256 sendAmount = escrowedTokens[_user];
