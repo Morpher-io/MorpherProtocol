@@ -43,6 +43,48 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		uint256 liquidationPrice
 	);
 
+	struct OpenPositionInfo {
+		uint256 lastUpdated;
+		uint256 sharesOpened;
+		uint256 meanEntryPrice;
+		uint256 meanEntrySpread;
+		uint256 meanEntryLeverage;
+	}
+
+	function _openPositionForMintingLimiterTest(
+		address user
+	) internal returns (OpenPositionInfo memory info) {
+		// Open Position
+		uint256 marketPriceOpen = 50000 * PRECISION;
+		uint256 marketSpreadOpen = 10 * PRECISION;
+		uint256 orderLeverage = 5 * PRECISION;
+		uint256 openAmount = 1001 * 10**18;
+
+		vm.warp(SECOND_RATE_TS);
+		vm.prank(address(morpherOracle));
+		bytes32 orderIdOpen = morpherTradeEngine.requestOrderId(
+			user,
+			keccak256("CRYPTO_BTC"),
+			0,
+			openAmount,
+			true, // long
+			orderLeverage
+		);
+
+		vm.prank(address(morpherOracle));
+		morpherTradeEngine.processOrder(orderIdOpen, marketPriceOpen, marketSpreadOpen, 0, block.timestamp * 1000);
+
+		(
+			info.lastUpdated,
+			info.sharesOpened,
+			,
+			info.meanEntryPrice,
+			info.meanEntrySpread,
+			info.meanEntryLeverage,
+			,
+		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+	}
+
 	function setUp() public override {
 		super.setUp();
 		morpherAccessControl.grantRole(morpherToken.ADMINISTRATOR_ROLE(), address(this));
@@ -1762,34 +1804,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		morpherMintingLimiter.setMintingLimitDaily(1000000 ether); // high daily limit to not interfere
 
 		// 2. Open Position
-		uint256 marketPriceOpen = 50000 * PRECISION;
-		uint256 marketSpreadOpen = 10 * PRECISION;
-		uint256 orderLeverage = 5 * PRECISION;
-		uint256 openAmount = 1001 * 10**18;
-
-		vm.warp(SECOND_RATE_TS);
-		vm.prank(address(morpherOracle));
-		bytes32 orderIdOpen = morpherTradeEngine.requestOrderId(
-			user,
-			keccak256("CRYPTO_BTC"),
-			0,
-			openAmount,
-			true, // long
-			orderLeverage
-		);
-
-		vm.prank(address(morpherOracle));
-		morpherTradeEngine.processOrder(orderIdOpen, marketPriceOpen, marketSpreadOpen, 0, block.timestamp * 1000);
-
-		(
-			uint256 lastUpdated,
-			uint256 sharesOpened,
-			,
-			uint256 meanEntryPrice,
-			uint256 meanEntrySpread,
-			uint256 meanEntryLeverage,
-			,
-		) = morpherTradeEngine.portfolio(user, keccak256("CRYPTO_BTC"));
+		OpenPositionInfo memory posInfo = _openPositionForMintingLimiterTest(user);
 
 		// 3. Close Position
 		vm.warp(block.timestamp + 1 days);
@@ -1800,7 +1815,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 		bytes32 orderIdClose = morpherTradeEngine.requestOrderId(
 			user,
 			keccak256("CRYPTO_BTC"),
-			sharesOpened,
+			posInfo.sharesOpened,
 			0,
 			false, // closing long
 			PRECISION
@@ -1813,19 +1828,20 @@ contract MorkpherTradingEngineTest is BaseSetup {
 
 		// 4. Verification
 		// Calculate expected principal and profit
-		uint256 costPerShare = meanEntryPrice + ((meanEntrySpread * meanEntryLeverage) / PRECISION);
-		uint256 principal = sharesOpened * costPerShare;
+		uint256 costPerShare =
+			posInfo.meanEntryPrice + ((posInfo.meanEntrySpread * posInfo.meanEntryLeverage) / PRECISION);
+		uint256 principal = posInfo.sharesOpened * costPerShare;
 
 		uint256 shareValueOnClose = morpherTradeEngine.longShareValue(
-			meanEntryPrice,
-			meanEntryLeverage,
-			lastUpdated,
+			posInfo.meanEntryPrice,
+			posInfo.meanEntryLeverage,
+			posInfo.lastUpdated,
 			marketPriceClose,
 			marketSpreadClose,
-			meanEntryLeverage,
+			posInfo.meanEntryLeverage,
 			true
 		);
-		uint256 totalPayout = sharesOpened * shareValueOnClose;
+		uint256 totalPayout = posInfo.sharesOpened * shareValueOnClose;
 		uint256 profit = totalPayout - principal;
 
 		// The profit should be escrowed because it's higher than profitLimit
