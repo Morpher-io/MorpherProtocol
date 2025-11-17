@@ -351,7 +351,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * @param amount Amount of tokens to lock
 	 */
 	function lockRewards(address account, uint256 amount) public onlyRole(AIRDROPADMIN_ROLE) {
-		require(balanceOf(account) >= _lockedRewards[account] + amount, "MorpherToken: insufficient balance for locking");
+		// require(balanceOf(account) >= _lockedRewards[account] + amount, "MorpherToken: insufficient balance for locking"); //we don't need that, because the Admin should be able to lock more tokens than the actual balance (in case they are in positions locked or future airdrops etc)
 		
 		_lockedRewards[account] += amount;
 		_totalLockedRewards += amount;
