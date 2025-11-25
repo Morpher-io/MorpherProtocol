@@ -64,8 +64,6 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 
 	bool public escrowOpenOrderEnabled;
 
-    address public morpherReferralOracleAddress; // Added
-    mapping(bytes32 => bool) public isReferredOrder; // Added
 
 	struct InterestRate {
 		uint256 validFrom;
@@ -145,6 +143,11 @@ contract MorpherTradeEngine is UUPSUpgradeable, ContextUpgradeable { // Inherit 
 
 	mapping(uint256 => InterestRate) private _OLDinterestRates;
 	uint256 private _OLDnumInterestRates;
+
+
+	// --- added new state variables prevent proxy upgrade storage slot overwritinhg
+    address public morpherReferralOracleAddress; // Added
+    mapping(bytes32 => bool) public isReferredOrder; // Added
 
 	// ----------------------------------------------------------------------------
 	// Events

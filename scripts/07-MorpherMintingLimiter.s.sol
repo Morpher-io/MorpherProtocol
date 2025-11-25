@@ -18,7 +18,7 @@ contract DeployMorpherMintingLimiter is DeployOrUpgradeV5 {
 
     string constant CONTRACT_KEY = "MorpherMintingLimiter";
     // Use fully qualified name or filename as required by the upgrades plugin
-    string constant CONTRACT_NAME = "MorpherMintingLimiter.sol:MorpherMintingLimiter";
+    string constant CONTRACT_NAME = "MorpherMintingLimiter.sol";
 
     function deployImplementation() internal override returns (address) {
         MorpherMintingLimiter mintingLimiter = new MorpherMintingLimiter();
@@ -37,8 +37,8 @@ contract DeployMorpherMintingLimiter is DeployOrUpgradeV5 {
         // Get configuration from environment
         uint256 mintLimitPerUser = vm.envOr("MINTING_LIMIT_PER_USER", uint256(0));
         uint256 mintLimitDaily = vm.envOr("MINTING_LIMIT_DAILY", uint256(0));
-        uint256 mintLimitPerUserDaily = vm.envOr("MINTING_LIMIT_PER_USER_DAILY", 500000 ether);
-        uint256 mintLimitPerMarketDaily = vm.envOr("MINTING_LIMIT_PER_MARKET_DAILY", 500000 ether);
+        uint256 mintLimitPerUserDaily = vm.envOr("MINTING_LIMIT_PER_USER_DAILY", uint(500000 ether));
+        uint256 mintLimitPerMarketDaily = vm.envOr("MINTING_LIMIT_PER_MARKET_DAILY", uint(500000 ether));
         uint256 timelockPeriodMinting = vm.envOr("MINTING_TIME_LOCK_PERIOD", uint256(0));
 
         // Check if deploying fresh

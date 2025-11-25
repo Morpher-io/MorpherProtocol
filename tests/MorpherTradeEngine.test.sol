@@ -1828,9 +1828,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 
 		// 4. Verification
 		// Calculate expected principal and profit
-		uint256 costPerShare =
-			posInfo.meanEntryPrice + ((posInfo.meanEntrySpread * posInfo.meanEntryLeverage) / PRECISION);
-		uint256 principal = posInfo.sharesOpened * costPerShare;
+		// uint256 principal = posInfo.sharesOpened * (posInfo.meanEntryPrice + ((posInfo.meanEntrySpread * posInfo.meanEntryLeverage) / PRECISION));
 
 		uint256 shareValueOnClose = morpherTradeEngine.longShareValue(
 			posInfo.meanEntryPrice,
@@ -1842,7 +1840,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 			true
 		);
 		uint256 totalPayout = posInfo.sharesOpened * shareValueOnClose;
-		uint256 profit = totalPayout - principal;
+		uint256 profit = totalPayout - (posInfo.sharesOpened * (posInfo.meanEntryPrice + ((posInfo.meanEntrySpread * posInfo.meanEntryLeverage) / PRECISION)));
 
 		// The profit should be escrowed because it's higher than profitLimit
 		assert(profit > profitLimit);
@@ -1850,7 +1848,7 @@ contract MorkpherTradingEngineTest is BaseSetup {
 
 		// The user's balance should have received the principal
 		uint256 balanceAfterClose = morpherToken.getTradeableBalanceOf(user);
-		assertEq(balanceAfterClose, balanceBeforeClose + principal);
+		assertEq(balanceAfterClose, balanceBeforeClose + (posInfo.sharesOpened * (posInfo.meanEntryPrice + ((posInfo.meanEntrySpread * posInfo.meanEntryLeverage) / PRECISION))));
 
 		// The position should be closed
 		(
