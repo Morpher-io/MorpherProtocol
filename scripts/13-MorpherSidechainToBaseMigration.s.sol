@@ -20,9 +20,12 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 	// Use fully qualified name or filename as required by the upgrades plugin
 	string constant CONTRACT_NAME = "MorpherSidechainToBaseMigration.sol";
 
-	function run() public {
-		vm.startBroadcast();
+    function deployImplementation() internal override returns (address) {
+        MorpherSidechainToBaseMigration migration = new MorpherSidechainToBaseMigration();
+        return address(migration);
+    }
 
+	function run() public {
 		// Load required addresses
 		address accessControlAddress = loadAddress("MorpherAccessControl");
 		address stateAddress = loadAddress("MorpherState");
@@ -40,6 +43,8 @@ contract DeployMorpherSidechainToBaseMigration is DeployOrUpgradeV5 {
 		// Check if deploying fresh
 		address existingProxy = loadAddress(CONTRACT_KEY);
 		bool isNewDeployment = existingProxy == address(0);
+
+		vm.startBroadcast();
 
 		// Deploy or upgrade using the V5 UUPS logic
 		address migrationProxy = deployOrUpgradeV5(
