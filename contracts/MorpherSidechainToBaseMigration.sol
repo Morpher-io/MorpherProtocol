@@ -320,7 +320,7 @@ contract MorpherSidechainToBaseMigration is UUPSUpgradeable, ContextUpgradeable 
             
             // Check if user already has a position for this market
             MorpherTradeEngine.position memory existingPosition = MorpherTradeEngine(state.morpherTradeEngineAddress()).getPosition(_user, pos.marketId);
-            require(existingPosition.longShares == 0 && existingPosition.shortShares == 0, 
+            require(existingPosition.longShares == 0 && existingPosition.shortShares == 0 && existingPosition.meanEntryPrice > 0 && existingPosition.meanEntrySpread > 0 && existingPosition.meanEntryLeverage > 0, 
                     "MorpherMigration: User already has a position for this market");
             
             // Mark position as migrated
