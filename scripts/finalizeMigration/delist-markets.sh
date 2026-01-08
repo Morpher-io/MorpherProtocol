@@ -199,14 +199,21 @@ while IFS=',' read -r market_id hash; do
             --gas-limit 8000000 \
             --legacy \
             --gas-price 1 \
-            --json 2>&1)
+            --json 2>&1) || true
 
-        DEACTIVATE_STATUS=$(echo "$DEACTIVATE_RESULT" | jq -r '.status // "error"')
+        # Check if result is valid JSON and extract status
+        if echo "$DEACTIVATE_RESULT" | jq -e . >/dev/null 2>&1; then
+            DEACTIVATE_STATUS=$(echo "$DEACTIVATE_RESULT" | jq -r '.status // "error"')
+        else
+            DEACTIVATE_STATUS="error"
+        fi
+
         if [ "$DEACTIVATE_STATUS" == "0x1" ]; then
             echo "  Market deactivated successfully"
             ((PROCESSED++))
         else
             echo "  Warning: Failed to deactivate market (positions were still closed)"
+            echo "  Response: $DEACTIVATE_RESULT"
             ((PROCESSED++))
         fi
     fi
