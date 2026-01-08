@@ -66,7 +66,10 @@ echo "Admin Address: $ADMIN_ADDRESS"
 CURRENT_ADMIN=$(cast call $MORPHER_STATE "getAdministrator()(address)" --rpc-url $SIDECHAIN_RPC_URL)
 echo "Current State Administrator: $CURRENT_ADMIN"
 
-if [ "${ADMIN_ADDRESS,,}" != "${CURRENT_ADMIN,,}" ]; then
+# Case-insensitive comparison (compatible with Bash 3.x on macOS)
+ADMIN_LOWER=$(echo "$ADMIN_ADDRESS" | tr '[:upper:]' '[:lower:]')
+CURRENT_LOWER=$(echo "$CURRENT_ADMIN" | tr '[:upper:]' '[:lower:]')
+if [ "$ADMIN_LOWER" != "$CURRENT_LOWER" ]; then
     echo "Warning: Your address is not the current administrator!"
     echo "You need to be the administrator to delist markets."
     read -p "Continue anyway? (y/n) " -n 1 -r
