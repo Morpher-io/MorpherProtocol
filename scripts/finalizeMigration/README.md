@@ -307,8 +307,9 @@ After completing the migration steps, verify:
 - Re-run `delistMarket` with `_startFromScratch = false` to continue
 
 **Gas estimation errors**
-- Use explicit gas limits: `--gas-limit 5000000`
-- Process in smaller batches
+- The sidechain has a bug where specifying >25M gas causes transactions to get stuck
+- All scripts use `--gas-limit 8000000` to avoid this issue
+- Process in smaller batches if needed
 
 ---
 
