@@ -180,8 +180,22 @@ Get the list of users with active stakes and force-unstake them.
 
 **Option A: Use the Foundry script:**
 
-1. Edit `AdminUnstakeBatch.s.sol` and add user addresses to `usersToUnstake` array
-2. Run:
+1. Create `staked-users.csv` in this directory with one address per line:
+   ```
+   0x1234567890123456789012345678901234567890
+   0xabcdefabcdefabcdefabcdefabcdefabcdefabcd
+   0x9876543210987654321098765432109876543210
+   ```
+
+2. (Optional) Run a dry run first to see what will be unstaked:
+   ```bash
+   forge script scripts/finalizeMigration/AdminUnstakeBatch.s.sol \
+     --sig "dryRun()" \
+     --rpc-url $SIDECHAIN_RPC_URL \
+     -vvvv
+   ```
+
+3. Run the actual unstaking:
 
 ```bash
 export SIDECHAIN_RPC_URL="your-rpc-url"
@@ -321,6 +335,7 @@ After completing the migration steps, verify:
 | `MorpherStakingUnstakeOnly.sol` | Contract for admin force-unstaking |
 | `DeployStakingUnstakeOnly.s.sol` | Foundry deployment script |
 | `DelistMarkets.s.sol` | Foundry script for delisting markets |
-| `AdminUnstakeBatch.s.sol` | Foundry script for batch unstaking |
+| `AdminUnstakeBatch.s.sol` | Foundry script for batch unstaking (reads from CSV) |
 | `delist-markets.sh` | Shell script for delisting from CSV |
 | `market-hashes.csv` | (You provide) CSV with market IDs and hashes |
+| `staked-users.csv` | (You provide) CSV with staked user addresses (one per line) |
