@@ -134,6 +134,7 @@ while IFS=',' read -r market_id hash; do
         fi
 
         # Gas limit set to 8M to avoid sidechain bug where >25M causes stuck transactions
+        # Using --legacy for non-EIP1559 chain and --gas-price 1 for minimal cost
         TX_RESULT=$(cast send $MORPHER_ORACLE \
             "delistMarket(bytes32,bool)" \
             $hash \
@@ -141,6 +142,8 @@ while IFS=',' read -r market_id hash; do
             --private-key $ADMIN_PRIVATE_KEY \
             --rpc-url $SIDECHAIN_RPC_URL \
             --gas-limit 8000000 \
+            --legacy \
+            --gas-price 1 \
             --json 2>&1)
 
         TX_STATUS=$(echo "$TX_RESULT" | jq -r '.status // "error"')

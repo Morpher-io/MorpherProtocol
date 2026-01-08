@@ -57,7 +57,8 @@ export NEW_ADMIN="new-admin-address"
 cast send 0xB4881186b9E52F8BD6EC5F19708450cE57b24370 \
   "setAdministrator(address)" $NEW_ADMIN \
   --private-key $OWNER_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 ```
 
 ---
@@ -115,7 +116,8 @@ cast send 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb \
   0x876800e24f83128aaabe8a807ec28f2cb73570d4278ee005de3b27cd7ad4fcdb \
   true \
   --private-key $ADMIN_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 
 # Continue if incomplete
 cast send 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb \
@@ -123,7 +125,8 @@ cast send 0xf8B5b1699A00EDfdB6F15524646Bd5071bA419Fb \
   0x876800e24f83128aaabe8a807ec28f2cb73570d4278ee005de3b27cd7ad4fcdb \
   false \
   --private-key $ADMIN_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 ```
 
 ---
@@ -153,13 +156,15 @@ export ADMIN_PRIVATE_KEY="admin-private-key"
 cast send 0xB4881186b9E52F8BD6EC5F19708450cE57b24370 \
   "grantAccess(address)" $STAKING_UNSTAKE_ONLY \
   --private-key $ADMIN_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 
 # Enable transfers for the new contract
 cast send 0xB4881186b9E52F8BD6EC5F19708450cE57b24370 \
   "enableTransfers(address)" $STAKING_UNSTAKE_ONLY \
   --private-key $ADMIN_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 ```
 
 **Optional: Disable old staking contract:**
@@ -169,7 +174,8 @@ cast send 0xB4881186b9E52F8BD6EC5F19708450cE57b24370 \
 cast send 0xB4881186b9E52F8BD6EC5F19708450cE57b24370 \
   "denyAccess(address)" 0x318Ea6e12A3e49703666C85eEF372644b4022C49 \
   --private-key $ADMIN_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 ```
 
 ---
@@ -216,13 +222,15 @@ forge script scripts/finalizeMigration/AdminUnstakeBatch.s.sol \
 cast send $STAKING_UNSTAKE_ONLY \
   "adminUnstake(address)" "0xUserAddress" \
   --private-key $ADMIN_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 
 # Batch (up to ~50 users per transaction)
 cast send $STAKING_UNSTAKE_ONLY \
   "adminUnstakeBatch(address[])" "[0xUser1,0xUser2,0xUser3]" \
   --private-key $ADMIN_PRIVATE_KEY \
-  --rpc-url $SIDECHAIN_RPC_URL
+  --rpc-url $SIDECHAIN_RPC_URL \
+  --legacy --gas-price 1 --gas-limit 8000000
 ```
 
 **Query user stake info:**
@@ -320,9 +328,10 @@ After completing the migration steps, verify:
 **"DelistMarketIncomplete" events**
 - Re-run `delistMarket` with `_startFromScratch = false` to continue
 
-**Gas estimation errors**
+**Gas and transaction errors**
 - The sidechain has a bug where specifying >25M gas causes transactions to get stuck
 - All scripts use `--gas-limit 8000000` to avoid this issue
+- The sidechain is non-EIP1559, so use `--legacy --gas-price 1` for all transactions
 - Process in smaller batches if needed
 
 ---
