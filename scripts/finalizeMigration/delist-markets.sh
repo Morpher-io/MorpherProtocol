@@ -189,7 +189,26 @@ while IFS=',' read -r market_id hash; do
     done
 
     if [ "$COMPLETE" == "true" ]; then
-        ((PROCESSED++))
+        # Deactivate the market in MorpherState
+        echo "  Deactivating market..."
+        DEACTIVATE_RESULT=$(cast send $MORPHER_STATE \
+            "deActivateMarket(bytes32)" \
+            $hash \
+            --private-key $ADMIN_PRIVATE_KEY \
+            --rpc-url $SIDECHAIN_RPC_URL \
+            --gas-limit 8000000 \
+            --legacy \
+            --gas-price 1 \
+            --json 2>&1)
+
+        DEACTIVATE_STATUS=$(echo "$DEACTIVATE_RESULT" | jq -r '.status // "error"')
+        if [ "$DEACTIVATE_STATUS" == "0x1" ]; then
+            echo "  Market deactivated successfully"
+            ((PROCESSED++))
+        else
+            echo "  Warning: Failed to deactivate market (positions were still closed)"
+            ((PROCESSED++))
+        fi
     fi
 
     echo ""
