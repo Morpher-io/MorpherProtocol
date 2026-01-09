@@ -181,6 +181,9 @@ while IFS=',' read -r market_id hash; do
             echo "  Delisting complete (attempt $ATTEMPTS)"
         elif echo "$LOGS" | grep -q "$INCOMPLETE_TOPIC"; then
             echo "  Delisting incomplete, continuing... (attempt $ATTEMPTS)"
+            # Sleep between delist attempts to allow oracle callbacks
+            echo "  Waiting 3 seconds before next attempt..."
+            sleep 3
         else
             # No recognizable event, assume complete
             COMPLETE=true
@@ -189,6 +192,39 @@ while IFS=',' read -r market_id hash; do
     done
 
     if [ "$COMPLETE" == "true" ]; then
+        # Wait for oracle callbacks to settle positions (async process)
+        echo "  Waiting for oracle callbacks to settle..."
+        sleep 5
+
+        # Check if all positions are actually closed by checking getMaxMappingIndex
+        echo "  Checking if all positions are closed..."
+        MAX_WAIT_ATTEMPTS=10
+        POSITIONS_CLOSED=false
+
+        for (( wait_i=1; wait_i<=MAX_WAIT_ATTEMPTS; wait_i++ )); do
+            EXPOSURE_COUNT=$(cast call $MORPHER_STATE \
+                "getMaxMappingIndex(bytes32)(uint256)" \
+                $hash \
+                --rpc-url $SIDECHAIN_RPC_URL 2>/dev/null) || EXPOSURE_COUNT="error"
+
+            # Remove any leading zeros and convert to number
+            EXPOSURE_COUNT=$(echo "$EXPOSURE_COUNT" | sed 's/^0*//' | sed 's/^$/0/')
+
+            if [ "$EXPOSURE_COUNT" == "0" ] || [ "$EXPOSURE_COUNT" == "" ]; then
+                POSITIONS_CLOSED=true
+                echo "  All positions closed (exposure count: 0)"
+                break
+            else
+                echo "  Still have $EXPOSURE_COUNT positions, waiting... (attempt $wait_i/$MAX_WAIT_ATTEMPTS)"
+                sleep 3
+            fi
+        done
+
+        if [ "$POSITIONS_CLOSED" == "false" ]; then
+            echo "  Warning: Positions may not be fully closed yet (exposure: $EXPOSURE_COUNT)"
+            echo "  Proceeding with deactivation anyway..."
+        fi
+
         # Deactivate the market in MorpherState
         echo "  Deactivating market..."
         DEACTIVATE_RESULT=$(cast send $MORPHER_STATE \
@@ -218,6 +254,9 @@ while IFS=',' read -r market_id hash; do
         fi
     fi
 
+    # Sleep before processing next market
+    echo "  Waiting 3 seconds before next market..."
+    sleep 3
     echo ""
 
 done < "$CSV_FILE"
