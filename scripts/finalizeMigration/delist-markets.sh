@@ -138,7 +138,7 @@ while IFS=',' read -r market_id hash; do
 
         # Gas limit set to 8M to avoid sidechain bug where >25M causes stuck transactions
         # Using --legacy for non-EIP1559 chain and --gas-price 1 for minimal cost
-        TX_RESULT=$(cast send $MORPHER_ORACLE \
+        TX_RESULT_RAW=$(cast send $MORPHER_ORACLE \
             "delistMarket(bytes32,bool)" \
             $hash \
             $START_FROM_SCRATCH \
@@ -147,9 +147,18 @@ while IFS=',' read -r market_id hash; do
             --gas-limit 8000000 \
             --legacy \
             --gas-price 1 \
-            --json 2>&1)
+            --json 2>&1) || true
 
-        TX_STATUS=$(echo "$TX_RESULT" | jq -r '.status // "error"')
+        # Extract only the JSON part (line starting with {)
+        TX_RESULT=$(echo "$TX_RESULT_RAW" | grep '^{' | head -1)
+
+        # Parse status, handling non-JSON output
+        if [ -n "$TX_RESULT" ] && echo "$TX_RESULT" | jq -e . >/dev/null 2>&1; then
+            TX_STATUS=$(echo "$TX_RESULT" | jq -r '.status // "error"')
+        else
+            echo "  Raw output: $TX_RESULT_RAW"
+            TX_STATUS="error"
+        fi
 
         if [ "$TX_STATUS" != "0x1" ]; then
             echo "  Transaction failed on attempt $ATTEMPTS"
