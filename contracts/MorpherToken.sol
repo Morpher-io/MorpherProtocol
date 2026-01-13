@@ -24,6 +24,8 @@ pragma solidity ^0.8.15;
 import {ERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/ERC20Upgradeable.sol";
 import {ERC20PausableUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import {ERC20PermitUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol"; // Use standard Permit
+import {ERC20VotesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import {NoncesUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/utils/NoncesUpgradeable.sol";
 import {UUPSUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/proxy/utils/UUPSUpgradeable.sol";
 // Remove draft EIP712, ECDSA, Counters if only used for permit
 // import {ECDSAUpgradeable} from "../lib/openzeppelin-contracts-upgradeable-5/contracts/utils/cryptography/ECDSAUpgradeable.sol";
@@ -32,7 +34,7 @@ import "./MorpherAccessControl.sol"; // Use adapted v5 interface
 import "./MorpherState.sol"; // Use adapted v5 interface
 
 
-contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable { // Inherit new modules
+contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20PermitUpgradeable, ERC20VotesUpgradeable, UUPSUpgradeable { // Inherit new modules
 	MorpherAccessControl public morpherAccessControl;
 
 	bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -95,7 +97,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	// Mapping to track locked tokens per user
 	mapping(address => TokenLock) private _timeLocks;
 
-	// Total amount of time-locked tokens across all users (Removed but left here for proxy updates)
+	// Total amount of time-locked tokens across all users (used for governance quorum calculation)
 	uint256 private _totalTimeLocked;
 
 	// Mapping to track monthly transfers of net minted tokens
@@ -123,6 +125,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		__ERC20Pausable_init();
 		__UUPSUpgradeable_init();
 		__ERC20Permit_init(_permitName); // Initialize ERC20Permit
+		__ERC20Votes_init(); // Initialize ERC20Votes (uses same EIP712 domain as Permit)
 
 		morpherAccessControl = MorpherAccessControl(_morpherAccessControlAddress);
 		morpherState = MorpherState(_morpherStateAddress);
@@ -380,25 +383,28 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * @param lockDuration Duration in seconds for which tokens will be locked
 	 */
 	function lockTokensForTime(address account, uint256 amount, uint256 lockDuration) public onlyRole(AIRDROPADMIN_ROLE) {
-		// require(balanceOf(account) >= amount, "MorpherToken: insufficient balance for locking"); //we should be able to set the timelock 
-		
+		// require(balanceOf(account) >= amount, "MorpherToken: insufficient balance for locking"); //we should be able to set the timelock
+
 		uint256 unlockTime = block.timestamp + lockDuration;
-		
+
 		// If tokens are already locked and the lock is still active, add to it
 		if (_timeLocks[account].amount > 0 && block.timestamp < _timeLocks[account].lockedUntil) {
 			_timeLocks[account].amount += amount;
-			
+			_totalTimeLocked += amount; // Track total time-locked for governance quorum calculation
+
 			// Lock for whichever period is longer
 			if (unlockTime > _timeLocks[account].lockedUntil) {
 				_timeLocks[account].lockedUntil = unlockTime;
 			}
 		} else {
 			// Create a new lock (this will also overwrite an expired lock)
+			// If overwriting an expired lock, subtract the old amount first
+			if (_timeLocks[account].amount > 0) {
+				_totalTimeLocked -= _timeLocks[account].amount;
+			}
 			_timeLocks[account] = TokenLock(amount, unlockTime);
+			_totalTimeLocked += amount; // Track total time-locked for governance quorum calculation
 		}
-
-		// _totalTimeLocked += amount; // Removed update
-
 
 		emit TokensLocked(account, amount, _timeLocks[account].lockedUntil);
 
@@ -543,7 +549,7 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	function _update(address from, address to, uint256 amount)
 		internal
 		virtual
-		override(ERC20Upgradeable, ERC20PausableUpgradeable) // Override both parents
+		override(ERC20Upgradeable, ERC20PausableUpgradeable, ERC20VotesUpgradeable) // Override all parents
 	{
 		// --- Custom Logic Start ---
 		// This logic runs *before* the balance update and pause check from super._update
@@ -595,11 +601,12 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 
 				if (amount > unlockedBalance) {
 					uint256 burnFromLocked = amount - unlockedBalance;
-					
+
 					// Burn from time-locked first
 					if (timeLockedAmount > 0) {
 						uint256 burnFromTimeLock = burnFromLocked < timeLockedAmount ? burnFromLocked : timeLockedAmount;
 						_timeLocks[from].amount -= burnFromTimeLock;
+						_totalTimeLocked -= burnFromTimeLock; // Update total time-locked for governance quorum
 						burnFromLocked -= burnFromTimeLock;
 						emit TokensUnlocked(from, burnFromTimeLock);
 					}
@@ -699,4 +706,52 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	// function nonces(...) ... // Use ERC20Permit's nonces()
 	// function DOMAIN_SEPARATOR() ... // Use ERC20Permit's DOMAIN_SEPARATOR()
 	// function _useNonce(...) ... // Use ERC20Permit's _useNonce()
+
+	// --- ERC20Votes / ERC20Permit diamond inheritance resolution ---
+	/**
+	 * @dev Override nonces to resolve diamond inheritance between ERC20PermitUpgradeable and ERC20VotesUpgradeable
+	 */
+	function nonces(address owner) public view virtual override(ERC20PermitUpgradeable, NoncesUpgradeable) returns (uint256) {
+		return super.nonces(owner);
+	}
+
+	// --- Governance Support ---
+	/**
+	 * @dev Returns the circulating supply (total supply minus locked tokens).
+	 * This is used by MorpherGovernor for quorum calculation.
+	 * Circulating supply = sum of all balanceOf() returns, which excludes:
+	 * - Locked rewards (_totalLockedRewards)
+	 * - Time-locked tokens (_totalTimeLocked)
+	 * Note: Does not include _totalTokensInPositions as those are virtual supply for trading.
+	 */
+	function getCirculatingSupply() public view returns (uint256) {
+		return super.totalSupply() - _totalLockedRewards - _totalTimeLocked;
+	}
+
+	/**
+	 * @dev Returns the total amount of time-locked tokens across all users
+	 */
+	function getTotalTimeLocked() public view returns (uint256) {
+		return _totalTimeLocked;
+	}
+
+	/**
+	 * @dev Cleans up expired time locks for specified accounts.
+	 * This decrements _totalTimeLocked for locks that have expired.
+	 * Can be called by anyone to maintain accurate circulating supply calculation.
+	 * @param accounts Array of addresses to check and clean up expired locks for
+	 */
+	function cleanupExpiredTimeLocks(address[] calldata accounts) external {
+		for (uint256 i = 0; i < accounts.length; i++) {
+			TokenLock storage lock = _timeLocks[accounts[i]];
+			// If lock has expired and there's still tracked amount
+			if (lock.amount > 0 && block.timestamp >= lock.lockedUntil) {
+				uint256 expiredAmount = lock.amount;
+				_totalTimeLocked -= expiredAmount;
+				lock.amount = 0;
+				lock.lockedUntil = 0;
+				emit TokensUnlocked(accounts[i], expiredAmount);
+			}
+		}
+	}
 }
