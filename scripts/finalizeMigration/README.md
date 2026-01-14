@@ -186,12 +186,22 @@ Get the list of users with active stakes and force-unstake them.
 
 **Option A: Use the Foundry script:**
 
-1. Create `staked-users.csv` in this directory with one address per line:
+1. Create `staked-users.csv` in this directory. Supports two formats:
+
+   **Simple format (one address per line):**
    ```
    0x1234567890123456789012345678901234567890
    0xabcdefabcdefabcdefabcdefabcdefabcdefabcd
-   0x9876543210987654321098765432109876543210
    ```
+
+   **CSV format with header (exports from database):**
+   ```csv
+   eth_address,stake_value
+   0x1234567890123456789012345678901234567890,10517846831770300000
+   0xabcdefabcdefabcdefabcdefabcdefabcdefabcd,10974775896884400000
+   ```
+
+   Note: The script auto-detects headers and handles BOM characters.
 
 2. (Optional) Run a dry run first to see what will be unstaked:
    ```bash
@@ -347,4 +357,4 @@ After completing the migration steps, verify:
 | `AdminUnstakeBatch.s.sol` | Foundry script for batch unstaking (reads from CSV) |
 | `delist-markets.sh` | Shell script for delisting from CSV |
 | `market-hashes.csv` | (You provide) CSV with market IDs and hashes |
-| `staked-users.csv` | (You provide) CSV with staked user addresses (one per line) |
+| `staked-users.csv` | (You provide) CSV with staked user addresses (supports simple or CSV format) |

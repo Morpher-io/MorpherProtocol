@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPLv3
-pragma solidity ^0.8.20;
+pragma solidity 0.8.19;
 
 import "forge-std/Script.sol";
 import "./MorpherStakingUnstakeOnly.sol";
@@ -58,6 +58,9 @@ contract AdminUnstakeBatch is Script {
         // Read the entire file
         string memory fileContent = vm.readFile(csvPath);
 
+        // Remove BOM if present (UTF-8 BOM is 0xEF 0xBB 0xBF)
+        fileContent = _removeBom(fileContent);
+
         // Split by newlines and parse each address
         string[] memory lines = vm.split(fileContent, "\n");
 
@@ -77,9 +80,12 @@ contract AdminUnstakeBatch is Script {
                 continue;
             }
 
+            // Extract first column if CSV has multiple columns (e.g., "address,stake_value")
+            line = _extractFirstColumn(line);
+
             // Skip header if present (starts with non-0x)
             if (bytes(line).length < 2 || bytes(line)[0] != bytes1("0") || bytes(line)[1] != bytes1("x")) {
-                // Could be a header like "address" - skip it
+                // Could be a header like "eth_address" - skip it
                 continue;
             }
 
@@ -89,6 +95,43 @@ contract AdminUnstakeBatch is Script {
                 usersToUnstake.push(user);
             }
         }
+    }
+
+    function _removeBom(string memory s) internal pure returns (string memory) {
+        bytes memory b = bytes(s);
+        // UTF-8 BOM is 0xEF 0xBB 0xBF (3 bytes)
+        if (b.length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF) {
+            bytes memory trimmed = new bytes(b.length - 3);
+            for (uint256 i = 3; i < b.length; i++) {
+                trimmed[i - 3] = b[i];
+            }
+            return string(trimmed);
+        }
+        return s;
+    }
+
+    function _extractFirstColumn(string memory line) internal pure returns (string memory) {
+        bytes memory b = bytes(line);
+        uint256 commaIndex = 0;
+        bool foundComma = false;
+
+        for (uint256 i = 0; i < b.length; i++) {
+            if (b[i] == bytes1(",")) {
+                commaIndex = i;
+                foundComma = true;
+                break;
+            }
+        }
+
+        if (!foundComma) {
+            return line; // No comma, return as-is
+        }
+
+        bytes memory firstCol = new bytes(commaIndex);
+        for (uint256 i = 0; i < commaIndex; i++) {
+            firstCol[i] = b[i];
+        }
+        return string(firstCol);
     }
 
     function _trimCarriageReturn(string memory s) internal pure returns (string memory) {
@@ -150,7 +193,8 @@ contract AdminUnstakeBatch is Script {
             }
 
             batchCount++;
-            console.log("Processing batch", batchCount, ":", batch.length, "users (", i + 1, "-", end, ")");
+            console.log("Processing batch", batchCount);
+            console.log("  Users in batch:", batch.length);
 
             uint256 batchAmount = stakingContract.adminUnstakeBatch(batch);
             totalUnstaked += batchAmount;
