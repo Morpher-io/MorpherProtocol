@@ -184,7 +184,19 @@ cast send 0xB4881186b9E52F8BD6EC5F19708450cE57b24370 \
 
 Get the list of users with active stakes and force-unstake them.
 
-**Option A: Use the Foundry script:**
+**Option A: Use the shell script (recommended, much faster):**
+
+```bash
+export SIDECHAIN_RPC_URL="your-rpc-url"
+export ADMIN_PRIVATE_KEY="admin-private-key"
+export STAKING_UNSTAKE_ONLY_ADDRESS="deployed-contract-address"
+
+./unstake-users.sh
+# Or specify a custom CSV path:
+./unstake-users.sh /path/to/staked-users.csv
+```
+
+**Option B: Use the Foundry script (slower, but useful for dry runs):**
 
 1. Create `staked-users.csv` in this directory. Supports two formats:
 
@@ -356,5 +368,6 @@ After completing the migration steps, verify:
 | `DelistMarkets.s.sol` | Foundry script for delisting markets |
 | `AdminUnstakeBatch.s.sol` | Foundry script for batch unstaking (reads from CSV) |
 | `delist-markets.sh` | Shell script for delisting from CSV |
+| `unstake-users.sh` | Shell script for batch unstaking from CSV (faster than Foundry) |
 | `market-hashes.csv` | (You provide) CSV with market IDs and hashes |
 | `staked-users.csv` | (You provide) CSV with staked user addresses (supports simple or CSV format) |
