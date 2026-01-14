@@ -124,17 +124,18 @@ while IFS=',' read -r market_id hash; do
     # Keep calling until complete (the function may need multiple calls for large markets)
     COMPLETE=false
     ATTEMPTS=0
-    MAX_ATTEMPTS=10
+    MAX_ATTEMPTS=500
 
     while [ "$COMPLETE" == "false" ] && [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
         ((ATTEMPTS++))
 
         # First call with startFromScratch=true, subsequent calls with false
-        if [ $ATTEMPTS -eq 1 ]; then
+        # Fix: we do all wtih startFromScratch=true in case the oracle missed something
+        # if [ $ATTEMPTS -eq 1 ]; then
             START_FROM_SCRATCH="true"
-        else
-            START_FROM_SCRATCH="false"
-        fi
+        # else
+        #     START_FROM_SCRATCH="false"
+        # fi
 
         # Gas limit set to 8M to avoid sidechain bug where >25M causes stuck transactions
         # Using --legacy for non-EIP1559 chain and --gas-price 1 for minimal cost
@@ -162,11 +163,28 @@ while IFS=',' read -r market_id hash; do
 
         if [ "$TX_STATUS" != "0x1" ]; then
             echo "  Transaction failed on attempt $ATTEMPTS"
+            echo "  --- DEBUG INFO ---"
+            echo "  TX_STATUS: $TX_STATUS"
+            if [ -n "$TX_RESULT" ]; then
+                echo "  TX_HASH: $(echo "$TX_RESULT" | jq -r '.transactionHash // "none"')"
+                echo "  BLOCK: $(echo "$TX_RESULT" | jq -r '.blockNumber // "none"')"
+                echo "  GAS_USED: $(echo "$TX_RESULT" | jq -r '.gasUsed // "none"')"
+                # Try to get revert reason if available
+                REVERT_REASON=$(echo "$TX_RESULT" | jq -r '.revertReason // empty')
+                if [ -n "$REVERT_REASON" ]; then
+                    echo "  REVERT_REASON: $REVERT_REASON"
+                fi
+            fi
+            echo "  RAW OUTPUT:"
+            echo "$TX_RESULT_RAW" | head -20 | sed 's/^/    /'
+            echo "  --- END DEBUG ---"
             if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
                 echo "  Max attempts reached, moving to next market"
                 ((FAILED++))
                 break
             fi
+            # Sleep a bit before retrying
+            sleep 2
             continue
         fi
 
@@ -191,8 +209,8 @@ while IFS=',' read -r market_id hash; do
         elif echo "$LOGS" | grep -q "$INCOMPLETE_TOPIC"; then
             echo "  Delisting incomplete, continuing... (attempt $ATTEMPTS)"
             # Sleep between delist attempts to allow oracle callbacks
-            echo "  Waiting 3 seconds before next attempt..."
-            sleep 3
+            echo "  Waiting 10 seconds before next attempt..."
+            sleep 10
         else
             # No recognizable event, assume complete
             COMPLETE=true
@@ -225,7 +243,7 @@ while IFS=',' read -r market_id hash; do
                 break
             else
                 echo "  Still have $EXPOSURE_COUNT positions, waiting... (attempt $wait_i/$MAX_WAIT_ATTEMPTS)"
-                sleep 3
+                sleep 5
             fi
         done
 
