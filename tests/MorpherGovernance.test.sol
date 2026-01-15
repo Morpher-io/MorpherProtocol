@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "./BaseSetup.sol";
 import "../contracts/MorpherGovernor.sol";
+import "../contracts/MorpherTimelockController.sol";
 import {TimelockControllerUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/governance/TimelockControllerUpgradeable.sol";
 import {ERC1967Proxy} from "../lib/openzeppelin-contracts-5/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IGovernor} from "../lib/openzeppelin-contracts-5/contracts/governance/IGovernor.sol";
@@ -14,7 +15,7 @@ import {IGovernor} from "../lib/openzeppelin-contracts-5/contracts/governance/IG
  */
 contract MorpherGovernanceTest is BaseSetup {
     MorpherGovernor internal governor;
-    TimelockControllerUpgradeable internal timelock;
+    MorpherTimelockController internal timelock;
 
     // Test accounts
     address internal voter1;
@@ -53,21 +54,20 @@ contract MorpherGovernanceTest is BaseSetup {
     }
 
     function _deployTimelock() internal {
-        // Deploy TimelockController implementation
-        TimelockControllerUpgradeable impl = new TimelockControllerUpgradeable();
+        // Deploy MorpherTimelockController implementation
+        MorpherTimelockController impl = new MorpherTimelockController();
 
-        // Setup timelock with no initial proposers (Governor will be added)
-        address[] memory proposers = new address[](0);
-        address[] memory executors = new address[](1);
-        executors[0] = address(0); // Anyone can execute
-
+        // Setup timelock with MorpherState reference and open execution
         bytes memory initData = abi.encodeCall(
-            TimelockControllerUpgradeable.initialize,
-            (TIMELOCK_MIN_DELAY, proposers, executors, address(this))
+            MorpherTimelockController.initialize,
+            (address(morpherState), TIMELOCK_MIN_DELAY, true) // true = open execution
         );
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        timelock = TimelockControllerUpgradeable(payable(address(proxy)));
+        timelock = MorpherTimelockController(payable(address(proxy)));
+
+        // Grant TIMELOCK_ADMIN_ROLE to test contract for setup
+        morpherAccessControl.grantRole(timelock.TIMELOCK_ADMIN_ROLE(), address(this));
     }
 
     function _deployGovernor() internal {
@@ -78,7 +78,7 @@ contract MorpherGovernanceTest is BaseSetup {
             MorpherGovernor.initialize,
             (
                 address(morpherState),
-                timelock,
+                TimelockControllerUpgradeable(payable(address(timelock))),
                 VOTING_DELAY,
                 VOTING_PERIOD,
                 PROPOSAL_THRESHOLD
@@ -88,9 +88,10 @@ contract MorpherGovernanceTest is BaseSetup {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         governor = MorpherGovernor(payable(address(proxy)));
 
-        // Grant Governor roles on Timelock
-        timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
-        timelock.grantRole(timelock.CANCELLER_ROLE(), address(governor));
+        // Grant Governor roles via MorpherAccessControl
+        // TIMELOCK_PROPOSER_ROLE and TIMELOCK_CANCELLER_ROLE
+        morpherAccessControl.grantRole(timelock.TIMELOCK_PROPOSER_ROLE(), address(governor));
+        morpherAccessControl.grantRole(timelock.TIMELOCK_CANCELLER_ROLE(), address(governor));
 
         // Grant Timelock roles on AccessControl for protocol operations
         morpherAccessControl.grantRole(morpherAccessControl.PROXYUPDATER_ROLE(), address(timelock));

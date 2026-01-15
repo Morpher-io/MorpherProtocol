@@ -6,6 +6,7 @@ import {DeployOrUpgradeV5} from "./deployOrUpgradeV5.sol";
 import {MorpherGovernor} from "../contracts/MorpherGovernor.sol";
 import {MorpherAccessControl} from "../contracts/MorpherAccessControl.sol";
 import {MorpherState} from "../contracts/MorpherState.sol";
+import {MorpherTimelockController} from "../contracts/MorpherTimelockController.sol";
 import {TimelockControllerUpgradeable} from "../lib/openzeppelin-contracts-upgradable-5/contracts/governance/TimelockControllerUpgradeable.sol";
 
 /**
@@ -86,18 +87,19 @@ contract DeployMorpherGovernor is DeployOrUpgradeV5 {
             console.log("Configuring roles...");
 
             // Get contract instances
-            TimelockControllerUpgradeable timelock = TimelockControllerUpgradeable(payable(timelockAddress));
+            MorpherTimelockController timelock = MorpherTimelockController(payable(timelockAddress));
             MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
 
-            // Grant Governor the PROPOSER and CANCELLER roles on Timelock
-            bytes32 proposerRole = timelock.PROPOSER_ROLE();
-            bytes32 cancellerRole = timelock.CANCELLER_ROLE();
+            // Grant Governor the TIMELOCK_PROPOSER_ROLE and TIMELOCK_CANCELLER_ROLE on MorpherAccessControl
+            // These allow the Governor to propose and cancel operations on the Timelock
+            bytes32 proposerRole = timelock.TIMELOCK_PROPOSER_ROLE();
+            bytes32 cancellerRole = timelock.TIMELOCK_CANCELLER_ROLE();
 
-            timelock.grantRole(proposerRole, governorProxy);
-            console.log("Granted PROPOSER_ROLE to Governor on Timelock");
+            accessControl.grantRole(proposerRole, governorProxy);
+            console.log("Granted TIMELOCK_PROPOSER_ROLE to Governor");
 
-            timelock.grantRole(cancellerRole, governorProxy);
-            console.log("Granted CANCELLER_ROLE to Governor on Timelock");
+            accessControl.grantRole(cancellerRole, governorProxy);
+            console.log("Granted TIMELOCK_CANCELLER_ROLE to Governor");
 
             // Grant Timelock the necessary roles on MorpherAccessControl
             // These allow governance proposals to execute protocol changes
@@ -105,17 +107,17 @@ contract DeployMorpherGovernor is DeployOrUpgradeV5 {
             // PROXYUPDATER_ROLE - for upgrading contracts
             bytes32 proxyUpdaterRole = accessControl.PROXYUPDATER_ROLE();
             accessControl.grantRole(proxyUpdaterRole, timelockAddress);
-            console.log("Granted PROXYUPDATER_ROLE to Timelock on AccessControl");
+            console.log("Granted PROXYUPDATER_ROLE to Timelock");
 
             // ADMINISTRATOR_ROLE - for admin functions
             bytes32 adminRole = keccak256("ADMINISTRATOR_ROLE");
             accessControl.grantRole(adminRole, timelockAddress);
-            console.log("Granted ADMINISTRATOR_ROLE to Timelock on AccessControl");
+            console.log("Granted ADMINISTRATOR_ROLE to Timelock");
 
             // GOVERNANCE_ROLE - for governance-specific functions in MorpherState
             bytes32 governanceRole = keccak256("GOVERNANCE_ROLE");
             accessControl.grantRole(governanceRole, timelockAddress);
-            console.log("Granted GOVERNANCE_ROLE to Timelock on AccessControl");
+            console.log("Granted GOVERNANCE_ROLE to Timelock");
 
             console.log("");
             console.log("Initial setup complete!");
@@ -125,7 +127,7 @@ contract DeployMorpherGovernor is DeployOrUpgradeV5 {
             console.log("2. Register on Tally (https://www.tally.xyz/add-a-dao)");
             console.log("3. After confidence period, consider:");
             console.log("   - Revoking ADMINISTRATOR_ROLE from EOA accounts");
-            console.log("   - Renouncing DEFAULT_ADMIN_ROLE on Timelock");
+            console.log("   - Renouncing TIMELOCK_ADMIN_ROLE from deployer");
         }
 
         vm.stopBroadcast();
