@@ -134,6 +134,26 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 		// _HASHED_VERSION = keccak256(bytes("1")); // Handled by ERC20Permit
 	}
 
+	/**
+	 * @dev Reinitializer for V2 - seeds voting checkpoints with existing supply.
+	 * Must be called immediately after upgrading to the version with ERC20Votes.
+	 *
+	 * This fixes the cold-start problem where _totalCheckpoints is empty but
+	 * tokens already exist, which causes arithmetic underflow on burns.
+	 *
+	 * How it works:
+	 * - _transferVotingUnits(address(0), ...) adds to _totalCheckpoints
+	 * - Using address(1) as "to" means no delegate vote movement since
+	 *   delegates(address(1)) returns address(0), making _moveDelegateVotes a no-op
+	 */
+	function initializeV2() public reinitializer(2) {
+		// Seed the voting checkpoints with the current total supply.
+		uint256 existingSupply = ERC20Upgradeable.totalSupply();
+		if (existingSupply > 0) {
+			_transferVotingUnits(address(0), address(1), existingSupply);
+		}
+	}
+
 	// --- Implement _authorizeUpgrade ---
 	function _authorizeUpgrade(address /** unused */)
 		internal

@@ -43,7 +43,8 @@ contract DeployMorpherToken is DeployOrUpgradeV5 { // Inherit from V5 helper
 			CONTRACT_NAME,
 			// Ensure initializer signature matches the adapted v5 contract, including permit name
 			abi.encodeCall(MorpherToken.initialize, (accessControlAddress, stateAddress, PERMIT_NAME)),
-			bytes("") // No upgrade call data needed for this example
+			// Call initializeV2() on upgrade to seed voting checkpoints with existing supply
+			abi.encodeCall(MorpherToken.initializeV2, ())
 		);
 
 		console.log("MorpherToken V5 Proxy at:", tokenProxy);
