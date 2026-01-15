@@ -66,8 +66,9 @@ contract MorpherGovernanceTest is BaseSetup {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         timelock = MorpherTimelockController(payable(address(proxy)));
 
-        // Grant TIMELOCK_ADMIN_ROLE to test contract for setup
-        morpherAccessControl.grantRole(timelock.TIMELOCK_ADMIN_ROLE(), address(this));
+        // Grant DEFAULT_ADMIN_ROLE to test contract for setup (used by updateDelay)
+        // Note: TIMELOCK_ADMIN_ROLE exists but our hasRole override delegates to MorpherAccessControl
+        morpherAccessControl.grantRole(timelock.DEFAULT_ADMIN_ROLE(), address(this));
     }
 
     function _deployGovernor() internal {
@@ -89,9 +90,9 @@ contract MorpherGovernanceTest is BaseSetup {
         governor = MorpherGovernor(payable(address(proxy)));
 
         // Grant Governor roles via MorpherAccessControl
-        // TIMELOCK_PROPOSER_ROLE and TIMELOCK_CANCELLER_ROLE
-        morpherAccessControl.grantRole(timelock.TIMELOCK_PROPOSER_ROLE(), address(governor));
-        morpherAccessControl.grantRole(timelock.TIMELOCK_CANCELLER_ROLE(), address(governor));
+        // PROPOSER_ROLE and CANCELLER_ROLE (standard OZ Timelock roles)
+        morpherAccessControl.grantRole(timelock.PROPOSER_ROLE(), address(governor));
+        morpherAccessControl.grantRole(timelock.CANCELLER_ROLE(), address(governor));
 
         // Grant Timelock roles on AccessControl for protocol operations
         morpherAccessControl.grantRole(morpherAccessControl.PROXYUPDATER_ROLE(), address(timelock));

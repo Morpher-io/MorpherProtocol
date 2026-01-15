@@ -90,16 +90,16 @@ contract DeployMorpherGovernor is DeployOrUpgradeV5 {
             MorpherTimelockController timelock = MorpherTimelockController(payable(timelockAddress));
             MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
 
-            // Grant Governor the TIMELOCK_PROPOSER_ROLE and TIMELOCK_CANCELLER_ROLE on MorpherAccessControl
+            // Grant Governor the PROPOSER_ROLE and CANCELLER_ROLE on MorpherAccessControl
             // These allow the Governor to propose and cancel operations on the Timelock
-            bytes32 proposerRole = timelock.TIMELOCK_PROPOSER_ROLE();
-            bytes32 cancellerRole = timelock.TIMELOCK_CANCELLER_ROLE();
+            bytes32 proposerRole = timelock.PROPOSER_ROLE();
+            bytes32 cancellerRole = timelock.CANCELLER_ROLE();
 
             accessControl.grantRole(proposerRole, governorProxy);
-            console.log("Granted TIMELOCK_PROPOSER_ROLE to Governor");
+            console.log("Granted PROPOSER_ROLE to Governor");
 
             accessControl.grantRole(cancellerRole, governorProxy);
-            console.log("Granted TIMELOCK_CANCELLER_ROLE to Governor");
+            console.log("Granted CANCELLER_ROLE to Governor");
 
             // Grant Timelock the necessary roles on MorpherAccessControl
             // These allow governance proposals to execute protocol changes
@@ -127,7 +127,7 @@ contract DeployMorpherGovernor is DeployOrUpgradeV5 {
             console.log("2. Register on Tally (https://www.tally.xyz/add-a-dao)");
             console.log("3. After confidence period, consider:");
             console.log("   - Revoking ADMINISTRATOR_ROLE from EOA accounts");
-            console.log("   - Renouncing TIMELOCK_ADMIN_ROLE from deployer");
+            console.log("   - Renouncing DEFAULT_ADMIN_ROLE from deployer");
         }
 
         vm.stopBroadcast();

@@ -16,10 +16,10 @@ import {ERC1967Proxy} from "../lib/openzeppelin-contracts-5/contracts/proxy/ERC1
  * - Min delay: 2 days (172,800 seconds)
  * - Open execution: true (anyone can execute ready operations)
  * - Roles managed via MorpherAccessControl:
- *   - TIMELOCK_PROPOSER_ROLE: Governor
- *   - TIMELOCK_EXECUTOR_ROLE: (not needed if open execution)
- *   - TIMELOCK_CANCELLER_ROLE: Governor
- *   - TIMELOCK_ADMIN_ROLE: Initially deployer, then renounced
+ *   - PROPOSER_ROLE: Governor
+ *   - EXECUTOR_ROLE: (not needed if open execution)
+ *   - CANCELLER_ROLE: Governor
+ *   - DEFAULT_ADMIN_ROLE: Initially deployer, then renounced
  */
 contract DeployMorpherTimelock is DeploymentUtils {
 
@@ -66,20 +66,20 @@ contract DeployMorpherTimelock is DeploymentUtils {
         console.log("Min delay:", MIN_DELAY / 1 days, "days");
         console.log("Open execution:", OPEN_EXECUTION);
 
-        // Grant TIMELOCK_ADMIN_ROLE to deployer for initial setup
+        // Grant DEFAULT_ADMIN_ROLE to deployer for initial setup
         MorpherAccessControl accessControl = MorpherAccessControl(accessControlAddress);
         MorpherTimelockController timelock = MorpherTimelockController(payable(timelockAddress));
 
-        bytes32 timelockAdminRole = timelock.TIMELOCK_ADMIN_ROLE();
-        accessControl.grantRole(timelockAdminRole, msg.sender);
-        console.log("Granted TIMELOCK_ADMIN_ROLE to deployer");
+        bytes32 adminRole = timelock.DEFAULT_ADMIN_ROLE();
+        accessControl.grantRole(adminRole, msg.sender);
+        console.log("Granted DEFAULT_ADMIN_ROLE to deployer");
 
         console.log("");
         console.log("IMPORTANT: After deploying MorpherGovernor:");
-        console.log("1. Grant TIMELOCK_PROPOSER_ROLE to Governor on MorpherAccessControl");
-        console.log("2. Grant TIMELOCK_CANCELLER_ROLE to Governor on MorpherAccessControl");
+        console.log("1. Grant PROPOSER_ROLE to Governor on MorpherAccessControl");
+        console.log("2. Grant CANCELLER_ROLE to Governor on MorpherAccessControl");
         console.log("3. Grant PROXYUPDATER_ROLE, ADMINISTRATOR_ROLE to Timelock on MorpherAccessControl");
-        console.log("4. Renounce TIMELOCK_ADMIN_ROLE from deployer after testing");
+        console.log("4. Renounce DEFAULT_ADMIN_ROLE from deployer after testing");
 
         // Save address to deployments
         saveAddress(CONTRACT_KEY, timelockAddress);
