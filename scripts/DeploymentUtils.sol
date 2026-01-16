@@ -28,6 +28,9 @@
             address sidechainMigration;
             address swapHelper;
             address adminFunctions;
+            // Governance contracts
+            address timelock;
+            address governor;
         }
 
         function getAddressesPath() internal view virtual returns (string memory) {
@@ -58,12 +61,12 @@
             string memory path = getAddressesPath();
             // Define the base JSON structure *without* proxyAdmin
             // Ensure all keys from the Addresses struct are present
-            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0", "MorpherAdminFunctions": "0x0"}'; // REMOVED proxyAdmin, added missing keys
+            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0", "MorpherAdminFunctions": "0x0", "MorpherTimelock": "0x0", "MorpherGovernor": "0x0"}';
 
             if (!vm.isFile(path)) {
                 vm.writeFile(path, baseJsonStructure);
             }
-            // This assumes the key exists in the base structure.
+            // vm.writeJson can add new keys even if not in base structure
             vm.writeJson(vm.toString(value), path, string.concat(".", key));
         }
 
@@ -72,13 +75,14 @@
                 address(0), address(0), address(0), address(0),
                 address(0), address(0), address(0), /* removed proxyAdmin */
                 address(0), address(0), address(0), address(0),
-                address(0), address(0), address(0), address(0) // Added sidechainMigration, swapHelper
+                address(0), address(0), address(0), address(0),
+                address(0), address(0) // timelock, governor
             );
         }
 
         function saveAddresses(Addresses memory addrs) internal virtual {
             string memory path = getAddressesPath();
-            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0", "MorpherAdminFunctions": "0x0"}'; // REMOVED proxyAdmin, added missing keys
+            string memory baseJsonStructure = '{"MorpherAccessControl": "0x0", "MorpherAirdrop": "0x0", "MorpherInterestRateManager": "0x0", "MorpherMintingLimiter": "0x0", "MorpherOracle": "0x0", "MorpherSidechainToBaseMigration": "0x0", "MorpherState": "0x0", "MorpherStaking": "0x0", "MorpherToken": "0x0", "MorpherTradeEngine": "0x0", "MorpherSwapHelper": "0x0", "MorpherUserBlocking": "0x0", "MorpherBridge": "0x0", "MorpherAdminFunctions": "0x0", "MorpherTimelock": "0x0", "MorpherGovernor": "0x0"}';
 
             if (!vm.isFile(path)) {
                 vm.writeFile(path, baseJsonStructure);
@@ -100,6 +104,8 @@
             vm.writeJson(vm.toString(addrs.swapHelper), path, ".MorpherSwapHelper");
             vm.writeJson(vm.toString(addrs.userBlocking), path, ".MorpherUserBlocking");
             vm.writeJson(vm.toString(addrs.adminFunctions), path, ".MorpherAdminFunctions");
+            vm.writeJson(vm.toString(addrs.timelock), path, ".MorpherTimelock");
+            vm.writeJson(vm.toString(addrs.governor), path, ".MorpherGovernor");
         }
 
         function loadAddressesFromJson(string memory json) internal pure virtual returns (Addresses memory) {
