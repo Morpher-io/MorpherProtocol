@@ -78,7 +78,10 @@ contract MorpherTimelockController is TimelockControllerUpgradeable {
 
     /**
      * @notice Check if account has role - delegates to MorpherAccessControl
-     * @dev Overrides AccessControlUpgradeable.hasRole to use centralized access control
+     * @dev Overrides AccessControlUpgradeable.hasRole to use centralized access control.
+     *      Note: DEFAULT_ADMIN_ROLE check is not needed because grantRole/revokeRole/renounceRole
+     *      are all disabled (they revert), so no function actually uses DEFAULT_ADMIN_ROLE.
+     *      Self-admin functions (updateDelay, setOpenExecution) use msg.sender checks instead.
      * @param role The role to check (PROPOSER_ROLE, EXECUTOR_ROLE, CANCELLER_ROLE)
      * @param account The account to check
      * @return True if account has the role
@@ -87,12 +90,6 @@ contract MorpherTimelockController is TimelockControllerUpgradeable {
         // Special case: address(0) check for open execution
         if (role == EXECUTOR_ROLE && account == address(0)) {
             return openExecution;
-        }
-
-        // Special case: timelock itself always has admin role for self-administration
-        // This is needed for updateDelay() to work via scheduled operations
-        if (role == DEFAULT_ADMIN_ROLE && account == address(this)) {
-            return true;
         }
 
         // Delegate to MorpherAccessControl
