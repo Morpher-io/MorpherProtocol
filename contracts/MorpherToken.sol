@@ -145,6 +145,8 @@ contract MorpherToken is ERC20Upgradeable, ERC20PausableUpgradeable, ERC20Permit
 	 * - _transferVotingUnits(address(0), ...) adds to _totalCheckpoints
 	 * - Using address(1) as "to" means no delegate vote movement since
 	 *   delegates(address(1)) returns address(0), making _moveDelegateVotes a no-op
+	 *
+	 * @custom:oz-upgrades-validate-as-initializer
 	 */
 	function initializeV2() public reinitializer(2) {
 		// Seed the voting checkpoints with the current total supply.
